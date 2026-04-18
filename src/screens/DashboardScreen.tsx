@@ -35,22 +35,22 @@ export function DashboardScreen() {
       mainVariant="dashboard"
       headerActions={
         <>
-          <Button type="button" variant="header" disabled>
+          <Button type="button" variant="header">
             <FileText size={14} />
             Recover
           </Button>
-          <Button type="button" variant="header" disabled>
+          <Button type="button" variant="header">
             <Download size={14} />
             Export
           </Button>
-          <Button type="button" variant="header" disabled>
+          <Button type="button" variant="header">
             <SlidersHorizontal size={14} />
             Policies
           </Button>
         </>
       }
       headerSettingsAction={
-        <Button type="button" variant="header" size="icon" disabled aria-label="Settings">
+        <Button type="button" variant="header" size="icon" aria-label="Settings">
           <Settings size={14} />
         </Button>
       }
