@@ -1,0 +1,85 @@
+{
+  "milestone": "welcome-entry",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx vitest run --config vitest.config.ts --maxWorkers=4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx tsc -b",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 3,
+    "passed": 1,
+    "failed": 2,
+    "failedFeatures": [
+      "import-flow",
+      "onboard-flow"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "import-flow",
+      "severity": "blocking",
+      "description": "Import error retry path drops required backup route state, so Try Again from /import/error cannot reliably return to a working decrypt step and instead guard-redirects to /import."
+    },
+    {
+      "featureId": "import-flow",
+      "severity": "blocking",
+      "description": "Guard redirects in Import use render-time navigate inside useState initializer instead of <Navigate>/useEffect, which is an unsafe pattern associated with guarded-route blank/deep-link issues."
+    },
+    {
+      "featureId": "onboard-flow",
+      "severity": "blocking",
+      "description": "Single-returning-profile welcome variant omits the Onboard action, so onboarding is not accessible from Welcome for users with exactly one saved profile."
+    },
+    {
+      "featureId": "onboard-flow",
+      "severity": "blocking",
+      "description": "Guard redirects in Onboard use render-time navigate inside useState initializer instead of <Navigate>/useEffect, matching known deep-link blank-screen risk."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Require guarded screens to redirect with <Navigate to=\"...\" replace /> (or useEffect-based navigation) and explicitly forbid render-time navigation side effects such as useState(() => navigate(...)).",
+      "evidence": "Both import-flow and onboard-flow reviewers reported blocking issues caused by the same guard anti-pattern in guarded routes.",
+      "isSystemic": true
+    },
+    {
+      "target": ".factory/skills/ui-builder/SKILL.md",
+      "suggestion": "Clarify browser-validation requirement to align procedure with actual accepted workflow: either require explicit agent-browser skill invocation or explicitly allow direct `agent-browser` CLI use when available.",
+      "evidence": "welcome-enhancements review observed successful validation via direct agent-browser CLI despite current skill text requiring agent-browser skill invocation.",
+      "isSystemic": true
+    },
+    {
+      "target": ".factory/skills/ui-builder/SKILL.md",
+      "suggestion": "Refine strict procedure checks (Paper README/screenshot reads and mandatory TDD order) to distinguish hard requirements from preferred practice, and require accurate handoff feedback when deviating.",
+      "evidence": "import-flow and onboard-flow reviews observed procedure deviations while handoffs still marked followedProcedure=true.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Guard redirect convention gap between AGENTS and implementation patterns.",
+      "reason": "duplicate"
+    },
+    {
+      "observation": "Add IndexedDB key-seeding detail to shared user-testing knowledge.",
+      "reason": "ambiguous"
+    }
+  ],
+  "previousRound": null
+}

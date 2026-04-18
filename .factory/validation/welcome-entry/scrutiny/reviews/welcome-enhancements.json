@@ -1,0 +1,33 @@
+{
+  "featureId": "welcome-enhancements",
+  "reviewedAt": "2026-04-18T23:07:39.735597Z",
+  "commitId": "467e1ee",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Implementation covers the requested Welcome variants: unlock error modal state, multi-profile rows with Unlock/Rotate, and a scrollable many-profile layout with overflow indicator and preserved first-time/single-profile behavior. I found no blocking correctness issues; one non-blocking robustness gap remains in overflow-indicator counting.",
+    "issues": [
+      {
+        "file": "src/screens/WelcomeScreen.tsx",
+        "line": 30,
+        "severity": "non_blocking",
+        "description": "The hidden-row indicator count is computed with an approximate fixed row height and Math.round(remaining / 112). This can undercount/overcount and may briefly hide the indicator before the list is truly at bottom for certain content heights. Use a deterministic approach (e.g., Math.ceil with measured row height, or sentinel/intersection-based overflow detection) to keep the indicator behavior stable."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-builder skill requires invoking the agent-browser skill, but the worker used direct `agent-browser` CLI commands throughout and still completed verification successfully; this suggests the procedure wording is stricter than actual workflow.",
+      "evidence": "worker-transcripts.jsonl (session e42015ee-b27e-4b28-93ea-eeb15fa07174) shows many `Execute` calls using `agent-browser ...` and no `Skill` call for `agent-browser`; .factory/skills/ui-builder/SKILL.md says \"Required Skills: agent-browser\" and \"Invoke `agent-browser` skill\"."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Manual verification required discovering IndexedDB profile key conventions ad hoc; this setup knowledge is not captured in shared testing docs.",
+      "evidence": "Transcript shows worker debugging injected profile data and then reading src/lib/storage/profileStore.ts to find `igloo.web-demo-v2.profile-index`; .factory/library/user-testing.md notes that IndexedDB persists but does not document key names/data-shape guidance for seeding profile states."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review passed for welcome-enhancements. The feature implementation meets the requested behavior and preserves existing welcome variants, with no blocking defects identified; one non-blocking improvement is recommended for overflow-indicator count robustness."
+}

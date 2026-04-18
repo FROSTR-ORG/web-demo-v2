@@ -1,0 +1,45 @@
+{
+  "featureId": "onboard-flow",
+  "reviewedAt": "2026-04-18T23:07:34.559239Z",
+  "commitId": "075ef59",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The Onboard flow screens and routes were added and mostly match the expected UI, but two blocking issues remain: Welcome entry is incomplete for one supported Welcome variant, and guarded-route redirects use an unsafe render-time navigation pattern that is already known to produce blank deep-link behavior.",
+    "issues": [
+      {
+        "file": "src/screens/WelcomeScreen.tsx",
+        "line": 188,
+        "severity": "blocking",
+        "description": "The single-returning-profile Welcome variant (returning && !isMulti) only renders New Keyset and Import actions, with no Onboard action. This means Onboard is not actually accessible from Welcome for users with exactly one profile, so the feature does not fully satisfy \"enable Welcome entry\" across Welcome states."
+      },
+      {
+        "file": "src/screens/OnboardScreens.tsx",
+        "line": 398,
+        "severity": "blocking",
+        "description": "GuardRedirect performs navigation inside a useState initializer (line 401), which is a render-time side effect. This pattern is unsafe in React and is already associated with blank deep-link behavior for guarded routes (including /onboard/handshake). Replace with <Navigate to={to} replace /> (preferred) or a useEffect-based redirect."
+      },
+      {
+        "file": "src/screens/__tests__/OnboardScreens.test.tsx",
+        "line": 16,
+        "severity": "non_blocking",
+        "description": "Routing hooks are fully mocked, so the guard test only asserts that navigate was called and cannot catch real router behavior regressions (e.g., blank deep-link guard redirects). Add at least one integration-style router test using real routes to validate guarded onboarding paths."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Guard redirect guidance is split across shared docs, and AGENTS.md does not explicitly require the safer <Navigate>-based guard pattern. Workers repeated a known risky redirect implementation.",
+      "evidence": "AGENTS.md:44 says to redirect when state is missing but does not specify implementation; .factory/library/architecture.md:96 explicitly recommends <Navigate>; src/screens/OnboardScreens.tsx:398-402 uses useState(() => navigate(...))."
+    },
+    {
+      "area": "skills",
+      "observation": "The ui-builder skill's strict TDD procedure was not followed in this run, but handoff feedback still reported followedProcedure=true, indicating a skill/procedure mismatch that should be clarified.",
+      "evidence": ".factory/skills/ui-builder/SKILL.md:41-44 and 64 require writing tests before implementation and verifying initial test failure; worker-transcripts.jsonl session 32b79aa8-235d-4e20-ad52-b2633feab5ff shows Tool: Create for src/screens/OnboardScreens.tsx before Tool: Create for src/screens/__tests__/OnboardScreens.test.tsx; handoff.skillFeedback has followedProcedure=true with suggestedChanges about TDD practicality."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review failed for onboard-flow. The flow is largely implemented, but Welcome entry is incomplete for single-profile users and the guarded-route redirect implementation uses an unsafe render-time navigation pattern that can break deep-link redirects."
+}

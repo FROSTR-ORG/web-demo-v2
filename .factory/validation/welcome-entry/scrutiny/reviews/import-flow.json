@@ -1,0 +1,45 @@
+{
+  "featureId": "import-flow",
+  "reviewedAt": "2026-04-18T23:06:50.180455Z",
+  "commitId": "2c4c54b",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The import flow screens/routes are present and mostly match expected UI, but two blocking navigation defects remain: the error retry path drops required state, and guard redirects are implemented with a render-time side effect.",
+    "issues": [
+      {
+        "file": "src/screens/ImportScreens.tsx",
+        "line": 112,
+        "severity": "blocking",
+        "description": "The decrypt failure path navigates to /import/error without carrying backup context, and Try Again later navigates to /import/decrypt without state (line 288) while DecryptBackupScreen requires location.state.backupString (line 103). Result: Try Again immediately guard-redirects to /import, so users cannot actually retry decryption from the error screen. Pass backupString through error route state and restore it on Try Again."
+      },
+      {
+        "file": "src/screens/ImportScreens.tsx",
+        "line": 309,
+        "severity": "blocking",
+        "description": "GuardRedirect triggers navigation inside a useState initializer (render-time side effect). In React StrictMode this is unsafe and is a known source of blank guarded screens/deep-link redirect issues. Replace GuardRedirect with <Navigate to={to} replace /> (preferred) or a useEffect-based redirect."
+      },
+      {
+        "file": "src/screens/__tests__/ImportScreens.test.tsx",
+        "line": 127,
+        "severity": "non_blocking",
+        "description": "The Try Again test only asserts a navigate call (line 134) under a mocked static useLocation (line 21), so it misses the real guard interaction where /import/decrypt lacks state and redirects away. Add an integration-style router test for the wrong-password path to catch this regression."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Guard redirect implementation diverged from documented architecture guidance, and AGENTS.md does not explicitly require <Navigate>-based guards.",
+      "evidence": ".factory/library/architecture.md:96 says guarded screens should redirect with <Navigate>; src/screens/ImportScreens.tsx:309 uses useState(() => navigate(...)). AGENTS.md:44 only says to redirect when state is missing, without prescribing the safer pattern."
+    },
+    {
+      "area": "skills",
+      "observation": "The ui-builder procedure says to read Paper README + screen.html + screenshot for each screen, but this run only read import screen.html files while handoff still reported followedProcedure=true.",
+      "evidence": "worker-transcripts.jsonl entry for session df0bbf70-7f35-4c99-b4ea-d49a74fe1446 shows Read calls for igloo-paper/screens/import/*/screen.html and no README/screenshot reads; handoff.skillFeedback.followedProcedure is true."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review failed for import-flow. Core flow exists, but retry navigation from Import Error is broken by dropped route state, and GuardRedirect uses a render-time navigation anti-pattern that can cause guarded-route blank/deep-link failures."
+}
