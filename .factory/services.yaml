@@ -1,0 +1,15 @@
+commands:
+  install: cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npm install
+  build: cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npm run build
+  test: cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx vitest run --config vitest.config.ts --maxWorkers=4
+  test:e2e: cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx playwright test
+  typecheck: cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx tsc -b
+  lint: echo "No lint configured"
+
+services:
+  web:
+    start: cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx vite --host 127.0.0.1 --port 5173 &
+    stop: lsof -ti :5173 | xargs kill 2>/dev/null
+    healthcheck: curl -sf http://127.0.0.1:5173
+    port: 5173
+    depends_on: []

@@ -1,0 +1,39 @@
+# User Testing
+
+Testing surface, tools, and resource cost classification.
+
+---
+
+## Validation Surface
+
+- **Browser UI** at `http://127.0.0.1:5173` (Vite dev server)
+- **Tool:** agent-browser (Playwright-based headless Chromium)
+- **Viewport:** 1440×1080 (desktop)
+
+## Validation Setup
+
+1. Start the Vite dev server: see `.factory/services.yaml` → `services.web.start`
+2. Wait for healthcheck: `curl -sf http://127.0.0.1:5173`
+3. Launch agent-browser and navigate to `http://127.0.0.1:5173`
+
+## Validation Concurrency
+
+- **Machine:** 128 GB RAM, 18 CPU cores
+- **Per-instance footprint:** ~642 MB (Vite dev server ~257 MB + Chrome instance ~385 MB)
+- **Usable headroom (70%):** ~75 GB
+- **Max concurrent validators:** 5 (5 × 642 MB = ~3.2 GB, well within budget)
+- **Note:** All validators share one Vite dev server; only the Chrome instances multiply
+
+## Testing Approach
+
+- Navigate through flows using agent-browser accessibility snapshots
+- Take screenshots at key screens for visual verification
+- Check console for errors after each flow
+- Verify navigation by checking URL changes
+- Verify interactive elements via accessibility tree (buttons, inputs, modals)
+
+## Known Constraints
+
+- WASM loading may add 2-3 seconds to initial page load
+- IndexedDB state persists between test runs — validators may need to clear storage for clean state
+- Some screens require pre-existing profile data (Dashboard, Settings, Export, Recover) — validators need to set up state first via the Create flow or mock data
