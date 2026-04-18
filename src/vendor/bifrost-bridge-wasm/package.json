@@ -1,0 +1,19 @@
+{
+  "name": "bifrost-bridge-wasm",
+  "type": "module",
+  "collaborators": [
+    "Christopher Scott"
+  ],
+  "version": "0.5.0",
+  "license": "MIT",
+  "files": [
+    "bifrost_bridge_wasm_bg.wasm",
+    "bifrost_bridge_wasm.js",
+    "bifrost_bridge_wasm.d.ts"
+  ],
+  "main": "bifrost_bridge_wasm.js",
+  "types": "bifrost_bridge_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
