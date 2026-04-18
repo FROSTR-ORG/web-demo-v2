@@ -1,0 +1,68 @@
+{
+  "groupId": "onboard-completion",
+  "testedAt": "2026-04-18T23:51:56Z",
+  "isolation": {
+    "surface": "agent-browser",
+    "appUrl": "http://127.0.0.1:5173",
+    "browserSession": "val-cross-004-onboard",
+    "storageClearedAtStart": true,
+    "scope": "VAL-CROSS-004 only"
+  },
+  "toolsUsed": ["agent-browser"],
+  "assertions": [
+    {
+      "id": "VAL-CROSS-004",
+      "title": "Full Onboard-to-Dashboard flow works end-to-end",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open / in isolated browser session after clearing cookies/localStorage/IndexedDB",
+          "expected": "Welcome screen loads from clean state",
+          "observed": "Welcome loaded at http://127.0.0.1:5173/ with Onboard entry visible"
+        },
+        {
+          "action": "Click Onboard on Welcome",
+          "expected": "Navigate to Enter Package screen",
+          "observed": "Navigated to http://127.0.0.1:5173/onboard with package/password inputs and Begin Onboarding button"
+        },
+        {
+          "action": "Enter onboarding package + password and click Begin Onboarding",
+          "expected": "Navigate to Handshake state",
+          "observed": "Navigated to http://127.0.0.1:5173/onboard/handshake and handshake screen rendered"
+        },
+        {
+          "action": "Allow handshake to progress",
+          "expected": "Navigate to Onboarding Complete screen",
+          "observed": "Navigated to http://127.0.0.1:5173/onboard/complete with password + confirm password + Save & Launch Signer"
+        },
+        {
+          "action": "Submit Save & Launch Signer with matching password fields",
+          "expected": "Reach dashboard, or welcome with onboarded profile visible if lock behavior applies",
+          "observed": "Navigated to http://127.0.0.1:5173/ showing returning-user profile row ('My Signing Key ... Unlock'), satisfying contract's locked-profile acceptance path"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/onboard-completion/VAL-CROSS-004-01-welcome.png",
+          "welcome-entry/onboard-completion/VAL-CROSS-004-02-onboard-enter-package.png",
+          "welcome-entry/onboard-completion/VAL-CROSS-004-03-onboard-handshake.png",
+          "welcome-entry/onboard-completion/VAL-CROSS-004-04-onboarding-complete.png",
+          "welcome-entry/onboard-completion/VAL-CROSS-004-05-final-destination.png"
+        ],
+        "consoleErrors": "none (agent-browser errors: [])",
+        "network": "No requests captured by agent-browser network logger for this client-side transition flow (requests: [])"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "agent-browser network request capture returned an empty request list for this run, despite successful route transitions.",
+      "resolved": true,
+      "resolution": "Used URL checkpoints + sequential screenshots + console/error logs as primary evidence, per guidance note for client-side transitions.",
+      "affectedAssertions": ["VAL-CROSS-004"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 1 assertion (VAL-CROSS-004): pass. End-to-end Onboard flow progressed Welcome -> Enter Package -> Handshake -> Onboarding Complete -> Welcome returning-user state with onboarded profile row visible (accepted final state per contract)."
+}

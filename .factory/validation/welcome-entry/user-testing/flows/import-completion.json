@@ -1,0 +1,67 @@
+{
+  "groupId": "import-completion",
+  "testedAt": "2026-04-18T23:51:47Z",
+  "isolation": {
+    "surface": "agent-browser",
+    "appUrl": "http://127.0.0.1:5173",
+    "session": "import-completion",
+    "usedDefaultSession": false,
+    "storageClearedAtStart": true,
+    "urlBoundaryRespected": true
+  },
+  "toolsUsed": ["agent-browser"],
+  "assertions": [
+    {
+      "id": "VAL-CROSS-003",
+      "title": "Full Import-to-Dashboard flow works end-to-end",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open / in isolated session after clearing cookies/localStorage/IndexedDB",
+          "expected": "First-time Welcome renders in clean state",
+          "observed": "Welcome rendered at / with New Keyset, Import Device Profile, and Onboard actions"
+        },
+        {
+          "action": "Click Import Device Profile",
+          "expected": "Navigate to Load Backup",
+          "observed": "Navigated to /import with Load Backup heading, backup input, upload, and Continue button"
+        },
+        {
+          "action": "Enter backup string bfprofile1-import-validation-sample and continue",
+          "expected": "Navigate to Decrypt Backup",
+          "observed": "Navigated to /import/decrypt with loaded backup display and Backup Password input"
+        },
+        {
+          "action": "Enter backup password and click Decrypt Backup",
+          "expected": "Navigate to Review & Save Profile",
+          "observed": "Navigated to /import/review with Group Profile and Device Profile cards"
+        },
+        {
+          "action": "Enter local profile password + confirm and click Import & Launch Signer",
+          "expected": "Reach final destination (Dashboard or Welcome with profile saved)",
+          "observed": "Navigated to / and returning-user Welcome showed imported profile row: My Signing Key (2/3) with Unlock control"
+        },
+        {
+          "action": "Validate imported profile data consistency",
+          "expected": "Imported profile data matches backup-derived review data",
+          "observed": "Group name/threshold shown during review (My Signing Key, 2 of 3) matched final saved profile row label on Welcome"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/import-completion/VAL-CROSS-003-01-welcome.png",
+          "welcome-entry/import-completion/VAL-CROSS-003-02-import-load.png",
+          "welcome-entry/import-completion/VAL-CROSS-003-03-import-decrypt.png",
+          "welcome-entry/import-completion/VAL-CROSS-003-04-import-review-save.png",
+          "welcome-entry/import-completion/VAL-CROSS-003-05-import-destination-welcome.png"
+        ],
+        "consoleErrors": "none (welcome-entry/import-completion/VAL-CROSS-003-console-errors.txt is empty)",
+        "network": "No requests captured (welcome-entry/import-completion/VAL-CROSS-003-network-requests.txt); flow transitions were client-side"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 1 assertion (VAL-CROSS-003): pass. Import flow progressed Welcome -> Load Backup -> Decrypt Backup -> Review & Save -> Welcome with imported profile persisted and visible."
+}
