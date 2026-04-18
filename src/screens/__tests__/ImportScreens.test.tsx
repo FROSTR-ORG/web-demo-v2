@@ -88,6 +88,30 @@ describe("DecryptBackupScreen", () => {
     expect(screen.getByRole("button", { name: /Decrypt Backup/i })).toBeInTheDocument();
     expect(screen.getByText("Back")).toBeInTheDocument();
   });
+
+  it("redirects to /import when accessed without backup state (guard redirect)", () => {
+    mocks.locationState = null;
+    const { container } = render(
+      <MemoryRouter>
+        <DecryptBackupScreen />
+      </MemoryRouter>
+    );
+    /* When no backup state, the component renders nothing (Navigate redirects) */
+    expect(container.textContent).toBe("");
+  });
+
+  it("navigates to error with backup context when password is 'wrong'", () => {
+    mocks.locationState = { backupString: "bfprofile1abc123" };
+    render(
+      <MemoryRouter>
+        <DecryptBackupScreen />
+      </MemoryRouter>
+    );
+    const passwordInput = screen.getByLabelText("Backup Password");
+    fireEvent.change(passwordInput, { target: { value: "wrong" } });
+    fireEvent.click(screen.getByRole("button", { name: /Decrypt Backup/i }));
+    expect(mocks.navigate).toHaveBeenCalledWith("/import/error", { state: { backupString: "bfprofile1abc123" } });
+  });
 });
 
 describe("ReviewSaveScreen", () => {
@@ -108,6 +132,17 @@ describe("ReviewSaveScreen", () => {
     expect(screen.getByRole("button", { name: /Import & Launch Signer/i })).toBeInTheDocument();
     expect(screen.getByText("Back")).toBeInTheDocument();
   });
+
+  it("redirects to /import when accessed without backup state (guard redirect)", () => {
+    mocks.locationState = null;
+    const { container } = render(
+      <MemoryRouter>
+        <ReviewSaveScreen />
+      </MemoryRouter>
+    );
+    /* When no state, the component renders nothing (Navigate redirects) */
+    expect(container.textContent).toBe("");
+  });
 });
 
 describe("ImportErrorScreen", () => {
@@ -124,14 +159,15 @@ describe("ImportErrorScreen", () => {
     expect(screen.getByText("Back")).toBeInTheDocument();
   });
 
-  it("Try Again button navigates to decrypt screen", () => {
+  it("Try Again button navigates to decrypt screen with backup context", () => {
+    mocks.locationState = { backupString: "bfprofile1abc123" };
     render(
       <MemoryRouter>
         <ImportErrorScreen />
       </MemoryRouter>
     );
     fireEvent.click(screen.getByRole("button", { name: /Try Again/i }));
-    expect(mocks.navigate).toHaveBeenCalledWith("/import/decrypt");
+    expect(mocks.navigate).toHaveBeenCalledWith("/import/decrypt", { state: { backupString: "bfprofile1abc123" } });
   });
 
   it("Back to Import button navigates to load backup screen", () => {

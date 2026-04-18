@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import { AppShell } from "../components/shell";
 import { PageHeading } from "../components/shell";
@@ -100,7 +100,7 @@ export function DecryptBackupScreen() {
 
   /* Guard: redirect if no backup loaded */
   if (!backupString) {
-    return <GuardRedirect to="/import" />;
+    return <Navigate to="/import" replace />;
   }
 
   const validation = validateBackupString(backupString);
@@ -109,7 +109,7 @@ export function DecryptBackupScreen() {
     if (!password.trim()) return;
     /* Mock: navigate to review on success, or error if password is "wrong" */
     if (password === "wrong") {
-      navigate("/import/error");
+      navigate("/import/error", { state: { backupString } });
     } else {
       navigate("/import/review", { state: { backupString, password } });
     }
@@ -164,7 +164,7 @@ export function ReviewSaveScreen() {
 
   /* Guard: redirect if no prior decrypt step */
   if (!state?.backupString) {
-    return <GuardRedirect to="/import" />;
+    return <Navigate to="/import" replace />;
   }
 
   const passwordsMatch = profilePassword.length > 0 && profilePassword === confirmPassword;
@@ -262,6 +262,8 @@ export function ReviewSaveScreen() {
 
 export function ImportErrorScreen() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const backupString = (location.state as { backupString?: string } | null)?.backupString ?? "";
 
   return (
     <AppShell mainVariant="flow">
@@ -285,7 +287,7 @@ export function ImportErrorScreen() {
         </div>
 
         <div className="inline-actions">
-          <Button type="button" onClick={() => navigate("/import/decrypt")}>
+          <Button type="button" onClick={() => navigate("/import/decrypt", { state: { backupString } })}>
             Try Again
           </Button>
           <Button type="button" variant="ghost" onClick={() => navigate("/import")}>
@@ -303,11 +305,4 @@ function truncate(str: string, len: number) {
   return str.length > len ? str.slice(0, len) + "..." : str;
 }
 
-function GuardRedirect({ to }: { to: string }) {
-  const navigate = useNavigate();
-  /* Use an effect-free redirect pattern */
-  useState(() => {
-    navigate(to, { replace: true });
-  });
-  return null;
-}
+
