@@ -1,0 +1,246 @@
+{
+  "groupId": "welcome-returning",
+  "testedAt": "2026-04-18T23:39:27Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "appUrl": "http://127.0.0.1:5173",
+    "surface": "agent-browser",
+    "flowValidatorGuidanceSection": "Flow Validator Guidance: agent-browser",
+    "session": "welcome-returning-f2366386",
+    "cleanContext": "cookies, localStorage, sessionStorage, and IndexedDB cleared at start",
+    "assertionScope": [
+      "VAL-WELCOME-005",
+      "VAL-WELCOME-006",
+      "VAL-WELCOME-007",
+      "VAL-WELCOME-008",
+      "VAL-WELCOME-009",
+      "VAL-CROSS-005",
+      "VAL-CROSS-009"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-WELCOME-005",
+      "title": "Returning single profile shows profile row with unlock",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Created one profile in-session, then navigated to /",
+          "expected": "Welcome shows returning-user variant for a single profile",
+          "observed": "Subtitle showed 'Welcome back.' with one profile row"
+        },
+        {
+          "action": "Inspect profile row contents",
+          "expected": "Row includes label, threshold info, truncated group key, and Unlock",
+          "observed": "Row displayed profile label, '2/3', truncated key, and Unlock status pill"
+        },
+        {
+          "action": "Inspect actions below list",
+          "expected": "New Keyset and Import action buttons visible",
+          "observed": "New Keyset and Import Device Profile buttons were visible"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/welcome-returning/VAL-WELCOME-005-returning-single.png"
+        ],
+        "consoleErrors": "none (agent-browser errors output was empty)",
+        "network": "No requests captured by agent-browser network logger; observed client-side UI/URL transitions only"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WELCOME-006",
+      "title": "Returning many (4+) shows scrollable profile list with overflow indicator",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Created profiles in-session until 6 total profiles existed, then opened /",
+          "expected": "Overflow indicator appears and secondary actions remain visible",
+          "observed": "Indicator text '3 more below' appeared; New Keyset/Import/Onboard remained visible below list"
+        },
+        {
+          "action": "Scroll profile list container",
+          "expected": "Additional rows become visible after scrolling",
+          "observed": "Scrolled div.profile-list-scrollable to scrollTop 324; additional lower profile rows became visible"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/welcome-returning/VAL-WELCOME-006-returning-many-top.png",
+          "welcome-entry/welcome-returning/VAL-WELCOME-006-returning-many-scrolled.png"
+        ],
+        "consoleErrors": "none (agent-browser errors output was empty)",
+        "network": "No requests captured by agent-browser network logger; observed client-side UI/URL transitions only"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WELCOME-007",
+      "title": "Unlock modal opens, accepts password, successful unlock navigates to Dashboard",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Click returning profile row on Welcome",
+          "expected": "Unlock modal opens with title, password input, Unlock, Cancel",
+          "observed": "Unlock modal opened with Profile Password input and Unlock/Cancel buttons"
+        },
+        {
+          "action": "Type password into modal input",
+          "expected": "Masked password field updates",
+          "observed": "Input accepted text; get value returned testpass123"
+        },
+        {
+          "action": "Submit correct password",
+          "expected": "Modal closes and app navigates to /dashboard/{profileId}",
+          "observed": "Navigated to /dashboard/f06e971164f59b5d531ed1268f69a0e78cccf245d30f7f5937d998eee6b16e47"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/welcome-returning/VAL-WELCOME-007-unlock-modal-open.png",
+          "welcome-entry/welcome-returning/VAL-WELCOME-007-dashboard-after-unlock.png"
+        ],
+        "consoleErrors": "none (agent-browser errors output was empty)",
+        "network": "No requests captured by agent-browser network logger; unlock/navigation appeared client-side"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WELCOME-008",
+      "title": "Unlock error shows inline error on wrong password, modal stays open",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open Unlock modal and submit wrong password",
+          "expected": "Inline error appears and modal remains open",
+          "observed": "Inline error text 'decryption failed' appeared; modal remained open at /"
+        },
+        {
+          "action": "Attempt further input after error",
+          "expected": "Password field remains editable",
+          "observed": "Password field remained interactive and accepted updated input"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/welcome-returning/VAL-WELCOME-008-unlock-wrong-password-error.png"
+        ],
+        "consoleErrors": "none (agent-browser errors output was empty)",
+        "network": "No requests captured by agent-browser network logger; error handling appeared client-side"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WELCOME-009",
+      "title": "Returning multi (2-3 profiles) shows all profile rows with Unlock and Rotate",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Created additional profiles until 3 total profiles existed, then opened /",
+          "expected": "Returning multi state with all rows visible without scrolling",
+          "observed": "Three profile rows were visible simultaneously on Welcome"
+        },
+        {
+          "action": "Inspect row controls and details",
+          "expected": "Each row shows label, threshold, truncated key, Unlock and Rotate",
+          "observed": "Each row showed 2/3, truncated key, Unlock button, and Rotate button"
+        },
+        {
+          "action": "Inspect secondary actions",
+          "expected": "New Keyset, Import, and Onboard are visible",
+          "observed": "All three secondary action buttons were visible"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/welcome-returning/VAL-WELCOME-009-returning-multi-3profiles.png"
+        ],
+        "consoleErrors": "none (agent-browser errors output was empty)",
+        "network": "No requests captured by agent-browser network logger; observed client-side UI/URL transitions only"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-005",
+      "title": "Dashboard Lock navigates to Welcome showing returning-user variant with profile list",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From /dashboard/{profileId}, click Lock",
+          "expected": "Navigate to / and show returning-user Welcome with profile list",
+          "observed": "Redirected to / with 'Welcome back.' and profile row showing Unlock"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/welcome-returning/VAL-CROSS-005-welcome-after-dashboard-lock.png"
+        ],
+        "consoleErrors": "none (agent-browser errors output was empty)",
+        "network": "No requests captured by agent-browser network logger; lock transition appeared client-side"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-009",
+      "title": "Profile data persists in IndexedDB across page reload",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "After profile creation and lock, hard reload /",
+          "expected": "Returning profile list still appears",
+          "observed": "Profile row remained visible after reload on /"
+        },
+        {
+          "action": "Unlock using original password after reload",
+          "expected": "Unlock succeeds and navigates to dashboard",
+          "observed": "Unlock with testpass123 succeeded and navigated to /dashboard/{profileId}"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/welcome-returning/VAL-CROSS-009-welcome-after-reload.png",
+          "welcome-entry/welcome-returning/VAL-CROSS-009-dashboard-after-reload-unlock.png"
+        ],
+        "consoleErrors": "none (agent-browser errors output was empty)",
+        "network": "No requests captured by agent-browser network logger; persistence and unlock observed via UI state and URL"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "During profile-state setup, the Create flow's Distribution Completion screen kept 'Finish Distribution' disabled (0 of 2 remote packages accounted for), preventing dashboard completion via that button.",
+      "resolved": true,
+      "resolution": "Returned to / directly after /create/complete; created profiles were persisted and usable for returning-user assertions.",
+      "affectedAssertions": [
+        "VAL-WELCOME-005",
+        "VAL-WELCOME-006",
+        "VAL-WELCOME-007",
+        "VAL-WELCOME-008",
+        "VAL-WELCOME-009",
+        "VAL-CROSS-005",
+        "VAL-CROSS-009"
+      ]
+    },
+    {
+      "description": "agent-browser network requests output reported 'No requests captured' for this run.",
+      "resolved": true,
+      "resolution": "Used URL transitions, DOM state checks, and screenshots as primary behavioral evidence; noted network capture limitation per assertion.",
+      "affectedAssertions": [
+        "VAL-WELCOME-005",
+        "VAL-WELCOME-006",
+        "VAL-WELCOME-007",
+        "VAL-WELCOME-008",
+        "VAL-WELCOME-009",
+        "VAL-CROSS-005",
+        "VAL-CROSS-009"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 7 assigned assertions for welcome returning flows: 7 passed, 0 failed, 0 blocked."
+}

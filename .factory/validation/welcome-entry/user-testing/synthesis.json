@@ -1,0 +1,62 @@
+{
+  "milestone": "welcome-entry",
+  "round": 1,
+  "status": "fail",
+  "assertionsSummary": {
+    "total": 27,
+    "passed": 25,
+    "failed": 2,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-CROSS-001",
+    "VAL-CROSS-005",
+    "VAL-CROSS-008",
+    "VAL-CROSS-009",
+    "VAL-IMPORT-001",
+    "VAL-IMPORT-002",
+    "VAL-IMPORT-003",
+    "VAL-IMPORT-004",
+    "VAL-IMPORT-005",
+    "VAL-IMPORT-006",
+    "VAL-ONBOARD-001",
+    "VAL-ONBOARD-002",
+    "VAL-ONBOARD-003",
+    "VAL-ONBOARD-004",
+    "VAL-ONBOARD-005",
+    "VAL-ONBOARD-006",
+    "VAL-WELCOME-001",
+    "VAL-WELCOME-002",
+    "VAL-WELCOME-003",
+    "VAL-WELCOME-004",
+    "VAL-WELCOME-005",
+    "VAL-WELCOME-006",
+    "VAL-WELCOME-007",
+    "VAL-WELCOME-008",
+    "VAL-WELCOME-009"
+  ],
+  "failedAssertions": [
+    {
+      "id": "VAL-CROSS-003",
+      "reason": "Import completion returned to first-time Welcome without saving/importing profile state, so end-to-end import-to-dashboard (or saved-profile welcome) contract was not met."
+    },
+    {
+      "id": "VAL-CROSS-004",
+      "reason": "Onboarding completion does not land on dashboard and does not show an onboarded returning-profile state on Welcome."
+    }
+  ],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Added Flow Validator Guidance for agent-browser isolation boundaries and constraints.",
+      "source": "setup"
+    },
+    {
+      "target": "user-testing.md",
+      "description": "Added welcome-entry flow notes for deterministic onboarding failure-path testing and network-capture caveat.",
+      "source": "flow-report"
+    }
+  ],
+  "previousRound": null
+}

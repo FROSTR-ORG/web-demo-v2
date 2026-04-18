@@ -1,0 +1,144 @@
+{
+  "groupId": "welcome-entry-new",
+  "testedAt": "2026-04-18T23:33:07Z",
+  "isolation": {
+    "appUrl": "http://127.0.0.1:5173",
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "session": "welcome-entry-new",
+    "cleanContext": true,
+    "assertionsScoped": [
+      "VAL-WELCOME-001",
+      "VAL-WELCOME-002",
+      "VAL-WELCOME-003",
+      "VAL-WELCOME-004",
+      "VAL-CROSS-001"
+    ]
+  },
+  "toolsUsed": ["agent-browser", "curl"],
+  "assertions": [
+    {
+      "id": "VAL-WELCOME-001",
+      "title": "First-time welcome renders",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open / in dedicated clean browser session",
+          "expected": "First-time welcome card with subtitle and New Keyset/Import Device Profile/Onboard buttons is visible",
+          "observed": "Welcome screen rendered first-time variant with subtitle 'Split your Nostr key. Sign from anywhere.' and all 3 action buttons"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/welcome-entry-new/VAL-WELCOME-001-first-time-welcome.png"
+        ],
+        "consoleErrors": "none",
+        "network": "GET http://127.0.0.1:5173/ and Vite assets loaded; no failed requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WELCOME-002",
+      "title": "New Keyset button navigates to /create",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Click New Keyset from first-time welcome",
+          "expected": "Navigate to /create and Create Keyset form renders",
+          "observed": "URL changed to http://127.0.0.1:5173/create and Create New Keyset form with keyset inputs rendered"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/welcome-entry-new/VAL-WELCOME-002-create-screen.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Navigation to /create occurred via client-side routing; no failed requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WELCOME-003",
+      "title": "Import button navigates to Import flow",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Click Import Device Profile from welcome",
+          "expected": "Import flow entry (Load Backup) renders with heading and inputs",
+          "observed": "URL changed to http://127.0.0.1:5173/import and Load Backup screen rendered with backup input, upload button, and Continue"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/welcome-entry-new/VAL-WELCOME-003-import-load-backup.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Navigation to /import occurred via client-side routing; no failed requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WELCOME-004",
+      "title": "Onboard button navigates to Onboard flow",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Click Onboard from welcome",
+          "expected": "Onboard entry (Enter Package) renders with heading and inputs",
+          "observed": "URL changed to http://127.0.0.1:5173/onboard and Enter Onboarding Package screen rendered with package/password inputs and Begin Onboarding button"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/welcome-entry-new/VAL-WELCOME-004-onboard-enter-package.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Navigation to /onboard occurred via client-side routing; no failed requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-001",
+      "title": "First-visit with no saved profiles shows first-time welcome UI",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open / in clean isolated session and inspect DOM",
+          "expected": "First-time welcome variant present; Welcome back absent; no profile rows",
+          "observed": "DOM check returned hasFirstTimeSubtitle=true, hasWelcomeBack=false, profileRows=0; New Keyset/Import Device Profile/Onboard present"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/welcome-entry-new/VAL-CROSS-001-clean-session-welcome.png"
+        ],
+        "consoleErrors": "none",
+        "network": "GET http://127.0.0.1:5173/ and app assets loaded; no failed requests observed",
+        "domCheck": {
+          "hasFirstTimeSubtitle": true,
+          "hasWelcomeBack": false,
+          "hasNewKeyset": true,
+          "hasImport": true,
+          "hasOnboard": true,
+          "profileRows": 0
+        }
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Request log was reset when clearing diagnostics, so network evidence was captured after executing assertion flows.",
+      "resolved": true,
+      "resolution": "Collected network request evidence after flow execution using agent-browser network requests.",
+      "affectedAssertions": [
+        "VAL-WELCOME-001",
+        "VAL-WELCOME-002",
+        "VAL-WELCOME-003",
+        "VAL-WELCOME-004",
+        "VAL-CROSS-001"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 5 assigned assertions in isolated clean session: 5 passed, 0 failed, 0 blocked. First-time welcome UI and entry navigations to Create/Import/Onboard all worked with no console errors."
+}

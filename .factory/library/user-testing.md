@@ -37,3 +37,17 @@ Testing surface, tools, and resource cost classification.
 - WASM loading may add 2-3 seconds to initial page load
 - IndexedDB state persists between test runs — validators may need to clear storage for clean state
 - Some screens require pre-existing profile data (Dashboard, Settings, Export, Recover) — validators need to set up state first via the Create flow or mock data
+
+## Flow Validator Guidance: agent-browser
+
+- Use a unique browser session per validator and never use the default session.
+- Treat each validator as isolated: start by clearing storage/cookies in its own browser context before running assertions.
+- Stay within assigned assertions only; do not modify app code or shared service configuration.
+- Use only `http://127.0.0.1:5173` as the app URL and do not use other ports.
+- Save screenshots and any other artifacts only under the assigned evidence directory for that validator group.
+- If an assertion depends on prior state (e.g., returning-user profile), create that state within the same validator session rather than relying on another validator.
+
+## Welcome-Entry Validation Notes
+
+- Onboard failure-path assertions are most reliably reached using the Handshake screen's **Simulate Failure** control.
+- `agent-browser` network request capture may occasionally return no entries for pure client-side route transitions; treat screenshot + URL + console evidence as primary in those runs.

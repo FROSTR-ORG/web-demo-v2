@@ -1,0 +1,215 @@
+{
+  "groupId": "import-flow",
+  "testedAt": "2026-04-18T23:35:23Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "appUrl": "http://127.0.0.1:5173",
+    "testingSurface": "agent-browser",
+    "session": "import-flow-f2366386",
+    "cleanContext": true,
+    "assertionScope": [
+      "VAL-IMPORT-001",
+      "VAL-IMPORT-002",
+      "VAL-IMPORT-003",
+      "VAL-IMPORT-004",
+      "VAL-IMPORT-005",
+      "VAL-IMPORT-006",
+      "VAL-CROSS-003"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-IMPORT-001",
+      "title": "Load Backup screen renders with backup input, upload button, continue button",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From Welcome (/), click \"Import Device Profile\".",
+          "expected": "Navigate to /import and render Load Backup with heading, backup input, upload button, continue button, and Back link.",
+          "observed": "Navigated to http://127.0.0.1:5173/import; Load Backup UI rendered with Profile Backup textarea, Upload Backup File button, Continue button, and Back button."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/import-flow/VAL-IMPORT-001-load-backup.png"
+        ],
+        "consoleErrors": "none observed",
+        "network": "No API/network dependency required for this render assertion."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-IMPORT-002",
+      "title": "Decrypt Backup screen renders with loaded backup display, password input, decrypt button",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Enter valid backup string prefix (bfprofile1...) on /import and click Continue.",
+          "expected": "Navigate to /import/decrypt showing loaded backup display with validation info, backup password field, and Decrypt button.",
+          "observed": "Navigated to http://127.0.0.1:5173/import/decrypt; loaded backup summary/validation text shown, Backup Password masked field shown, and Decrypt Backup button present with Back link."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/import-flow/VAL-IMPORT-002-decrypt-backup.png"
+        ],
+        "consoleErrors": "none observed",
+        "network": "No API/network dependency required for this render assertion."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-IMPORT-003",
+      "title": "Review & Save screen renders with Group/Device Profile cards, password fields, save button",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "On /import/decrypt, enter non-\"wrong\" backup password and click Decrypt Backup.",
+          "expected": "Navigate to /import/review with Group Profile card, Device Profile card, password + confirm fields, Import & Launch Signer button, and Back link.",
+          "observed": "Navigated to http://127.0.0.1:5173/import/review; Group Profile and Device Profile cards rendered, Password and Confirm Password fields rendered, Import & Launch Signer button rendered, and Back link present."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/import-flow/VAL-IMPORT-003-review-save.png"
+        ],
+        "consoleErrors": "none observed",
+        "network": "No API/network dependency required for this render assertion."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-IMPORT-004",
+      "title": "Error screen renders with warning styling, error title/description, retry and back buttons",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "On /import/decrypt, enter backup password \"wrong\" and click Decrypt Backup.",
+          "expected": "Navigate to /import/error and render warning alert with Incorrect Password title, description, Try Again, and Back to Import.",
+          "observed": "Navigated to http://127.0.0.1:5173/import/error; warning alert with icon rendered, title \"Incorrect Password\" rendered, explanatory text rendered, and both Try Again + Back to Import buttons rendered."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/import-flow/VAL-IMPORT-004-error-screen.png"
+        ],
+        "consoleErrors": "none observed",
+        "network": "No API/network dependency required for this render assertion."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-IMPORT-005",
+      "title": "Full Import happy path navigable (Welcome → Load → Decrypt → Review → Dashboard/Welcome)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Follow happy path: Welcome → Import Device Profile → Load Backup (valid bfprofile1...) → Decrypt Backup (non-wrong password) → Review & Save Profile → Import & Launch Signer.",
+          "expected": "Each transition occurs via button click and final destination is Dashboard or Welcome.",
+          "observed": "All transitions succeeded via UI buttons: / → /import → /import/decrypt → /import/review → /. Final destination was Welcome at http://127.0.0.1:5173/."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/import-flow/VAL-IMPORT-005-01-welcome.png",
+          "welcome-entry/import-flow/VAL-IMPORT-005-01b-load.png",
+          "welcome-entry/import-flow/VAL-IMPORT-005-02-decrypt.png",
+          "welcome-entry/import-flow/VAL-IMPORT-005-03b-review.png",
+          "welcome-entry/import-flow/VAL-IMPORT-005-04-destination.png"
+        ],
+        "consoleErrors": "none observed",
+        "network": "No API/network dependency required for this happy-path navigation assertion."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-IMPORT-006",
+      "title": "Back navigation works at each Import step (each screen's Back returns to previous)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From /import/error click Back.",
+          "expected": "Return to /import.",
+          "observed": "Returned to http://127.0.0.1:5173/import."
+        },
+        {
+          "action": "From /import click Back.",
+          "expected": "Return to /.",
+          "observed": "Returned to http://127.0.0.1:5173/."
+        },
+        {
+          "action": "From /import/decrypt click Back.",
+          "expected": "Return to /import.",
+          "observed": "Returned to http://127.0.0.1:5173/import."
+        },
+        {
+          "action": "From /import/review click Back.",
+          "expected": "Return to /import/decrypt.",
+          "observed": "Returned to http://127.0.0.1:5173/import/decrypt."
+        },
+        {
+          "action": "Run browser error check after all back-navigation checks.",
+          "expected": "No console errors.",
+          "observed": "agent-browser errors returned no errors."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/import-flow/VAL-IMPORT-006-error-before-back.png",
+          "welcome-entry/import-flow/VAL-IMPORT-006-error-back-to-load.png",
+          "welcome-entry/import-flow/VAL-IMPORT-006-load-before-back.png",
+          "welcome-entry/import-flow/VAL-IMPORT-006-load-back-to-welcome.png",
+          "welcome-entry/import-flow/VAL-IMPORT-006-decrypt-before-back.png",
+          "welcome-entry/import-flow/VAL-IMPORT-006-decrypt-back-to-load.png",
+          "welcome-entry/import-flow/VAL-IMPORT-006-review-before-back.png",
+          "welcome-entry/import-flow/VAL-IMPORT-006-review-back-to-decrypt.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API/network dependency required for back-navigation assertion."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-003",
+      "title": "Full Import-to-Dashboard flow works end-to-end",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Execute full Import path from Welcome through Review & Save and submit Import & Launch Signer.",
+          "expected": "Reach Dashboard OR Welcome with imported profile saved and data matching backup contents.",
+          "observed": "Flow reached http://127.0.0.1:5173/ (Welcome), but Welcome remained first-time variant (\"Split your Nostr key. Sign from anywhere.\"), with no profile row/Unlock state; imported profile was not persisted."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/import-flow/VAL-IMPORT-005-01-welcome.png",
+          "welcome-entry/import-flow/VAL-IMPORT-005-01b-load.png",
+          "welcome-entry/import-flow/VAL-IMPORT-005-02-decrypt.png",
+          "welcome-entry/import-flow/VAL-IMPORT-005-03b-review.png",
+          "welcome-entry/import-flow/VAL-CROSS-003-final-destination.png"
+        ],
+        "consoleErrors": "none observed",
+        "network": "No requests captured by agent-browser network logger."
+      },
+      "issues": "Import completion returned to first-time Welcome without saving/importing profile state, so end-to-end import-to-dashboard (or saved-profile welcome) contract was not met."
+    }
+  ],
+  "frictions": [
+    {
+      "description": "The flow accepts only backup strings with the bfprofile1 prefix; Continue remains disabled otherwise.",
+      "resolved": true,
+      "resolution": "Used a bfprofile1-prefixed backup string to continue through the flow.",
+      "affectedAssertions": [
+        "VAL-IMPORT-002",
+        "VAL-IMPORT-005",
+        "VAL-IMPORT-006",
+        "VAL-CROSS-003"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 7 assertions in import-flow: 6 passed (VAL-IMPORT-001..006) and 1 failed (VAL-CROSS-003). Import screens and navigation/back behavior worked, but full cross-area import did not persist profile state or reach dashboard in clean-session validation."
+}

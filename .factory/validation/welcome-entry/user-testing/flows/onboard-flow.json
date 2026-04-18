@@ -1,0 +1,256 @@
+{
+  "groupId": "onboard-flow",
+  "testedAt": "2026-04-18T23:34:51.404092+00:00",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "appUrl": "http://127.0.0.1:5173",
+    "browserSession": "onboard-flow-f2366386",
+    "cleanContext": true,
+    "storageReset": [
+      "cookies clear",
+      "localStorage clear",
+      "IndexedDB cleared before tests"
+    ],
+    "assignedAssertions": [
+      "VAL-ONBOARD-001",
+      "VAL-ONBOARD-002",
+      "VAL-ONBOARD-003",
+      "VAL-ONBOARD-004",
+      "VAL-ONBOARD-005",
+      "VAL-ONBOARD-006",
+      "VAL-CROSS-004",
+      "VAL-CROSS-008"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser",
+    "curl"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-ONBOARD-001",
+      "title": "Enter Package screen renders with package input, QR button, password field, begin button",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to Welcome and click Onboard",
+          "expected": "Enter Package screen opens",
+          "observed": "Navigated to /onboard"
+        },
+        {
+          "action": "Inspect form controls",
+          "expected": "Package textarea, Scan QR button, Package Password field, Begin Onboarding button, and Back link are present",
+          "observed": "All expected controls rendered; Begin Onboarding initially disabled until valid package"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/onboard-flow/VAL-ONBOARD-001-enter-package.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API calls observed; local Vite asset GET requests loaded successfully"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ONBOARD-002",
+      "title": "Handshake screen renders with vertical timeline showing progress states",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Enter valid package/password and click Begin Onboarding",
+          "expected": "Navigate to Handshake screen",
+          "observed": "Navigated to /onboard/handshake"
+        },
+        {
+          "action": "Inspect handshake timeline and actions",
+          "expected": "Timeline includes done/in-progress/pending states, summary bar, and Cancel Onboarding button",
+          "observed": "All three timeline states visible with summary bar and Cancel Onboarding button"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/onboard-flow/VAL-ONBOARD-002-handshake.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API calls observed; route transition handled client-side"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ONBOARD-003",
+      "title": "Onboarding Failed renders with warning styling, timeout message, retry and back buttons",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From handshake, trigger failure path and wait for transition",
+          "expected": "Navigate to failed screen",
+          "observed": "Navigated to /onboard/failed"
+        },
+        {
+          "action": "Inspect failed-state UI",
+          "expected": "Amber warning alert with timeout title/description plus Retry and Back to Onboarding buttons",
+          "observed": "Warning alert titled 'Onboarding Timed Out' and both recovery buttons rendered"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/onboard-flow/VAL-ONBOARD-003-failed.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API calls observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ONBOARD-004",
+      "title": "Onboarding Complete renders with Group/Device Profile review cards, password fields, save button",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Allow handshake flow to auto-advance",
+          "expected": "Navigate to onboarding complete screen",
+          "observed": "Navigated to /onboard/complete"
+        },
+        {
+          "action": "Inspect complete-state content",
+          "expected": "Success indicator, Group Profile card, Device Profile card, password + confirm fields, Save & Launch Signer button, and no Back link",
+          "observed": "All expected cards/fields/button present and no Back control visible"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/onboard-flow/VAL-ONBOARD-004-complete.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API calls observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ONBOARD-005",
+      "title": "Full Onboard happy path navigable (Welcome \u2192 Enter \u2192 Handshake \u2192 Complete \u2192 Dashboard)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Follow happy path from Welcome through Enter Package and Handshake",
+          "expected": "Transitions proceed to Onboarding Complete",
+          "observed": "Welcome (/) -> Enter (/onboard) -> Handshake (/onboard/handshake) -> Complete (/onboard/complete)"
+        },
+        {
+          "action": "Submit Save & Launch Signer",
+          "expected": "Navigate to destination (Dashboard or Welcome)",
+          "observed": "Navigated to Welcome at /"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/onboard-flow/VAL-ONBOARD-005-step1-enter-package.png",
+          "welcome-entry/onboard-flow/VAL-ONBOARD-005-step2-handshake.png",
+          "welcome-entry/onboard-flow/VAL-ONBOARD-005-step3-complete.png",
+          "welcome-entry/onboard-flow/VAL-ONBOARD-005-step4-final-destination.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API calls observed; local static asset GET requests only"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ONBOARD-006",
+      "title": "Onboard failure path navigable (Welcome \u2192 Enter \u2192 Handshake \u2192 Failed, with retry)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Trigger failure from Handshake",
+          "expected": "Navigate to Onboarding Failed",
+          "observed": "Navigated to /onboard/failed"
+        },
+        {
+          "action": "Click Retry on failed screen",
+          "expected": "Return to Handshake screen",
+          "observed": "Navigated to /onboard/handshake"
+        },
+        {
+          "action": "Click Back to Onboarding on failed screen",
+          "expected": "Return to Enter Package screen",
+          "observed": "Navigated to /onboard"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/onboard-flow/VAL-ONBOARD-006-step2-handshake.png",
+          "welcome-entry/onboard-flow/VAL-ONBOARD-006-step3-failed.png",
+          "welcome-entry/onboard-flow/VAL-ONBOARD-006-step4-retry-handshake.png",
+          "welcome-entry/onboard-flow/VAL-ONBOARD-006-step5-back-to-onboarding.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API calls observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-004",
+      "title": "Full Onboard-to-Dashboard flow works end-to-end",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Run full onboard path from Welcome through Complete",
+          "expected": "Reach dashboard after Save & Launch Signer (or return to welcome with onboarded profile visible)",
+          "observed": "Flow reached /onboard/complete, but Save & Launch Signer navigated to / with first-time Welcome state and no onboarded profile row"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/onboard-flow/VAL-CROSS-004-step0-welcome.png",
+          "welcome-entry/onboard-flow/VAL-CROSS-004-step1-enter-package.png",
+          "welcome-entry/onboard-flow/VAL-CROSS-004-step2-handshake.png",
+          "welcome-entry/onboard-flow/VAL-CROSS-004-step3-complete.png",
+          "welcome-entry/onboard-flow/VAL-CROSS-004-final-destination.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API calls observed; local assets served by Vite"
+      },
+      "issues": "Onboarding completion does not land on dashboard and does not show an onboarded returning-profile state on Welcome."
+    },
+    {
+      "id": "VAL-CROSS-008",
+      "title": "Unknown routes redirect to Welcome (catch-all)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /nonexistent",
+          "expected": "Redirect to / and render Welcome",
+          "observed": "Resolved to / and rendered Welcome"
+        },
+        {
+          "action": "Navigate to /foo/bar",
+          "expected": "Redirect to / and render Welcome",
+          "observed": "Resolved to / and rendered Welcome"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome-entry/onboard-flow/VAL-CROSS-008-invalid-nonexistent.png",
+          "welcome-entry/onboard-flow/VAL-CROSS-008-invalid-foo-bar.png",
+          "welcome-entry/onboard-flow/VAL-CROSS-008-welcome-after-redirect.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Client-side redirects; no API calls observed"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Triggering the timeout/failure path required using a hidden 'Simulate Failure' control on the Handshake screen.",
+      "resolved": true,
+      "resolution": "Used the Simulate Failure button to deterministically reach /onboard/failed and validate retry/back recovery actions.",
+      "affectedAssertions": [
+        "VAL-ONBOARD-003",
+        "VAL-ONBOARD-006"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 8 assigned assertions: 7 passed, 1 failed (VAL-CROSS-004)."
+}
