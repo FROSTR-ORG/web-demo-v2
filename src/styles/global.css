@@ -1905,3 +1905,195 @@ a {
   font-size: 13px;
   line-height: 16px;
 }
+
+/* ========================================
+   Onboard flow screens
+   ======================================== */
+
+.onboard-scan-btn {
+  align-self: flex-start;
+}
+
+/* --- Handshake timeline --- */
+
+.onboard-timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.onboard-timeline-step {
+  display: flex;
+  gap: 16px;
+  min-height: 48px;
+}
+
+.onboard-timeline-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+  width: 24px;
+}
+
+.onboard-dot {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.onboard-dot.done {
+  background: var(--ig-green);
+}
+
+.onboard-dot.active {
+  background: var(--ig-amber);
+}
+
+.onboard-dot.pending {
+  background: transparent;
+  border: 1.5px solid #334155;
+}
+
+.onboard-dot-ellipsis {
+  color: #fff;
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.onboard-timeline-line {
+  flex: 1 1 auto;
+  width: 1px;
+  min-height: 20px;
+  background: var(--ig-border-soft);
+}
+
+.onboard-timeline-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 2px;
+  padding-bottom: 16px;
+}
+
+.onboard-step-label {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.onboard-step-label.done {
+  color: var(--ig-text);
+}
+
+.onboard-step-label.active {
+  color: var(--ig-amber);
+}
+
+.onboard-step-label.pending {
+  color: var(--ig-faint);
+}
+
+.onboard-step-detail {
+  color: var(--ig-faint);
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* --- Handshake summary bar --- */
+
+.onboard-summary-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  background: rgba(30, 58, 138, 0.08);
+  border: 1px solid var(--ig-border);
+}
+
+.onboard-summary-package {
+  color: var(--ig-faint);
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.onboard-summary-sep {
+  color: #475569;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.onboard-summary-share {
+  color: var(--ig-faint);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* --- Onboarding Failed alert --- */
+
+.onboard-error-alert {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 8px;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.25);
+}
+
+.onboard-error-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: rgba(234, 179, 8, 0.3);
+  color: #facc15;
+}
+
+.onboard-error-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.onboard-error-title {
+  color: #facc15;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.onboard-error-description {
+  color: #fde68a;
+  font-size: 13px;
+  line-height: 16px;
+}
+
+/* --- Onboarding Complete header --- */
+
+.onboard-complete-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.onboard-complete-check {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--ig-green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

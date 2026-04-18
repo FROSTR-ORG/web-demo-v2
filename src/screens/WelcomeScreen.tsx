@@ -111,7 +111,7 @@ export function WelcomeScreen() {
         <button type="button" className="returning-chip-btn" onClick={() => navigate("/import")}>
           Import Device Profile
         </button>
-        <button type="button" className="returning-chip-btn" disabled>
+        <button type="button" className="returning-chip-btn" onClick={() => navigate("/onboard")}>
           Onboard
         </button>
       </div>
@@ -154,7 +154,7 @@ export function WelcomeScreen() {
               <Button type="button" variant="secondary" size="sm" onClick={() => navigate("/import")}>
                 Import Device Profile
               </Button>
-              <Button type="button" variant="secondary" size="sm" disabled>
+              <Button type="button" variant="secondary" size="sm" onClick={() => navigate("/onboard")}>
                 Onboard
               </Button>
             </div>

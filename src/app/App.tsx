@@ -5,6 +5,7 @@ import { DashboardScreen } from "../screens/DashboardScreen";
 import { DistributeSharesScreen } from "../screens/DistributeSharesScreen";
 import { DistributionCompleteScreen } from "../screens/DistributionCompleteScreen";
 import { LoadBackupScreen, DecryptBackupScreen, ReviewSaveScreen, ImportErrorScreen } from "../screens/ImportScreens";
+import { EnterPackageScreen, HandshakeScreen, OnboardingFailedScreen, OnboardingCompleteScreen } from "../screens/OnboardScreens";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
 
 export function App() {
@@ -19,6 +20,10 @@ export function App() {
       <Route path="/import/decrypt" element={<DecryptBackupScreen />} />
       <Route path="/import/review" element={<ReviewSaveScreen />} />
       <Route path="/import/error" element={<ImportErrorScreen />} />
+      <Route path="/onboard" element={<EnterPackageScreen />} />
+      <Route path="/onboard/handshake" element={<HandshakeScreen />} />
+      <Route path="/onboard/failed" element={<OnboardingFailedScreen />} />
+      <Route path="/onboard/complete" element={<OnboardingCompleteScreen />} />
       <Route path="/dashboard/:profileId" element={<DashboardScreen />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
