@@ -1,0 +1,33 @@
+{
+  "featureId": "fix-onboard-guards-welcome",
+  "reviewedAt": "2026-04-18T23:26:42Z",
+  "commitId": "a5fbae4",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "This fix commit addresses both prior blocking failures from onboard-flow: guarded onboard routes now use React Router Navigate redirects instead of render-time useState navigation, and the single-profile Welcome variant now includes an Onboard action. The original onboard-flow diff (075ef59) introduced the missing single-profile action and GuardRedirect pattern; this fix directly corrects those points.",
+    "issues": [
+      {
+        "file": "src/screens/__tests__/OnboardScreens.test.tsx",
+        "line": 124,
+        "severity": "non_blocking",
+        "description": "Guard redirect tests assert empty render output while routing hooks are mocked (lines 20-21, 124, 189), so they do not verify the actual redirect destination path. This leaves some room for false confidence if redirect targets regress."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-builder skill procedure and skillFeedback rubric appear misaligned with actual execution: the run used direct `agent-browser` CLI commands via Execute and updated tests after implementation edits, but handoff still reports followedProcedure=true.",
+      "evidence": ".factory/skills/ui-builder/SKILL.md lines 14-16 and 104 require invoking `agent-browser` skill; lines 41-64 require tests-first with initial failure. Transcript skeleton for session 6c5cf83d-737b-4d93-989f-3752df0dcec2 shows only `mission-worker-base` and `ui-builder` skill calls, multiple `agent-browser --session ...` Execute commands (e.g., line 322+ in extracted skeleton), and OnboardScreens.tsx edits before test-file edits (line 135+ vs line 267+ in extracted skeleton)."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Manual verification of single-profile Welcome state required trial-and-error IndexedDB seeding because shared testing docs do not provide a concrete profile seeding recipe or key schema.",
+      "evidence": "Transcript skeleton includes repeated exploratory storage commands (querying profileStore, idb-keyval usage, multiple failed/successful injection attempts before validation). .factory/library/user-testing.md notes that some screens need pre-existing profile data but does not document concrete seed steps or storage keys."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/welcome-entry/scrutiny/reviews/onboard-flow.json",
+  "summary": "PASS: fix-onboard-guards-welcome adequately resolves the two blocking issues from onboard-flow by replacing unsafe guard redirects with Navigate and adding the missing single-profile Welcome Onboard action. I reviewed the fix transcript skeleton and both diffs (075ef59 and a5fbae4); only a non-blocking test-strength gap remains."
+}

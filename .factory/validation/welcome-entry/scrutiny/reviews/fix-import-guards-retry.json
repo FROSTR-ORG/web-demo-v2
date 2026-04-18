@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-import-guards-retry",
+  "reviewedAt": "2026-04-18T23:26:09Z",
+  "commitId": "d763ae8",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix commit fully addresses both prior blocking defects in Import flow: guarded screens now use <Navigate> redirects, and Import Error retry preserves backup route state back into /import/decrypt.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-builder skill procedure currently requires Paper README/screen/screenshot reads for each screen, but fix-only bug work can be completed correctly without design-reference reads; this exception is not explicit in the skill.",
+      "evidence": ".factory/skills/ui-builder/SKILL.md ('Study Paper References') requires README + screen.html + screenshot. worker-transcripts.jsonl entry for session 5138dcc2-65fc-4871-84a9-3f88347a82d0 shows code/test-focused reads and no igloo-paper reads, while handoff.skillFeedback.followedProcedure=true."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/welcome-entry/scrutiny/reviews/import-flow.json",
+  "summary": "Fix review passed. Compared to the original import-flow commit/review, this fix resolves both blocking failures: deep-link guards no longer rely on render-time navigation side effects, and /import/error -> Try Again now carries backup context so decrypt retry works."
+}

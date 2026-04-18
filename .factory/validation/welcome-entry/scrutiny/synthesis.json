@@ -1,7 +1,7 @@
 {
   "milestone": "welcome-entry",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -20,66 +20,32 @@
     }
   },
   "reviewsSummary": {
-    "total": 3,
-    "passed": 1,
-    "failed": 2,
-    "failedFeatures": [
-      "import-flow",
-      "onboard-flow"
-    ]
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "failedFeatures": []
   },
-  "blockingIssues": [
-    {
-      "featureId": "import-flow",
-      "severity": "blocking",
-      "description": "Import error retry path drops required backup route state, so Try Again from /import/error cannot reliably return to a working decrypt step and instead guard-redirects to /import."
-    },
-    {
-      "featureId": "import-flow",
-      "severity": "blocking",
-      "description": "Guard redirects in Import use render-time navigate inside useState initializer instead of <Navigate>/useEffect, which is an unsafe pattern associated with guarded-route blank/deep-link issues."
-    },
-    {
-      "featureId": "onboard-flow",
-      "severity": "blocking",
-      "description": "Single-returning-profile welcome variant omits the Onboard action, so onboarding is not accessible from Welcome for users with exactly one saved profile."
-    },
-    {
-      "featureId": "onboard-flow",
-      "severity": "blocking",
-      "description": "Guard redirects in Onboard use render-time navigate inside useState initializer instead of <Navigate>/useEffect, matching known deep-link blank-screen risk."
-    }
-  ],
+  "blockingIssues": [],
   "appliedUpdates": [],
   "suggestedGuidanceUpdates": [
     {
-      "target": "AGENTS.md",
-      "suggestion": "Require guarded screens to redirect with <Navigate to=\"...\" replace /> (or useEffect-based navigation) and explicitly forbid render-time navigation side effects such as useState(() => navigate(...)).",
-      "evidence": "Both import-flow and onboard-flow reviewers reported blocking issues caused by the same guard anti-pattern in guarded routes.",
+      "target": ".factory/skills/ui-builder/SKILL.md",
+      "suggestion": "Clarify procedural expectations for fix-only tasks and compliance reporting: explicitly state when Paper-reference reads/TDD-first are mandatory vs optional, and require handoff.skillFeedback to reflect actual deviations (including direct `agent-browser` CLI usage when skill invocation is expected).",
+      "evidence": "Both fix-feature reviews (fix-import-guards-retry and fix-onboard-guards-welcome) flagged procedure/feedback misalignment in ui-builder execution, despite correct code outcomes.",
       "isSystemic": true
     },
     {
-      "target": ".factory/skills/ui-builder/SKILL.md",
-      "suggestion": "Clarify browser-validation requirement to align procedure with actual accepted workflow: either require explicit agent-browser skill invocation or explicitly allow direct `agent-browser` CLI use when available.",
-      "evidence": "welcome-enhancements review observed successful validation via direct agent-browser CLI despite current skill text requiring agent-browser skill invocation.",
-      "isSystemic": true
-    },
-    {
-      "target": ".factory/skills/ui-builder/SKILL.md",
-      "suggestion": "Refine strict procedure checks (Paper README/screenshot reads and mandatory TDD order) to distinguish hard requirements from preferred practice, and require accurate handoff feedback when deviating.",
-      "evidence": "import-flow and onboard-flow reviews observed procedure deviations while handoffs still marked followedProcedure=true.",
+      "target": ".factory/library/user-testing.md",
+      "suggestion": "Add a concrete IndexedDB profile-seeding recipe (keys and minimal record shape) for validating returning-user Welcome variants without iterative trial-and-error setup.",
+      "evidence": "fix-onboard-guards-welcome review reported repeated exploratory storage attempts to establish single-profile state; current user-testing library note only states that pre-existing profile data is required.",
       "isSystemic": true
     }
   ],
   "rejectedObservations": [
     {
-      "observation": "Guard redirect convention gap between AGENTS and implementation patterns.",
+      "observation": "ui-builder Paper-reference-read exception note from fix-import-guards-retry.",
       "reason": "duplicate"
-    },
-    {
-      "observation": "Add IndexedDB key-seeding detail to shared user-testing knowledge.",
-      "reason": "ambiguous"
     }
   ],
-  "previousRound": null
+  "previousRound": ".factory/validation/welcome-entry/scrutiny/synthesis.round1.json"
 }
