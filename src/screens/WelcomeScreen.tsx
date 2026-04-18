@@ -108,7 +108,7 @@ export function WelcomeScreen() {
         <button type="button" className="returning-chip-btn" onClick={() => navigate("/create")}>
           New Keyset
         </button>
-        <button type="button" className="returning-chip-btn" disabled>
+        <button type="button" className="returning-chip-btn" onClick={() => navigate("/import")}>
           Import Device Profile
         </button>
         <button type="button" className="returning-chip-btn" disabled>
@@ -151,7 +151,7 @@ export function WelcomeScreen() {
             </div>
             <div className="secondary-actions">
               <span>or</span>
-              <Button type="button" variant="secondary" size="sm" disabled>
+              <Button type="button" variant="secondary" size="sm" onClick={() => navigate("/import")}>
                 Import Device Profile
               </Button>
               <Button type="button" variant="secondary" size="sm" disabled>
@@ -190,7 +190,7 @@ export function WelcomeScreen() {
                 <Plus size={16} />
                 New Keyset
               </Button>
-              <Button type="button" variant="secondary" disabled>
+              <Button type="button" variant="secondary" onClick={() => navigate("/import")}>
                 <Upload size={16} />
                 Import Device Profile
               </Button>
