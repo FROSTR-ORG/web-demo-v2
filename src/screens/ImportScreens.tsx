@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
+import { useAppState } from "../app/AppState";
 import { AppShell } from "../components/shell";
 import { PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField } from "../components/ui";
+import { saveProfile } from "../lib/storage/profileStore";
+import type { StoredProfileRecord } from "../lib/bifrost/types";
 
 /* ---------- Mock data for the review screen ---------- */
 
@@ -158,9 +161,11 @@ export function DecryptBackupScreen() {
 export function ReviewSaveScreen() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { reloadProfiles } = useAppState();
   const state = location.state as { backupString?: string; password?: string } | null;
   const [profilePassword, setProfilePassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
 
   /* Guard: redirect if no prior decrypt step */
   if (!state?.backupString) {
@@ -169,9 +174,34 @@ export function ReviewSaveScreen() {
 
   const passwordsMatch = profilePassword.length > 0 && profilePassword === confirmPassword;
 
-  function handleImport() {
-    /* Mock: navigate to welcome (simulating saved profile) */
-    navigate("/");
+  async function handleImport() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const now = Date.now();
+      const profileId = `import-${now}-${Math.random().toString(36).slice(2, 8)}`;
+      const record: StoredProfileRecord = {
+        summary: {
+          id: profileId,
+          label: MOCK_REVIEW_DATA.groupName,
+          deviceName: "Igloo Web",
+          groupName: MOCK_REVIEW_DATA.groupName,
+          threshold: 2,
+          memberCount: 3,
+          localShareIdx: 1,
+          groupPublicKey: "a1b2c3d4e5f6".repeat(5) + "a1b2c3d4",
+          relays: MOCK_REVIEW_DATA.relays,
+          createdAt: now,
+          lastUsedAt: now
+        },
+        encryptedProfilePackage: "bfprofile1-mock-imported-package"
+      };
+      await saveProfile(record);
+      await reloadProfiles();
+      navigate("/");
+    } catch {
+      setSaving(false);
+    }
   }
 
   return (

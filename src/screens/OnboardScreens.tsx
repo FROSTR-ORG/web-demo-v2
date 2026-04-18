@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, Check, QrCode } from "lucide-react";
+import { useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField } from "../components/ui";
+import { saveProfile } from "../lib/storage/profileStore";
+import type { StoredProfileRecord } from "../lib/bifrost/types";
 
 /* ---------- Mock data ---------- */
 
@@ -315,14 +318,41 @@ export function OnboardingCompleteScreen() {
 
 function OnboardingCompleteContent() {
   const navigate = useNavigate();
+  const { reloadProfiles } = useAppState();
   const [profilePassword, setProfilePassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const passwordsMatch = profilePassword.length > 0 && profilePassword === confirmPassword;
 
-  function handleSave() {
-    /* Mock: navigate to welcome (simulating saved profile) */
-    navigate("/");
+  async function handleSave() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const now = Date.now();
+      const profileId = `onboard-${now}-${Math.random().toString(36).slice(2, 8)}`;
+      const record: StoredProfileRecord = {
+        summary: {
+          id: profileId,
+          label: MOCK_REVIEW_DATA.groupName,
+          deviceName: "Igloo Web",
+          groupName: MOCK_REVIEW_DATA.groupName,
+          threshold: 2,
+          memberCount: 3,
+          localShareIdx: 1,
+          groupPublicKey: "b2c3d4e5f6a1".repeat(5) + "b2c3d4e5",
+          relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
+          createdAt: now,
+          lastUsedAt: now
+        },
+        encryptedProfilePackage: "bfonboard1-mock-onboarded-package"
+      };
+      await saveProfile(record);
+      await reloadProfiles();
+      navigate("/");
+    } catch {
+      setSaving(false);
+    }
   }
 
   return (

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
@@ -10,7 +10,9 @@ import {
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
-  locationState: null as Record<string, unknown> | null
+  locationState: null as Record<string, unknown> | null,
+  reloadProfiles: vi.fn().mockResolvedValue(undefined),
+  mockSaveProfile: vi.fn().mockResolvedValue(undefined)
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -27,6 +29,14 @@ vi.mock("react-router-dom", async () => {
     })
   };
 });
+
+vi.mock("../../app/AppState", () => ({
+  useAppState: () => ({ reloadProfiles: mocks.reloadProfiles })
+}));
+
+vi.mock("../../lib/storage/profileStore", () => ({
+  saveProfile: mocks.mockSaveProfile
+}));
 
 afterEach(() => {
   cleanup();
@@ -199,7 +209,7 @@ describe("OnboardingCompleteScreen", () => {
     expect(screen.queryByText("Back")).not.toBeInTheDocument();
   });
 
-  it("Save & Launch Signer navigates to home", () => {
+  it("Save & Launch Signer saves profile and navigates to home", async () => {
     mocks.locationState = { fromHandshake: true };
     render(
       <MemoryRouter>
@@ -207,6 +217,11 @@ describe("OnboardingCompleteScreen", () => {
       </MemoryRouter>
     );
     fireEvent.click(screen.getByRole("button", { name: /Save & Launch Signer/i }));
-    expect(mocks.navigate).toHaveBeenCalledWith("/");
+    await waitFor(() => {
+      expect(mocks.mockSaveProfile).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(mocks.navigate).toHaveBeenCalledWith("/");
+    });
   });
 });
