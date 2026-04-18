@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, Check, QrCode } from "lucide-react";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField } from "../components/ui";
@@ -116,7 +116,7 @@ export function HandshakeScreen() {
 
   /* Guard: redirect if no package loaded */
   if (!state?.packageString) {
-    return <GuardRedirect to="/onboard" />;
+    return <Navigate to="/onboard" replace />;
   }
 
   return <HandshakeContent packageString={state.packageString} navigate={navigate} />;
@@ -159,7 +159,7 @@ function HandshakeContent({
     if (allDone) {
       /* All steps done → go to complete */
       const timer = window.setTimeout(() => {
-        navigate("/onboard/complete", { replace: true });
+        navigate("/onboard/complete", { replace: true, state: { fromHandshake: true } });
       }, 500);
       return () => window.clearTimeout(timer);
     }
@@ -302,6 +302,18 @@ export function OnboardingFailedScreen() {
    ========================================================== */
 
 export function OnboardingCompleteScreen() {
+  const location = useLocation();
+  const state = location.state as { fromHandshake?: boolean } | null;
+
+  /* Guard: redirect if not arriving from handshake */
+  if (!state?.fromHandshake) {
+    return <Navigate to="/onboard" replace />;
+  }
+
+  return <OnboardingCompleteContent />;
+}
+
+function OnboardingCompleteContent() {
   const navigate = useNavigate();
   const [profilePassword, setProfilePassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -393,13 +405,4 @@ export function OnboardingCompleteScreen() {
   );
 }
 
-/* ---------- Helpers ---------- */
 
-function GuardRedirect({ to }: { to: string }) {
-  const navigate = useNavigate();
-  /* Use an effect-free redirect pattern (matches ImportScreens) */
-  useState(() => {
-    navigate(to, { replace: true });
-  });
-  return null;
-}

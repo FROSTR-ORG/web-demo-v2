@@ -194,6 +194,9 @@ export function WelcomeScreen() {
                 <Upload size={16} />
                 Import Device Profile
               </Button>
+              <Button type="button" variant="secondary" onClick={() => navigate("/onboard")}>
+                Onboard
+              </Button>
             </div>
           </div>
         )}

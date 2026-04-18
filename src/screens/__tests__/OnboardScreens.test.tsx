@@ -115,12 +115,13 @@ describe("HandshakeScreen", () => {
 
   it("guard redirects to /onboard if no state", () => {
     mocks.locationState = null;
-    render(
+    const { container } = render(
       <MemoryRouter>
         <HandshakeScreen />
       </MemoryRouter>
     );
-    expect(mocks.navigate).toHaveBeenCalledWith("/onboard", { replace: true });
+    /* When no state, the component renders nothing (Navigate redirects) */
+    expect(container.textContent).toBe("");
   });
 });
 
@@ -161,6 +162,7 @@ describe("OnboardingFailedScreen", () => {
 
 describe("OnboardingCompleteScreen", () => {
   it("renders success header, profile cards, password fields, and save button", () => {
+    mocks.locationState = { fromHandshake: true };
     render(
       <MemoryRouter>
         <OnboardingCompleteScreen />
@@ -176,7 +178,19 @@ describe("OnboardingCompleteScreen", () => {
     expect(screen.getByRole("button", { name: /Save & Launch Signer/i })).toBeInTheDocument();
   });
 
+  it("guard redirects to /onboard if no state", () => {
+    mocks.locationState = null;
+    const { container } = render(
+      <MemoryRouter>
+        <OnboardingCompleteScreen />
+      </MemoryRouter>
+    );
+    /* When no state, the component renders nothing (Navigate redirects) */
+    expect(container.textContent).toBe("");
+  });
+
   it("has no Back link (terminal success state)", () => {
+    mocks.locationState = { fromHandshake: true };
     render(
       <MemoryRouter>
         <OnboardingCompleteScreen />
@@ -186,6 +200,7 @@ describe("OnboardingCompleteScreen", () => {
   });
 
   it("Save & Launch Signer navigates to home", () => {
+    mocks.locationState = { fromHandshake: true };
     render(
       <MemoryRouter>
         <OnboardingCompleteScreen />
