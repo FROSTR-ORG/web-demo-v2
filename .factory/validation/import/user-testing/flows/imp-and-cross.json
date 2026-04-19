@@ -1,0 +1,215 @@
+{
+  "groupId": "imp-and-cross",
+  "testedAt": "2026-04-19T21:12:53.480486+00:00",
+  "isolation": {
+    "surface": "browser-ui",
+    "appOrigin": "http://127.0.0.1:5173",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "evidenceDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/import/imp-and-cross"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-IMP-001",
+      "title": "Import Load Backup renders core content",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/import-load-backup",
+          "expected": "Load Backup content renders",
+          "observed": "Header, helper copy, validator, Upload Backup File, and Continue rendered"
+        },
+        {
+          "action": "Click Continue",
+          "expected": "Navigate to /import/decrypt",
+          "observed": "Navigated to /import/decrypt"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "import/imp-and-cross/VAL-IMP-001-load-backup.png",
+          "import/imp-and-cross/VAL-IMP-001-after-continue.png"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null,
+      "reason": "Scenario content and required navigation matched contract."
+    },
+    {
+      "id": "VAL-IMP-002",
+      "title": "Import Decrypt Backup renders with Created date suffix",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/import-decrypt-backup",
+          "expected": "Decrypt view includes Created date suffix and Decrypt CTA",
+          "observed": "Validator text included '\u00b7 Created Mar 8, 2026'; labels and Decrypt Backup CTA visible"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "import/imp-and-cross/VAL-IMP-002-decrypt-backup.png"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null,
+      "reason": "Required validator suffix and decrypt screen content were present."
+    },
+    {
+      "id": "VAL-IMP-003",
+      "title": "Import Review & Save Profile renders content parity",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/import-review-save-profile",
+          "expected": "Review cards, meta strip, password section, launch CTA",
+          "observed": "Group/Device cards, meta strip with Backup Created date, relay list, and Import & Launch Signer CTA rendered"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "import/imp-and-cross/VAL-IMP-003-review-save-profile.png"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null,
+      "reason": "All required review/save elements were visible in the scenario."
+    },
+    {
+      "id": "VAL-IMP-004",
+      "title": "Import Error (wrong-password, amber) renders",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/import-error",
+          "expected": "Amber incorrect-password alert with Try Again and Back to Import",
+          "observed": "Incorrect Password alert rendered with amber title color and both CTAs present"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "import/imp-and-cross/VAL-IMP-004-import-error-amber.png"
+        ],
+        "consoleErrors": "none",
+        "styleCheck": "titleColor rgb(250, 204, 21)"
+      },
+      "issues": null,
+      "reason": "Wrong-password variant used amber styling and correct dual-CTA layout."
+    },
+    {
+      "id": "VAL-IMP-005",
+      "title": "Import Error (corrupted, red) renders",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/import-error-corrupted",
+          "expected": "Red corrupted alert with single Back to Import CTA",
+          "observed": "Backup Corrupted alert rendered in red and Try Again was absent"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "import/imp-and-cross/VAL-IMP-005-import-error-corrupted.png"
+        ],
+        "consoleErrors": "none",
+        "styleCheck": "titleColor rgb(248, 113, 113); hasTryAgain false"
+      },
+      "issues": null,
+      "reason": "Corrupted variant was visually distinct (red) and had only the expected single CTA."
+    },
+    {
+      "id": "VAL-IMP-006",
+      "title": "Import error CTAs navigate correctly",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From /demo/import-error click Try Again",
+          "expected": "Navigate to /import/decrypt",
+          "observed": "Navigated to /import/decrypt"
+        },
+        {
+          "action": "From /demo/import-error click Back to Import",
+          "expected": "Navigate to /import",
+          "observed": "Navigated to /import"
+        },
+        {
+          "action": "From /demo/import-error-corrupted click Back to Import",
+          "expected": "Navigate to /import",
+          "observed": "Navigated to /import"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "import/imp-and-cross/VAL-IMP-006-try-again-to-decrypt.png",
+          "import/imp-and-cross/VAL-IMP-006-back-to-import-from-amber.png",
+          "import/imp-and-cross/VAL-IMP-006-back-to-import-from-corrupted.png"
+        ],
+        "consoleErrors": "none",
+        "urlTrace": [
+          "http://127.0.0.1:5173/import/decrypt",
+          "http://127.0.0.1:5173/import",
+          "http://127.0.0.1:5173/import"
+        ]
+      },
+      "issues": null,
+      "reason": "All import-error CTAs routed to their expected destinations."
+    },
+    {
+      "id": "VAL-CROSS-006",
+      "title": "Main app welcome \u2192 import path",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open / and click Import Device Profile",
+          "expected": "Navigate to /import",
+          "observed": "Navigated to /import"
+        },
+        {
+          "action": "Complete import/decrypt/review actions",
+          "expected": "/import \u2192 /import/decrypt \u2192 /import/review \u2192 /dashboard/{profileId}",
+          "observed": "Reached /import/decrypt, /import/review, then /dashboard/4fed4d96fa8854549afe8246f49a343d00bbae3e365eed73934387ed658c628e"
+        },
+        {
+          "action": "Open /import/error",
+          "expected": "Error variant reachable",
+          "observed": "Import Error screen rendered at /import/error"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "import/imp-and-cross/VAL-CROSS-006-step-0-welcome.png",
+          "import/imp-and-cross/VAL-CROSS-006-step-1-import.png",
+          "import/imp-and-cross/VAL-CROSS-006-step-2-decrypt.png",
+          "import/imp-and-cross/VAL-CROSS-006-step-3-review.png",
+          "import/imp-and-cross/VAL-CROSS-006-step-4-dashboard.png",
+          "import/imp-and-cross/VAL-CROSS-006-step-5-error-variant.png"
+        ],
+        "consoleErrors": "none",
+        "urlTrace": [
+          "http://127.0.0.1:5173/",
+          "http://127.0.0.1:5173/import",
+          "http://127.0.0.1:5173/import/decrypt",
+          "http://127.0.0.1:5173/import/review",
+          "http://127.0.0.1:5173/dashboard/4fed4d96fa8854549afe8246f49a343d00bbae3e365eed73934387ed658c628e",
+          "http://127.0.0.1:5173/import/error"
+        ]
+      },
+      "issues": null,
+      "reason": "End-to-end welcome-to-import flow and error route accessibility behaved as specified."
+    }
+  ],
+  "frictions": [
+    {
+      "description": "In main-app /import and /import/decrypt routes, CTAs were disabled until required fields were filled (backup string, backup password, profile password pair), so progression required entering sample values.",
+      "resolved": true,
+      "resolution": "Filled required inputs before pressing Continue/Decrypt/Import to complete the flow.",
+      "affectedAssertions": [
+        "VAL-CROSS-006"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 7 assertions (VAL-IMP-001..006, VAL-CROSS-006): 7 passed, 0 failed, 0 blocked."
+}

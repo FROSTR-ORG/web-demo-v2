@@ -1,0 +1,30 @@
+{
+  "milestone": "import",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 7,
+    "passed": 7,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-IMP-001",
+    "VAL-IMP-002",
+    "VAL-IMP-003",
+    "VAL-IMP-004",
+    "VAL-IMP-005",
+    "VAL-IMP-006",
+    "VAL-CROSS-006"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Documented that /import and /import/decrypt require filling required fields before CTAs enable in main-app flow checks.",
+      "source": "flow-report"
+    }
+  ],
+  "previousRound": null
+}

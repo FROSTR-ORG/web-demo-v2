@@ -58,6 +58,7 @@ For cross-flow assertions starting from the main app `/`, the initial state is d
 - On some screens, accessible text extraction may concatenate adjacent number+label text (example: `12saved profiles`); for such cases, combine URL/screenshot evidence with robust text checks instead of a single exact-string wait.
 - Some list screens reuse identical button labels (e.g., multiple `Rotate` buttons in welcome variants); prefer row-scoped selectors or snapshot refs to avoid ambiguous clicks.
 - In the create happy path, `Finish Distribution` may remain disabled until remote package handoff actions are completed on `/create/distribute`; complete required Copy/QR actions before asserting completion navigation.
+- In main-app import flow checks (`/import`, `/import/decrypt`), Continue/Decrypt CTAs stay disabled until required inputs are populated (backup text and passwords); provide sample values before asserting navigation.
 
 ## Flow Validator Guidance: browser-ui
 
