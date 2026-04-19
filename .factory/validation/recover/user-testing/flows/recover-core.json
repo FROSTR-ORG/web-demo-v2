@@ -1,0 +1,100 @@
+{
+  "groupId": "recover-core",
+  "testedAt": "2026-04-19T22:14:50Z",
+  "isolation": {
+    "appUrl": "http://127.0.0.1:5173",
+    "surface": "browser-ui",
+    "browserSession": "recover-core",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-REC-001",
+      "title": "Recover Collect Shares renders incompatible-shares variant",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Navigate to /demo/recover-collect-shares",
+          "expected": "Recover Collect Shares scenario loads",
+          "observed": "Loaded http://127.0.0.1:5173/demo/recover-collect-shares"
+        },
+        {
+          "action": "Verify core content",
+          "expected": "Recover NSEC heading, subtitle, Loaded badges, Incompatible Shares alert, and share chips are visible; Recover NSEC button is disabled",
+          "observed": "All listed copy/alert content visible; Recover NSEC button reported disabled in snapshot"
+        },
+        {
+          "action": "Check paste input availability",
+          "expected": "Paste input accepts text",
+          "observed": "No input/textarea/textbox elements present in DOM (allInputsCount=0)"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "recover/recover-core/VAL-REC-001-recover-collect-shares.png"
+        ],
+        "consoleErrors": "none (agent-browser errors: [])",
+        "network": "No relevant API traffic observed; UI loaded from local SPA origin."
+      },
+      "issues": "Expected paste input was not present on /demo/recover-collect-shares."
+    },
+    {
+      "id": "VAL-REC-002",
+      "title": "Recover Success renders with copy/reveal interactions",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Navigate to /demo/recover-success",
+          "expected": "Recover success screen with warning callout, masked/revealed labels, and Copy/Reveal/Clear controls",
+          "observed": "Expected sections and controls are visible"
+        },
+        {
+          "action": "Click Copy to Clipboard",
+          "expected": "Copied confirmation appears",
+          "observed": "Copied! became visible after click"
+        },
+        {
+          "action": "Click Reveal",
+          "expected": "NSEC visibility toggles",
+          "observed": "No visible toggle change; full nsec text was already visible before click and remained visible after click; button label stayed 'Reveal'"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "recover/recover-core/VAL-REC-002-recover-success-initial.png",
+          "recover/recover-core/VAL-REC-002-recover-success-after-copy.png",
+          "recover/recover-core/VAL-REC-002-recover-success-after-reveal-click.png"
+        ],
+        "consoleErrors": "none (agent-browser errors: [])",
+        "network": "No relevant API traffic observed; only local static asset requests."
+      },
+      "issues": "Reveal interaction did not toggle NSEC visibility."
+    },
+    {
+      "id": "VAL-REC-003",
+      "title": "Recover Clear action re-masks the NSEC",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "On /demo/recover-success, click Reveal then click Clear",
+          "expected": "Clear removes revealed full nsec and returns to masked display",
+          "observed": "After Clear, full nsec text no longer present and masked nsec snippet remained visible"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "recover/recover-core/VAL-REC-003-recover-success-after-clear.png"
+        ],
+        "consoleErrors": "none (agent-browser errors: [])",
+        "network": "No relevant API traffic observed during interaction."
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 3 assertions: 1 passed, 2 failed. Failures: VAL-REC-001 (missing paste input) and VAL-REC-002 (Reveal did not toggle NSEC visibility)."
+}
