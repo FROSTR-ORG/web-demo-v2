@@ -1,0 +1,71 @@
+import { Button } from "../../../components/ui";
+import type { PeerStatus } from "../../../lib/bifrost/types";
+import { EventLogPanel } from "../panels/EventLogPanel";
+import { PeersPanel } from "../panels/PeersPanel";
+import { PendingApprovalsPanel } from "../panels/PendingApprovalsPanel";
+
+export function RunningState({
+  relays,
+  onlineCount,
+  signReadyLabel,
+  peers,
+  pendingOperations,
+  paperPanels,
+  onStop,
+  onLock,
+  onRefresh,
+}: {
+  relays: string[];
+  onlineCount: number;
+  signReadyLabel: string;
+  peers: PeerStatus[];
+  pendingOperations: unknown[];
+  paperPanels: boolean;
+  onStop: () => void;
+  onLock: () => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <>
+      <div className="dash-status-card">
+        <div className="dash-status-row">
+          <div className="dash-status-info">
+            <span className="status-light" />
+            <div className="dash-status-text">
+              <div className="dash-status-title">Signer Running</div>
+              <div className="help">Connected to {relays.join(", ")}</div>
+            </div>
+          </div>
+          <div className="inline-actions">
+            <Button type="button" variant="danger" onClick={onStop}>
+              Stop Signer
+            </Button>
+            <Button type="button" variant="ghost" onClick={onLock}>
+              Lock
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <PeersPanel
+        peers={peers}
+        onlineCount={onlineCount}
+        signReadyLabel={signReadyLabel}
+        paperPanels={paperPanels}
+        onRefresh={onRefresh}
+      />
+
+      {paperPanels ? (
+        <>
+          <EventLogPanel />
+          <PendingApprovalsPanel />
+        </>
+      ) : pendingOperations.length > 0 ? (
+        <div className="panel panel-pad">
+          <div className="value">Pending Operations</div>
+          <div className="help">{pendingOperations.length} operation(s) currently pending.</div>
+        </div>
+      ) : null}
+    </>
+  );
+}

@@ -1,0 +1,72 @@
+import { Button } from "../../../components/ui";
+
+export function RelaysOfflineState({
+  onStop,
+  onRetry,
+}: {
+  onStop: () => void;
+  onRetry: () => void;
+}) {
+  return (
+    <>
+      <div className="dash-hero-card">
+        <div className="dash-hero-content">
+          <div className="dash-hero-indicator">
+            <span className="status-light" />
+            <span className="dash-hero-title green">Signer Running</span>
+          </div>
+          <p className="dash-hero-copy">
+            Runtime is active, but every configured relay is currently unreachable. Signing and sync are degraded until connectivity returns.
+          </p>
+        </div>
+        <div className="dash-hero-action">
+          <Button type="button" variant="danger" onClick={onStop}>
+            Stop Signer
+          </Button>
+        </div>
+      </div>
+
+      <div className="dash-two-col">
+        <div className="dash-info-panel">
+          <div className="dash-panel-kicker">Readiness</div>
+
+          <div className="dash-readiness-row">
+            <div className="dash-readiness-orbit">
+              <div className="dash-readiness-orbit-inner">
+                <span className="dash-readiness-dot offline" />
+              </div>
+            </div>
+            <div className="dash-readiness-labels">
+              <span className="dash-readiness-status">Offline</span>
+              <span className="help">—</span>
+            </div>
+            <div className="dash-readiness-detail">
+              <div className="dash-readiness-title">All Relays Offline</div>
+              <p className="dash-readiness-desc">
+                Peer presence and pool exchange pause when no relay route is available.
+              </p>
+            </div>
+          </div>
+
+          <div className="dash-badge-row">
+            <span className="dash-badge red">0 / 2 relays reachable</span>
+            <span className="dash-badge amber">Ready count degraded</span>
+          </div>
+        </div>
+
+        <div className="dash-info-panel">
+          <div className="dash-panel-kicker">Recovery</div>
+          <p className="dash-info-line">
+            Check network reachability, relay DNS resolution, and local firewall state. Relay sessions will automatically recover when a route is available.
+          </p>
+          <div className="dash-info-note">
+            Signing requests remain blocked or degraded here because runtime has no live relay path to peers.
+          </div>
+          <Button type="button" variant="primary" onClick={onRetry}>
+            Retry Connections
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+}
