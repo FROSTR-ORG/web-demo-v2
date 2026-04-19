@@ -49,7 +49,7 @@ export function CreateProfileScreen() {
   return (
     <AppShell headerMeta={createSession.draft.groupName} mainVariant="flow">
       <form className="screen-column" onSubmit={submit}>
-        <Stepper current={2} variant="create" />
+        <Stepper current={2} variant="shared" />
         <BackLink onClick={() => navigate("/create")} />
         <PageHeading
           title="Create Profile"
@@ -157,7 +157,7 @@ export function CreateProfileScreen() {
         </div>
 
         {error ? <div className="error">{error}</div> : null}
-        <Button type="submit" size="full" disabled={busy}>
+        <Button type="submit" size="full" disabled={busy || !confirmMatches}>
           {busy ? "Creating Profile..." : "Continue to Distribute Shares"}
         </Button>
       </form>

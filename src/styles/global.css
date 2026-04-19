@@ -362,6 +362,13 @@ a {
   background: var(--ig-blue-strong);
 }
 
+.button-primary:disabled,
+.button-primary[aria-disabled="true"] {
+  background: #2563EB40;
+  color: rgba(255, 255, 255, 0.4);
+  opacity: 1;
+}
+
 .button-secondary {
   color: rgba(96, 165, 250, 0.75);
   background: rgba(30, 58, 138, 0.15);
@@ -599,6 +606,20 @@ a {
 
 .input-shell .input {
   padding-right: 44px;
+}
+
+.input-shell .input.input-has-leading {
+  padding-left: 40px;
+}
+
+.input-leading {
+  position: absolute;
+  left: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+  pointer-events: none;
 }
 
 .password-input {
@@ -1224,6 +1245,10 @@ a {
 
 .package-actions {
   gap: 8px;
+}
+
+.package-actions.locked {
+  opacity: 0.4;
 }
 
 .password-lock-row {

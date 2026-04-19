@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { EyeOff } from "lucide-react";
+import { EyeOff, Pencil } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppState } from "../app/AppState";
@@ -75,7 +75,8 @@ export function CreateKeysetScreen() {
             setGroupName(event.target.value);
             if (fieldErrors.groupName) setFieldErrors((prev) => ({ ...prev, groupName: undefined }));
           }}
-          help="A friendly name for this keyset's group profile. Visible to all peers."
+          leading={<Pencil size={16} />}
+          help="A friendly name for this keyset's group profile. Visible to all peers in the keyset."
           error={fieldErrors.groupName}
         />
         <div className="field">
@@ -122,7 +123,7 @@ export function CreateKeysetScreen() {
           />
         </div>
         <div className="help">
-          The minimum number of shares required to sign. Must be at least 2 and no more than the total number of keys.
+          Any {threshold} of {count} shares can sign — min threshold is 2, min shares is 3
         </div>
         {error ? <div className="error">{error}</div> : null}
         <Button type="submit" size="full" disabled={busy}>

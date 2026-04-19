@@ -44,7 +44,7 @@ export function DistributeSharesScreen() {
             const distributed = pkg.copied || pkg.qrShown;
             const locked = demoUi.shared?.lockedPackageIndexes?.includes(pkg.idx) ?? false;
             return (
-              <div className="package-card" key={pkg.idx}>
+              <div className={`package-card${locked ? " locked" : ""}`} key={pkg.idx}>
                 <div className="package-head">
                   <div className="package-title-row">
                     <div className="package-title">Share {pkg.idx + 1}</div>
@@ -53,19 +53,7 @@ export function DistributeSharesScreen() {
                   <StatusPill tone={distributed ? "success" : "warning"}>{distributed ? "Distributed" : "Not distributed"}</StatusPill>
                 </div>
                 <div className="help">Member {shortHex(pkg.memberPubkey)}</div>
-                <div className="copy-block">
-                  <SecretDisplay value={PAPER_MASKED_PACKAGE} />
-                  <Button
-                    type="button"
-                    variant="chip"
-                    size="sm"
-                    disabled={locked}
-                    onClick={() => updatePackageState(pkg.idx, { copied: true })}
-                  >
-                    <Copy size={13} />
-                    Copy
-                  </Button>
-                </div>
+                <SecretDisplay value={PAPER_MASKED_PACKAGE} />
                 <div className="field">
                   <span className="kicker">Package Password</span>
                   <div className="password-lock-row">
@@ -79,7 +67,17 @@ export function DistributeSharesScreen() {
                     )}
                   </div>
                 </div>
-                <div className="package-actions">
+                <div className={`package-actions${locked ? " locked" : ""}`}>
+                  <Button
+                    type="button"
+                    variant="chip"
+                    size="sm"
+                    disabled={locked}
+                    onClick={() => updatePackageState(pkg.idx, { copied: true })}
+                  >
+                    <Copy size={13} />
+                    Copy
+                  </Button>
                   <QrButton value={pkg.packageText} disabled={locked} onShown={() => updatePackageState(pkg.idx, { qrShown: true })} />
                 </div>
               </div>

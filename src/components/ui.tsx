@@ -47,13 +47,15 @@ export function TextField({
   help,
   error,
   trailing,
+  leading,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { label: string; help?: string; error?: string; trailing?: ReactNode }) {
+}: InputHTMLAttributes<HTMLInputElement> & { label: string; help?: string; error?: string; trailing?: ReactNode; leading?: ReactNode }) {
   return (
     <label className="field">
       <span className="label">{label}</span>
-      <span className="input-shell">
-        <input {...props} className={`input${error ? " input-error" : ""}`} />
+      <span className={`input-shell${leading ? " input-shell-with-leading" : ""}`}>
+        {leading ? <span className="input-leading">{leading}</span> : null}
+        <input {...props} className={`input${error ? " input-error" : ""}${leading ? " input-has-leading" : ""}`} />
         {trailing ? <span className="input-trailing">{trailing}</span> : null}
       </span>
       {help && !error ? <span className="help">{help}</span> : null}
@@ -131,8 +133,8 @@ export function NumberStepper({
 
 export function Stepper({ current, variant = "create" }: { current: 1 | 2 | 3; variant?: "create" | "shared" | "rotate-keyset" }) {
   const step1Label = variant === "rotate-keyset" ? "Rotate Keyset" : variant === "create" ? "Create" : "Create / Rotate";
-  const step2Label = variant === "create" ? "Setup Profile" : "Create Profile";
-  const step3Label = variant === "create" ? "Onboard Devices" : "Distribute Shares";
+  const step2Label = "Create Profile";
+  const step3Label = "Distribute Shares";
   const steps = [
     { n: 1, label: step1Label },
     { n: 2, label: step2Label },

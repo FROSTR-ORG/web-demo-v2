@@ -114,6 +114,53 @@ describe("CreateKeysetScreen", () => {
       expect(screen.getByText("Keyset name is required.")).toBeInTheDocument();
     });
   });
+
+  it("renders canonical create Stepper labels (VAL-CRT-002)", () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>
+    );
+    // Stepper step 1 "Create"; step 2 "Create Profile"; step 3 "Distribute Shares"
+    expect(screen.getByText("Create Profile")).toBeInTheDocument();
+    expect(screen.getByText("Distribute Shares")).toBeInTheDocument();
+    expect(screen.queryByText("Setup Profile")).not.toBeInTheDocument();
+    expect(screen.queryByText("Onboard Devices")).not.toBeInTheDocument();
+  });
+
+  it("renders canonical Keyset Name help text including 'peers in the keyset' (VAL-CRT-003)", () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>
+    );
+    expect(
+      screen.getByText("A friendly name for this keyset's group profile. Visible to all peers in the keyset.")
+    ).toBeInTheDocument();
+  });
+
+  it("renders dynamic threshold/shares help line and re-interpolates on stepper change (VAL-CRT-004/013)", () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>
+    );
+    expect(
+      screen.getByText("Any 2 of 3 shares can sign — min threshold is 2, min shares is 3")
+    ).toBeInTheDocument();
+
+    // Click the Total Shares + button to go 3 -> 4
+    fireEvent.click(screen.getByLabelText("Increase Total Shares"));
+    expect(
+      screen.getByText("Any 2 of 4 shares can sign — min threshold is 2, min shares is 3")
+    ).toBeInTheDocument();
+
+    // Click Threshold + to go 2 -> 3
+    fireEvent.click(screen.getByLabelText("Increase Threshold"));
+    expect(
+      screen.getByText("Any 3 of 4 shares can sign — min threshold is 2, min shares is 3")
+    ).toBeInTheDocument();
+  });
 });
 
 /* ==========================================================
