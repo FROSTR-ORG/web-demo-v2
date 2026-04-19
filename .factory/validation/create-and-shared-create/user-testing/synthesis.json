@@ -1,29 +1,27 @@
 {
   "milestone": "create-and-shared-create",
-  "round": 2,
-  "status": "fail",
+  "round": 3,
+  "status": "pass",
   "assertionsSummary": {
-    "total": 5,
-    "passed": 4,
-    "failed": 1,
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
     "blocked": 0
   },
   "passedAssertions": [
-    "VAL-CRT-007",
-    "VAL-SHR-005",
-    "VAL-SHR-008",
-    "VAL-SHR-011"
+    "VAL-CRT-012"
   ],
-  "failedAssertions": [
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [
     {
-      "id": "VAL-CRT-012",
-      "reason": "Flow did not progress beyond /create/profile, so stepper progression to /create/distribute and /create/complete could not be validated."
+      "target": "user-testing.md",
+      "description": "Documented that create flow completion CTA can remain disabled until remote package handoff actions are completed in Distribute Shares.",
+      "source": "flow-report"
     }
   ],
-  "blockedAssertions": [],
-  "appliedUpdates": [],
-  "previousRound": ".factory/validation/create-and-shared-create/user-testing/synthesis.round1.json",
+  "previousRound": ".factory/validation/create-and-shared-create/user-testing/synthesis.round2.json",
   "flowReports": [
-    ".factory/validation/create-and-shared-create/user-testing/flows/rerun-round2-core.json"
+    ".factory/validation/create-and-shared-create/user-testing/flows/rerun-round3-core.json"
   ]
 }

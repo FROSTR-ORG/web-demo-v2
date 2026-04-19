@@ -1,0 +1,29 @@
+{
+  "milestone": "create-and-shared-create",
+  "round": 2,
+  "status": "fail",
+  "assertionsSummary": {
+    "total": 5,
+    "passed": 4,
+    "failed": 1,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-CRT-007",
+    "VAL-SHR-005",
+    "VAL-SHR-008",
+    "VAL-SHR-011"
+  ],
+  "failedAssertions": [
+    {
+      "id": "VAL-CRT-012",
+      "reason": "Flow did not progress beyond /create/profile, so stepper progression to /create/distribute and /create/complete could not be validated."
+    }
+  ],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "previousRound": ".factory/validation/create-and-shared-create/user-testing/synthesis.round1.json",
+  "flowReports": [
+    ".factory/validation/create-and-shared-create/user-testing/flows/rerun-round2-core.json"
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "groupId": "rerun-round3-core",
+  "testedAt": "2026-04-19T20:30:57Z",
+  "isolation": {
+    "surface": "browser-ui",
+    "appUrl": "http://127.0.0.1:5173",
+    "browserSession": "rerun-round3-core-browser",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "assertionScope": [
+      "VAL-CRT-012"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-CRT-012",
+      "title": "Full Create → Shared happy path",
+      "status": "pass",
+      "reproductionSteps": [
+        "Navigate to http://127.0.0.1:5173/demo/create-keyset and click 'Create Keyset'.",
+        "Verify route progression to /create/progress and auto-advance to /create/profile.",
+        "At /create/profile, confirm no 'invalid input: Invalid group package' message, fill Password + Confirm Password, then continue.",
+        "On /create/distribute, perform package handoff actions (Copy/QR for remote packages) and continue to /create/complete.",
+        "On /create/complete, click 'Finish Distribution' and verify navigation to /dashboard/{profileId}."
+      ],
+      "observations": [
+        "Observed URL progression: /create/progress -> /create/profile -> /create/distribute -> /create/complete -> /dashboard/a62c6e300a1d759cafa27aabf212d2d7675c1e1eadfa48448e1406744fbe3830.",
+        "No blocking 'invalid input: Invalid group package' error appeared on /create/profile.",
+        "Console log and page error captures are empty (no errors recorded during flow)."
+      ],
+      "evidence": {
+        "urlTrace": "create-and-shared-create/rerun-round3-core/VAL-CRT-012-url-trace.log",
+        "screenshots": [
+          "create-and-shared-create/rerun-round3-core/VAL-CRT-012-01-demo-create-keyset.png",
+          "create-and-shared-create/rerun-round3-core/VAL-CRT-012-02-create-progress.png",
+          "create-and-shared-create/rerun-round3-core/VAL-CRT-012-03-create-profile.png",
+          "create-and-shared-create/rerun-round3-core/VAL-CRT-012-03b-create-profile-passwords-filled.png",
+          "create-and-shared-create/rerun-round3-core/VAL-CRT-012-04-create-distribute.png",
+          "create-and-shared-create/rerun-round3-core/VAL-CRT-012-04b-create-distribute-after-actions.png",
+          "create-and-shared-create/rerun-round3-core/VAL-CRT-012-05-create-complete.png",
+          "create-and-shared-create/rerun-round3-core/VAL-CRT-012-05b-create-complete-ready.png",
+          "create-and-shared-create/rerun-round3-core/VAL-CRT-012-06-dashboard-final.png"
+        ],
+        "consoleLog": "create-and-shared-create/rerun-round3-core/VAL-CRT-012-console.log",
+        "pageErrorsLog": "create-and-shared-create/rerun-round3-core/VAL-CRT-012-page-errors.log",
+        "profileTextCapture": "create-and-shared-create/rerun-round3-core/VAL-CRT-012-profile-body.txt"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "'Finish Distribution' was initially disabled at /create/complete until remote package handoff actions were performed on /create/distribute.",
+      "resolved": true,
+      "resolution": "Returned to /create/distribute, completed Copy/QR actions for remote packages, then proceeded to /create/complete where 'Finish Distribution' became enabled.",
+      "affectedAssertions": [
+        "VAL-CRT-012"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "VAL-CRT-012 passed on rerun: full create happy path progressed through /create/progress, /create/profile, /create/distribute, /create/complete, and finished at /dashboard/{profileId} with no console/page errors and no invalid group package blocker at /create/profile."
+}
