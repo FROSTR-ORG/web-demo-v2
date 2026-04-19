@@ -568,6 +568,21 @@ a {
   background: var(--ig-border-soft);
 }
 
+.section-info-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(151, 179, 255, 0.45);
+  color: rgba(151, 179, 255, 0.8);
+  font-family: "Roboto Mono", monospace;
+  font-size: 9px;
+  line-height: 9px;
+}
+
 .section-copy {
   font-size: 14px;
   line-height: 20px;

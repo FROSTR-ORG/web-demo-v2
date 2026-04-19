@@ -18,9 +18,9 @@ export function CreateProfileScreen() {
     deviceName: demoUi.shared?.profileNamePreset ?? defaultProfileDraft().deviceName,
     password: presetPassword,
     confirmPassword: presetPassword,
-    relays: demoUi.shared?.relayPreset ? ["wss://relay.primal.net", "wss://relay.damus.io", demoUi.shared.relayPreset] : defaultProfileDraft().relays
+    relays: demoUi.shared?.relayPreset ? ["wss://relay.primal.net", demoUi.shared.relayPreset] : defaultProfileDraft().relays
   }));
-  const [relayInput, setRelayInput] = useState(demoUi.shared?.relayPreset ?? "wss://");
+  const [relayInput, setRelayInput] = useState("wss://");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -81,7 +81,7 @@ export function CreateProfileScreen() {
         </div>
 
         <div className="password-group">
-          <SectionHeader title="Profile Password" copy="This password encrypts your profile on this device. You'll need it each time you unlock it." />
+          <SectionHeader title="Profile Password" copy="This password encrypts your profile on this device. You'll need it each time you unlock it." infoIcon />
           <div className="profile-password-row">
             <PasswordField label="Password" value={draft.password} onChange={(event) => setDraft((current) => ({ ...current, password: event.target.value }))} />
             <PasswordField

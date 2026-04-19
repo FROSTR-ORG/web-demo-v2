@@ -30,11 +30,16 @@ export function BackLink({ onClick, label = "Back" }: { onClick: () => void; lab
   );
 }
 
-export function SectionHeader({ title, copy }: { title: string; copy?: string }) {
+export function SectionHeader({ title, copy, infoIcon = false }: { title: string; copy?: string; infoIcon?: boolean }) {
   return (
     <div className="section-block">
       <div className="section-title-row">
         <div className="section-title">{title}</div>
+        {infoIcon ? (
+          <span className="section-info-dot" aria-hidden="true">
+            i
+          </span>
+        ) : null}
         <div className="section-rule" />
       </div>
       {copy ? <p className="section-copy">{copy}</p> : null}

@@ -37,15 +37,15 @@ export function DistributionCompleteScreen() {
           <div className="completion-list">
             {createSession.onboardingPackages.map((pkg, index) => {
               const distributed = pkg.copied || pkg.qrShown;
-              const paperRows = [
-                { title: "Member #1 - Igloo Mobile", device: "Existing Device", status: "Copied" },
-                { title: "Member #2 - Igloo Desktop", device: "New Device", status: "QR shown" }
+              const paperRows: { title: string; device: string; statuses: string[] }[] = [
+                { title: "Member #1 - Igloo Mobile", device: "Existing Device", statuses: ["Copied", "QR shown"] },
+                { title: "Member #2 - Igloo Desktop", device: "New Device", statuses: ["QR shown"] }
               ];
               const paperRow = demoUi.shared?.completionPreset ? paperRows[index] : undefined;
               return (
                 <div className="completion-row" key={pkg.idx}>
                   <div className="completion-main">
-                    <span className={`completion-check ${distributed ? "" : "pending"}`}>
+                    <span className={`completion-check ${paperRow || distributed ? "" : "pending"}`}>
                       <Check size={13} />
                     </span>
                     <span>
@@ -54,10 +54,16 @@ export function DistributionCompleteScreen() {
                     </span>
                   </div>
                   <div className="inline-actions">
-                    {paperRow ? <span className="completion-status-ok">{paperRow.status}</span> : null}
+                    {paperRow
+                      ? paperRow.statuses.map((status) => (
+                          <span key={status} className="completion-status-ok">
+                            {status}
+                          </span>
+                        ))
+                      : null}
                     {!paperRow && pkg.copied ? <span className="completion-status-ok">Copied</span> : null}
                     {!paperRow && pkg.qrShown ? <span className="completion-status-ok">QR shown</span> : null}
-                    {!distributed ? <span className="help">Pending</span> : null}
+                    {!paperRow && !distributed ? <span className="help">Pending</span> : null}
                   </div>
                 </div>
               );
