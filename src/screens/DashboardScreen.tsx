@@ -1,4 +1,4 @@
-import { ChevronDown, Download, FileText, HelpCircle, RotateCw, Settings, SlidersHorizontal, X } from "lucide-react";
+import { ChevronDown, Clock, Download, FileText, HelpCircle, RotateCw, Settings, SlidersHorizontal, X, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAppState } from "../app/AppState";
@@ -8,6 +8,7 @@ import { shortHex } from "../lib/bifrost/format";
 import type { PeerStatus } from "../lib/bifrost/types";
 
 type DashboardState = "running" | "connecting" | "stopped" | "relays-offline" | "signing-blocked";
+type ModalState = "none" | "policy-prompt" | "signing-failed";
 
 export function DashboardScreen() {
   const { profileId } = useParams();
@@ -15,6 +16,7 @@ export function DashboardScreen() {
   const { activeProfile, runtimeStatus, lockProfile, refreshRuntime } = useAppState();
   const [mockState, setMockState] = useState<DashboardState>("running");
   const [showPolicies, setShowPolicies] = useState(false);
+  const [activeModal, setActiveModal] = useState<ModalState>("none");
 
   if (!profileId) {
     return <Navigate to="/" replace />;
@@ -82,6 +84,25 @@ export function DashboardScreen() {
             <option value="relays-offline">All Relays Offline</option>
             <option value="signing-blocked">Signing Blocked</option>
           </select>
+          <div className="dash-modal-triggers">
+            <span className="dash-modal-trigger-label">Modals:</span>
+            <button
+              type="button"
+              className="dash-modal-trigger-btn"
+              onClick={() => setActiveModal("policy-prompt")}
+              aria-label="Open Policy Prompt"
+            >
+              Policy Prompt
+            </button>
+            <button
+              type="button"
+              className="dash-modal-trigger-btn"
+              onClick={() => setActiveModal("signing-failed")}
+              aria-label="Open Signing Failed"
+            >
+              Signing Failed
+            </button>
+          </div>
         </div>
 
         {/* Summary bar — shared across all states */}
@@ -145,6 +166,14 @@ export function DashboardScreen() {
           </>
         )}
       </section>
+
+      {/* Modal overlays */}
+      {activeModal === "policy-prompt" && (
+        <SignerPolicyPromptModal onClose={() => setActiveModal("none")} />
+      )}
+      {activeModal === "signing-failed" && (
+        <SigningFailedModal onClose={() => setActiveModal("none")} />
+      )}
     </AppShell>
   );
 }
@@ -653,6 +682,146 @@ function PeerRow({ peer }: { peer: PeerStatus }) {
         )}
       </div>
       <div className="latency-slot">{peer.online ? "Ready" : "Offline"}</div>
+    </div>
+  );
+}
+
+/* ========================================
+   Signer Policy Prompt Modal
+   ======================================== */
+function SignerPolicyPromptModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="policy-modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="policy-modal" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="policy-modal-header">
+          <div className="policy-modal-header-row">
+            <div className="policy-modal-title-group">
+              <div className="policy-modal-icon">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M10 1L18 5.5V14.5L10 19L2 14.5V5.5L10 1Z" stroke="#EAB308" strokeWidth="1.5" fill="none" />
+                  <path d="M10 7V11M10 13V13.5" stroke="#EAB308" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </div>
+              <h2 className="policy-modal-title">Signer Policy</h2>
+            </div>
+            <button type="button" className="policy-modal-close" onClick={onClose} aria-label="Close modal">
+              <X size={16} />
+            </button>
+          </div>
+          <p className="policy-modal-subtitle">
+            A peer is requesting permission to sign on your behalf
+          </p>
+        </div>
+
+        {/* Request info */}
+        <div className="policy-modal-request">
+          <span className="policy-request-badge">SIGN</span>
+          <span className="policy-request-peer">from Peer #2</span>
+          <span className="policy-request-key">029c4a...1f5e</span>
+          <span className="policy-request-domain"> · primal.net</span>
+        </div>
+
+        {/* Details table */}
+        <div className="policy-details-table">
+          <div className="policy-detail-row">
+            <span className="policy-detail-label">EVENT KIND</span>
+            <span className="policy-detail-value">kind:1 (Short Text Note)</span>
+          </div>
+          <div className="policy-detail-row">
+            <span className="policy-detail-label">CONTENT</span>
+            <span className="policy-detail-value">&ldquo;gm nostr, anyone up for a coffee meetup...&rdquo;</span>
+          </div>
+          <div className="policy-detail-row">
+            <span className="policy-detail-label">PUBKEY</span>
+            <span className="policy-detail-value mono">029c4a...1f5e</span>
+          </div>
+          <div className="policy-detail-row">
+            <span className="policy-detail-label">DOMAIN</span>
+            <span className="policy-detail-value bold">primal.net</span>
+          </div>
+        </div>
+
+        {/* Expiration timer */}
+        <div className="policy-expiry">
+          <Clock size={14} />
+          <span>Expires in 42s</span>
+        </div>
+
+        {/* Action buttons — 3 rows × 2 buttons */}
+        <div className="policy-actions">
+          <div className="policy-action-row">
+            <button type="button" className="policy-btn deny" onClick={onClose}>
+              Deny
+            </button>
+            <button type="button" className="policy-btn allow" onClick={onClose}>
+              Allow once
+            </button>
+          </div>
+          <div className="policy-action-row">
+            <button type="button" className="policy-btn allow-outline" onClick={onClose}>
+              Always allow
+            </button>
+            <button type="button" className="policy-btn allow-outline" onClick={onClose}>
+              Always for kind:1
+            </button>
+          </div>
+          <div className="policy-action-row">
+            <button type="button" className="policy-btn deny-outline" onClick={onClose}>
+              Always deny for kind:1
+            </button>
+            <button type="button" className="policy-btn deny-outline" onClick={onClose}>
+              Always deny for primal.net
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========================================
+   Signing Failed Modal
+   ======================================== */
+function SigningFailedModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="policy-modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="signing-failed-modal" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="signing-failed-header">
+          <div className="signing-failed-title-group">
+            <div className="signing-failed-icon">
+              <XCircle size={20} color="#EF4444" />
+            </div>
+            <h2 className="signing-failed-title">Signing Failed</h2>
+          </div>
+          <button type="button" className="policy-modal-close" onClick={onClose} aria-label="Close modal">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="signing-failed-body">
+          <p className="signing-failed-description">
+            Unable to complete signature for event kind:1. All 3 retry attempts exhausted.
+          </p>
+          <div className="signing-failed-code">
+            <span className="signing-failed-code-text">
+              Round: r-0x4f2a · Peers responded: 1/2 · Error: insufficient partial signatures
+            </span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="signing-failed-actions">
+          <button type="button" className="signing-failed-dismiss" onClick={onClose}>
+            Dismiss
+          </button>
+          <button type="button" className="signing-failed-retry" onClick={onClose}>
+            Retry
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
