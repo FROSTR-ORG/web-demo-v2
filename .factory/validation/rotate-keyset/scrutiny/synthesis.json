@@ -1,0 +1,61 @@
+{
+  "milestone": "rotate-keyset",
+  "round": 1,
+  "status": "pass",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx vitest run --config vitest.config.ts --maxWorkers=4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx tsc -b",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [
+    {
+      "target": "library",
+      "description": "Updated .factory/library/architecture.md to reflect that App composes CoreRoutes (not a flat App.tsx route table), documented current route groups including rotate-keyset adaptation routes, and clarified the validation-contract exception for literal utility-style class tokens.",
+      "sourceFeature": "rotate-keyset-adaptation-fidelity"
+    }
+  ],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": ".factory/skills/ui-builder/SKILL.md",
+      "suggestion": "Clarify agent-browser usage expectations so the procedure explicitly allows either invoking the agent-browser skill or running the approved `agent-browser --session ...` CLI workflow via Execute.",
+      "evidence": "Two rotate-keyset reviews observed transcript executions using direct agent-browser CLI while SKILL instructions mandate invoking the skill, causing avoidable procedure-deviation ambiguity.",
+      "isSystemic": true
+    },
+    {
+      "target": ".factory/skills/ui-builder/SKILL.md",
+      "suggestion": "Add an explicit exception that literal Paper/validation token classes (e.g. `bg-[#EF44441A]`) are permitted when contract assertions require exact class evidence, to align with mission AGENTS guidance.",
+      "evidence": "rotate-keyset-core-fidelity required token classes for VAL-RTK-001 while ui-builder skill currently says not to use Tailwind utility classes, creating conflicting guidance.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Duplicate architecture-doc staleness report from multiple reviews.",
+      "reason": "duplicate"
+    },
+    {
+      "observation": "Duplicate agent-browser invocation mismatch report from multiple reviews.",
+      "reason": "duplicate"
+    }
+  ],
+  "previousRound": null
+}

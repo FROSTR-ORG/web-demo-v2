@@ -1,0 +1,26 @@
+{
+  "featureId": "rotate-keyset-core-fidelity",
+  "reviewedAt": "2026-04-19T22:48:19Z",
+  "commitId": "18136f2",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Commit 18136f2 resolves the two declared core-fidelity audit gaps (disabled intake CTA visual and removal of the top BackLink on group-mismatch) and retains required retry CTA routing/error-state content for the reviewed rotate-keyset core screens. No blocking or non-blocking code defects were found in the reviewed diff.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-builder skill contains guidance that conflicts with mission conventions: it says not to use Tailwind utility classes, while mission AGENTS explicitly requires exact Tailwind-style token classes when quoted by the validation contract.",
+      "evidence": "web-demo-v2/.factory/skills/ui-builder/SKILL.md:91 ('Do NOT use Tailwind utility classes') vs mission AGENTS.md:49 (exception requiring quoted classes like bg-[#EF44441A]); reviewed commit uses class token bg-[#2563EB40] in src/screens/RotateKeysetScreens.tsx for VAL-RTK-001."
+    },
+    {
+      "area": "skills",
+      "observation": "The ui-builder skill procedure says to invoke the agent-browser skill, but actual worker execution used direct agent-browser CLI commands via Execute; this mismatch should be clarified to reduce procedural ambiguity.",
+      "evidence": "web-demo-v2/.factory/skills/ui-builder/SKILL.md:33 and :128 instruct 'Invoke agent-browser skill'; transcript skeleton for workerSessionId cdeba91d-2c33-42d1-bf87-5abeb2deab85 shows Execute commands beginning with 'agent-browser --session ...' and no Skill call for agent-browser."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Pass: rotate-keyset-core-fidelity implementation is acceptable with no code issues found in commit 18136f2; two documentation/procedure alignment observations were recorded for shared state."
+}

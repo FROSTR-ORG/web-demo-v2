@@ -1,0 +1,26 @@
+{
+  "featureId": "rotate-keyset-add-adaptation-scenarios",
+  "reviewedAt": "2026-04-19T22:48:52Z",
+  "commitId": "d6b19ed",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Implementation satisfies the feature scope: three rotate-keyset adaptation demo scenarios were added with correct IDs/paths/flow, canonical behavior is preserved, and CoreRoutes already contains the corresponding rotate-keyset adaptation routes. The added test covers VAL-RTK-010 by asserting scenario presence/path and rotate-keyset stepper labels when rendered through CoreRoutes.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-builder skill says to invoke the agent-browser skill for manual verification, but worker transcripts commonly run agent-browser via Execute CLI directly; this can create false \"procedure deviation\" ambiguity even when verification is correctly done.",
+      "evidence": ".factory/skills/ui-builder/SKILL.md:31-33 and 126-129 vs mission worker transcript line 30 (workerSessionId fe4b3741-c87c-447e-b1ef-ec7bc404b4be) showing `## Tool: Execute` calls like `agent-browser --session ...`."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Architecture shared-state routing docs are stale and can mislead route-related features: they describe App.tsx as the flat route table and omit many active routes (including rotate-keyset adaptation routes), while the current app delegates to CoreRoutes.",
+      "evidence": ".factory/library/architecture.md:17-27 lists only a minimal App.tsx route table; src/app/App.tsx:2,8-12 uses CoreRoutes; src/app/CoreRoutes.tsx:61-63 contains /rotate-keyset/profile|distribute|complete."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "PASS: d6b19ed correctly adds rotate-keyset adaptation scenarios and test coverage for VAL-RTK-010, with expected route wiring present in CoreRoutes. No feature-blocking defects found."
+}

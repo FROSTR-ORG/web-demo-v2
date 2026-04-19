@@ -1,0 +1,21 @@
+{
+  "featureId": "rotate-keyset-adaptation-fidelity",
+  "reviewedAt": "2026-04-19T22:49:02Z",
+  "commitId": "85bc35c",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Reviewed handoff, transcript skeleton, and commit 85bc35c. The rotate-keyset adaptation screens satisfy the feature description and expected behavior: create-profile uses rotate stepper state and required sections/copy, distribute renders the three required share cards with fresh-share language and locked Share 3 actions, and completion renders the required member rows/success card with finish navigation to dashboard profile.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "knowledge",
+      "observation": "Library architecture routing docs are stale for current app scope and omit rotate-keyset routes, so workers must inspect CoreRoutes directly for accurate route coverage.",
+      "evidence": ".factory/library/architecture.md:15-27 lists only /create* and /dashboard routes; transcript shows worker reading src/app/CoreRoutes.tsx to determine actual rotate-keyset paths."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Feature passes scrutiny. Implementation and tests in commit 85bc35c cover the rotate-keyset adaptation fidelity requirements for Create Profile, Distribute Shares, and Distribution Completion."
+}

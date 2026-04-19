@@ -14,17 +14,23 @@ The app is a Vite + React + TypeScript project using React Router for navigation
 
 ### Routing layer
 
-`App.tsx` defines flat `<Routes>`:
+`App.tsx` delegates screen routing to `CoreRoutes` and only injects demo routes:
 
-| Path | Screen | Purpose |
+- `/demo` → `DemoGallery`
+- `/demo/:scenarioId/*` → `DemoScenarioPage`
+
+`CoreRoutes.tsx` defines the full app route table. Major groups:
+
+| Path group | Examples | Purpose |
 |---|---|---|
-| `/` | `WelcomeScreen` | Landing / profile picker |
-| `/create` | `CreateKeysetScreen` | Set keyset name, threshold, share count |
-| `/create/profile` | `CreateProfileScreen` | Device name, password, relays |
-| `/create/distribute` | `DistributeSharesScreen` | Copy/QR onboarding packages |
-| `/create/complete` | `DistributionCompleteScreen` | Confirmation + link to dashboard |
-| `/dashboard/:profileId` | `DashboardScreen` | Runtime status, signing, settings |
-| `*` | Redirect → `/` | Catch-all |
+| Welcome | `/` | Landing / profile picker |
+| Create | `/create`, `/create/progress`, `/create/profile`, `/create/distribute`, `/create/complete` | Keyset creation + initial distribution |
+| Import / Onboard | `/import/*`, `/onboard/*` | Bring existing profiles/shares onto device |
+| Rotate keyset | `/rotate-keyset`, `/rotate-keyset/review`, `/rotate-keyset/progress`, `/rotate-keyset/profile`, `/rotate-keyset/distribute`, `/rotate-keyset/complete`, error routes | Keyset rotation and adaptation screens |
+| Rotate share | `/rotate-share`, `/rotate-share/applying`, `/rotate-share/failed`, `/rotate-share/updated` | Local share replacement flow |
+| Recover | `/recover/:profileId`, `/recover/:profileId/success` | Recover NSEC from shares |
+| Dashboard | `/dashboard/:profileId` | Runtime status, signing, settings |
+| Catch-all | `*` | Redirect → `/` |
 
 ### State management
 
@@ -71,7 +77,9 @@ Each screen lives in `src/screens/<Name>Screen.tsx`. Screens consume `useAppStat
 
 ### Approach
 
-The project uses **custom CSS classes** defined in `src/styles/global.css`. It does **not** use Tailwind utility classes. Components reference class names like `.button-primary`, `.status-pill`, `.app-shell`, etc.
+The project uses **custom CSS classes** defined in `src/styles/global.css`. Components primarily reference semantic class names like `.button-primary`, `.status-pill`, `.app-shell`, etc.
+
+Exception: when validation assertions explicitly require literal tokenized utility-style classes from Paper captures (for example `bg-[#2563EB40]`), those class tokens are intentionally included in JSX for contract parity evidence.
 
 ### Design tokens
 
@@ -91,10 +99,10 @@ The project uses **custom CSS classes** defined in `src/styles/global.css`. It d
 
 ## Routing
 
-- Routes are defined declaratively in `App.tsx` using `react-router-dom` `<Routes>` / `<Route>`.
-- Catch-all `*` redirects to `/`.
-- State-dependent screens should guard against missing prerequisites (e.g. no `createSession`) by redirecting to the prior step with `<Navigate>`.
-- In-flow back navigation uses the `<BackLink>` component with an `onClick` handler (typically `navigate(-1)` or explicit path).
+- `App.tsx` composes `CoreRoutes` and contributes demo-only routes (`/demo`, `/demo/:scenarioId/*`).
+- `CoreRoutes.tsx` is the source of truth for screen routes; catch-all `*` redirects to `/`.
+- State-dependent screens guard against missing prerequisites (e.g. no `createSession`) by redirecting to a prior step with `<Navigate>`.
+- In-flow back navigation uses `<BackLink>` with an `onClick` handler (typically `navigate(-1)` or explicit path).
 
 ## Data Flow
 
