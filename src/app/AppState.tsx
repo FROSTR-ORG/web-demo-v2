@@ -19,7 +19,7 @@ import type {
   StoredProfileSummary
 } from "../lib/bifrost/types";
 import { LocalRuntimeSimulator } from "../lib/relay/localSimulator";
-import { getProfile, listProfiles, saveProfile, touchProfile } from "../lib/storage/profileStore";
+import { getProfile, listProfiles, removeProfile, saveProfile, touchProfile } from "../lib/storage/profileStore";
 
 export interface CreateDraft {
   groupName: string;
@@ -55,6 +55,7 @@ interface AppStateValue {
   finishDistribution: () => Promise<string>;
   unlockProfile: (id: string, password: string) => Promise<void>;
   lockProfile: () => void;
+  clearCredentials: () => Promise<void>;
   setSignerPaused: (paused: boolean) => void;
   refreshRuntime: () => void;
 }
@@ -258,6 +259,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setSignerPausedState(false);
   }, []);
 
+  const clearCredentials = useCallback(async () => {
+    const id = activeProfile?.id;
+    runtimeRef.current = null;
+    simulatorRef.current?.stop();
+    simulatorRef.current = null;
+    setRuntimeStatus(null);
+    setActiveProfile(null);
+    setSignerPausedState(false);
+    if (id) {
+      await removeProfile(id);
+    }
+    await reloadProfiles();
+  }, [activeProfile, reloadProfiles]);
+
   const setSignerPaused = useCallback((paused: boolean) => {
     setSignerPausedState(paused);
     if (paused) {
@@ -301,6 +316,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       finishDistribution,
       unlockProfile,
       lockProfile,
+      clearCredentials,
       setSignerPaused,
       refreshRuntime
     }),
@@ -317,6 +333,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       finishDistribution,
       unlockProfile,
       lockProfile,
+      clearCredentials,
       setSignerPaused,
       refreshRuntime
     ]

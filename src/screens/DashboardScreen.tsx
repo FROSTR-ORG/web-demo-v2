@@ -1,4 +1,4 @@
-import { ChevronDown, Clock, Download, FileText, HelpCircle, RotateCw, Settings, SlidersHorizontal, X, XCircle } from "lucide-react";
+import { ChevronDown, Clock, Download, FileText, HelpCircle, RotateCw, Settings, SlidersHorizontal, Trash2, X, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAppState } from "../app/AppState";
@@ -8,15 +8,16 @@ import { shortHex } from "../lib/bifrost/format";
 import type { PeerStatus } from "../lib/bifrost/types";
 
 type DashboardState = "running" | "connecting" | "stopped" | "relays-offline" | "signing-blocked";
-type ModalState = "none" | "policy-prompt" | "signing-failed";
+type ModalState = "none" | "policy-prompt" | "signing-failed" | "clear-credentials";
 
 export function DashboardScreen() {
   const { profileId } = useParams();
   const navigate = useNavigate();
-  const { activeProfile, runtimeStatus, lockProfile, refreshRuntime } = useAppState();
+  const { activeProfile, runtimeStatus, lockProfile, clearCredentials, refreshRuntime } = useAppState();
   const [mockState, setMockState] = useState<DashboardState>("running");
   const [showPolicies, setShowPolicies] = useState(false);
   const [activeModal, setActiveModal] = useState<ModalState>("none");
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (!profileId) {
     return <Navigate to="/" replace />;
@@ -60,7 +61,7 @@ export function DashboardScreen() {
         </>
       }
       headerSettingsAction={
-        <Button type="button" variant="header" size="icon" aria-label="Settings">
+        <Button type="button" variant="header" size="icon" aria-label="Settings" onClick={() => setSettingsOpen(true)}>
           <Settings size={14} />
         </Button>
       }
@@ -173,6 +174,36 @@ export function DashboardScreen() {
       )}
       {activeModal === "signing-failed" && (
         <SigningFailedModal onClose={() => setActiveModal("none")} />
+      )}
+      {activeModal === "clear-credentials" && (
+        <ClearCredentialsModal
+          groupName={activeProfile.groupName}
+          shareIdx={runtimeStatus.metadata.member_idx}
+          deviceName={activeProfile.deviceName}
+          onCancel={() => setActiveModal("none")}
+          onConfirm={async () => {
+            await clearCredentials();
+            navigate("/");
+          }}
+        />
+      )}
+
+      {/* Settings sidebar */}
+      {settingsOpen && (
+        <SettingsSidebar
+          profile={activeProfile}
+          relays={activeProfile.relays}
+          groupPublicKey={activeProfile.groupPublicKey}
+          threshold={activeProfile.threshold}
+          memberCount={activeProfile.memberCount}
+          shareIdx={runtimeStatus.metadata.member_idx}
+          onClose={() => setSettingsOpen(false)}
+          onLock={() => {
+            lockProfile();
+            navigate("/");
+          }}
+          onClearCredentials={() => setActiveModal("clear-credentials")}
+        />
       )}
     </AppShell>
   );
@@ -819,6 +850,306 @@ function SigningFailedModal({ onClose }: { onClose: () => void }) {
           </button>
           <button type="button" className="signing-failed-retry" onClick={onClose}>
             Retry
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========================================
+   Settings Sidebar
+   ======================================== */
+interface SettingsSidebarProps {
+  profile: { groupName: string; deviceName: string };
+  relays: string[];
+  groupPublicKey: string;
+  threshold: number;
+  memberCount: number;
+  shareIdx: number;
+  onClose: () => void;
+  onLock: () => void;
+  onClearCredentials: () => void;
+}
+
+function SettingsSidebar({
+  profile,
+  relays: initialRelays,
+  groupPublicKey,
+  threshold,
+  memberCount,
+  shareIdx,
+  onClose,
+  onLock,
+  onClearCredentials,
+}: SettingsSidebarProps) {
+  const [relays, setRelays] = useState(initialRelays);
+  const [newRelay, setNewRelay] = useState("");
+
+  function handleRemoveRelay(index: number) {
+    setRelays((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function handleAddRelay() {
+    const trimmed = newRelay.trim();
+    if (trimmed && !relays.includes(trimmed)) {
+      setRelays((prev) => [...prev, trimmed]);
+      setNewRelay("");
+    }
+  }
+
+  return (
+    <>
+      {/* Scrim */}
+      <div className="settings-scrim" onClick={onClose} data-testid="settings-scrim" />
+
+      {/* Sidebar panel */}
+      <div className="settings-sidebar" role="dialog" aria-label="Settings" data-testid="settings-sidebar">
+        <div className="settings-sidebar-scroll">
+          {/* Header */}
+          <div className="settings-header">
+            <div className="settings-title">Settings</div>
+            <button
+              type="button"
+              className="settings-close"
+              onClick={onClose}
+              aria-label="Close settings"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* DEVICE PROFILE */}
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <span className="settings-section-label">Device Profile</span>
+              <span className="settings-section-rule" />
+            </div>
+            <div className="settings-card">
+              <div className="settings-row">
+                <span className="settings-row-label">Profile Name</span>
+                <div className="settings-row-value">
+                  <span>{profile.deviceName}</span>
+                  <span className="settings-edit-icon">✎</span>
+                </div>
+              </div>
+              <div className="settings-row">
+                <span className="settings-row-label">Profile Password</span>
+                <div className="settings-row-value">
+                  <span>••••••••</span>
+                  <button type="button" className="settings-change-btn">Change</button>
+                </div>
+              </div>
+              {/* Relays */}
+              <div className="settings-relays">
+                {relays.map((relay, idx) => (
+                  <div className="settings-relay-row" key={relay}>
+                    <div className="settings-relay-url">{relay}</div>
+                    <button
+                      type="button"
+                      className="settings-relay-remove"
+                      aria-label={`Remove ${relay}`}
+                      onClick={() => handleRemoveRelay(idx)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <div className="settings-relay-row">
+                  <input
+                    className="settings-relay-input"
+                    type="text"
+                    placeholder="wss://..."
+                    value={newRelay}
+                    onChange={(e) => setNewRelay(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleAddRelay();
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="settings-relay-add"
+                    onClick={handleAddRelay}
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="settings-hint">
+              Configuration for this device's share (Share #{shareIdx})
+            </div>
+          </div>
+
+          {/* GROUP PROFILE */}
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <span className="settings-section-label">Group Profile</span>
+              <span className="settings-section-rule" />
+            </div>
+            <div className="settings-card">
+              <div className="settings-row">
+                <span className="settings-row-label">Keyset Name</span>
+                <span className="settings-row-text">{profile.groupName}</span>
+              </div>
+              <div className="settings-row">
+                <span className="settings-row-label">Keyset npub</span>
+                <span className="settings-row-npub">{shortHex(groupPublicKey, 10, 8)}</span>
+              </div>
+              <div className="settings-row">
+                <span className="settings-row-label">Threshold</span>
+                <span className="settings-row-text">{threshold} of {memberCount}</span>
+              </div>
+              <div className="settings-row">
+                <span className="settings-row-label">Created</span>
+                <span className="settings-row-text">Feb 24, 2026</span>
+              </div>
+              <div className="settings-row settings-row-last">
+                <span className="settings-row-label">Updated</span>
+                <span className="settings-row-text">Mar 8, 2026</span>
+              </div>
+            </div>
+            <div className="settings-hint">
+              Shared across all peers. Synced via Nostr.
+            </div>
+          </div>
+
+          {/* ROTATE SHARE */}
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <span className="settings-section-label">Rotate Share</span>
+              <span className="settings-section-rule" />
+            </div>
+            <div className="settings-action-row">
+              <div className="settings-action-info">
+                <div className="settings-action-name">Rotate Share</div>
+                <div className="settings-action-desc">
+                  Replace only this device's local share from Settings while keeping the same group public key and keyset membership.
+                </div>
+              </div>
+              <button type="button" className="settings-btn-blue">Rotate Share</button>
+            </div>
+          </div>
+
+          {/* EXPORT & BACKUP */}
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <span className="settings-section-label">Export &amp; Backup</span>
+              <span className="settings-section-rule" />
+            </div>
+            <div className="settings-action-group">
+              <div className="settings-action-row">
+                <div className="settings-action-info">
+                  <div className="settings-action-name">Export Profile</div>
+                  <div className="settings-action-desc">
+                    Encrypted backup of your share and configuration
+                  </div>
+                </div>
+                <button type="button" className="settings-btn-blue">Export</button>
+              </div>
+              <div className="settings-action-row">
+                <div className="settings-action-info">
+                  <div className="settings-action-name">Export Share</div>
+                  <div className="settings-action-desc">
+                    Unencrypted share key in hex
+                  </div>
+                </div>
+                <button type="button" className="settings-btn-muted">Copy</button>
+              </div>
+            </div>
+          </div>
+
+          {/* PROFILE SECURITY */}
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <span className="settings-section-label">Profile Security</span>
+              <span className="settings-section-rule" />
+            </div>
+            <div className="settings-action-group">
+              <div className="settings-action-row">
+                <div className="settings-action-info">
+                  <div className="settings-action-name">Lock Profile</div>
+                  <div className="settings-action-desc">
+                    Return to profile list to open another profile
+                  </div>
+                </div>
+                <button type="button" className="settings-btn-red" onClick={onLock}>
+                  Lock
+                </button>
+              </div>
+              <div className="settings-action-row">
+                <div className="settings-action-info">
+                  <div className="settings-action-name">Clear Credentials</div>
+                  <div className="settings-action-desc">
+                    Delete this device's saved profile, share, password, and relay configuration
+                  </div>
+                </div>
+                <button type="button" className="settings-btn-red" onClick={onClearCredentials}>
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ========================================
+   Clear Credentials Modal
+   ======================================== */
+function ClearCredentialsModal({
+  groupName,
+  shareIdx,
+  deviceName,
+  onCancel,
+  onConfirm,
+}: {
+  groupName: string;
+  shareIdx: number;
+  deviceName: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="clear-creds-backdrop" role="dialog" aria-modal="true" data-testid="clear-credentials-modal">
+      <div className="clear-creds-modal" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="clear-creds-header">
+          <div className="clear-creds-title-group">
+            <div className="clear-creds-icon">
+              <Trash2 size={20} />
+            </div>
+            <h2 className="clear-creds-title">Clear Credentials</h2>
+          </div>
+          <button
+            type="button"
+            className="clear-creds-close"
+            onClick={onCancel}
+            aria-label="Close modal"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="clear-creds-body">
+          <p className="clear-creds-description">
+            Are you sure you want to clear this device's saved credentials? This removes the local profile, share, password, and relay configuration from this device. This action cannot be undone. Other peers and the shared group profile are not changed.
+          </p>
+          <div className="clear-creds-badge">
+            {groupName} · Share #{shareIdx} · {deviceName}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="clear-creds-actions">
+          <button type="button" className="clear-creds-cancel" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="button" className="clear-creds-confirm" onClick={onConfirm}>
+            Clear Credentials
           </button>
         </div>
       </div>
