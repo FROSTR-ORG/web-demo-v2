@@ -51,3 +51,8 @@ Testing surface, tools, and resource cost classification.
 
 - Onboard failure-path assertions are most reliably reached using the Handshake screen's **Simulate Failure** control.
 - `agent-browser` network request capture may occasionally return no entries for pure client-side route transitions; treat screenshot + URL + console evidence as primary in those runs.
+
+## Dashboard-States Validation Notes
+
+- For clean-session setup, the fastest path to Dashboard is: create profile in Create flow, return to Welcome, then unlock the newly saved profile.
+- In headless runs, Create > Distribution Completion may keep **Finish Distribution** disabled until each remote share's QR modal is opened and dismissed with **Done**.

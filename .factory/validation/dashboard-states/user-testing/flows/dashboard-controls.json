@@ -1,0 +1,161 @@
+{
+  "groupId": "dashboard-controls",
+  "testedAt": "2026-04-19T00:46:04.100580+00:00",
+  "isolation": {
+    "surface": "agent-browser",
+    "appUrl": "http://127.0.0.1:5173",
+    "browserSession": "2e2d7b0a2b34__u2",
+    "cleanStorageAtStart": true
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-DASH-007",
+      "title": "Mock state toggle allows switching between all 5 dashboard states without page reload",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open dashboard and locate Mock State control",
+          "expected": "Visible control with all 5 states",
+          "observed": "Dropdown present with Running, Connecting, Stopped, All Relays Offline, Signing Blocked"
+        },
+        {
+          "action": "Switch through all 5 states using dropdown",
+          "expected": "Dashboard content updates per state",
+          "observed": "Each selected state rendered corresponding panel/status changes"
+        },
+        {
+          "action": "Verify no page reload while cycling states",
+          "expected": "State changes without reload",
+          "observed": "URL stayed constant and in-page JS marker persisted across state switches"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-states/dashboard-controls/VAL-DASH-007-running.png",
+          "dashboard-states/dashboard-controls/VAL-DASH-007-connecting.png",
+          "dashboard-states/dashboard-controls/VAL-DASH-007-stopped.png",
+          "dashboard-states/dashboard-controls/VAL-DASH-007-all-relays-offline.png",
+          "dashboard-states/dashboard-controls/VAL-DASH-007-signing-blocked.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No requests captured (client-side state transitions only)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DASH-011",
+      "title": "Dashboard header buttons (Recover, Export, Policies, Settings) are enabled and clickable",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Inspect header button disabled state via DOM",
+          "expected": "Recover/Export/Policies/Settings are enabled (not disabled)",
+          "observed": "All four buttons had disabled=false and no disabled attribute"
+        },
+        {
+          "action": "Click Policies",
+          "expected": "Policies action triggers policies view",
+          "observed": "Policies view opened (Signer Policies/Peer Policies visible)"
+        },
+        {
+          "action": "Click Recover, Export, Settings",
+          "expected": "Each click triggers its respective action (navigation/modal/sidebar)",
+          "observed": "No visible action triggered for Recover, Export, or Settings; URL and main view remained unchanged"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-states/dashboard-controls/VAL-DASH-011-header.png",
+          "dashboard-states/dashboard-controls/VAL-DASH-011-recover-action.png",
+          "dashboard-states/dashboard-controls/VAL-DASH-011-export-action-running.png",
+          "dashboard-states/dashboard-controls/VAL-DASH-011-settings-action-running.png",
+          "dashboard-states/dashboard-controls/VAL-DASH-011-policies-toggle-back.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No requests captured"
+      },
+      "issues": "Recover, Export, and Settings buttons appear enabled but did not trigger observable action during clicks; only Policies action worked."
+    },
+    {
+      "id": "VAL-DASH-013",
+      "title": "Stop Signer button transitions to Stopped state",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From Running state, click Stop Signer",
+          "expected": "Transition to Stopped state with red status and Start Signer button",
+          "observed": "State changed to Stopped; dropdown selected Stopped and Start Signer button appeared"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-states/dashboard-controls/VAL-DASH-013-before-running.png",
+          "dashboard-states/dashboard-controls/VAL-DASH-013-after-stopped.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No requests captured"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DASH-014",
+      "title": "Start Signer button transitions to Connecting or Running state",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From Stopped state, click Start Signer",
+          "expected": "Transition to Connecting or Running with amber/green status",
+          "observed": "Transitioned to Running; Stop Signer button and running state controls returned"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-states/dashboard-controls/VAL-DASH-014-before-stopped.png",
+          "dashboard-states/dashboard-controls/VAL-DASH-014-after-start.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No requests captured"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DASH-015",
+      "title": "Policies button in header activates Policies view",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Click Policies in dashboard header",
+          "expected": "Policies view appears with Signer Policies and Peer Policies panels",
+          "observed": "Policies view activated; policy rule controls and peer policy rows became visible"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-states/dashboard-controls/VAL-DASH-015-after-click-policies.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No requests captured"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "While creating in-session state, Create > Distribution Completion showed 'Finish Distribution' disabled and did not become actionable; reached dashboard by returning to Welcome and unlocking the newly saved profile.",
+      "resolved": true,
+      "resolution": "Unlocked saved profile from Welcome to enter dashboard for assigned assertions.",
+      "affectedAssertions": [
+        "VAL-DASH-007",
+        "VAL-DASH-011",
+        "VAL-DASH-013",
+        "VAL-DASH-014",
+        "VAL-DASH-015"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 5 assigned assertions: 4 passed (VAL-DASH-007, VAL-DASH-013, VAL-DASH-014, VAL-DASH-015) and 1 failed (VAL-DASH-011: Recover/Export/Settings did not trigger actions despite enabled state)."
+}

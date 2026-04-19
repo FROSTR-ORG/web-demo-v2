@@ -1,0 +1,157 @@
+{
+  "groupId": "dashboard-state-core",
+  "testedAt": "2026-04-19T00:44:10Z",
+  "isolation": {
+    "surface": "agent-browser",
+    "appUrl": "http://127.0.0.1:5173",
+    "sessionName": "2e2d7b0a2b34__u1",
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "cleanContext": true
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-DASH-001",
+      "title": "Running state shows green status, connected relay info, Stop Signer and Lock buttons",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Set Mock State to Running on dashboard",
+          "expected": "Signer Running status with connected relays is shown",
+          "observed": "Signer Running shown with subtitle 'Connected to wss://relay.primal.net, wss://relay.damus.io'"
+        },
+        {
+          "action": "Inspect controls and panels",
+          "expected": "Stop Signer and Lock buttons plus peers/group summary are visible",
+          "observed": "Stop Signer and Lock buttons visible; peers panel and group summary row visible on /dashboard/06547881a651b4194d61ddbb5b1e0d4e59323b44609a25c76ed4fa5a757db9c2"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-states/dashboard-state-core/VAL-DASH-001-running.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No requests captured via agent-browser network log"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DASH-002",
+      "title": "Connecting state shows amber indicators, connection progress panel with step indicators",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Set Mock State to Connecting",
+          "expected": "Signer Connecting state appears with amber/in-progress presentation",
+          "observed": "Status changed to 'Signer Connecting...' with 'Connecting...' action indicator"
+        },
+        {
+          "action": "Inspect body content",
+          "expected": "Connection Progress and Current Targets panels with mixed progress steps",
+          "observed": "Connection Progress panel lists completed/in-progress/pending steps and Current Targets shows relay/peer summary on same dashboard URL"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-states/dashboard-state-core/VAL-DASH-002-connecting.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No requests captured via agent-browser network log"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DASH-003",
+      "title": "Stopped state shows red indicators, Start Signer button, readiness panel with offline badges",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Set Mock State to Stopped",
+          "expected": "Signer Stopped state with red/offline messaging",
+          "observed": "Status changed to 'Signer Stopped' with offline runtime messaging"
+        },
+        {
+          "action": "Inspect controls and readiness content",
+          "expected": "Start Signer button and readiness panel with offline badges",
+          "observed": "Start Signer button present; Readiness panel shows offline state with relay/peer/signing availability badges"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-states/dashboard-state-core/VAL-DASH-003-stopped.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No requests captured via agent-browser network log"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DASH-004",
+      "title": "All Relays Offline shows signer running but degraded message, readiness panel, Retry button",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Set Mock State to All Relays Offline",
+          "expected": "Signer remains running with degraded/all-relays-offline messaging",
+          "observed": "Status remains 'Signer Running' with degraded description indicating all configured relays are unreachable"
+        },
+        {
+          "action": "Inspect recovery/readiness sections",
+          "expected": "Readiness indicates all relays offline and Retry Connections action is present",
+          "observed": "Readiness panel shows 'Offline\u2014All Relays Offline' and Recovery panel contains 'Retry Connections' button"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-states/dashboard-state-core/VAL-DASH-004-all-relays-offline.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No requests captured via agent-browser network log"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DASH-005",
+      "title": "Signing Blocked shows amber warning panel with common causes and operator action buttons",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Set Mock State to Signing Blocked",
+          "expected": "Signer still running plus separate Signing Blocked warning panel",
+          "observed": "Signer remains running and a 'Signing Blocked' panel appears with gating explanation"
+        },
+        {
+          "action": "Inspect warning subpanels",
+          "expected": "Common Causes list and Operator Action section with Open Policies and Review Approvals buttons",
+          "observed": "Common Causes section visible; Operator Action section contains 'Open Policies' and 'Review Approvals' buttons"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-states/dashboard-state-core/VAL-DASH-005-signing-blocked.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No requests captured via agent-browser network log"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "During in-session setup, the Create flow's 'Finish Distribution' button remained disabled, so dashboard access was achieved by returning to Welcome and unlocking the newly created profile.",
+      "resolved": true,
+      "resolution": "Used Welcome -> profile Unlock path in the same isolated session to reach /dashboard/{profileId}.",
+      "affectedAssertions": [
+        "VAL-DASH-001",
+        "VAL-DASH-002",
+        "VAL-DASH-003",
+        "VAL-DASH-004",
+        "VAL-DASH-005"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 5 assertions (VAL-DASH-001..005): 5 passed, 0 failed, 0 blocked."
+}

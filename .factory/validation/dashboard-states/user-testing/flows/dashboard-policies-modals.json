@@ -1,0 +1,190 @@
+{
+  "groupId": "dashboard-policies-modals",
+  "testedAt": "2026-04-19T00:46:05Z",
+  "isolation": {
+    "surface": "agent-browser",
+    "appUrl": "http://127.0.0.1:5173",
+    "browserSessionName": "2e2d7b0a2b34__u3",
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "cleanBrowserContext": true
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-DASH-006",
+      "title": "Policies view shows Signer Policies with per-method rules and Peer Policies with permission badges",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open dashboard and click header Policies button",
+          "expected": "Policies view renders with Signer Policies and Peer Policies panels",
+          "observed": "Policies view rendered at dashboard URL with both panels visible"
+        },
+        {
+          "action": "Inspect policy content",
+          "expected": "Signer panel shows default policy selector + per-method rules; peer panel shows SIGN/ECDH/PING/ONBOARD badges",
+          "observed": "Signer panel showed default selector and rules (sign_event:1, nip44_encrypt, get_public_key, primal.net); Peer panel showed 3 peers with SIGN/ECDH/PING/ONBOARD badges"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-006-policies-view.png"
+        ],
+        "consoleErrors": "none (agent-browser errors returned no entries during this flow)",
+        "network": "agent-browser network requests: No requests captured (client-side UI route/state transitions only)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DASH-008",
+      "title": "Signer Policy Prompt modal shows request details, peer info, and 6 action buttons (Deny through Always deny)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Click Open Policy Prompt",
+          "expected": "Full-screen Signer Policy overlay appears",
+          "observed": "Signer Policy modal opened over dashboard with backdrop"
+        },
+        {
+          "action": "Inspect modal body",
+          "expected": "Request badge, peer info, metadata table, expiration timer, and 6 action buttons in 3 rows",
+          "observed": "Modal showed SIGN badge, Peer #2 + pubkey + domain, EVENT KIND/CONTENT/PUBKEY/DOMAIN rows, Expires in 42s, and six buttons: Deny, Allow once, Always allow, Always for kind:1, Always deny for kind:1, Always deny for primal.net"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-008-policy-prompt-modal.png"
+        ],
+        "consoleErrors": "none (agent-browser errors returned no entries during this flow)",
+        "network": "agent-browser network requests: No requests captured (modal interaction was local UI state)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DASH-009",
+      "title": "Signing Failed modal shows error details, code box, Dismiss and Retry buttons",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Click Open Signing Failed",
+          "expected": "Signing Failed modal opens",
+          "observed": "Signing Failed modal opened over dashboard with backdrop"
+        },
+        {
+          "action": "Inspect modal content",
+          "expected": "Red error icon, title, description, technical code/detail box, Dismiss and Retry",
+          "observed": "Modal showed red error icon, Signing Failed title, failure description, monospace technical detail box, and Dismiss/Retry footer buttons"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-009-signing-failed-modal.png"
+        ],
+        "consoleErrors": "none (agent-browser errors returned no entries during this flow)",
+        "network": "agent-browser network requests: No requests captured (modal interaction was local UI state)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DASH-010",
+      "title": "Modal overlays dismiss correctly (close button, action buttons all close modal)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Policy Prompt dismissal via X and actions",
+          "expected": "X, Deny, and Allow once each close the modal and remove backdrop",
+          "observed": "Policy Prompt closed successfully via Close (X), Deny, and Allow once; post-action screenshots show dashboard without modal/backdrop"
+        },
+        {
+          "action": "Signing Failed dismissal via X and actions",
+          "expected": "X, Dismiss, and Retry each close the modal and remove backdrop",
+          "observed": "Signing Failed closed successfully via Close (X), Dismiss, and Retry; post-action screenshots show dashboard without modal/backdrop"
+        },
+        {
+          "action": "Check dashboard interactivity after dismissals",
+          "expected": "Dashboard remains interactive once modal closes",
+          "observed": "Header controls and modal trigger buttons remained available after each dismissal"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-010-policy-before-close-x.png",
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-010-policy-after-close-x.png",
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-010-policy-before-deny.png",
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-010-policy-after-deny.png",
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-010-policy-before-allow-once.png",
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-010-policy-after-allow-once.png",
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-010-signing-failed-before-close-x.png",
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-010-signing-failed-after-close-x.png",
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-010-signing-failed-before-dismiss.png",
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-010-signing-failed-after-dismiss.png",
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-010-signing-failed-before-retry.png",
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-010-signing-failed-after-retry.png"
+        ],
+        "consoleErrors": "none (agent-browser errors returned no entries during dismissal checks)",
+        "network": "agent-browser network requests: No requests captured (all checks were modal UI state transitions)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DASH-012",
+      "title": "Cycling through all dashboard states and modals produces no console errors",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Cycle Mock State through Running, Connecting, Stopped, All Relays Offline, Signing Blocked, then back to Running",
+          "expected": "State transitions complete without crashes or unhandled errors",
+          "observed": "All five states switched successfully via dropdown in-session with no visible breakage"
+        },
+        {
+          "action": "Open and close Policy Prompt and Signing Failed during the cycle",
+          "expected": "Modals continue to function and close cleanly",
+          "observed": "Policy Prompt and Signing Failed both opened and closed successfully during the cycle"
+        },
+        {
+          "action": "Inspect browser error log at end of full cycle",
+          "expected": "Zero console errors/unhandled exceptions",
+          "observed": "agent-browser errors returned no entries"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-states/dashboard-policies-modals/VAL-DASH-012-after-state-and-modal-cycle.png"
+        ],
+        "consoleErrors": "none (agent-browser errors returned no entries after full cycle)",
+        "network": "agent-browser network requests: No requests captured"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "To reach dashboard from a clean context, Finish Distribution stayed disabled until each remote package was marked distributed via QR modal. Copy clicks alone were insufficient in this headless run.",
+      "resolved": true,
+      "resolution": "Opened both package QR modals and clicked Done for each, then completed distribution and navigated to dashboard.",
+      "affectedAssertions": [
+        "VAL-DASH-006",
+        "VAL-DASH-008",
+        "VAL-DASH-009",
+        "VAL-DASH-010",
+        "VAL-DASH-012"
+      ]
+    },
+    {
+      "description": "agent-browser network request capture returned 'No requests captured' during these dashboard state/modal checks.",
+      "resolved": true,
+      "resolution": "Used screenshot + URL + console error evidence as primary proof for these client-side interactions.",
+      "affectedAssertions": [
+        "VAL-DASH-006",
+        "VAL-DASH-008",
+        "VAL-DASH-009",
+        "VAL-DASH-010",
+        "VAL-DASH-012"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 5 assigned assertions (VAL-DASH-006, 008, 009, 010, 012): all 5 passed in isolated session 2e2d7b0a2b34__u3 at http://127.0.0.1:5173, with no console errors observed."
+}
