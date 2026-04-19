@@ -11,6 +11,12 @@ NOTE: Startup and cleanup are handled by `worker-base`. This skill defines the W
 
 Use for any feature that involves creating new screen components, modifying existing screens, adding routes, creating UI components, or wiring navigation. This covers all features in the Igloo Web Demo V2 UI mission.
 
+## Validation Context (IMPORTANT)
+
+All fidelity assertions in this mission are validated against the **DemoGallery** at `http://127.0.0.1:5173/demo/{scenario-id}` — NOT the main app. Every screen you build or modify must be reachable through a scenario entry in `web-demo-v2/src/demo/scenarios.ts`. If a feature asks you to adapt screens that don't yet have scenarios (e.g. the rotate-keyset adaptation scenarios), you must also add those entries to `scenarios.ts` so validators can navigate to them.
+
+Expected copy in the validation contract is quoted directly from `igloo-paper/screens/{flow}/{screen}/screen.html`. Match that copy character-for-character for headings, labels, CTAs, help text, and error messages. Structural fidelity (sections, order, visual hierarchy) is required; pixel-perfect fidelity is not.
+
 ## Required Skills
 
 - `agent-browser` — Used for manual visual verification of built screens. Invoke after implementation to navigate the app and confirm screens render correctly and navigation works.
@@ -76,12 +82,17 @@ For new CSS classes:
 - Follow existing naming conventions (lowercase-hyphenated, e.g., `.import-form`, `.error-panel`)
 - Use CSS custom properties from `src/styles/paper-tokens.css` for colors and typography
 
-### 5. Add Routes
+### 5. Add Routes and Demo Scenarios
 
-Register new routes in `src/app/App.tsx`:
+Register new routes in `src/app/CoreRoutes.tsx`:
 - Import the new screen component
 - Add a `<Route path="/..." element={<NewScreen />} />` inside the existing `<Routes>` block
 - Follow the existing route naming pattern (lowercase, hyphenated)
+
+Register new demo scenarios in `src/demo/scenarios.ts` for EVERY new screen or screen variant:
+- Add a `DemoScenario` entry with `id`, `flow`, `pathname`, `title`, `paperRef`, `expectedText`, and optional `appState` preset.
+- Set `canonical: false` for variants that should not appear in the gallery index (e.g. error sub-states).
+- Validators will navigate to `/demo/{id}` to test the screen; without a scenario entry, validation cannot proceed.
 
 ### 6. Wire Navigation
 
@@ -143,10 +154,10 @@ lsof -ti :5173 | xargs kill 2>/dev/null
       {
         "file": "src/screens/__tests__/ImportScreens.test.tsx",
         "cases": [
-          { "name": "LoadBackupScreen renders heading and input", "verifies": "VAL-IMPORT-001" },
-          { "name": "DecryptBackupScreen renders password input", "verifies": "VAL-IMPORT-002" },
-          { "name": "ReviewSaveScreen renders profile cards", "verifies": "VAL-IMPORT-003" },
-          { "name": "ImportErrorScreen renders error styling", "verifies": "VAL-IMPORT-004" }
+          { "name": "LoadBackupScreen renders heading and input", "verifies": "VAL-IMP-001" },
+          { "name": "DecryptBackupScreen renders password input", "verifies": "VAL-IMP-002" },
+          { "name": "ReviewSaveScreen renders profile cards", "verifies": "VAL-IMP-003" },
+          { "name": "ImportErrorScreen renders error styling", "verifies": "VAL-IMP-004" }
         ]
       }
     ]

@@ -1,68 +1,70 @@
 # User Testing
 
-Testing surface, tools, and resource cost classification.
+Testing surface, tools, and resource cost classification for this mission.
 
 ---
 
 ## Validation Surface
 
-- **Browser UI** at `http://127.0.0.1:5173` (Vite dev server)
-- **Tool:** agent-browser (Playwright-based headless Chromium)
-- **Viewport:** 1440×1080 (desktop)
+- **Browser UI** at `http://127.0.0.1:5173` (Vite dev server).
+- **DemoGallery entry points** at `http://127.0.0.1:5173/demo/{scenario-id}` — each scenario in `src/demo/scenarios.ts` maps one URL to one Paper screen reference and mounts the component with its mock app state preset. This is the PRIMARY testing surface for every UI fidelity assertion.
+- **Main app routes** at `http://127.0.0.1:5173/*` — used for cross-flow navigation assertions (e.g. VAL-CROSS-005..014).
+- **Tool:** `agent-browser` (Playwright-based headless Chromium) is mandatory per mission rules for web-app surfaces.
+- **Viewport:** 1440×1080 (desktop). For mobile-specific assertions, use 390×844 (Pixel 5).
 
 ## Validation Setup
 
-1. Start the Vite dev server: see `.factory/services.yaml` → `services.web.start`
-2. Wait for healthcheck: `curl -sf http://127.0.0.1:5173`
-3. Launch agent-browser and navigate to `http://127.0.0.1:5173`
+1. Start the Vite dev server: see `.factory/services.yaml` → `services.web.start`.
+2. Wait for healthcheck: `curl -sf http://127.0.0.1:5173`.
+3. Launch `agent-browser` and navigate to target URL.
 
 ## Validation Concurrency
 
-- **Machine:** 128 GB RAM, 18 CPU cores
-- **Per-instance footprint:** ~642 MB (Vite dev server ~257 MB + Chrome instance ~385 MB)
-- **Usable headroom (70%):** ~75 GB
-- **Max concurrent validators:** 5 (5 × 642 MB = ~3.2 GB, well within budget)
-- **Note:** All validators share one Vite dev server; only the Chrome instances multiply
+- **Machine:** 128 GB RAM, 18 CPU cores.
+- **Per-instance footprint:** ~642 MB (Vite dev server ~257 MB shared + Chrome instance ~385 MB per validator).
+- **Usable headroom (70%):** > 75 GB — plenty of room.
+- **Max concurrent validators:** **5** (conservative, matches upper guidance cap).
+- **Shared Vite dev server:** all validators share one dev server on 5173; only Chrome instances multiply.
 
-## Testing Approach
+## Testing Approach for This Mission
 
-- Navigate through flows using agent-browser accessibility snapshots
-- Take screenshots at key screens for visual verification
-- Check console for errors after each flow
-- Verify navigation by checking URL changes
-- Verify interactive elements via accessibility tree (buttons, inputs, modals)
+For UI fidelity assertions:
+1. Navigate to the scenario's `/demo/{id}` URL.
+2. Wait for `networkidle`.
+3. Assert expected text (headings, labels, CTAs, help text) is visible in the DOM — quote from the Paper `screen.html` as the source of truth.
+4. For interaction assertions: click/type/press as specified, then assert the expected post-state (URL change, modal appearance, updated copy, etc.).
+5. Capture screenshots + console errors as evidence.
+
+**SPA content is client-rendered.** Do NOT rely on `curl | grep` to verify in-page text — the raw HTML only returns `<div id="root"></div>` + `<title>Igloo Web</title>`. Always use `agent-browser` with `wait --load networkidle`.
+
+## DemoGallery Quick Reference
+
+- Gallery index: `/demo` shows all canonical scenarios grouped by flow.
+- Canonical scenario page: `/demo/{id}` renders the app shell + demo chrome toolbar (All screens, Previous, Next, Raw, Reference).
+- Raw mode: `/demo/{id}?chrome=0` hides the demo chrome (useful for visual parity screenshots against Paper screenshots).
+- Variant scenarios (`canonical: false`, e.g. `import-error-corrupted`, `onboard-failed-rejected`) are reachable only by direct URL — they do NOT appear in the gallery index.
+
+## Scenario-Level Setup
+
+Every DemoGallery scenario injects its own mock `AppStateValue` via `MockAppStateProvider` — validators do NOT need to manually create profiles, unlock, or seed fixtures. The scenario's `appState` preset (see `src/demo/fixtures.ts` and `src/demo/scenarios.ts`) is the ground truth for what the user would see for that particular runtime state.
+
+For cross-flow assertions starting from the main app `/`, the initial state is defined by the `AppStateProvider` in `src/app/AppState.tsx`, which loads profiles from IndexedDB. For a clean state, validators may need to clear IndexedDB between tests (`indexedDB.deleteDatabase` or agent-browser storage clear).
 
 ## Known Constraints
 
-- WASM loading may add 2-3 seconds to initial page load
-- IndexedDB state persists between test runs — validators may need to clear storage for clean state
-- Some screens require pre-existing profile data (Dashboard, Settings, Export, Recover) — validators need to set up state first via the Create flow or mock data
+- WASM loading may add 2–3 seconds to initial page load.
+- IndexedDB state persists between test runs — clear storage if you need a clean main-app flow.
+- Some cross-flow assertions require pre-existing profile state; create it in the same validator session via the Create flow rather than relying on another validator.
 
-## Flow Validator Guidance: agent-browser
+## Flow Validator Guidance
 
-- Use a unique browser session per validator and never use the default session.
-- Treat each validator as isolated: start by clearing storage/cookies in its own browser context before running assertions.
+- Use a unique browser session per validator; never reuse the default session.
 - Stay within assigned assertions only; do not modify app code or shared service configuration.
-- Use only `http://127.0.0.1:5173` as the app URL and do not use other ports.
-- Save screenshots and any other artifacts only under the assigned evidence directory for that validator group.
-- If an assertion depends on prior state (e.g., returning-user profile), create that state within the same validator session rather than relying on another validator.
+- Use only `http://127.0.0.1:5173` as the app URL.
+- Save screenshots and artifacts only under the assigned evidence directory.
+- Treat `agent-browser` network capture as secondary evidence for pure client-side SPA route transitions — URL checks + screenshots + console error checks are primary.
 
-## Welcome-Entry Validation Notes
+## Mission Tool Mandates
 
-- Onboard failure-path assertions are most reliably reached using the Handshake screen's **Simulate Failure** control.
-- `agent-browser` network request capture may occasionally return no entries for pure client-side route transitions; treat screenshot + URL + console evidence as primary in those runs.
-
-## Dashboard-States Validation Notes
-
-- For clean-session setup, the fastest path to Dashboard is: create profile in Create flow, return to Welcome, then unlock the newly saved profile.
-- In headless runs, Create > Distribution Completion may keep **Finish Distribution** disabled until each remote share's QR modal is opened and dismissed with **Done**.
-
-## Settings-Export-Recover Validation Notes
-
-- In headless `agent-browser`, the Export flow's **Copy** action may log a clipboard-permission console warning (`writeText` denied) even when UI feedback correctly changes to **Copied!**.
-- For Settings/Export/Recover SPA-only transitions, `agent-browser` network capture often returns no requests; prefer URL checks, screenshots, and console error checks as primary evidence.
-
-## Rotation-Flows Validation Notes
-
-- For `VAL-WELCOME-010`, create **2+ saved profiles** in-session before testing. The single-profile returning variant can show only Unlock, while the multi-profile returning rows expose explicit **Rotate** buttons.
-- In this round, selecting **Rotate** from a specific Welcome profile row navigated correctly to `/rotate-keyset`, but the form preloaded a non-selected source label (`"My Signing Key"`). Retest should verify selected-row keyset preload after fix.
+- **agent-browser is mandatory** for every UI fidelity assertion (mission rule for web-app surfaces).
+- **Shell (bash)** is used only for: TypeScript build (`npx tsc -b`), Vitest (`npx vitest run --config vitest.config.ts`), Playwright (`npx playwright test`) — see VAL-CROSS-016..019.
