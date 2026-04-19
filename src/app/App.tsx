@@ -4,6 +4,7 @@ import { CreateProfileScreen } from "../screens/CreateProfileScreen";
 import { DashboardScreen } from "../screens/DashboardScreen";
 import { DistributeSharesScreen } from "../screens/DistributeSharesScreen";
 import { DistributionCompleteScreen } from "../screens/DistributionCompleteScreen";
+import { GenerationProgressScreen } from "../screens/GenerationProgressScreen";
 import { LoadBackupScreen, DecryptBackupScreen, ReviewSaveScreen, ImportErrorScreen } from "../screens/ImportScreens";
 import { EnterPackageScreen, HandshakeScreen, OnboardingFailedScreen, OnboardingCompleteScreen } from "../screens/OnboardScreens";
 import { CollectSharesScreen, RecoverSuccessScreen } from "../screens/RecoverScreens";
@@ -14,6 +15,7 @@ export function App() {
     <Routes>
       <Route path="/" element={<WelcomeScreen />} />
       <Route path="/create" element={<CreateKeysetScreen />} />
+      <Route path="/create/progress" element={<GenerationProgressScreen />} />
       <Route path="/create/profile" element={<CreateProfileScreen />} />
       <Route path="/create/distribute" element={<DistributeSharesScreen />} />
       <Route path="/create/complete" element={<DistributionCompleteScreen />} />

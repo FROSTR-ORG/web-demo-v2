@@ -53,11 +53,11 @@ export function TextField({
     <label className="field">
       <span className="label">{label}</span>
       <span className="input-shell">
-        <input {...props} className="input" />
+        <input {...props} className={`input${error ? " input-error" : ""}`} />
         {trailing ? <span className="input-trailing">{trailing}</span> : null}
       </span>
-      {help ? <span className="help">{help}</span> : null}
-      {error ? <span className="error">{error}</span> : null}
+      {help && !error ? <span className="help">{help}</span> : null}
+      {error ? <span className="field-error-text">{error}</span> : null}
     </label>
   );
 }
