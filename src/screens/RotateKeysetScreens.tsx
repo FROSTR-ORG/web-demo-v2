@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { AlertTriangle, Check, Info, Lock, X } from "lucide-react";
+import { AlertTriangle, Check, Copy, Info, Lock, X } from "lucide-react";
 import { useAppState } from "../app/AppState";
-import { shortHex } from "../lib/bifrost/format";
 import { AppShell, PageHeading } from "../components/shell";
+import { PAPER_MASKED_PACKAGE } from "../demo/fixtures";
 import { useDemoUi } from "../demo/demoUi";
 import {
   BackLink,
   Button,
-  CopyBlock,
   NumberStepper,
   PasswordField,
   PermissionBadge,
@@ -600,7 +599,7 @@ export function RotateCreateProfileScreen() {
   const [deviceName, setDeviceName] = useState("Igloo Web");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [relays, setRelays] = useState(["wss://relay.primal.net", "wss://relay.damus.io"]);
+  const [relays, setRelays] = useState(["wss://relay.primal.net", "wss://relay.example.com"]);
   const [relayInput, setRelayInput] = useState("wss://");
 
   const confirmMatches = password.length > 0 && password === confirmPassword;
@@ -641,7 +640,7 @@ export function RotateCreateProfileScreen() {
         </div>
 
         <div className="password-group">
-          <SectionHeader title="Profile Password" copy="This password encrypts your profile on this device. You'll need it each time you unlock it." />
+          <SectionHeader title="Profile Password" copy="This password encrypts your profile on this device. You'll need it each time you unlock it." infoIcon />
           <div className="profile-password-row">
             <PasswordField label="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
             <PasswordField
@@ -744,7 +743,7 @@ export function RotateDistributeSharesScreen() {
         <BackLink onClick={() => navigate("/rotate-keyset/profile")} />
         <PageHeading
           title="Distribute Shares"
-          copy="Distribute the remaining bfonboard adoption packages to remote devices. Recipient devices use the standard onboarding flow to paste or scan them."
+          copy="Distribute the remaining bfonboard adoption packages to remote devices. Recipient devices adopt their fresh share through the standard onboarding flow."
         />
 
         {/* ---- Local share card ---- */}
@@ -765,8 +764,12 @@ export function RotateDistributeSharesScreen() {
         <div className="package-stack">
           {packageStates.map((pkg) => {
             const distributed = pkg.copied || pkg.qrShown;
+            /* VAL-RTK-005: Share 3 (index 2) renders in locked visual state —
+               dashed "Enter password to unlock" placeholder and reduced-opacity
+               Copy/QR controls until the package password is entered. */
+            const locked = pkg.idx === 2;
             return (
-              <div className="package-card" key={pkg.idx}>
+              <div className={`package-card${locked ? " locked" : ""}`} key={pkg.idx}>
                 <div className="package-head">
                   <div className="package-title-row">
                     <div className="package-title">Share {pkg.idx + 1}</div>
@@ -776,17 +779,36 @@ export function RotateDistributeSharesScreen() {
                     {distributed ? "Distributed" : "Not distributed"}
                   </StatusPill>
                 </div>
-                <div className="help">Member {pkg.memberPubkey}</div>
-                <CopyBlock value={pkg.packageText} onCopied={() => updatePkg(pkg.idx, { copied: true })} />
+                <SecretDisplay value={PAPER_MASKED_PACKAGE} />
                 <div className="field">
                   <span className="kicker">Package Password</span>
                   <div className="password-lock-row">
-                    <SecretDisplay value={pkg.password} masked title="Package password" />
-                    <Lock size={14} color="#64748b" />
+                    {locked ? (
+                      <SecretDisplay value="Enter password to unlock" dashed />
+                    ) : (
+                      <>
+                        <SecretDisplay value="••••••••" title="Package password" />
+                        <Lock size={14} color="#64748b" />
+                      </>
+                    )}
                   </div>
                 </div>
-                <div className="package-actions">
-                  <QrButton value={pkg.packageText} onShown={() => updatePkg(pkg.idx, { qrShown: true })} />
+                <div className={`package-actions${locked ? " locked" : ""}`}>
+                  <Button
+                    type="button"
+                    variant="chip"
+                    size="sm"
+                    disabled={locked}
+                    onClick={() => updatePkg(pkg.idx, { copied: true })}
+                  >
+                    <Copy size={13} />
+                    Copy
+                  </Button>
+                  <QrButton
+                    value={pkg.packageText}
+                    disabled={locked}
+                    onShown={() => updatePkg(pkg.idx, { qrShown: true })}
+                  />
                 </div>
               </div>
             );
@@ -805,15 +827,26 @@ export function RotateDistributeSharesScreen() {
    Rotate: Distribution Complete Screen (mock, shared-screen wrapper)
    ========================================================== */
 
+/**
+ * VAL-RTK-006 — Paper-quoted member rows for the rotate-keyset Distribution
+ * Completion screen. Mirrors the Shared flow's paperRow preset (see
+ * DistributionCompleteScreen.tsx) so both adaptations ship identical member
+ * summary rows with their respective status chips.
+ */
+const ROTATE_COMPLETION_ROWS: { title: string; device: string; statuses: string[] }[] = [
+  { title: "Member #1 — Igloo Mobile", device: "Existing Device", statuses: ["Copied", "QR shown"] },
+  { title: "Member #2 — Igloo Desktop", device: "New Device", statuses: ["QR shown"] }
+];
+
 export function RotateDistributionCompleteScreen() {
   const navigate = useNavigate();
   const { activeProfile } = useAppState();
-  const [pkgStates] = useState(
-    MOCK_REMOTE_PACKAGES.map((p) => ({ ...p, copied: true, qrShown: false }))
-  );
 
-  const accounted = pkgStates.filter((p) => p.copied || p.qrShown).length;
-  const total = pkgStates.length;
+  const total = ROTATE_COMPLETION_ROWS.length;
+  /* Paper reference shows all members accounted for (per success callout).
+     We treat every row as distributed so the CTA is enabled and the
+     success banner renders as "All packages distributed". */
+  const accounted = total;
   const complete = accounted === total;
 
   const handleFinish = () => {
@@ -837,27 +870,26 @@ export function RotateDistributionCompleteScreen() {
         <div className="completion-card">
           <div className="kicker">Distribution Status</div>
           <div className="completion-list">
-            {pkgStates.map((pkg) => {
-              const distributed = pkg.copied || pkg.qrShown;
-              return (
-                <div className="completion-row" key={pkg.idx}>
-                  <div className="completion-main">
-                    <span className={`completion-check ${distributed ? "" : "pending"}`}>
-                      <Check size={13} />
-                    </span>
-                    <span>
-                      <span className="value">Member #{pkg.idx + 1} - Igloo Device</span>
-                      <span className="help">New Device</span>
-                    </span>
-                  </div>
-                  <div className="inline-actions">
-                    {pkg.copied ? <span className="completion-status-ok">Copied</span> : null}
-                    {pkg.qrShown ? <span className="completion-status-ok">QR shown</span> : null}
-                    {!distributed ? <span className="help">Pending</span> : null}
-                  </div>
+            {ROTATE_COMPLETION_ROWS.map((row) => (
+              <div className="completion-row" key={row.title}>
+                <div className="completion-main">
+                  <span className="completion-check">
+                    <Check size={13} />
+                  </span>
+                  <span>
+                    <span className="value">{row.title}</span>
+                    <span className="help">{row.device}</span>
+                  </span>
                 </div>
-              );
-            })}
+                <div className="inline-actions">
+                  {row.statuses.map((status) => (
+                    <span key={status} className="completion-status-ok">
+                      {status}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

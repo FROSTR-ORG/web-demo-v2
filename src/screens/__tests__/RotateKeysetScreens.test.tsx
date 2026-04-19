@@ -521,6 +521,32 @@ describe("RotateCreateProfileScreen", () => {
     fireEvent.click(screen.getByText("Back"));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/progress");
   });
+
+  /* VAL-RTK-004: Relays section lists wss://relay.primal.net (Connected - 24ms)
+     and wss://relay.example.com per Paper shared/2-create-profile. */
+  it("renders Paper relays wss://relay.primal.net and wss://relay.example.com", () => {
+    render(
+      <MemoryRouter>
+        <RotateCreateProfileScreen />
+      </MemoryRouter>
+    );
+    expect(screen.getByText("wss://relay.primal.net")).toBeInTheDocument();
+    expect(screen.getByText("wss://relay.example.com")).toBeInTheDocument();
+    expect(screen.getByText(/Connected - 24ms/)).toBeInTheDocument();
+  });
+
+  /* VAL-RTK-004: Assigned Local Share panel surfaces Local Share / Keyset rows. */
+  it("renders Assigned Local Share panel with Local Share and Keyset rows", () => {
+    render(
+      <MemoryRouter>
+        <RotateCreateProfileScreen />
+      </MemoryRouter>
+    );
+    expect(screen.getByText("Assigned Local Share")).toBeInTheDocument();
+    expect(screen.getByText("Share #0, Encrypted")).toBeInTheDocument();
+    expect(screen.getByText("Local Share")).toBeInTheDocument();
+    expect(screen.getByText("Keyset")).toBeInTheDocument();
+  });
 });
 
 /* ==========================================================
@@ -567,6 +593,62 @@ describe("RotateDistributeSharesScreen", () => {
     );
     fireEvent.click(screen.getByText("Back"));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/profile");
+  });
+
+  /* VAL-RTK-005: Subtitle mentions "fresh share" so the rotate adaptation
+     preserves the rotation-aware language required by the contract. */
+  it("subtitle mentions fresh share (rotation-aware language)", () => {
+    render(
+      <MemoryRouter>
+        <RotateDistributeSharesScreen />
+      </MemoryRouter>
+    );
+    expect(screen.getByText(/fresh share/)).toBeInTheDocument();
+  });
+
+  /* VAL-RTK-005: Share 3 renders in a locked visual state — dashed "Enter
+     password to unlock" placeholder and disabled Copy/QR controls. Share 2
+     renders with masked •••••••• and enabled Copy/QR. */
+  it("Share 3 card renders locked (dashed unlock placeholder + disabled Copy/QR)", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <RotateDistributeSharesScreen />
+      </MemoryRouter>
+    );
+    expect(screen.getByText("Enter password to unlock")).toBeInTheDocument();
+    const lockedCard = container.querySelector(".package-card.locked");
+    expect(lockedCard).toBeTruthy();
+    /* Disabled Copy + QR buttons inside the locked card */
+    const disabled = lockedCard!.querySelectorAll("button[disabled]");
+    expect(disabled.length).toBe(2);
+  });
+
+  it("Share 2 card renders masked •••••••• password with Copy + QR enabled", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <RotateDistributeSharesScreen />
+      </MemoryRouter>
+    );
+    /* There are two non-locked cards: local "Saved" card and Share 2 */
+    const cards = container.querySelectorAll(".package-card");
+    /* Share 2 is the second (index 1) — first remote package, not locked */
+    const share2 = cards[1];
+    expect(share2.textContent).toContain("Share 2");
+    expect(share2.textContent).toContain("••••••••");
+    const share2Buttons = share2.querySelectorAll("button:not([disabled])");
+    /* At least Copy + QR should be enabled */
+    expect(share2Buttons.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("renders masked bfonboard package text for remote shares", () => {
+    render(
+      <MemoryRouter>
+        <RotateDistributeSharesScreen />
+      </MemoryRouter>
+    );
+    /* Paper masked placeholder is used for both non-local remote packages */
+    const masked = screen.getAllByText(/bfonboard1•+/);
+    expect(masked.length).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -625,5 +707,33 @@ describe("RotateDistributionCompleteScreen", () => {
     );
     fireEvent.click(screen.getByText("Back"));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/distribute");
+  });
+
+  /* VAL-RTK-006: Distribution Status member rows mirror Paper capture exactly —
+     Member #1 — Igloo Mobile (Existing Device) with Copied + QR shown chips,
+     Member #2 — Igloo Desktop (New Device) with QR shown chip. */
+  it("renders Paper member rows with correct device labels and status chips", () => {
+    render(
+      <MemoryRouter>
+        <RotateDistributionCompleteScreen />
+      </MemoryRouter>
+    );
+    expect(screen.getByText("Member #1 — Igloo Mobile")).toBeInTheDocument();
+    expect(screen.getByText("Member #2 — Igloo Desktop")).toBeInTheDocument();
+    expect(screen.getByText("Existing Device")).toBeInTheDocument();
+    expect(screen.getByText("New Device")).toBeInTheDocument();
+    expect(screen.getByText("Copied")).toBeInTheDocument();
+    /* Both rows have "QR shown"; second row has only that chip */
+    const qrChips = screen.getAllByText("QR shown");
+    expect(qrChips.length).toBe(2);
+  });
+
+  it("success callout body reads '2 of 2 remote bfonboard packages ...'", () => {
+    render(
+      <MemoryRouter>
+        <RotateDistributionCompleteScreen />
+      </MemoryRouter>
+    );
+    expect(screen.getByText(/2 of 2 remote bfonboard packages have been accounted for/)).toBeInTheDocument();
   });
 });
