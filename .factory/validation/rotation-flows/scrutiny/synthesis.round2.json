@@ -1,7 +1,7 @@
 {
   "milestone": "rotation-flows",
-  "round": 3,
-  "status": "pass",
+  "round": 2,
+  "status": "fail",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -21,18 +21,26 @@
   },
   "reviewsSummary": {
     "total": 1,
-    "passed": 1,
-    "failed": 0,
-    "failedFeatures": []
+    "passed": 0,
+    "failed": 1,
+    "failedFeatures": [
+      "fix-rotation-nav-and-tests"
+    ]
   },
-  "blockingIssues": [],
+  "blockingIssues": [
+    {
+      "featureId": "rotate-keyset-form",
+      "severity": "blocking",
+      "description": "Unresolved rotate-keyset assertion mismatch remains: src/screens/__tests__/RotateKeysetScreens.test.tsx still expects \"02a3f8...8f2c\" while RotateKeysetFormScreen renders \"*************\"."
+    }
+  ],
   "appliedUpdates": [],
   "suggestedGuidanceUpdates": [],
   "rejectedObservations": [
     {
-      "observation": "ui-builder skill may need a fix-only exception path for manual browser verification requirements.",
-      "reason": "duplicate/already-documented in earlier scrutiny rounds"
+      "observation": "ui-builder skill test-first guidance does not reflect fix-only workflows.",
+      "reason": "duplicate (already captured in round 1 synthesis)"
     }
   ],
-  "previousRound": ".factory/validation/rotation-flows/scrutiny/synthesis.round2.json"
+  "previousRound": ".factory/validation/rotation-flows/scrutiny/synthesis.round1.json"
 }
