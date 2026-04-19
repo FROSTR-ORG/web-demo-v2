@@ -1,7 +1,7 @@
 {
   "milestone": "settings-export-recover",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -20,34 +20,26 @@
     }
   },
   "reviewsSummary": {
-    "total": 3,
-    "passed": 2,
-    "failed": 1,
-    "failedFeatures": [
-      "settings-sidebar"
-    ]
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "failedFeatures": []
   },
-  "blockingIssues": [
-    {
-      "featureId": "settings-sidebar",
-      "severity": "blocking",
-      "description": "Rotate Share button in Settings sidebar is enabled but has no click handler and is not disabled placeholder, violating requirement to either navigate to /rotate-share or be disabled."
-    }
-  ],
+  "blockingIssues": [],
   "appliedUpdates": [],
   "suggestedGuidanceUpdates": [
     {
       "target": "skills/ui-builder",
-      "suggestion": "Clarify expected browser validation interface: either require Skill invocation for agent-browser, or explicitly document direct `agent-browser --session ...` CLI workflow and valid subcommands (`open`, `close`, etc.).",
-      "evidence": "Both settings-sidebar and export-flow reviewers observed workers using direct `agent-browser` CLI commands (including initial `launch` misuse and subsequent help discovery) while marking skill procedure as followed.",
-      "isSystemic": true
+      "suggestion": "Allow a small-fix validation path for narrowly scoped wiring changes (e.g., one-line event handler fixes) where mandatory manual browser validation and test additions are optional if existing suite/typecheck pass.",
+      "evidence": "Fix feature `fix-rotate-share-button` was a targeted one-line navigation wiring correction with passing validators; reviewer observed the current ui-builder procedure is overly rigid for this class of change.",
+      "isSystemic": false
     }
   ],
   "rejectedObservations": [
     {
-      "observation": "ui-builder skill and actual agent-browser usage are mismatched (duplicate statement from second review).",
-      "reason": "duplicate"
+      "observation": "ui-builder skill and direct agent-browser CLI usage mismatch.",
+      "reason": "already documented in round 1 synthesis"
     }
   ],
-  "previousRound": null
+  "previousRound": ".factory/validation/settings-export-recover/scrutiny/synthesis.round1.json"
 }

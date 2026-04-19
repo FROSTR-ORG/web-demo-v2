@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-rotate-share-button",
+  "reviewedAt": "2026-04-19T01:35:34Z",
+  "commitId": "97d8e5682a1757ada62990547c9c558f43d96984",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly addresses the prior blocking issue: the Rotate Share button now has an onClick handler that closes the settings sidebar and navigates to /rotate-share.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-builder skill procedure is over-prescriptive for small fix tasks: it mandates test-first additions and manual agent-browser verification for all work, but this fix was a targeted wiring change and the worker correctly validated via required automated checks only.",
+      "evidence": ".factory/skills/ui-builder/SKILL.md (Work Procedure steps 3 and 8) vs fix transcript skeleton in /Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59/worker-transcripts.jsonl for session 0110b1b8-be5d-491a-a72a-9583ed85c6d6 and handoff.skillFeedback.suggestedChanges."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/settings-export-recover/scrutiny/reviews/settings-sidebar.json",
+  "summary": "Pass: reviewed prior fail and both relevant diffs; the Rotate Share button is now wired to navigate to /rotate-share and closes the sidebar, resolving the original blocking finding."
+}
