@@ -89,16 +89,36 @@ describe("EnterPackageScreen", () => {
     expect(screen.getByText(/Invalid package/)).toBeInTheDocument();
   });
 
-  it("Begin Onboarding button is disabled until valid input", () => {
+  it("Begin Onboarding button is disabled until valid package AND non-empty password are provided", () => {
     render(
       <MemoryRouter>
         <EnterPackageScreen />
       </MemoryRouter>
     );
+    /* Initial state: both inputs empty → disabled */
     expect(screen.getByRole("button", { name: /Begin Onboarding/i })).toBeDisabled();
+    /* Typing a valid package alone is not sufficient — password still empty */
     const textarea = screen.getByPlaceholderText("bfonboard1...");
     fireEvent.change(textarea, { target: { value: "bfonboard1abc123" } });
+    expect(screen.getByRole("button", { name: /Begin Onboarding/i })).toBeDisabled();
+    /* Adding a non-empty password enables the CTA */
+    const passwordInput = screen.getByLabelText("Package Password");
+    fireEvent.change(passwordInput, { target: { value: "pkg-pass" } });
     expect(screen.getByRole("button", { name: /Begin Onboarding/i })).not.toBeDisabled();
+  });
+
+  it("Begin Onboarding stays disabled when package is valid but password is only whitespace", () => {
+    render(
+      <MemoryRouter>
+        <EnterPackageScreen />
+      </MemoryRouter>
+    );
+    const textarea = screen.getByPlaceholderText("bfonboard1...");
+    fireEvent.change(textarea, { target: { value: "bfonboard1abc123" } });
+    const passwordInput = screen.getByLabelText("Package Password");
+    /* Whitespace-only passwords should not satisfy the non-empty requirement */
+    fireEvent.change(passwordInput, { target: { value: "   " } });
+    expect(screen.getByRole("button", { name: /Begin Onboarding/i })).toBeDisabled();
   });
 
   it("Back link navigates to welcome", () => {

@@ -74,9 +74,17 @@ export function EnterPackageScreen() {
   const [packageString, setPackageString] = useState(demoUi.onboard?.packagePreset ?? "");
   const [password, setPassword] = useState(demoUi.onboard?.passwordPreset ?? "");
   const validation = validatePackageString(packageString);
+  /*
+   * CTA gating: Begin Onboarding requires BOTH a valid onboarding package
+   * AND a non-empty password before it enables. Paper's Enter Package
+   * screen treats the password as a required field for the onboard flow,
+   * so the CTA stays disabled (bg-[#2563EB40]) while either input is
+   * missing.
+   */
+  const canBeginOnboarding = validation.valid && password.trim().length > 0;
 
   function handleBeginOnboarding() {
-    if (!validation.valid) return;
+    if (!canBeginOnboarding) return;
     navigate("/onboard/handshake", { state: { packageString: packageString.trim(), password } });
   }
 
@@ -124,8 +132,8 @@ export function EnterPackageScreen() {
         <Button
           type="button"
           size="full"
-          disabled={!validation.valid}
-          aria-disabled={!validation.valid}
+          disabled={!canBeginOnboarding}
+          aria-disabled={!canBeginOnboarding}
           onClick={handleBeginOnboarding}
         >
           Begin Onboarding
