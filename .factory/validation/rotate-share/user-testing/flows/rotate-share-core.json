@@ -1,0 +1,70 @@
+{
+  "milestone": "rotate-share",
+  "groupId": "rotate-share-core",
+  "surface": "browser-ui",
+  "assertions": [
+    {
+      "id": "VAL-RTS-001",
+      "status": "pass",
+      "reason": "Enter-package screen rendered required copy, validator line, and CTA; clicking Apply Share Update navigated to /rotate-share/applying. No console/page errors observed.",
+      "evidence": [
+        "rotate-share/rotate-share-core/VAL-RTS-001-enter-package.png",
+        "rotate-share/rotate-share-core/VAL-RTS-001-apply-to-applying.png",
+        "url:http://127.0.0.1:5173/rotate-share/applying"
+      ]
+    },
+    {
+      "id": "VAL-RTS-002",
+      "status": "pass",
+      "reason": "Applying Share Update screen rendered Back to Settings, all 4 progress rows, rotate package chip, and Cancel Share Update button as specified. No console/page errors observed.",
+      "evidence": [
+        "rotate-share/rotate-share-core/VAL-RTS-002-applying.png"
+      ]
+    },
+    {
+      "id": "VAL-RTS-003",
+      "status": "pass",
+      "reason": "Failed screen rendered required warning and actions; no top Back to Settings link was present (anchor count 0). Retry navigated to /rotate-share/applying and Back to Rotate Share navigated to /rotate-share. No console/page errors observed.",
+      "evidence": [
+        "rotate-share/rotate-share-core/VAL-RTS-003-failed.png",
+        "rotate-share/rotate-share-core/VAL-RTS-003-retry-to-applying.png",
+        "rotate-share/rotate-share-core/VAL-RTS-003-back-to-intake.png",
+        "url:http://127.0.0.1:5173/rotate-share/applying",
+        "url:http://127.0.0.1:5173/rotate-share"
+      ]
+    },
+    {
+      "id": "VAL-RTS-004",
+      "status": "pass",
+      "reason": "Updated screen rendered success banner and identity changes panel including unchanged group key plus old/new share and profile IDs.",
+      "evidence": [
+        "rotate-share/rotate-share-core/VAL-RTS-004-updated.png"
+      ]
+    },
+    {
+      "id": "VAL-RTS-005",
+      "status": "pass",
+      "reason": "From /demo/rotate-share-updated, Return to Signer navigated to /dashboard/demo-profile and Signer Running was visible.",
+      "evidence": [
+        "rotate-share/rotate-share-core/VAL-RTS-005-return-to-dashboard.png",
+        "url:http://127.0.0.1:5173/dashboard/demo-profile"
+      ]
+    },
+    {
+      "id": "VAL-RTS-006",
+      "status": "pass",
+      "reason": "From /demo/rotate-share-applying, Cancel Share Update navigated to /rotate-share intake screen (Enter Rotate Package).",
+      "evidence": [
+        "rotate-share/rotate-share-core/VAL-RTS-006-cancel-to-intake.png",
+        "url:http://127.0.0.1:5173/rotate-share"
+      ]
+    }
+  ],
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "frictions": [
+    "Using text-only selector for \"Retry\" was ambiguous because the warning copy also contains the word \"retry\"; resolved by targeting button role/name."
+  ],
+  "blockers": []
+}

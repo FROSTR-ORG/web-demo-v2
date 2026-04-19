@@ -1,0 +1,23 @@
+{
+  "milestone": "rotate-share",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 6,
+    "passed": 6,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-RTS-001",
+    "VAL-RTS-002",
+    "VAL-RTS-003",
+    "VAL-RTS-004",
+    "VAL-RTS-005",
+    "VAL-RTS-006"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "previousRound": null
+}
