@@ -4781,3 +4781,203 @@ a {
   color: #fff !important;
   font-weight: 500;
 }
+
+/* ========================================
+   Rotate Keyset Error Screens
+   ======================================== */
+
+/* --- Shared error card base --- */
+
+.rotate-error-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 16px;
+  gap: 12px;
+}
+
+.rotate-error-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rotate-error-card-title {
+  font-family: var(--font-inter, "Inter", sans-serif);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 18px;
+  color: rgba(147, 197, 253, 0.8);
+}
+
+.rotate-error-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-inter, "Inter", sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.rotate-error-badge.failed {
+  color: #ef4444;
+}
+
+.rotate-error-field {
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.rotate-error-field-mono {
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 13px;
+  line-height: 16px;
+  color: var(--ig-subtle);
+}
+
+/* --- Error banners --- */
+
+.rotate-error-banner {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  padding: 8px 12px;
+  gap: 8px;
+  font-family: var(--font-inter, "Inter", sans-serif);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.rotate-error-banner svg {
+  flex-shrink: 0;
+}
+
+.rotate-error-banner.red {
+  background: rgba(127, 29, 29, 0.2);
+  color: #ef4444;
+}
+
+.rotate-error-banner.amber {
+  background: rgba(120, 53, 15, 0.2);
+  color: #fbbf24;
+}
+
+/* --- Group Mismatch card --- */
+
+.rotate-error-card.mismatch {
+  background: rgba(127, 29, 29, 0.1);
+}
+
+.rotate-mismatch-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rotate-mismatch-header svg {
+  flex-shrink: 0;
+}
+
+.rotate-mismatch-title {
+  font-family: var(--font-inter, "Inter", sans-serif);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 18px;
+  color: #ef4444;
+}
+
+.rotate-mismatch-keys {
+  display: flex;
+  flex-direction: column;
+  padding-left: 30px;
+  gap: 8px;
+}
+
+.rotate-mismatch-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(30, 58, 138, 0.13);
+}
+
+.rotate-mismatch-row.last {
+  border-bottom: none;
+}
+
+.rotate-mismatch-label {
+  font-family: var(--font-inter, "Inter", sans-serif);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ig-muted);
+}
+
+.rotate-mismatch-value {
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.rotate-mismatch-value.blue {
+  color: var(--ig-blue);
+}
+
+.rotate-mismatch-value.red {
+  color: #ef4444;
+}
+
+.rotate-mismatch-help {
+  margin: 0;
+  font-family: var(--font-inter, "Inter", sans-serif);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ig-muted);
+}
+
+/* --- Generation Failed phase dots --- */
+
+.gen-failed-dot {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.generation-phase.failed .generation-phase-label,
+.generation-phase.failed .generation-phase-status {
+  color: #ef4444;
+}
+
+.generation-phase.failed {
+  background: rgba(127, 29, 29, 0.1);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 4px -4px;
+  border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* --- Green safety banner --- */
+
+.rotate-safety-banner {
+  display: flex;
+  align-items: center;
+  border-radius: 10px;
+  padding: 12px 16px;
+  gap: 10px;
+  background: rgba(5, 46, 22, 0.2);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  font-family: var(--font-inter, "Inter", sans-serif);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ig-green-soft);
+}
+
+.rotate-safety-banner svg {
+  flex-shrink: 0;
+}

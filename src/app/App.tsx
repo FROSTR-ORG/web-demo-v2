@@ -8,7 +8,17 @@ import { GenerationProgressScreen } from "../screens/GenerationProgressScreen";
 import { LoadBackupScreen, DecryptBackupScreen, ReviewSaveScreen, ImportErrorScreen } from "../screens/ImportScreens";
 import { EnterPackageScreen, HandshakeScreen, OnboardingFailedScreen, OnboardingCompleteScreen } from "../screens/OnboardScreens";
 import { CollectSharesScreen, RecoverSuccessScreen } from "../screens/RecoverScreens";
-import { RotateKeysetFormScreen, ReviewGenerateScreen } from "../screens/RotateKeysetScreens";
+import {
+  RotateKeysetFormScreen,
+  ReviewGenerateScreen,
+  RotateGenerationProgressScreen,
+  RotateWrongPasswordScreen,
+  RotateGroupMismatchScreen,
+  RotateGenerationFailedScreen,
+  RotateCreateProfileScreen,
+  RotateDistributeSharesScreen,
+  RotateDistributionCompleteScreen
+} from "../screens/RotateKeysetScreens";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
 
 export function App() {
@@ -30,6 +40,13 @@ export function App() {
       <Route path="/onboard/complete" element={<OnboardingCompleteScreen />} />
       <Route path="/rotate-keyset" element={<RotateKeysetFormScreen />} />
       <Route path="/rotate-keyset/review" element={<ReviewGenerateScreen />} />
+      <Route path="/rotate-keyset/progress" element={<RotateGenerationProgressScreen />} />
+      <Route path="/rotate-keyset/error-password" element={<RotateWrongPasswordScreen />} />
+      <Route path="/rotate-keyset/error-mismatch" element={<RotateGroupMismatchScreen />} />
+      <Route path="/rotate-keyset/error-failed" element={<RotateGenerationFailedScreen />} />
+      <Route path="/rotate-keyset/profile" element={<RotateCreateProfileScreen />} />
+      <Route path="/rotate-keyset/distribute" element={<RotateDistributeSharesScreen />} />
+      <Route path="/rotate-keyset/complete" element={<RotateDistributionCompleteScreen />} />
       <Route path="/recover/:profileId" element={<CollectSharesScreen />} />
       <Route path="/recover/:profileId/success" element={<RecoverSuccessScreen />} />
       <Route path="/dashboard/:profileId" element={<DashboardScreen />} />
