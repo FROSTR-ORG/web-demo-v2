@@ -1,7 +1,7 @@
 {
   "milestone": "import",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -21,38 +21,20 @@
   },
   "reviewsSummary": {
     "total": 1,
-    "passed": 0,
-    "failed": 1,
-    "failedFeatures": [
-      "import-fidelity"
-    ]
+    "passed": 1,
+    "failed": 0,
+    "failedFeatures": []
   },
-  "blockingIssues": [
-    {
-      "featureId": "import-fidelity",
-      "severity": "blocking",
-      "description": "Load Backup uses BackLink label 'Back' instead of required 'Back to Welcome' (VAL-IMP-001 / Paper import load-backup copy)."
-    },
-    {
-      "featureId": "import-fidelity",
-      "severity": "blocking",
-      "description": "Validator copy format mismatches required import strings by rendering '2 of 3' and 'Share #1 (Index 1)' instead of '2/3' and 'Share #1' in Import load/decrypt screens."
-    },
-    {
-      "featureId": "import-fidelity",
-      "severity": "blocking",
-      "description": "Corrupted error variant renders 'Back to Import' as secondary/ghost CTA, but contract/Paper require a single primary CTA for that variant (VAL-IMP-005)."
-    }
-  ],
+  "blockingIssues": [],
   "appliedUpdates": [],
   "suggestedGuidanceUpdates": [
     {
       "target": "mission planning artifacts",
       "suggestion": "Keep feature copy examples aligned with validation-contract and Paper literals for import flow to avoid implementing/testing non-canonical text variants.",
-      "evidence": "Review flagged features.json import examples using '(2 of 3) · Share #1 (Index 1)' while validation-contract and Paper require '(2/3) · Share #1'.",
+      "evidence": "Review for fix-import-copy-and-error-cta again found conflicting mission feature wording versus validation-contract for corrupted-error CTA expectations (features.json:916 vs validation-contract.md:293).",
       "isSystemic": false
     }
   ],
   "rejectedObservations": [],
-  "previousRound": null
+  "previousRound": ".factory/validation/import/scrutiny/synthesis.round1.json"
 }

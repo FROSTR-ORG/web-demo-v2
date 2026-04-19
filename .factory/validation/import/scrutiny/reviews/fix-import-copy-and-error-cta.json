@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-import-copy-and-error-cta",
+  "reviewedAt": "2026-04-19T21:02:44Z",
+  "commitId": "e81907f",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Pass. The fix commit directly resolves all three blocking findings from import-fidelity and updates tests to enforce the corrected behavior: Load Backup BackLink now reads 'Back to Welcome', load/decrypt validator strings now use the canonical '(2/3) · Share #1' format (with decrypt Created-date suffix), and corrupted-error now renders a single primary 'Back to Import' CTA while amber keeps primary+ghost pairing.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Mission feature text for the original import-fidelity feature still conflicts with the validation contract for the corrupted-error CTA, which can mislead future implementations/reviews.",
+      "evidence": "features.json:916 says import-error-corrupted uses a Retry CTA, while validation-contract.md:293 requires a single primary 'Back to Import' CTA (and the fix feature itself encodes this at features.json:959)."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/import/scrutiny/reviews/import-fidelity.json",
+  "summary": "Reviewed fix-import-copy-and-error-cta against the prior failing review and both commit diffs (d3acd68 and e81907f). The fix is adequate and complete for the original blockers; no new code defects were found."
+}

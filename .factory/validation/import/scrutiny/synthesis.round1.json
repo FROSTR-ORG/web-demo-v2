@@ -1,0 +1,58 @@
+{
+  "milestone": "import",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx vitest run --config vitest.config.ts --maxWorkers=4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx tsc -b",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "failedFeatures": [
+      "import-fidelity"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "import-fidelity",
+      "severity": "blocking",
+      "description": "Load Backup uses BackLink label 'Back' instead of required 'Back to Welcome' (VAL-IMP-001 / Paper import load-backup copy)."
+    },
+    {
+      "featureId": "import-fidelity",
+      "severity": "blocking",
+      "description": "Validator copy format mismatches required import strings by rendering '2 of 3' and 'Share #1 (Index 1)' instead of '2/3' and 'Share #1' in Import load/decrypt screens."
+    },
+    {
+      "featureId": "import-fidelity",
+      "severity": "blocking",
+      "description": "Corrupted error variant renders 'Back to Import' as secondary/ghost CTA, but contract/Paper require a single primary CTA for that variant (VAL-IMP-005)."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "mission planning artifacts",
+      "suggestion": "Keep feature copy examples aligned with validation-contract and Paper literals for import flow to avoid implementing/testing non-canonical text variants.",
+      "evidence": "Review flagged features.json import examples using '(2 of 3) · Share #1 (Index 1)' while validation-contract and Paper require '(2/3) · Share #1'.",
+      "isSystemic": false
+    }
+  ],
+  "rejectedObservations": [],
+  "previousRound": null
+}
