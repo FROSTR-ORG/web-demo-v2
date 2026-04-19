@@ -1,0 +1,33 @@
+{
+  "featureId": "onboard-fidelity",
+  "reviewedAt": "2026-04-19T21:28:03Z",
+  "commitId": "490d914b9e5c147613b41feb71d9a16d77818c59",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "Most Onboard parity updates are implemented correctly (help icons, handshake BackLink removal, failed-variant styling tokens, and dashboard handoff), but one explicit expected behavior remains unmet on Enter Package.",
+    "issues": [
+      {
+        "file": "src/screens/OnboardScreens.tsx",
+        "line": 127,
+        "severity": "blocking",
+        "description": "Feature expectedBehavior requires the primary CTA on /demo/onboard-enter-package to remain disabled until BOTH onboarding package and password are filled. Current logic enables the button based only on package validity (`const validation = validatePackageString(packageString)` and `disabled={!validation.valid}`), so a valid package with empty password enables navigation to /onboard/handshake."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Shared guidance conflicts with mission validation reality for styling classes: AGENTS/skill say not to use Tailwind utility classes, but validation-contract requires exact Tailwind-style class tokens for alert variants.",
+      "evidence": "AGENTS.md:49 ('No Tailwind utility classes'); .factory/skills/ui-builder/SKILL.md:84 ('Do NOT use Tailwind utility classes'); validation-contract.md:312 and 317 require `bg-[#EAB3081A]` / `bg-[#EF44441A]` token assertions, and implementation uses them at src/screens/OnboardScreens.tsx:302-303."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Feature metadata for onboard appears stale versus validation contract/Paper references, which can misdirect workers and reviewers.",
+      "evidence": "features.json:990 references `onboard-failed-expired`; features.json:993/995 mention 'Begin Handshake' and 'Finish' copy. Current contract/Paper use timeout variant + 'Begin Onboarding' and 'Save & Launch Signer' (validation-contract.md:311-317, 321-323)."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed worker session 50f2047d-23ea-41f5-aab9-2d4afd34a288, commit 490d914. The implementation is close to parity and generally solid, but it misses one stated behavior gate: Enter Package CTA enablement does not require password input. Marking this feature as fail pending that fix."
+}
