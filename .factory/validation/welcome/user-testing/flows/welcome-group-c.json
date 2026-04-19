@@ -1,0 +1,236 @@
+{
+  "groupId": "welcome-group-c",
+  "testedAt": "2026-04-19T18:55:05Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "appUrl": "http://127.0.0.1:5173",
+    "guidanceSection": "Flow Validator Guidance: browser-ui",
+    "assignedAssertions": [
+      "VAL-WEL-015",
+      "VAL-WEL-016",
+      "VAL-WEL-017",
+      "VAL-WEL-018",
+      "VAL-WEL-019",
+      "VAL-WEL-020",
+      "VAL-WEL-021"
+    ],
+    "browserSession": "welcome-group-c"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-WEL-015",
+      "title": "Returning (multi) \"Unlock\" on first profile opens modal",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/welcome-returning-multi",
+          "expected": "Returning-multi screen is visible",
+          "observed": "Screen loaded with profile rows and per-row Unlock buttons"
+        },
+        {
+          "action": "Click first profile row Unlock (My Signing Key)",
+          "expected": "Unlock modal opens",
+          "observed": "Unlock Profile modal opened"
+        },
+        {
+          "action": "Verify modal identity subtitle",
+          "expected": "My Signing Key · 2/3 · #0",
+          "observed": "Exact subtitle text present"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-c/VAL-WEL-015-unlock-modal.png"
+        ],
+        "consoleErrors": "none",
+        "network": "N/A (UI modal interaction only)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-016",
+      "title": "Returning (multi) chip row navigations",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From /demo/welcome-returning-multi click New Keyset chip",
+          "expected": "Navigate to /create",
+          "observed": "URL became http://127.0.0.1:5173/create"
+        },
+        {
+          "action": "Return to /demo/welcome-returning-multi and click Import Device Profile chip",
+          "expected": "Navigate to /import",
+          "observed": "URL became http://127.0.0.1:5173/import"
+        },
+        {
+          "action": "Return to /demo/welcome-returning-multi and click Onboard chip",
+          "expected": "Navigate to /onboard",
+          "observed": "URL became http://127.0.0.1:5173/onboard"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-c/VAL-WEL-016-new-keyset-nav.png",
+          "welcome/group-c/VAL-WEL-016-import-nav.png",
+          "welcome/group-c/VAL-WEL-016-onboard-nav.png"
+        ],
+        "consoleErrors": "none",
+        "network": "SPA route transitions observed to /create, /import, /onboard"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-017",
+      "title": "Returning (many) renders core content",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/welcome-returning-many",
+          "expected": "Welcome back page with many-profile variant",
+          "observed": "Page loaded with Welcome back heading and many-profile list"
+        },
+        {
+          "action": "Verify required visible profile rows and controls",
+          "expected": "Rows include My Signing Key, Work Key, Backup Key, Cold Storage, Family Key, Joint Key, each with Unlock + Rotate",
+          "observed": "All listed rows present with per-row Unlock and Rotate buttons"
+        },
+        {
+          "action": "Verify overflow/count UI elements",
+          "expected": "Overflow chip '7 more below' and footer count '12 saved profiles'",
+          "observed": "Overflow chip visible; footer count rendered as 12 + 'saved profiles' label"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-c/VAL-WEL-017-many-core.png"
+        ],
+        "consoleErrors": "none",
+        "network": "N/A (static UI verification)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-018",
+      "title": "Returning (many) overflow indicator and count",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect returning-many variant markers",
+          "expected": "Both overflow pill and saved-profiles count are present",
+          "observed": "'7 more below' overflow pill and 12 saved profiles footer are present together"
+        },
+        {
+          "action": "Compare with variant intent",
+          "expected": "These markers distinguish many variant",
+          "observed": "Both markers appear on returning-many screen"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-c/VAL-WEL-018-overflow-count.png"
+        ],
+        "consoleErrors": "none",
+        "network": "N/A (static UI verification)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-019",
+      "title": "Returning (many) list is scrollable",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect .profile-list-scrollable container metrics before scroll",
+          "expected": "Container has overflow and starts at top",
+          "observed": "scrollTop=0, clientHeight=340, scrollHeight=1336"
+        },
+        {
+          "action": "Scroll inside .profile-list-scrollable",
+          "expected": "Scroll position changes and lower rows are revealed",
+          "observed": "scrollTop moved to 700; additional lower profile rows are visible"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-c/VAL-WEL-019-scroll-reveal.png"
+        ],
+        "consoleErrors": "none",
+        "network": "N/A (scroll behavior validation)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-020",
+      "title": "Returning (many) \"Unlock\" on first profile opens modal",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/welcome-returning-many",
+          "expected": "First profile row visible with Unlock",
+          "observed": "My Signing Key row present with Unlock button"
+        },
+        {
+          "action": "Click first Unlock",
+          "expected": "Unlock modal opens",
+          "observed": "Unlock Profile modal opened with expected title/subtitle"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-c/VAL-WEL-020-unlock-modal.png"
+        ],
+        "consoleErrors": "none",
+        "network": "N/A (UI modal interaction only)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-021",
+      "title": "Returning (many) chip row navigations",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From /demo/welcome-returning-many click New Keyset chip",
+          "expected": "Navigate to /create",
+          "observed": "URL became http://127.0.0.1:5173/create"
+        },
+        {
+          "action": "Return to /demo/welcome-returning-many and click Import Device Profile chip",
+          "expected": "Navigate to /import",
+          "observed": "URL became http://127.0.0.1:5173/import"
+        },
+        {
+          "action": "Return to /demo/welcome-returning-many and click Onboard chip",
+          "expected": "Navigate to /onboard",
+          "observed": "URL became http://127.0.0.1:5173/onboard"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-c/VAL-WEL-021-new-keyset-nav.png",
+          "welcome/group-c/VAL-WEL-021-import-nav.png",
+          "welcome/group-c/VAL-WEL-021-onboard-nav.png"
+        ],
+        "consoleErrors": "none",
+        "network": "SPA route transitions observed to /create, /import, /onboard"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Exact wait on text '12 saved profiles' timed out because accessibility text extraction concatenates the count as '12saved profiles' on this surface.",
+      "resolved": true,
+      "resolution": "Validated with screenshot evidence plus successful text wait for 'saved profiles' and visible count+label footer.",
+      "affectedAssertions": [
+        "VAL-WEL-017",
+        "VAL-WEL-018"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 7 assertions (VAL-WEL-015..021) on browser UI. All 7 passed; no console/page errors were reported during validation flows."
+}

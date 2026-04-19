@@ -55,14 +55,17 @@ For cross-flow assertions starting from the main app `/`, the initial state is d
 - WASM loading may add 2–3 seconds to initial page load.
 - IndexedDB state persists between test runs — clear storage if you need a clean main-app flow.
 - Some cross-flow assertions require pre-existing profile state; create it in the same validator session via the Create flow rather than relying on another validator.
+- On some screens, accessible text extraction may concatenate adjacent number+label text (example: `12saved profiles`); for such cases, combine URL/screenshot evidence with robust text checks instead of a single exact-string wait.
+- Some list screens reuse identical button labels (e.g., multiple `Rotate` buttons in welcome variants); prefer row-scoped selectors or snapshot refs to avoid ambiguous clicks.
 
-## Flow Validator Guidance
+## Flow Validator Guidance: browser-ui
 
-- Use a unique browser session per validator; never reuse the default session.
-- Stay within assigned assertions only; do not modify app code or shared service configuration.
-- Use only `http://127.0.0.1:5173` as the app URL.
-- Save screenshots and artifacts only under the assigned evidence directory.
-- Treat `agent-browser` network capture as secondary evidence for pure client-side SPA route transitions — URL checks + screenshots + console error checks are primary.
+- Surface/tool: browser UI via `agent-browser` only.
+- Isolation boundary: each validator must use its own browser session and its own assigned assertion IDs; never use the default session.
+- Shared-state constraint: validators may navigate app routes but must not modify app source, shared service config, or other validators' evidence/report files.
+- Allowed app origin: `http://127.0.0.1:5173` only.
+- Evidence boundary: write screenshots/log artifacts only inside the assigned mission evidence folder.
+- Evidence priority for SPA assertions: URL checks + screenshots + console/page errors are primary; network capture is secondary context.
 
 ## Mission Tool Mandates
 

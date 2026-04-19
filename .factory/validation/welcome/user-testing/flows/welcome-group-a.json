@@ -1,0 +1,175 @@
+{
+  "groupId": "welcome-group-a",
+  "testedAt": "2026-04-19T18:53:20Z",
+  "isolation": {
+    "milestone": "welcome",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "appUrl": "http://127.0.0.1:5173",
+    "guidanceSection": "Flow Validator Guidance: browser-ui",
+    "assignedAssertions": [
+      "VAL-WEL-001",
+      "VAL-WEL-002",
+      "VAL-WEL-003",
+      "VAL-WEL-004",
+      "VAL-WEL-005",
+      "VAL-WEL-006",
+      "VAL-WEL-007"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-WEL-001",
+      "title": "Welcome first-time renders core content",
+      "status": "pass",
+      "rationale": "Hero text, New Keyset card copy, primary CTA, and chip row actions were all visible on /demo/welcome-first-time with no page errors.",
+      "steps": [
+        {
+          "action": "Navigate to /demo/welcome-first-time",
+          "expected": "First-time welcome content and actions render",
+          "observed": "Rendered hero 'Split your Nostr key. Sign from anywhere.', New Keyset card, Create New Keyset, Import Device Profile, and Onboard"
+        },
+        {
+          "action": "Check browser errors",
+          "expected": "No console/page errors",
+          "observed": "agent-browser errors returned no entries"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-a/VAL-WEL-001-first-time-core.png"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-002",
+      "title": "Welcome first-time Create New Keyset navigates to /create",
+      "status": "pass",
+      "rationale": "Clicking the primary CTA moved the URL to /create.",
+      "steps": [
+        {
+          "action": "From /demo/welcome-first-time click 'Create New Keyset'",
+          "expected": "Navigate to /create",
+          "observed": "URL became http://127.0.0.1:5173/create"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-a/VAL-WEL-002-create-nav.png"
+        ],
+        "url": "http://127.0.0.1:5173/create"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-003",
+      "title": "Welcome first-time Import Device Profile navigates to /import",
+      "status": "pass",
+      "rationale": "Clicking the Import Device Profile chip moved the URL to /import.",
+      "steps": [
+        {
+          "action": "From /demo/welcome-first-time click 'Import Device Profile'",
+          "expected": "Navigate to /import",
+          "observed": "URL became http://127.0.0.1:5173/import"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-a/VAL-WEL-003-import-nav.png"
+        ],
+        "url": "http://127.0.0.1:5173/import"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-004",
+      "title": "Welcome first-time Onboard navigates to /onboard",
+      "status": "pass",
+      "rationale": "Clicking the Onboard chip moved the URL to /onboard.",
+      "steps": [
+        {
+          "action": "From /demo/welcome-first-time click 'Onboard'",
+          "expected": "Navigate to /onboard",
+          "observed": "URL became http://127.0.0.1:5173/onboard"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-a/VAL-WEL-004-onboard-nav.png"
+        ],
+        "url": "http://127.0.0.1:5173/onboard"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-005",
+      "title": "Welcome first-time secondary actions render as chips",
+      "status": "pass",
+      "rationale": "Import Device Profile and Onboard rendered as compact pill-like controls in one row with muted blue styling, distinct from the full-width primary button above.",
+      "steps": [
+        {
+          "action": "Inspect first-time screen action row",
+          "expected": "Secondary actions are chip-style controls in one row after 'or'",
+          "observed": "Both secondary controls were compact (~30px high), muted blue chips on the same row; primary Create button was larger full-width blue button"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-a/VAL-WEL-005-chip-style.png"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-006",
+      "title": "Returning (single) renders core content",
+      "status": "pass",
+      "rationale": "Returning-single scenario displayed required title, profile row, subtitle, Unlock/Rotate buttons, and chip-style secondary actions; no page errors.",
+      "steps": [
+        {
+          "action": "Navigate to /demo/welcome-returning-single",
+          "expected": "Welcome back content with one profile row and secondary chip actions",
+          "observed": "Rendered 'Welcome back.', 'My Signing Key', subtitle '2/3 \u00b7 #0 \u00b7 npub1qe3...7k4m', Unlock + Rotate, and chip row with New Keyset/Import Device Profile/Onboard"
+        },
+        {
+          "action": "Check browser errors",
+          "expected": "No console/page errors",
+          "observed": "agent-browser errors returned no entries"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-a/VAL-WEL-006-returning-single-core.png"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-007",
+      "title": "Returning (single) profile subtitle includes localShareIdx",
+      "status": "pass",
+      "rationale": "Subtitle included the required middle localShareIdx segment and separators in the order `2/3 \u00b7 #0 \u00b7 npub...`.",
+      "steps": [
+        {
+          "action": "Inspect subtitle on /demo/welcome-returning-single",
+          "expected": "Subtitle contains `2/3 \u00b7 #0 \u00b7 npub...` with #0 between separators",
+          "observed": "Displayed exactly `2/3 \u00b7 #0 \u00b7 npub1qe3...7k4m`"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-a/VAL-WEL-007-subtitle-local-share-idx.png"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 7 assertions in welcome group A: 7 passed, 0 failed, 0 blocked."
+}

@@ -1,0 +1,188 @@
+{
+  "groupId": "welcome-group-d",
+  "testedAt": "2026-04-19T13:55:00Z",
+  "isolation": {
+    "guidanceSection": "Flow Validator Guidance: browser-ui",
+    "appUrl": "http://127.0.0.1:5173",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "assignedAssertions": [
+      "VAL-WEL-022",
+      "VAL-WEL-023",
+      "VAL-WEL-024",
+      "VAL-WEL-025",
+      "VAL-WEL-026",
+      "VAL-WEL-027"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-WEL-022",
+      "title": "Unlock modal renders core content",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/welcome-unlock-modal",
+          "expected": "Returning-multi background is dimmed and Unlock modal shows lock icon, title, subtitle, password field, eye toggle, and Unlock CTA",
+          "observed": "Unlock modal rendered with title 'Unlock Profile', subtitle 'My Signing Key · 2/3 · #0', password field with eye toggle, and Unlock button over dimmed returning-multi background"
+        },
+        {
+          "action": "Check page errors",
+          "expected": "No console/page errors",
+          "observed": "none"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-d/VAL-WEL-022-unlock-modal.png"
+        ],
+        "consoleErrors": "none",
+        "network": "not applicable"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-023",
+      "title": "Unlock modal shows no error (variant distinction)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect modal body text on /demo/welcome-unlock-modal",
+          "expected": "No red helper text and 'Incorrect password. Please try again.' is absent",
+          "observed": "Modal showed no error helper; body text did not contain 'Incorrect password. Please try again.'"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-d/VAL-WEL-023-no-error.png"
+        ],
+        "consoleErrors": "none observed",
+        "network": "not applicable"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-024",
+      "title": "Unlock error modal renders core content",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/welcome-unlock-error-modal",
+          "expected": "Same centered unlock modal structure as VAL-WEL-022",
+          "observed": "Modal layout matched unlock modal structure with same title/subtitle/field/actions"
+        },
+        {
+          "action": "Check page errors",
+          "expected": "No console/page errors",
+          "observed": "none"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-d/VAL-WEL-024-unlock-error-modal.png"
+        ],
+        "consoleErrors": "none",
+        "network": "not applicable"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-025",
+      "title": "Unlock error modal shows incorrect-password copy (variant distinction)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect helper text under Profile Password on /demo/welcome-unlock-error-modal",
+          "expected": "Exact red helper line 'Incorrect password. Please try again.'",
+          "observed": "Helper line displayed exactly 'Incorrect password. Please try again.'"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-d/VAL-WEL-025-incorrect-password.png"
+        ],
+        "consoleErrors": "none observed",
+        "network": "not applicable"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-026",
+      "title": "Per-profile Rotate button navigates to /rotate-keyset",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/welcome-returning-single and click Rotate",
+          "expected": "Browser navigates to /rotate-keyset",
+          "observed": "Navigated to http://127.0.0.1:5173/rotate-keyset"
+        },
+        {
+          "action": "Navigate to /demo/welcome-returning-multi and click first profile Rotate",
+          "expected": "Browser navigates to /rotate-keyset",
+          "observed": "Navigated to http://127.0.0.1:5173/rotate-keyset"
+        },
+        {
+          "action": "Navigate to /demo/welcome-returning-many and click first profile Rotate",
+          "expected": "Browser navigates to /rotate-keyset",
+          "observed": "Navigated to http://127.0.0.1:5173/rotate-keyset"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-d/VAL-WEL-026-rotate-single.png",
+          "welcome/group-d/VAL-WEL-026-rotate-multi.png",
+          "welcome/group-d/VAL-WEL-026-rotate-many.png"
+        ],
+        "consoleErrors": "none observed",
+        "network": "not applicable"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-027",
+      "title": "Unlock modal submission and dismissal",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "On /demo/welcome-unlock-modal click modal Unlock with preset password",
+          "expected": "Navigate to /dashboard/{profileId} with Signer Running visible",
+          "observed": "Navigated to http://127.0.0.1:5173/dashboard/demo-profile with 'Signer Running' visible"
+        },
+        {
+          "action": "Re-open /demo/welcome-unlock-modal and press Escape",
+          "expected": "Modal closes and returns to returning-multi welcome view without URL navigation",
+          "observed": "Modal closed; URL remained http://127.0.0.1:5173/demo/welcome-unlock-modal and returning-multi content remained visible"
+        },
+        {
+          "action": "Re-open /demo/welcome-unlock-modal and click scrim",
+          "expected": "Modal closes and returns to returning-multi welcome view without URL navigation",
+          "observed": "Modal closed; URL remained http://127.0.0.1:5173/demo/welcome-unlock-modal and returning-multi content remained visible"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-d/VAL-WEL-027-unlock-to-dashboard.png",
+          "welcome/group-d/VAL-WEL-027-escape-dismiss.png",
+          "welcome/group-d/VAL-WEL-027-scrim-dismiss.png"
+        ],
+        "consoleErrors": "none observed",
+        "network": "not applicable"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "On welcome-returning-multi, clicking Rotate by role/name was ambiguous because three Rotate buttons are present.",
+      "resolved": true,
+      "resolution": "Used agent-browser snapshot refs and clicked the first profile row Rotate button explicitly.",
+      "affectedAssertions": [
+        "VAL-WEL-026"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 6 assertions (VAL-WEL-022..027): 6 passed, 0 failed, 0 blocked."
+}

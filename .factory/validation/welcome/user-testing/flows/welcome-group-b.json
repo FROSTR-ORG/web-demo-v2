@@ -1,0 +1,174 @@
+{
+  "groupId": "group-b",
+  "testedAt": "2026-04-19T18:53:02Z",
+  "isolation": {
+    "appUrl": "http://127.0.0.1:5173",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "guidanceSection": "Flow Validator Guidance: browser-ui",
+    "browserSession": "welcome-group-b",
+    "assignedAssertions": [
+      "VAL-WEL-008",
+      "VAL-WEL-009",
+      "VAL-WEL-010",
+      "VAL-WEL-011",
+      "VAL-WEL-012",
+      "VAL-WEL-013",
+      "VAL-WEL-014"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-WEL-008",
+      "title": "Returning (single) secondary actions use chip-style with \"or\" prefix",
+      "status": "pass",
+      "rationale": "On /demo/welcome-returning-single, the secondary actions are shown in an 'or' row as compact chips (New Keyset, Import Device Profile, Onboard), visually distinct from primary buttons.",
+      "steps": [
+        {
+          "action": "Navigate to /demo/welcome-returning-single",
+          "expected": "Secondary actions render as chip-style controls prefixed by literal 'or'",
+          "observed": "Observed 'or' label and chip-style New Keyset / Import Device Profile / Onboard controls"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-b/VAL-WEL-008-chip-style-or-row.png"
+        ],
+        "consoleErrors": "none (agent-browser errors returned no entries)",
+        "network": "Navigation GET /demo/welcome-returning-single -> 200 (rendered)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-009",
+      "title": "Returning (single) Unlock opens unlock modal",
+      "status": "pass",
+      "rationale": "Clicking Unlock opened modal overlay with header 'Unlock Profile' and identity subtitle 'My Signing Key \u00b7 2/3 \u00b7 #0'.",
+      "steps": [
+        {
+          "action": "Click Unlock on /demo/welcome-returning-single",
+          "expected": "Unlock modal opens with header and required identity subtitle",
+          "observed": "Modal opened with 'Unlock Profile' and 'My Signing Key \u00b7 2/3 \u00b7 #0'"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-b/VAL-WEL-009-unlock-modal.png"
+        ],
+        "consoleErrors": "none (agent-browser errors returned no entries)",
+        "network": "UI modal interaction only (no failing requests observed)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-010",
+      "title": "Returning (single) New Keyset chip navigates to /create",
+      "status": "pass",
+      "rationale": "From /demo/welcome-returning-single, clicking New Keyset navigated to /create.",
+      "steps": [
+        {
+          "action": "Click New Keyset chip",
+          "expected": "URL changes to /create",
+          "observed": "Current URL became http://127.0.0.1:5173/create"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-b/VAL-WEL-010-new-keyset-to-create.png"
+        ],
+        "consoleErrors": "none (agent-browser errors returned no entries)",
+        "network": "Navigation to /create observed via URL transition"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-011",
+      "title": "Returning (single) Import Device Profile chip navigates to /import",
+      "status": "pass",
+      "rationale": "From /demo/welcome-returning-single, clicking Import Device Profile navigated to /import.",
+      "steps": [
+        {
+          "action": "Click Import Device Profile chip",
+          "expected": "URL changes to /import",
+          "observed": "Current URL became http://127.0.0.1:5173/import"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-b/VAL-WEL-011-import-chip-to-import.png"
+        ],
+        "consoleErrors": "none (agent-browser errors returned no entries)",
+        "network": "Navigation to /import observed via URL transition"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-012",
+      "title": "Returning (single) Onboard chip navigates to /onboard",
+      "status": "pass",
+      "rationale": "From /demo/welcome-returning-single, clicking Onboard navigated to /onboard.",
+      "steps": [
+        {
+          "action": "Click Onboard chip",
+          "expected": "URL changes to /onboard",
+          "observed": "Current URL became http://127.0.0.1:5173/onboard"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-b/VAL-WEL-012-onboard-chip-to-onboard.png"
+        ],
+        "consoleErrors": "none (agent-browser errors returned no entries)",
+        "network": "Navigation to /onboard observed via URL transition"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-013",
+      "title": "Returning (multi) renders core content",
+      "status": "pass",
+      "rationale": "On /demo/welcome-returning-multi, observed Welcome back heading, stacked profile rows for My Signing Key / Work Key / Backup Key with per-row Unlock+Rotate, and chip-style 'or' row.",
+      "steps": [
+        {
+          "action": "Navigate to /demo/welcome-returning-multi",
+          "expected": "Core multi-profile content and per-row controls are visible",
+          "observed": "All required profile rows, subtitles, controls, and chip row were visible"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-b/VAL-WEL-013-returning-multi-core-content.png"
+        ],
+        "consoleErrors": "none (agent-browser errors returned no entries)",
+        "network": "Navigation GET /demo/welcome-returning-multi -> 200 (rendered)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-WEL-014",
+      "title": "Returning (multi) uses per-profile rows (variant distinction)",
+      "status": "pass",
+      "rationale": "The returning-multi screen shows multiple full-width stacked profile cards, each with its own Unlock and Rotate controls, distinct from first-time and many variants.",
+      "steps": [
+        {
+          "action": "Inspect /demo/welcome-returning-multi layout",
+          "expected": "Stacked per-profile rows with per-row actions (variant distinction)",
+          "observed": "Observed three stacked profile cards with independent Unlock/Rotate pairs and no many-variant overflow/count markers"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "welcome/group-b/VAL-WEL-014-returning-multi-per-profile-rows.png"
+        ],
+        "consoleErrors": "none (agent-browser errors returned no entries)",
+        "network": "Navigation GET /demo/welcome-returning-multi -> 200 (rendered)"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 7 assigned assertions (VAL-WEL-008..014): 7 passed, 0 failed, 0 blocked."
+}

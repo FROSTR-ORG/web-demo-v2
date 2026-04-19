@@ -1,0 +1,55 @@
+{
+  "milestone": "welcome",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 27,
+    "passed": 27,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-WEL-001",
+    "VAL-WEL-002",
+    "VAL-WEL-003",
+    "VAL-WEL-004",
+    "VAL-WEL-005",
+    "VAL-WEL-006",
+    "VAL-WEL-007",
+    "VAL-WEL-008",
+    "VAL-WEL-009",
+    "VAL-WEL-010",
+    "VAL-WEL-011",
+    "VAL-WEL-012",
+    "VAL-WEL-013",
+    "VAL-WEL-014",
+    "VAL-WEL-015",
+    "VAL-WEL-016",
+    "VAL-WEL-017",
+    "VAL-WEL-018",
+    "VAL-WEL-019",
+    "VAL-WEL-020",
+    "VAL-WEL-021",
+    "VAL-WEL-022",
+    "VAL-WEL-023",
+    "VAL-WEL-024",
+    "VAL-WEL-025",
+    "VAL-WEL-026",
+    "VAL-WEL-027"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Added required surface-specific section \"Flow Validator Guidance: browser-ui\" with isolation and evidence boundaries for flow validators.",
+      "source": "setup"
+    },
+    {
+      "target": "user-testing.md",
+      "description": "Documented assertion friction notes: accessible text concatenation edge case and row-scoped selection strategy for duplicate button labels.",
+      "source": "flow-report"
+    }
+  ],
+  "previousRound": null
+}
