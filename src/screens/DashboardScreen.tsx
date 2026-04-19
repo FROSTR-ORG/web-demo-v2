@@ -904,6 +904,7 @@ function SettingsSidebar({
   onClearCredentials,
   onExport,
 }: SettingsSidebarProps) {
+  const navigate = useNavigate();
   const [relays, setRelays] = useState(initialRelays);
   const [newRelay, setNewRelay] = useState("");
 
@@ -1048,7 +1049,7 @@ function SettingsSidebar({
                   Replace only this device's local share from Settings while keeping the same group public key and keyset membership.
                 </div>
               </div>
-              <button type="button" className="settings-btn-blue">Rotate Share</button>
+              <button type="button" className="settings-btn-blue" onClick={() => { onClose(); navigate('/rotate-share'); }}>Rotate Share</button>
             </div>
           </div>
 
