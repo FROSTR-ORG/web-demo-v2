@@ -1,0 +1,28 @@
+{
+  "featureId": "fix-rotation-nav-and-tests",
+  "reviewedAt": "2026-04-19T02:47:45Z",
+  "commitId": "628d0e0",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The fix commit correctly updates both rotation terminal actions to navigate to /dashboard/{profileId} with / fallback, but it does not resolve the previously flagged rotate-keyset test/assertion mismatch. Two of three blocking items are fixed; one blocking item remains.",
+    "issues": [
+      {
+        "file": "src/screens/__tests__/RotateKeysetScreens.test.tsx",
+        "line": 87,
+        "severity": "blocking",
+        "description": "The test still asserts `screen.getByText(\"02a3f8...8f2c\")`, while the rendered value in RotateKeysetFormScreen remains `\"*************\"` (`src/screens/RotateKeysetScreens.tsx:26`). This leaves the original rotate-keyset-form assertion/component mismatch unresolved."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-builder skill's strict tests-first TDD step does not match common fix-only workflow used here (implementation + existing-test updates), and worker feedback explicitly calls this out. The skill could document a fix-path variant to reduce procedure drift.",
+      "evidence": "Transcript skeleton for session 08890e30-76cd-4460-ab25-ac5679022ede shows implementation edits before test edits; handoff.skillFeedback suggests adjusting ui-builder guidance for fix-only features."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/rotation-flows/scrutiny/reviews/rotate-keyset-form.json; .factory/validation/rotation-flows/scrutiny/reviews/rotate-keyset-completion.json; .factory/validation/rotation-flows/scrutiny/reviews/rotate-share-flow.json",
+  "summary": "Reviewed fix feature 628d0e0 against prior failures in rotate-keyset-form, rotate-keyset-completion, and rotate-share-flow. Dashboard navigation fixes are correctly implemented for RotateDistributionComplete and LocalShareUpdated, but the rotate-keyset test/assertion mismatch remains in the committed code, so this fix review fails."
+}

@@ -1,6 +1,6 @@
 {
   "milestone": "rotation-flows",
-  "round": 1,
+  "round": 2,
   "status": "fail",
   "validatorsRun": {
     "test": {
@@ -20,56 +20,27 @@
     }
   },
   "reviewsSummary": {
-    "total": 4,
-    "passed": 1,
-    "failed": 3,
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
     "failedFeatures": [
-      "rotate-keyset-form",
-      "rotate-keyset-completion",
-      "rotate-share-flow"
+      "fix-rotation-nav-and-tests"
     ]
   },
   "blockingIssues": [
     {
       "featureId": "rotate-keyset-form",
       "severity": "blocking",
-      "description": "RotateKeyset screen test assertion mismatch: test expects text \"02a3f8...8f2c\" that the feature commit did not render, making verification unreliable."
-    },
-    {
-      "featureId": "rotate-keyset-completion",
-      "severity": "blocking",
-      "description": "RotateDistributionCompleteScreen routes Finish Distribution to \"/\" instead of Dashboard, violating VAL-ROTATEKS-007 happy-path destination."
-    },
-    {
-      "featureId": "rotate-share-flow",
-      "severity": "blocking",
-      "description": "RotateShare Local Share Updated screen routes \"Return to Signer\" to \"/\" instead of Dashboard, violating VAL-ROTATESH-004/005."
+      "description": "Unresolved rotate-keyset assertion mismatch remains: src/screens/__tests__/RotateKeysetScreens.test.tsx still expects \"02a3f8...8f2c\" while RotateKeysetFormScreen renders \"*************\"."
     }
   ],
   "appliedUpdates": [],
-  "suggestedGuidanceUpdates": [
-    {
-      "target": ".factory/skills/ui-builder/SKILL.md",
-      "suggestion": "Clarify or enforce the test-first requirement: either require explicit failing-test-first evidence in transcripts and accurate skillFeedback, or relax the procedure to match accepted workflow.",
-      "evidence": "Three reviews observed implementation edits before test edits while handoffs reported followedProcedure=true (create-generation-progress, rotate-keyset-completion, rotate-share-flow).",
-      "isSystemic": true
-    },
-    {
-      "target": "AGENTS.md",
-      "suggestion": "Add explicit icon guidance to match architecture docs (prefer lucide-react over inline SVG for consistency), or state approved exceptions.",
-      "evidence": "create-generation-progress review found inline SVG in GenerationProgressScreen while architecture guidance says icons should come from lucide-react.",
-      "isSystemic": false
-    }
-  ],
+  "suggestedGuidanceUpdates": [],
   "rejectedObservations": [
     {
-      "observation": "Clarify AGENTS token usage because feature added raw color literals.",
-      "reason": "already-documented"
-    },
-    {
-      "observation": "Update .factory/library/architecture.md route table for rotate-share/rotate-keyset immediately.",
-      "reason": "ambiguous"
+      "observation": "ui-builder skill test-first guidance does not reflect fix-only workflows.",
+      "reason": "duplicate (already captured in round 1 synthesis)"
     }
   ],
-  "previousRound": null
+  "previousRound": ".factory/validation/rotation-flows/scrutiny/synthesis.round1.json"
 }
