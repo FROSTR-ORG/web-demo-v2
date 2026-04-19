@@ -1,0 +1,54 @@
+{
+  "milestone": "onboard",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx vitest run --config vitest.config.ts --maxWorkers=4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx tsc -b",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "failedFeatures": [
+      "onboard-fidelity"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "onboard-fidelity",
+      "severity": "blocking",
+      "description": "On `/demo/onboard-enter-package`, the primary CTA enablement only depends on onboarding package validity (`disabled={!validation.valid}`) and does not require a non-empty package password, violating feature expectedBehavior that both package and password must be filled before enablement."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md and ui-builder skill guidance",
+      "suggestion": "Clarify the no-Tailwind rule to allow literal class-token parity when validation contracts explicitly assert class strings (for example alert variant tokens).",
+      "evidence": "AGENTS.md/skill prohibit Tailwind utility classes, but validation-contract assertions for import/onboard error variants require exact token classes such as `bg-[#EAB3081A]` and `bg-[#EF44441A]`.",
+      "isSystemic": true
+    },
+    {
+      "target": "mission feature specifications (features.json)",
+      "suggestion": "Keep feature-level expectedBehavior/copy synchronized with the latest validation contract and Paper references before assigning workers.",
+      "evidence": "onboard feature metadata references older copy/variants while validation-contract and Paper checks use newer wording and variant naming, increasing the risk of mismatched implementation goals.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [],
+  "previousRound": null
+}
