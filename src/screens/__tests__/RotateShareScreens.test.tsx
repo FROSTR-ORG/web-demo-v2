@@ -225,16 +225,17 @@ describe("ShareUpdateFailedScreen", () => {
     expect(screen.getByText(/Check relay connectivity/)).toBeInTheDocument();
   });
 
-  it("has Retry and Back to Rotate Share buttons", () => {
+  it("has Retry and Back to Rotate Share buttons (VAL-RTS-003)", () => {
     render(
       <MemoryRouter>
         <ShareUpdateFailedScreen />
       </MemoryRouter>
     );
     expect(screen.getByRole("button", { name: /^Retry$/i })).toBeInTheDocument();
-    // BackLink at top + inline action button both say "Back to Rotate Share"
+    // Only one "Back to Rotate Share" button exists — the inline action.
+    // No top BackLink is rendered per VAL-RTS-003.
     const backBtns = screen.getAllByRole("button", { name: /Back to Rotate Share/i });
-    expect(backBtns.length).toBeGreaterThanOrEqual(1);
+    expect(backBtns).toHaveLength(1);
   });
 
   it("Retry button navigates to applying screen", () => {
@@ -253,23 +254,21 @@ describe("ShareUpdateFailedScreen", () => {
         <ShareUpdateFailedScreen />
       </MemoryRouter>
     );
-    // Click the inline action button (second one, in inline-actions div)
-    const backBtns = screen.getAllByRole("button", { name: /Back to Rotate Share/i });
-    // The inline-actions button is the ghost variant
-    const inlineBtn = backBtns.find((btn) => btn.classList.contains("button-ghost"));
-    fireEvent.click(inlineBtn!);
+    const inlineBtn = screen.getByRole("button", { name: /Back to Rotate Share/i });
+    fireEvent.click(inlineBtn);
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-share");
   });
 
-  it("has Back to Rotate Share link in header area", () => {
-    render(
+  it("does NOT render a top BackLink above the title (VAL-RTS-003)", () => {
+    const { container } = render(
       <MemoryRouter>
         <ShareUpdateFailedScreen />
       </MemoryRouter>
     );
-    // BackLink at top of screen
-    const backLinks = screen.getAllByText("Back to Rotate Share");
-    expect(backLinks.length).toBeGreaterThanOrEqual(1);
+    // VAL-RTS-003: no `.back-link` (the BackLink component) above the title.
+    expect(container.querySelector(".back-link")).toBeNull();
+    // And no text variants of "Back to Settings" appear anywhere.
+    expect(screen.queryByText("Back to Settings")).not.toBeInTheDocument();
   });
 });
 

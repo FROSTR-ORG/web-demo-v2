@@ -263,7 +263,7 @@ export function ShareUpdateFailedScreen() {
   return (
     <AppShell mainVariant="flow" headerMeta={MOCK_KEYSET_NAME}>
       <div className="screen-column">
-        <BackLink onClick={() => navigate("/rotate-share")} label="Back to Rotate Share" />
+        {/* VAL-RTS-003: NO top Back/Back-to-Settings link on failed screen (audit gap). */}
         <PageHeading
           title="Share Update Failed"
           copy="The replacement share could not be applied. Your current local share is still active and no runtime signing state was changed."
