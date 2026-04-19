@@ -2097,3 +2097,438 @@ a {
   align-items: center;
   justify-content: center;
 }
+
+/* ========================================
+   Dashboard state toggle
+   ======================================== */
+
+.dash-state-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border: 1px dashed rgba(96, 165, 250, 0.35);
+  border-radius: 8px;
+  background: rgba(30, 58, 138, 0.12);
+}
+
+.dash-state-toggle-label {
+  color: var(--ig-blue);
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.dash-state-toggle-select {
+  flex: 1 1 auto;
+  min-height: 32px;
+  padding: 4px 10px;
+  color: var(--ig-text);
+  background: var(--ig-panel);
+  border: 1px solid var(--ig-border);
+  border-radius: 6px;
+  font-family: var(--font-inter, Inter, system-ui, sans-serif);
+  font-size: 13px;
+  line-height: 18px;
+  cursor: pointer;
+  outline: none;
+}
+
+.dash-state-toggle-select:focus {
+  border-color: rgba(96, 165, 250, 0.8);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+/* ========================================
+   Dashboard status card (Running state)
+   ======================================== */
+
+.dash-status-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 20px;
+  border: 1px solid var(--ig-border-soft);
+  border-radius: 10px;
+  background: var(--ig-panel-card);
+}
+
+.dash-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dash-status-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.dash-status-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dash-status-title {
+  color: var(--ig-text);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+/* ========================================
+   Dashboard hero card (Connecting, Stopped, Relays Offline, Signing Blocked)
+   ======================================== */
+
+.dash-hero-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border: 1px solid rgba(59, 130, 246, 0.16);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.dash-hero-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 720px;
+}
+
+.dash-hero-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dash-hero-title {
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.dash-hero-title.amber {
+  color: #fde68a;
+}
+
+.dash-hero-title.red {
+  color: #fca5a5;
+}
+
+.dash-hero-title.green {
+  color: #dcfce7;
+}
+
+.dash-hero-copy {
+  color: var(--ig-muted);
+  font-size: 15px;
+  line-height: 22px;
+  margin: 0;
+}
+
+.dash-hero-action {
+  flex: 0 0 auto;
+}
+
+.dash-connecting-badge {
+  min-width: 128px;
+  min-height: 42px;
+  color: #fde68a !important;
+  background: rgba(245, 158, 11, 0.16) !important;
+  border-color: rgba(245, 158, 11, 0.22) !important;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: default;
+}
+
+/* ========================================
+   Dashboard two-column layout
+   ======================================== */
+
+.dash-two-col {
+  display: flex;
+  gap: 18px;
+}
+
+.dash-two-col > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* ========================================
+   Dashboard info panels (Connection Progress, Readiness, etc.)
+   ======================================== */
+
+.dash-info-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid rgba(59, 130, 246, 0.16);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.dash-panel-kicker {
+  color: var(--ig-muted);
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 12px;
+  line-height: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dash-info-line {
+  color: var(--ig-text);
+  font-size: 15px;
+  line-height: 22px;
+  margin: 0;
+}
+
+.dash-info-note {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.65);
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  color: var(--ig-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* ========================================
+   Connection progress steps (Connecting state)
+   ======================================== */
+
+.dash-progress-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.dash-step-dot {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  margin-top: 4px;
+}
+
+.dash-step-dot.done {
+  background: var(--ig-green);
+}
+
+.dash-step-dot.active {
+  background: var(--ig-amber);
+}
+
+.dash-step-dot.pending {
+  background: transparent;
+  border: 2px solid rgba(148, 163, 184, 0.45);
+}
+
+.dash-step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dash-step-label {
+  color: var(--ig-text);
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.dash-step-detail {
+  color: var(--ig-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+/* ========================================
+   Readiness display (Stopped / Relays Offline)
+   ======================================== */
+
+.dash-readiness-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.dash-readiness-orbit {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #374151;
+}
+
+.dash-readiness-orbit-inner {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(17, 24, 39, 0.9);
+}
+
+.dash-readiness-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.dash-readiness-dot.offline {
+  background: #6b7280;
+}
+
+.dash-readiness-labels {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 48px;
+  flex: 0 0 auto;
+}
+
+.dash-readiness-status {
+  color: rgba(147, 197, 253, 0.8);
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dash-readiness-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dash-readiness-title {
+  color: var(--ig-text);
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.dash-readiness-desc {
+  color: var(--ig-muted);
+  font-size: 14px;
+  line-height: 20px;
+  margin: 0;
+}
+
+/* ========================================
+   Badge rows (Stopped / Relays Offline readiness badges)
+   ======================================== */
+
+.dash-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dash-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.dash-badge.red {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.14);
+}
+
+.dash-badge.amber {
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.dash-badge.neutral {
+  color: #cbd5e1;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+/* ========================================
+   Next step list (Stopped state)
+   ======================================== */
+
+.dash-next-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ========================================
+   Signing Blocked panel
+   ======================================== */
+
+.dash-blocked-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid rgba(245, 158, 11, 0.18);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.dash-blocked-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dash-blocked-title {
+  color: #fde68a;
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.dash-blocked-copy {
+  color: var(--ig-text);
+  font-size: 15px;
+  line-height: 22px;
+  margin: 0;
+}
+
+.dash-sub-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.65);
+  border: 1px solid rgba(59, 130, 246, 0.12);
+}
+
+.dash-sub-line {
+  color: #cbd5e1;
+  font-size: 14px;
+  line-height: 20px;
+  margin: 0;
+}
+
+.dash-action-row {
+  display: flex;
+  gap: 10px;
+}

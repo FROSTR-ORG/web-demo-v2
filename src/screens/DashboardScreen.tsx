@@ -1,4 +1,5 @@
 import { ChevronDown, Download, FileText, HelpCircle, RotateCw, Settings, SlidersHorizontal } from "lucide-react";
+import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAppState } from "../app/AppState";
 import { AppShell } from "../components/shell";
@@ -6,10 +7,13 @@ import { Button, PermissionBadge, StatusPill } from "../components/ui";
 import { shortHex } from "../lib/bifrost/format";
 import type { PeerStatus } from "../lib/bifrost/types";
 
+type DashboardState = "running" | "connecting" | "stopped" | "relays-offline" | "signing-blocked";
+
 export function DashboardScreen() {
   const { profileId } = useParams();
   const navigate = useNavigate();
-  const { activeProfile, runtimeStatus, signerPaused, lockProfile, setSignerPaused, refreshRuntime } = useAppState();
+  const { activeProfile, runtimeStatus, lockProfile, refreshRuntime } = useAppState();
+  const [mockState, setMockState] = useState<DashboardState>("running");
 
   if (!profileId) {
     return <Navigate to="/" replace />;
@@ -18,17 +22,20 @@ export function DashboardScreen() {
     return <Navigate to="/" replace />;
   }
 
-  const ready = runtimeStatus.readiness.runtime_ready;
-  const degraded = runtimeStatus.readiness.degraded_reasons.length > 0;
   const onlineCount = runtimeStatus.peers.filter((peer) => peer.online).length;
   const signReadyLabel = `${runtimeStatus.readiness.signing_peer_count}/${runtimeStatus.readiness.threshold} sign ready`;
-  const statusTone = signerPaused ? "error" : ready ? "success" : degraded ? "warning" : "default";
-  const statusLabel = signerPaused ? "Signer stopped" : ready ? "Signer Running" : degraded ? "Signing Blocked" : "Connecting";
-  const statusCopy = signerPaused
-    ? "Local ticking is paused."
-    : ready
-      ? `Connected to ${activeProfile.relays.join(", ")}`
-      : runtimeStatus.readiness.degraded_reasons.join(", ") || "Waiting for peer readiness.";
+
+  function handleStopSigner() {
+    setMockState("stopped");
+  }
+
+  function handleStartSigner() {
+    setMockState("running");
+  }
+
+  function handleRetryConnections() {
+    setMockState("connecting");
+  }
 
   return (
     <AppShell
@@ -56,6 +63,27 @@ export function DashboardScreen() {
       }
     >
       <section className="dashboard-column">
+        {/* Mock State Toggle */}
+        <div className="dash-state-toggle">
+          <label className="dash-state-toggle-label" htmlFor="mock-state-select">
+            Mock State
+          </label>
+          <select
+            id="mock-state-select"
+            className="dash-state-toggle-select"
+            value={mockState}
+            onChange={(e) => setMockState(e.target.value as DashboardState)}
+            aria-label="Mock State"
+          >
+            <option value="running">Running</option>
+            <option value="connecting">Connecting</option>
+            <option value="stopped">Stopped</option>
+            <option value="relays-offline">All Relays Offline</option>
+            <option value="signing-blocked">Signing Blocked</option>
+          </select>
+        </div>
+
+        {/* Summary bar — shared across all states */}
         <div className="dashboard-summary">
           <div className="dashboard-summary-group">
             <span className="value">{activeProfile.groupName}</span>
@@ -74,69 +102,397 @@ export function DashboardScreen() {
           </div>
         </div>
 
-        <div className="dashboard-status">
-          <div className="dashboard-status-row">
-            <div className="status-main">
-              <span className={`status-light ${statusTone === "warning" ? "warning" : statusTone === "error" ? "error" : ""}`} />
-              <div>
-                <div className="status-title">{statusLabel}</div>
-                <div className="help">{statusCopy}</div>
-              </div>
-            </div>
-            <div className="inline-actions">
-              <Button type="button" variant={signerPaused ? "secondary" : "danger"} onClick={() => setSignerPaused(!signerPaused)}>
-                {signerPaused ? "Start Signer" : "Stop Signer"}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  lockProfile();
-                  navigate("/");
-                }}
-              >
-                Lock
-              </Button>
-            </div>
-          </div>
-        </div>
+        {/* Conditional state rendering */}
+        {mockState === "running" && (
+          <RunningState
+            relays={activeProfile.relays}
+            onlineCount={onlineCount}
+            signReadyLabel={signReadyLabel}
+            peers={runtimeStatus.peers}
+            pendingOperations={runtimeStatus.pending_operations}
+            onStop={handleStopSigner}
+            onLock={() => {
+              lockProfile();
+              navigate("/");
+            }}
+            onRefresh={refreshRuntime}
+          />
+        )}
 
-        <div className="peers-panel">
-          <div className="peers-header">
-            <div className="peers-title-group">
-              <ChevronDown size={12} color="#93c5fd" />
-              <div className="peers-title">Peers</div>
-              <HelpCircle size={15} color="#93c5fd" />
-              <span className={`health-dot ${onlineCount > 0 ? "online" : "offline"}`} />
-              <StatusPill tone={onlineCount > 0 ? "success" : "warning"}>{onlineCount} online</StatusPill>
-              <StatusPill>{runtimeStatus.peers.length} total</StatusPill>
-            </div>
-            <div className="peers-badges">
-              <StatusPill tone="info">{signReadyLabel}</StatusPill>
-              <StatusPill>Avg: --</StatusPill>
-              <Button type="button" variant="header" size="icon" onClick={refreshRuntime} aria-label="Refresh peers">
-                <RotateCw size={16} />
-              </Button>
-            </div>
-          </div>
-          <div className="peer-list">
-            {runtimeStatus.peers.map((peer) => (
-              <PeerRow key={peer.pubkey} peer={peer} />
-            ))}
-          </div>
-        </div>
+        {mockState === "connecting" && (
+          <ConnectingState relays={activeProfile.relays} />
+        )}
 
-        {runtimeStatus.pending_operations.length > 0 ? (
-          <div className="panel panel-pad">
-            <div className="value">Pending Operations</div>
-            <div className="help">{runtimeStatus.pending_operations.length} operation(s) currently pending.</div>
-          </div>
-        ) : null}
+        {mockState === "stopped" && (
+          <StoppedState onStart={handleStartSigner} />
+        )}
+
+        {mockState === "relays-offline" && (
+          <RelaysOfflineState
+            onStop={handleStopSigner}
+            onRetry={handleRetryConnections}
+          />
+        )}
+
+        {mockState === "signing-blocked" && (
+          <SigningBlockedState onStop={handleStopSigner} />
+        )}
       </section>
     </AppShell>
   );
 }
 
+/* ========================================
+   State 1: Running
+   ======================================== */
+function RunningState({
+  relays,
+  onlineCount,
+  signReadyLabel,
+  peers,
+  pendingOperations,
+  onStop,
+  onLock,
+  onRefresh,
+}: {
+  relays: string[];
+  onlineCount: number;
+  signReadyLabel: string;
+  peers: PeerStatus[];
+  pendingOperations: unknown[];
+  onStop: () => void;
+  onLock: () => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <>
+      <div className="dash-status-card">
+        <div className="dash-status-row">
+          <div className="dash-status-info">
+            <span className="status-light" />
+            <div className="dash-status-text">
+              <div className="dash-status-title">Signer Running</div>
+              <div className="help">Connected to {relays.join(", ")}</div>
+            </div>
+          </div>
+          <div className="inline-actions">
+            <Button type="button" variant="danger" onClick={onStop}>
+              Stop Signer
+            </Button>
+            <Button type="button" variant="ghost" onClick={onLock}>
+              Lock
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="peers-panel">
+        <div className="peers-header">
+          <div className="peers-title-group">
+            <ChevronDown size={12} color="#93c5fd" />
+            <div className="peers-title">Peers</div>
+            <HelpCircle size={15} color="#93c5fd" />
+            <span className={`health-dot ${onlineCount > 0 ? "online" : "offline"}`} />
+            <StatusPill tone={onlineCount > 0 ? "success" : "warning"}>{onlineCount} online</StatusPill>
+            <StatusPill>{peers.length} total</StatusPill>
+          </div>
+          <div className="peers-badges">
+            <StatusPill tone="info">{signReadyLabel}</StatusPill>
+            <StatusPill>Avg: --</StatusPill>
+            <Button type="button" variant="header" size="icon" onClick={onRefresh} aria-label="Refresh peers">
+              <RotateCw size={16} />
+            </Button>
+          </div>
+        </div>
+        <div className="peer-list">
+          {peers.map((peer) => (
+            <PeerRow key={peer.pubkey} peer={peer} />
+          ))}
+        </div>
+      </div>
+
+      {pendingOperations.length > 0 ? (
+        <div className="panel panel-pad">
+          <div className="value">Pending Operations</div>
+          <div className="help">{pendingOperations.length} operation(s) currently pending.</div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+/* ========================================
+   State 2: Connecting
+   ======================================== */
+function ConnectingState({ relays }: { relays: string[] }) {
+  return (
+    <>
+      <div className="dash-hero-card">
+        <div className="dash-hero-content">
+          <div className="dash-hero-indicator">
+            <span className="status-light warning" />
+            <span className="dash-hero-title amber">Signer Connecting...</span>
+          </div>
+          <p className="dash-hero-copy">
+            Runtime is starting relay sessions and rebuilding peer state. Signing stays unavailable until connectivity and readiness recover.
+          </p>
+        </div>
+        <div className="dash-hero-action">
+          <Button type="button" variant="ghost" className="dash-connecting-badge">
+            Connecting...
+          </Button>
+        </div>
+      </div>
+
+      <div className="dash-two-col">
+        <div className="dash-info-panel">
+          <div className="dash-panel-kicker">Connection Progress</div>
+
+          <div className="dash-progress-step">
+            <span className="dash-step-dot done" />
+            <div className="dash-step-content">
+              <div className="dash-step-label">Runtime process started</div>
+              <div className="dash-step-detail">Signer booted and local credentials loaded.</div>
+            </div>
+          </div>
+
+          <div className="dash-progress-step">
+            <span className="dash-step-dot active" />
+            <div className="dash-step-content">
+              <div className="dash-step-label">Connecting to configured relays</div>
+              <div className="dash-step-detail">
+                Opening sessions for {relays.join(" and ")}.
+              </div>
+            </div>
+          </div>
+
+          <div className="dash-progress-step">
+            <span className="dash-step-dot pending" />
+            <div className="dash-step-content">
+              <div className="dash-step-label">Discovering peers and refilling pools</div>
+              <div className="dash-step-detail">
+                Ready state returns once peers are online and pool counts recover.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="dash-info-panel">
+          <div className="dash-panel-kicker">Current Targets</div>
+          <p className="dash-info-line">Relays: {relays.length} configured</p>
+          <p className="dash-info-line">Peers: waiting for presence announcements</p>
+          <div className="dash-info-note">
+            Event logs stay compact here. The primary concern is relay and peer readiness, not log volume.
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ========================================
+   State 3: Stopped
+   ======================================== */
+function StoppedState({ onStart }: { onStart: () => void }) {
+  return (
+    <>
+      <div className="dash-hero-card">
+        <div className="dash-hero-content">
+          <div className="dash-hero-indicator">
+            <span className="status-light error" />
+            <span className="dash-hero-title red">Signer Stopped</span>
+          </div>
+          <p className="dash-hero-copy">
+            Runtime is intentionally offline. Relay sessions, peer discovery, and signing capacity are paused until you start the signer again.
+          </p>
+        </div>
+        <div className="dash-hero-action">
+          <Button type="button" variant="primary" onClick={onStart}>
+            Start Signer
+          </Button>
+        </div>
+      </div>
+
+      <div className="dash-two-col">
+        <div className="dash-info-panel">
+          <div className="dash-panel-kicker">Readiness</div>
+
+          <div className="dash-readiness-row">
+            <div className="dash-readiness-orbit">
+              <div className="dash-readiness-orbit-inner">
+                <span className="dash-readiness-dot offline" />
+              </div>
+            </div>
+            <div className="dash-readiness-labels">
+              <span className="dash-readiness-status">Offline</span>
+              <span className="help">—</span>
+            </div>
+            <div className="dash-readiness-detail">
+              <div className="dash-readiness-title">No active relay or peer sessions</div>
+              <p className="dash-readiness-desc">
+                Starting the signer reconnects configured relays, re-announces presence, and begins refilling pool state.
+              </p>
+            </div>
+          </div>
+
+          <div className="dash-badge-row">
+            <span className="dash-badge red">0 relays connected</span>
+            <span className="dash-badge red">0 peers online</span>
+            <span className="dash-badge neutral">Signing unavailable</span>
+          </div>
+        </div>
+
+        <div className="dash-info-panel">
+          <div className="dash-panel-kicker">Next Step</div>
+          <div className="dash-next-steps">
+            <p className="dash-info-line">1. Start the signer to resume relay connectivity.</p>
+            <p className="dash-info-line">2. Wait for peers to return online and refill signing pools.</p>
+            <p className="dash-info-line">3. Policy prompts and approvals will resume once runtime is available again.</p>
+          </div>
+          <div className="dash-info-note">
+            Recent request queues remain preserved, but no new signing or encryption work can complete while the signer is stopped.
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ========================================
+   State 4: All Relays Offline
+   ======================================== */
+function RelaysOfflineState({
+  onStop,
+  onRetry,
+}: {
+  onStop: () => void;
+  onRetry: () => void;
+}) {
+  return (
+    <>
+      <div className="dash-hero-card">
+        <div className="dash-hero-content">
+          <div className="dash-hero-indicator">
+            <span className="status-light" />
+            <span className="dash-hero-title green">Signer Running</span>
+          </div>
+          <p className="dash-hero-copy">
+            Runtime is active, but every configured relay is currently unreachable. Signing and sync are degraded until connectivity returns.
+          </p>
+        </div>
+        <div className="dash-hero-action">
+          <Button type="button" variant="danger" onClick={onStop}>
+            Stop Signer
+          </Button>
+        </div>
+      </div>
+
+      <div className="dash-two-col">
+        <div className="dash-info-panel">
+          <div className="dash-panel-kicker">Readiness</div>
+
+          <div className="dash-readiness-row">
+            <div className="dash-readiness-orbit">
+              <div className="dash-readiness-orbit-inner">
+                <span className="dash-readiness-dot offline" />
+              </div>
+            </div>
+            <div className="dash-readiness-labels">
+              <span className="dash-readiness-status">Offline</span>
+              <span className="help">—</span>
+            </div>
+            <div className="dash-readiness-detail">
+              <div className="dash-readiness-title">All Relays Offline</div>
+              <p className="dash-readiness-desc">
+                Peer presence and pool exchange pause when no relay route is available.
+              </p>
+            </div>
+          </div>
+
+          <div className="dash-badge-row">
+            <span className="dash-badge red">0 / 2 relays reachable</span>
+            <span className="dash-badge amber">Ready count degraded</span>
+          </div>
+        </div>
+
+        <div className="dash-info-panel">
+          <div className="dash-panel-kicker">Recovery</div>
+          <p className="dash-info-line">
+            Check network reachability, relay DNS resolution, and local firewall state. Relay sessions will automatically recover when a route is available.
+          </p>
+          <div className="dash-info-note">
+            Signing requests remain blocked or degraded here because runtime has no live relay path to peers.
+          </div>
+          <Button type="button" variant="primary" onClick={onRetry}>
+            Retry Connections
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ========================================
+   State 5: Signing Blocked
+   ======================================== */
+function SigningBlockedState({ onStop }: { onStop: () => void }) {
+  return (
+    <>
+      <div className="dash-hero-card">
+        <div className="dash-hero-content">
+          <div className="dash-hero-indicator">
+            <span className="status-light" />
+            <span className="dash-hero-title green">Signer Running</span>
+          </div>
+          <p className="dash-hero-copy">
+            Runtime is online, but current policy/readiness gating prevents new signing work from completing.
+          </p>
+        </div>
+        <div className="dash-hero-action">
+          <Button type="button" variant="danger" onClick={onStop}>
+            Stop Signer
+          </Button>
+        </div>
+      </div>
+
+      <div className="dash-blocked-panel">
+        <div className="dash-blocked-header">
+          <span className="status-light warning" />
+          <span className="dash-blocked-title">Signing Blocked</span>
+        </div>
+        <p className="dash-blocked-copy">
+          Requests are not failing outright, but they cannot complete until the blocking condition clears. Use this state for policy prompts, pending operator review, or temporary readiness gating that stops signing before execution.
+        </p>
+        <div className="dash-two-col">
+          <div className="dash-sub-panel">
+            <div className="dash-panel-kicker">Common Causes</div>
+            <p className="dash-sub-line">Pending signer-policy decision</p>
+            <p className="dash-sub-line">Insufficient ready peers for current request type</p>
+            <p className="dash-sub-line">Temporary pool imbalance after reconnect</p>
+          </div>
+          <div className="dash-sub-panel">
+            <div className="dash-panel-kicker">Operator Action</div>
+            <p className="dash-sub-line">
+              Review approvals or open policies before retrying. If readiness is the issue, wait for relay and peer health to recover.
+            </p>
+            <div className="dash-action-row">
+              <Button type="button" variant="primary">
+                Open Policies
+              </Button>
+              <Button type="button" variant="ghost">
+                Review Approvals
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ========================================
+   Peer Row (reused in Running state)
+   ======================================== */
 function PeerRow({ peer }: { peer: PeerStatus }) {
   const incomingPct = Math.min(100, peer.incoming_available);
   const outgoingPct = Math.min(100, peer.outgoing_available);
