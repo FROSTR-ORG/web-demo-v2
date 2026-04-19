@@ -1,0 +1,28 @@
+{
+  "featureId": "dashboard-policies",
+  "reviewedAt": "2026-04-19T00:27:11Z",
+  "commitId": "43efb15f1828ba525342223eea3d9f0c44f642aa",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "Policies view structure, toggling behavior, and badge color wiring are implemented, but one expected behavior is not met: peer rows do not show truncated pubkeys.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen.tsx",
+        "line": 515,
+        "severity": "blocking",
+        "description": "Peer policy rows use a fixed masked placeholder (\"*************\") for pubkeys instead of truncated pubkey values per peer. The feature contract expects per-peer rows to include truncated pubkeys."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "knowledge",
+      "observation": "Validation coverage for dashboard policies does not explicitly assert truncated pubkey rendering in peer rows, which allowed a placeholder-only implementation to pass validator checks.",
+      "evidence": "features.json for dashboard-policies expectedBehavior includes truncated pubkeys, but validation-contract.md (VAL-DASH-006) only requires peer rows and colored permission badges."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed dashboard-policies (commit 43efb15f1828ba525342223eea3d9f0c44f642aa). Found a blocking requirement miss: peer pubkeys are placeholders rather than truncated values. Report marked fail."
+}

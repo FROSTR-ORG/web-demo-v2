@@ -1,0 +1,26 @@
+{
+  "featureId": "dashboard-modals",
+  "reviewedAt": "2026-04-19T00:27:40Z",
+  "commitId": "0c4535b",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Implementation covers the requested Signer Policy Prompt and Signing Failed overlays, including trigger controls, modal content, dismissal paths (close/action/backdrop), and backdrop overlay behavior. I found no high-confidence functional defects against the feature contract.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Architecture guidance states icons should come from lucide-react, but this feature includes an inline SVG icon for the Signer Policy warning glyph; AGENTS.md does not restate that icon-source convention, which may make this rule easy to miss.",
+      "evidence": ".factory/library/architecture.md:140 specifies lucide-react icons; src/screens/DashboardScreen.tsx:701 uses inline <svg> for the warning icon; mission AGENTS.md has no icon-source rule."
+    },
+    {
+      "area": "skills",
+      "observation": "The ui-builder skill mandates TDD ('Write Tests First'), but the transcript sequence shows implementation edits before creating the modal test file; handoff still reports followedProcedure=true. This suggests a mismatch between enforced practice and skill expectations.",
+      "evidence": ".factory/skills/ui-builder/SKILL.md:41 requires tests-first; transcript for session 39057c55-e7fd-4418-9700-2f2c93dc648e shows Edit operations on src/styles/global.css and src/screens/DashboardScreen.tsx before Tool: Create src/screens/__tests__/DashboardModals.test.tsx."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed dashboard-modals commit 0c4535b and related worker transcript/handoff; feature behavior matches description and expectedBehavior with no blocking code issues found. Logged shared-state observations about icon-source convention visibility and ui-builder tests-first procedure drift."
+}

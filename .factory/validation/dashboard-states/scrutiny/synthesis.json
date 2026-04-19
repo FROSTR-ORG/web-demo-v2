@@ -1,0 +1,65 @@
+{
+  "milestone": "dashboard-states",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx vitest run --config vitest.config.ts --maxWorkers=4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx tsc -b",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 4,
+    "passed": 3,
+    "failed": 1,
+    "failedFeatures": [
+      "dashboard-policies"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "dashboard-policies",
+      "severity": "blocking",
+      "description": "Peer policy rows use a fixed masked placeholder (\"*************\") for pubkeys instead of truncated per-peer pubkey values expected by the feature contract."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "validation-contract.md",
+      "suggestion": "Tighten VAL-DASH-006 to explicitly require peer rows to show truncated pubkeys, not just badge rows.",
+      "evidence": "Feature expectedBehavior for dashboard-policies requires truncated pubkeys, but VAL-DASH-006 only checks for peer rows and permission badges; this allowed placeholder pubkeys to pass until scrutiny.",
+      "isSystemic": false
+    },
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Add an explicit icon-source convention (e.g., prefer lucide-react unless a design-exact custom glyph is required and justified).",
+      "evidence": "Architecture guidance states lucide-react usage, but AGENTS.md omits this rule; dashboard-modals implemented an inline SVG warning icon.",
+      "isSystemic": false
+    },
+    {
+      "target": "ui-builder skill",
+      "suggestion": "Clarify or enforce the tests-first procedure so reported compliance aligns with observed execution order.",
+      "evidence": "ui-builder skill requires tests-first, but dashboard-modals transcript shows implementation edits before creating tests while handoff marked followedProcedure=true.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Undocumented nuance that using Distribute screen Copy actions may leave Finish Distribution disabled while QR flow enables progression.",
+      "reason": "ambiguous and environment-dependent behavior from a single transcript; needs broader confirmation before adding shared guidance."
+    }
+  ],
+  "previousRound": null
+}

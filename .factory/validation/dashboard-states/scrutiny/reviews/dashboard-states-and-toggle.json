@@ -1,0 +1,15 @@
+{
+  "featureId": "dashboard-states-and-toggle",
+  "reviewedAt": "2026-04-19T00:27:14Z",
+  "commitId": "8bd2777",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The feature implementation matches the requested behavior: all five dashboard states render via conditional UI, the mock state toggle is visible with all options, and Start/Stop transitions are implemented. The commit includes focused tests for each state and transition.",
+    "issues": []
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed handoff, transcript skeleton, and commit 8bd2777 for dashboard-states-and-toggle. No high-confidence actionable defects were found for the scoped requirements, so this review passes."
+}
