@@ -75,7 +75,7 @@ describe("RotateKeysetFormScreen", () => {
     expect(stepperLabels.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("renders source share #1 with validated badge", () => {
+  it("renders source share #1 with validated badge (default mock)", () => {
     render(
       <MemoryRouter>
         <RotateKeysetFormScreen />
@@ -86,6 +86,26 @@ describe("RotateKeysetFormScreen", () => {
     expect(screen.getAllByText("My Signing Key").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("02a3f8d4...8e4f2c")).toBeInTheDocument();
     expect(screen.getByText("Belongs to current group")).toBeInTheDocument();
+  });
+
+  it("reads location state profile and shows its keyset name", () => {
+    const profile = {
+      id: "prof_work",
+      label: "Work Key",
+      deviceName: "Work Laptop",
+      groupPublicKey: "03b7d2e4f1a8c9054f6a2e83d7b1094c5e8f3a6d2b7e4c19085f6d3a2b8ea91e",
+      relays: ["wss://relay.primal.net", "wss://relay.damus.io"]
+    };
+    render(
+      <MemoryRouter initialEntries={[{ pathname: "/rotate-keyset", state: { profile } }]}>
+        <RotateKeysetFormScreen />
+      </MemoryRouter>
+    );
+    /* Source share card should show the passed profile name */
+    expect(screen.getAllByText("Work Key").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("Work Laptop")).toBeInTheDocument();
+    expect(screen.getByText("prof_work")).toBeInTheDocument();
+    expect(screen.getByText("2 configured")).toBeInTheDocument();
   });
 
   it("renders source share #2 with input areas", () => {

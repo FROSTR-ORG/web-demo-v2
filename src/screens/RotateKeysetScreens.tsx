@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, Check, Info, Lock, X } from "lucide-react";
 import { useAppState } from "../app/AppState";
 import { shortHex } from "../lib/bifrost/format";
@@ -35,13 +35,24 @@ const MOCK_SOURCE_SHARE_1 = {
 
 export function RotateKeysetFormScreen() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [bfshare, setBfshare] = useState("");
   const [pkgPassword, setPkgPassword] = useState("");
   const [threshold, setThreshold] = useState(2);
   const [totalShares, setTotalShares] = useState(3);
 
+  /* Read profile data from location state (passed by WelcomeScreen Rotate button) */
+  const locationProfile = (location.state as { profile?: { id?: string; label?: string; deviceName?: string; groupPublicKey?: string; relays?: string[] } } | null)?.profile;
+  const sourceShare = {
+    label: locationProfile?.label ?? MOCK_SOURCE_SHARE_1.label,
+    deviceName: locationProfile?.deviceName ?? MOCK_SOURCE_SHARE_1.deviceName,
+    sharePubkey: locationProfile?.groupPublicKey ?? MOCK_SOURCE_SHARE_1.sharePubkey,
+    profileId: locationProfile?.id ?? MOCK_SOURCE_SHARE_1.profileId,
+    relays: locationProfile?.relays?.length ?? MOCK_SOURCE_SHARE_1.relays
+  };
+
   return (
-    <AppShell headerMeta={MOCK_SOURCE_SHARE_1.label} mainVariant="flow">
+    <AppShell headerMeta={sourceShare.label} mainVariant="flow">
       <div className="screen-column">
         <Stepper current={1} variant="rotate-keyset" />
         <BackLink onClick={() => navigate("/")} />
@@ -61,7 +72,7 @@ export function RotateKeysetFormScreen() {
           </div>
           <div className="source-share-field">
             <span className="source-share-field-label">Saved Profile</span>
-            <div className="source-share-value validated">{MOCK_SOURCE_SHARE_1.label}</div>
+            <div className="source-share-value validated">{sourceShare.label}</div>
           </div>
           <div className="source-share-field">
             <span className="source-share-field-label">Profile Password</span>
@@ -70,19 +81,19 @@ export function RotateKeysetFormScreen() {
           <div className="source-share-details">
             <div className="source-share-detail-row">
               <span className="source-share-detail-key">Device Name</span>
-              <span className="source-share-detail-val">{MOCK_SOURCE_SHARE_1.deviceName}</span>
+              <span className="source-share-detail-val">{sourceShare.deviceName}</span>
             </div>
             <div className="source-share-detail-row">
               <span className="source-share-detail-key">Share Public Key</span>
-              <span className="source-share-detail-val">{shortHex(MOCK_SOURCE_SHARE_1.sharePubkey)}</span>
+              <span className="source-share-detail-val">{shortHex(sourceShare.sharePubkey)}</span>
             </div>
             <div className="source-share-detail-row">
               <span className="source-share-detail-key">Profile ID</span>
-              <span className="source-share-detail-val">{MOCK_SOURCE_SHARE_1.profileId}</span>
+              <span className="source-share-detail-val">{sourceShare.profileId}</span>
             </div>
             <div className="source-share-detail-row">
               <span className="source-share-detail-key">Relays</span>
-              <span className="source-share-detail-val">{MOCK_SOURCE_SHARE_1.relays} configured</span>
+              <span className="source-share-detail-val">{sourceShare.relays} configured</span>
             </div>
             <div className="source-share-detail-row last">
               <span className="source-share-detail-key">Group Match</span>

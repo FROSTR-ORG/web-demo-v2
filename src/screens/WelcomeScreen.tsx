@@ -91,7 +91,7 @@ export function WelcomeScreen() {
           <button
             type="button"
             className="profile-row-btn rotate"
-            onClick={() => navigate("/rotate-keyset")}
+            onClick={() => navigate("/rotate-keyset", { state: { profile } })}
           >
             Rotate
           </button>

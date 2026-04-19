@@ -174,7 +174,7 @@ describe("WelcomeScreen", () => {
     expect(screen.getByText("Unlock Profile")).toBeInTheDocument();
   });
 
-  it("Rotate button navigates to /rotate-keyset", () => {
+  it("Rotate button navigates to /rotate-keyset with profile state", () => {
     mocks.profiles = [
       makeProfile("p1", "My Signing Key"),
       makeProfile("p2", "Work Key")
@@ -186,7 +186,26 @@ describe("WelcomeScreen", () => {
     );
     const rotateButtons = screen.getAllByText("Rotate");
     fireEvent.click(rotateButtons[0]);
-    expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset");
+    expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset", {
+      state: { profile: mocks.profiles[0] }
+    });
+  });
+
+  it("Rotate button passes correct profile for non-first profile", () => {
+    mocks.profiles = [
+      makeProfile("p1", "My Signing Key"),
+      makeProfile("p2", "Work Key")
+    ];
+    render(
+      <MemoryRouter>
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    const rotateButtons = screen.getAllByText("Rotate");
+    fireEvent.click(rotateButtons[1]);
+    expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset", {
+      state: { profile: mocks.profiles[1] }
+    });
   });
 
   it("chip-style New Keyset button navigates to /create in multi variant", () => {
