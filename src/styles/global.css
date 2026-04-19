@@ -1935,6 +1935,18 @@ a {
   border: 1px solid rgba(234, 179, 8, 0.25);
 }
 
+/*
+ * VAL-IMP-005 — red/corrupted variant must be visually distinct from the
+ * amber wrong-password variant. Paper's reference uses
+ * `bg-[#EF44441A] border-[#EF444440]`, whose rgba equivalents are applied
+ * below so that `getComputedStyle(...).backgroundColor` / `.borderColor`
+ * match what agent-browser expects.
+ */
+.import-error-alert.red {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
 .import-error-icon {
   width: 20px;
   height: 20px;
@@ -1945,6 +1957,11 @@ a {
   border-radius: 50%;
   background: rgba(234, 179, 8, 0.3);
   color: #facc15;
+}
+
+.import-error-alert.red .import-error-icon {
+  background: rgba(239, 68, 68, 0.3);
+  color: #f87171;
 }
 
 .import-error-body {
@@ -1960,10 +1977,38 @@ a {
   line-height: 16px;
 }
 
+.import-error-alert.red .import-error-title {
+  color: #f87171;
+}
+
 .import-error-description {
   color: #fde68a;
   font-size: 13px;
   line-height: 16px;
+}
+
+.import-error-alert.red .import-error-description {
+  color: #fca5a5;
+}
+
+/* --- Label row with inline info/help icon (Paper audit gap) --- */
+
+.import-label-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.import-password-title-row {
+  align-items: center;
+}
+
+.import-label-help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ig-blue);
+  opacity: 0.75;
 }
 
 /* ========================================

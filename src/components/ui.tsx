@@ -74,16 +74,28 @@ export function PasswordField({
   help,
   error,
   checked,
+  labelHelp,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { label: string; help?: string; error?: string; checked?: boolean }) {
+}: InputHTMLAttributes<HTMLInputElement> & { label: string; help?: string; error?: string; checked?: boolean; labelHelp?: ReactNode }) {
   const [visible, setVisible] = useState(false);
   const generatedId = useId();
   const id = props.id ?? generatedId;
   return (
     <div className="field">
-      <label className="label" htmlFor={id}>
-        {label}
-      </label>
+      {labelHelp ? (
+        <span className="import-label-row">
+          <label className="label" htmlFor={id}>
+            {label}
+          </label>
+          <span className="import-label-help-icon" aria-hidden="true">
+            {labelHelp}
+          </span>
+        </span>
+      ) : (
+        <label className="label" htmlFor={id}>
+          {label}
+        </label>
+      )}
       <span className={`password-shell ${checked ? "checked" : ""}`}>
         <input {...props} id={id} className="input password-input" type={visible ? "text" : "password"} />
         {checked ? (

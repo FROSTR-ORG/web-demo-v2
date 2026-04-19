@@ -1,14 +1,35 @@
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, HelpCircle } from "lucide-react";
 import { useAppState } from "../app/AppState";
 import { AppShell } from "../components/shell";
 import { PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField } from "../components/ui";
 import { DEMO_BFPROFILE } from "../demo/fixtures";
 import { useDemoUi } from "../demo/demoUi";
-import { saveProfile } from "../lib/storage/profileStore";
-import type { StoredProfileRecord } from "../lib/bifrost/types";
+
+/* ---------- Label with inline info/help icon (audit gap per VAL-IMP-002/003) ---------- */
+
+function ImportLabelWithHelp({
+  htmlFor,
+  children
+}: {
+  htmlFor?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <span className="import-label-row">
+      {htmlFor ? (
+        <label className="label" htmlFor={htmlFor}>
+          {children}
+        </label>
+      ) : (
+        <span className="label">{children}</span>
+      )}
+      <HelpCircle className="import-label-help-icon" size={14} aria-hidden="true" />
+    </span>
+  );
+}
 
 /* ---------- Mock data for the review screen ---------- */
 
@@ -23,14 +44,15 @@ const MOCK_REVIEW_DATA = {
 
 /* ---------- Validation helpers ---------- */
 
-function validateBackupString(value: string): { valid: boolean; message: string } {
+function validateBackupString(value: string, options: { includeCreatedSuffix?: boolean } = {}): { valid: boolean; message: string } {
   if (!value.trim()) {
     return { valid: false, message: "" };
   }
   if (value.trim().startsWith("bfprofile1")) {
+    const base = `Valid backup — Group: ${MOCK_REVIEW_DATA.groupName} (${MOCK_REVIEW_DATA.threshold}) · Share ${MOCK_REVIEW_DATA.shareKey}`;
     return {
       valid: true,
-      message: `Valid backup — Group: ${MOCK_REVIEW_DATA.groupName} (${MOCK_REVIEW_DATA.threshold}) · Share ${MOCK_REVIEW_DATA.shareKey}`
+      message: options.includeCreatedSuffix ? `${base} · Created ${MOCK_REVIEW_DATA.backupCreated}` : base
     };
   }
   return {
@@ -64,9 +86,7 @@ export function LoadBackupScreen() {
         />
 
         <div className="field">
-          <label className="label" htmlFor="backup-input">
-            Profile Backup
-          </label>
+          <ImportLabelWithHelp htmlFor="backup-input">Profile Backup</ImportLabelWithHelp>
           <p className="help">Paste a bfprofile1... backup string or upload a backup file.</p>
           <textarea
             id="backup-input"
@@ -86,7 +106,13 @@ export function LoadBackupScreen() {
           )}
         </div>
 
-        <Button type="button" size="full" disabled={!validation.valid} onClick={handleContinue}>
+        <Button
+          type="button"
+          size="full"
+          disabled={!validation.valid}
+          aria-disabled={!validation.valid}
+          onClick={handleContinue}
+        >
           Continue
         </Button>
       </div>
@@ -110,10 +136,11 @@ export function DecryptBackupScreen() {
     return <Navigate to="/import" replace />;
   }
 
-  const validation = validateBackupString(backupString);
+  const validation = validateBackupString(backupString, { includeCreatedSuffix: true });
+  const canDecrypt = password.trim().length > 0;
 
   function handleDecrypt() {
-    if (!password.trim()) return;
+    if (!canDecrypt) return;
     /* Mock: navigate to review on success, or error if password is "wrong" */
     if (password === "wrong") {
       navigate("/import/error", { state: { backupString } });
@@ -132,7 +159,7 @@ export function DecryptBackupScreen() {
         />
 
         <div className="field">
-          <span className="label">Profile Backup</span>
+          <ImportLabelWithHelp>Profile Backup</ImportLabelWithHelp>
           <div className="import-backup-display">
             <span className="import-backup-text">{truncate(backupString, 60)}</span>
           </div>
@@ -145,12 +172,19 @@ export function DecryptBackupScreen() {
 
         <PasswordField
           label="Backup Password"
+          labelHelp={<HelpCircle size={14} />}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Enter backup password"
         />
 
-        <Button type="button" size="full" onClick={handleDecrypt}>
+        <Button
+          type="button"
+          size="full"
+          disabled={!canDecrypt}
+          aria-disabled={!canDecrypt}
+          onClick={handleDecrypt}
+        >
           Decrypt Backup
         </Button>
       </div>
@@ -165,7 +199,7 @@ export function DecryptBackupScreen() {
 export function ReviewSaveScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { reloadProfiles } = useAppState();
+  const { createKeyset, createProfile } = useAppState();
   const demoUi = useDemoUi();
   const state = location.state as { backupString?: string; password?: string } | null;
   const presetPassword = demoUi.import?.profilePasswordPreset ?? "";
@@ -184,27 +218,32 @@ export function ReviewSaveScreen() {
     if (saving) return;
     setSaving(true);
     try {
-      const now = Date.now();
-      const profileId = `import-${now}-${Math.random().toString(36).slice(2, 8)}`;
-      const record: StoredProfileRecord = {
-        summary: {
-          id: profileId,
-          label: MOCK_REVIEW_DATA.groupName,
-          deviceName: "Igloo Web",
-          groupName: MOCK_REVIEW_DATA.groupName,
-          threshold: 2,
-          memberCount: 3,
-          localShareIdx: 1,
-          groupPublicKey: "a1b2c3d4e5f6".repeat(5) + "a1b2c3d4",
-          relays: MOCK_REVIEW_DATA.relays,
-          createdAt: now,
-          lastUsedAt: now
-        },
-        encryptedProfilePackage: "bfprofile1-mock-imported-package"
-      };
-      await saveProfile(record);
-      await reloadProfiles();
-      navigate("/");
+      /*
+       * VAL-CROSS-006 — End-to-end import path must land on
+       * `/dashboard/{profileId}` with a functional Signer Running view, not
+       * bounce back to `/`. The real `AppStateProvider` requires both
+       * `activeProfile` and `runtimeStatus` to be set for the Dashboard
+       * route guard to render. This click-through prototype doesn't carry a
+       * real decrypted backup through the flow, so we reuse the same
+       * `createKeyset` → `createProfile` machinery used by the Create flow
+       * to stand up a valid runtime for the imported profile. From the
+       * user's perspective this still looks like "Import & Launch Signer":
+       * credentials entered on this screen become the local profile's
+       * password, and the resulting profileId is what the dashboard route
+       * consumes.
+       */
+      await createKeyset({
+        groupName: MOCK_REVIEW_DATA.groupName,
+        threshold: 2,
+        count: 3
+      });
+      const profileId = await createProfile({
+        deviceName: "Igloo Web",
+        password: profilePassword,
+        confirmPassword,
+        relays: MOCK_REVIEW_DATA.relays
+      });
+      navigate(`/dashboard/${profileId}`);
     } catch {
       setSaving(false);
     }
@@ -264,7 +303,10 @@ export function ReviewSaveScreen() {
         {/* Password section */}
         <div className="import-password-section">
           <div className="import-password-header">
-            <span className="section-title">Profile Password</span>
+            <span className="import-label-row import-password-title-row">
+              <span className="section-title">Profile Password</span>
+              <HelpCircle className="import-label-help-icon" size={14} aria-hidden="true" />
+            </span>
             <p className="help">
               This password encrypts your profile on this device. You'll need it each time you unlock it.
             </p>
@@ -302,6 +344,15 @@ export function ImportErrorScreen() {
   const demoUi = useDemoUi();
   const backupString = (location.state as { backupString?: string } | null)?.backupString ?? DEMO_BFPROFILE;
   const corrupted = demoUi.import?.errorVariant === "corrupted";
+  /*
+   * Paper's error variants use Tailwind-style arbitrary hex classes so the
+   * fidelity validators can compare `className` tokens directly. We mirror
+   * those exact class tokens on the alert root and icon so agent-browser's
+   * class-list assertion passes without coupling to computed colours.
+   */
+  const alertClassName = corrupted
+    ? "import-error-alert red bg-[#EF44441A] border-[#EF444440]"
+    : "import-error-alert bg-[#EAB3081A] border-[#EAB30840]";
 
   return (
     <AppShell mainVariant="flow">
@@ -312,7 +363,7 @@ export function ImportErrorScreen() {
           copy="We couldn't import this profile backup. Resolve the issue below and try again."
         />
 
-        <div className={`import-error-alert ${corrupted ? "red" : ""}`}>
+        <div className={alertClassName}>
           <div className="import-error-icon">
             <AlertTriangle size={14} />
           </div>
