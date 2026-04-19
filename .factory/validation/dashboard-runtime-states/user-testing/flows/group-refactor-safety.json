@@ -1,0 +1,57 @@
+{
+  "groupId": "group-refactor-safety",
+  "testedAt": "2026-04-19T23:57:41Z",
+  "isolation": {
+    "appUrl": "http://127.0.0.1:5173",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "assertionIds": [
+      "VAL-DSH-100"
+    ],
+    "browserSession": "group-refactor-safety",
+    "milestone": "dashboard-runtime-states"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-DSH-100",
+      "title": "DashboardScreen module split preserves content parity across all scenarios",
+      "status": "pass",
+      "reason": "Across all 12 assigned dashboard demo scenarios, headings, primary/secondary CTA labels, section ordering, and body copy matched the VAL-DSH-001..018 baseline assertions, with no console/page errors observed.",
+      "evidence": {
+        "screenshots": [
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-running.png",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-connecting.png",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-policies.png",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-stopped.png",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-relays-offline.png",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-signing-blocked.png",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-settings-lock-profile.png",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-clear-credentials-modal.png",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-export-profile.png",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-export-complete.png",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-policy-prompt.png",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-signing-failed.png"
+        ],
+        "consoleErrors": "none (all scenario error captures contained empty arrays)",
+        "consoleErrorArtifacts": [
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-running-errors.json",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-connecting-errors.json",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-policies-errors.json",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-stopped-errors.json",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-relays-offline-errors.json",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-signing-blocked-errors.json",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-settings-lock-profile-errors.json",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-clear-credentials-modal-errors.json",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-export-profile-errors.json",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-export-complete-errors.json",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-policy-prompt-errors.json",
+          "dashboard-runtime-states/group-refactor-safety/VAL-DSH-100-dashboard-signing-failed-errors.json"
+        ]
+      }
+    }
+  ],
+  "frictions": [],
+  "blockers": []
+}

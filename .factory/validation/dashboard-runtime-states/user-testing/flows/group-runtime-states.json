@@ -1,0 +1,118 @@
+{
+  "groupId": "group-runtime-states",
+  "milestone": "dashboard-runtime-states",
+  "testedAt": "2026-04-19T23:57:01Z",
+  "isolation": {
+    "surface": "browser-ui",
+    "appUrl": "http://127.0.0.1:5173",
+    "routesUsed": [
+      "/demo/dashboard-connecting",
+      "/demo/dashboard-policies",
+      "/demo/dashboard-stopped",
+      "/demo/dashboard-relays-offline",
+      "/demo/dashboard-signing-blocked"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-DSH-004",
+      "status": "pass",
+      "reason": "Connecting route rendered all required headline, description, three Connection Progress rows with exact supporting copy, and Current Targets values.",
+      "evidence": {
+        "route": "/demo/dashboard-connecting",
+        "screenshots": [
+          "dashboard-runtime-states/group-runtime-states/VAL-DSH-004-dashboard-connecting.png"
+        ],
+        "consoleErrors": "none"
+      }
+    },
+    {
+      "id": "VAL-DSH-005",
+      "status": "pass",
+      "reason": "Policies route rendered Signer Policies heading, Default policy value Ask every time, expected help text, and Peer Policies rows for Peer #0/#1/#2 each containing SIGN/ECDH/PING/ONBOARD badges.",
+      "evidence": {
+        "route": "/demo/dashboard-policies",
+        "screenshots": [
+          "dashboard-runtime-states/group-runtime-states/VAL-DSH-005-dashboard-policies.png"
+        ],
+        "consoleErrors": "none"
+      }
+    },
+    {
+      "id": "VAL-DSH-006",
+      "status": "pass",
+      "reason": "Policies top-nav button was visibly highlighted and computed style values were active blue while Recover/Export stayed inactive gray.",
+      "evidence": {
+        "route": "/demo/dashboard-policies",
+        "screenshots": [
+          "dashboard-runtime-states/group-runtime-states/VAL-DSH-006-policies-active-highlight.png"
+        ],
+        "consoleErrors": "none",
+        "styleCheck": {
+          "Recover": {
+            "color": "rgb(209, 213, 219)",
+            "borderColor": "rgb(209, 213, 219)",
+            "svgStroke": "rgb(209, 213, 219)"
+          },
+          "Export": {
+            "color": "rgb(209, 213, 219)",
+            "borderColor": "rgb(209, 213, 219)",
+            "svgStroke": "rgb(209, 213, 219)"
+          },
+          "Policies": {
+            "color": "rgb(147, 197, 253)",
+            "borderColor": "rgb(147, 197, 253)",
+            "svgStroke": "rgb(147, 197, 253)"
+          }
+        }
+      }
+    },
+    {
+      "id": "VAL-DSH-007",
+      "status": "pass",
+      "reason": "Stopped route showed Signer Stopped headline/body copy, Start Signer CTA, Readiness block (Offline, no active relay/peer sessions, signing unavailable), and Next Step ending sentence exactly as specified.",
+      "evidence": {
+        "route": "/demo/dashboard-stopped",
+        "screenshots": [
+          "dashboard-runtime-states/group-runtime-states/VAL-DSH-007-dashboard-stopped.png"
+        ],
+        "consoleErrors": "none"
+      }
+    },
+    {
+      "id": "VAL-DSH-008",
+      "status": "pass",
+      "reason": "Relays-offline route displayed Signer Running with degraded banner, Stop Signer action, Readiness Offline + All Relays Offline details, Recovery guidance, footer sentence, and Retry Connections CTA.",
+      "evidence": {
+        "route": "/demo/dashboard-relays-offline",
+        "screenshots": [
+          "dashboard-runtime-states/group-runtime-states/VAL-DSH-008-dashboard-relays-offline.png"
+        ],
+        "consoleErrors": "none"
+      }
+    },
+    {
+      "id": "VAL-DSH-009",
+      "status": "pass",
+      "reason": "Signing-blocked route rendered required status card text, Signing Blocked callout and guidance, Common Causes list items, Operator Action copy, and dual CTAs Open Policies + Review Approvals.",
+      "evidence": {
+        "route": "/demo/dashboard-signing-blocked",
+        "screenshots": [
+          "dashboard-runtime-states/group-runtime-states/VAL-DSH-009-dashboard-signing-blocked.png"
+        ],
+        "consoleErrors": "none"
+      }
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": {
+    "total": 6,
+    "pass": 6,
+    "fail": 0,
+    "blocked": 0
+  }
+}

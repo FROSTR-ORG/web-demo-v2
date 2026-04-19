@@ -1,0 +1,29 @@
+{
+  "milestone": "dashboard-runtime-states",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 12,
+    "passed": 12,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-DSH-001",
+    "VAL-DSH-002",
+    "VAL-DSH-003",
+    "VAL-DSH-004",
+    "VAL-DSH-005",
+    "VAL-DSH-006",
+    "VAL-DSH-007",
+    "VAL-DSH-008",
+    "VAL-DSH-009",
+    "VAL-DSH-019",
+    "VAL-DSH-020",
+    "VAL-DSH-100"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "previousRound": null
+}

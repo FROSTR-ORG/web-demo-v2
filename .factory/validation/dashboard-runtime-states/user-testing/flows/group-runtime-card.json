@@ -1,0 +1,132 @@
+{
+  "groupId": "group-runtime-card",
+  "testedAt": "2026-04-19T23:56:49Z",
+  "milestone": "dashboard-runtime-states",
+  "isolation": {
+    "surface": "browser-ui",
+    "appUrl": "http://127.0.0.1:5173",
+    "demoRoutes": [
+      "/demo/dashboard-running",
+      "/demo/dashboard-stopped",
+      "/demo/dashboard-connecting"
+    ],
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-DSH-001",
+      "status": "pass",
+      "reason": "On /demo/dashboard-running, the page rendered the expected dashboard runtime content: status card (Signer Running + relay subtext), peers chips and rows, event log entries, and pending approvals header with \"3 pending\" and \"Nearest: 42s\".",
+      "evidence": {
+        "route": "/demo/dashboard-running",
+        "screenshots": [
+          "dashboard-runtime-states/group-runtime-card/VAL-DSH-001-dashboard-running.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json returned [])",
+        "observedText": [
+          "Signer Running",
+          "Connected to wss://relay.primal.net, wss://relay.damus.io",
+          "Peers",
+          "2 online",
+          "3 total",
+          "~186 ready",
+          "Avg: 31ms",
+          "Event Log",
+          "8 events",
+          "Pool sync with peer #0 — 50 received · 50 sent",
+          "Signature request received from 02a3f8...8f2c",
+          "Partial signature sent — aggregation complete",
+          "ECDH request processed for 02d7e1b9...3b9e",
+          "ECDH request from peer #2 — signer policy required",
+          "Ping sweep — 2/3 online (avg 31ms) · pools balanced",
+          "Echo published — announced presence on 2 relays",
+          "Pending Approvals",
+          "3 pending",
+          "Nearest: 42s"
+        ]
+      }
+    },
+    {
+      "id": "VAL-DSH-002",
+      "status": "pass",
+      "reason": "In the running status card action group, exactly one CTA was present: \"Stop Signer\". No inline Lock/Lock Profile action appeared.",
+      "evidence": {
+        "route": "/demo/dashboard-running",
+        "screenshots": [
+          "dashboard-runtime-states/group-runtime-card/VAL-DSH-002-running-stop-only.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json returned [])",
+        "observedInteractiveElements": [
+          "button \"Stop Signer\"",
+          "no \"Lock\"/\"Lock Profile\" button in status card actions"
+        ]
+      }
+    },
+    {
+      "id": "VAL-DSH-003",
+      "status": "pass",
+      "reason": "Pending Approvals showed exactly three rows in order with required subjects and TTL values.",
+      "evidence": {
+        "route": "/demo/dashboard-running",
+        "screenshots": [
+          "dashboard-runtime-states/group-runtime-card/VAL-DSH-003-running-pending-approvals.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json returned [])",
+        "observedRows": [
+          "1) SIGN · Peer #2 · 029c4a...1f5e · kind:1 Short Text Note · 42s",
+          "2) ECDH · Peer #1 · 02d7e1...3b9e · NIP-44 key exchange · 1m 12s",
+          "3) SIGN · Peer #0 · 02a3f8...8f2c · kind:4 Encrypted DM · 3m 05s"
+        ]
+      }
+    },
+    {
+      "id": "VAL-DSH-019",
+      "status": "pass",
+      "reason": "On /demo/dashboard-stopped, the status card rendered exactly one CTA: \"Start Signer\". No \"Stop Signer\" CTA appeared in the status card area.",
+      "evidence": {
+        "route": "/demo/dashboard-stopped",
+        "screenshots": [
+          "dashboard-runtime-states/group-runtime-card/VAL-DSH-019-dashboard-stopped.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json returned [])",
+        "observedInteractiveElements": [
+          "button \"Start Signer\"",
+          "no \"Stop Signer\" button"
+        ]
+      }
+    },
+    {
+      "id": "VAL-DSH-020",
+      "status": "pass",
+      "reason": "On /demo/dashboard-connecting, the status card showed connecting-state content and indicator with no simultaneous Start/Stop controls (neither Start Signer nor Stop Signer visible).",
+      "evidence": {
+        "route": "/demo/dashboard-connecting",
+        "screenshots": [
+          "dashboard-runtime-states/group-runtime-card/VAL-DSH-020-dashboard-connecting.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json returned [])",
+        "observedText": [
+          "Signer Connecting...",
+          "Connecting...",
+          "Connection Progress",
+          "Current Targets"
+        ],
+        "observedInteractiveElements": [
+          "no \"Start Signer\" button",
+          "no \"Stop Signer\" button"
+        ]
+      }
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": {
+    "total": 5,
+    "pass": 5,
+    "fail": 0,
+    "blocked": 0
+  }
+}
