@@ -1,0 +1,45 @@
+{
+  "featureId": "rotate-share-flow",
+  "reviewedAt": "2026-04-19T02:37:35Z",
+  "commitId": "4ad8f46",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The flow is implemented with all four screens and routes, but the happy-path terminal navigation does not return to Dashboard as required by the validation contract.",
+    "issues": [
+      {
+        "file": "src/screens/RotateShareScreens.tsx",
+        "line": 404,
+        "severity": "blocking",
+        "description": "The 'Return to Signer' action navigates to '/' (Welcome) instead of returning to Dashboard. This breaks VAL-ROTATESH-004 ('Return to Signer' goes to Dashboard) and VAL-ROTATESH-005 (happy path ends at Dashboard)."
+      },
+      {
+        "file": "src/screens/__tests__/RotateShareScreens.test.tsx",
+        "line": 339,
+        "severity": "non_blocking",
+        "description": "Test expectation enshrines the wrong terminal navigation by asserting navigate('/') for 'Return to Signer', masking the contract mismatch instead of catching it."
+      },
+      {
+        "file": "src/screens/RotateShareScreens.tsx",
+        "line": 240,
+        "severity": "non_blocking",
+        "description": "A user-visible 'Simulate Failure' debug button is shipped on the Applying screen but is not part of the rotate-share design/spec content."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-builder skill mandates tests-first TDD (write failing tests before implementation), but transcript order shows implementation file creation before test creation and no failing-test phase. Handoff still reports followedProcedure=true, suggesting enforcement/feedback drift.",
+      "evidence": ".factory/skills/ui-builder/SKILL.md (\"Write Tests First (TDD)\") vs transcript skeleton for session 46e5ab42-410c-4426-9901-6db39619d1bc: Create src/screens/RotateShareScreens.tsx occurs before Create src/screens/__tests__/RotateShareScreens.test.tsx."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Architecture shared reference route table is stale and omits rotate-keyset and rotate-share routes, reducing usefulness for reviewers/workers validating current navigation behavior.",
+      "evidence": ".factory/library/architecture.md route table has no rotate-share/rotate-keyset entries; grep for 'rotate-share|rotate-keyset' returns no matches."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review failed due to a blocking flow mismatch: Local Share Updated's 'Return to Signer' goes to Welcome instead of Dashboard, violating rotate-share happy-path expectations. Additional non-blocking findings include a test that codifies the wrong destination and a user-facing debug control on the Applying screen."
+}

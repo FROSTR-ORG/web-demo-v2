@@ -1,0 +1,34 @@
+{
+  "featureId": "rotate-keyset-form",
+  "reviewedAt": "2026-04-19T02:37:21Z",
+  "commitId": "739ab91",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature adds the requested Rotate Keyset form/review screens, stepper variant, and routes, but the commit contains a blocking verification inconsistency in the new test suite and one navigation gap in the review CTA path.",
+    "issues": [
+      {
+        "file": "src/screens/__tests__/RotateKeysetScreens.test.tsx",
+        "line": 69,
+        "severity": "blocking",
+        "description": "Test expects text \"02a3f8...8f2c\" that is not rendered by this commit's RotateKeysetFormScreen. The screen data source uses `sharePubkey: \"*************\"` (src/screens/RotateKeysetScreens.tsx lines 12 and 62), so this assertion cannot pass as written, making the feature's test verification unreliable."
+      },
+      {
+        "file": "src/screens/RotateKeysetScreens.tsx",
+        "line": 233,
+        "severity": "non_blocking",
+        "description": "Primary CTA on Review & Generate navigates to `/rotate-keyset/progress`, but this route is not registered in the same commit's router (src/app/App.tsx lines 31-33 only include `/rotate-keyset` and `/rotate-keyset/review`). Clicking it falls through to the catch-all redirect and drops the user to Welcome."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "AGENTS.md says to use CSS custom properties from paper-tokens.css for colors/fonts, but this feature adds many raw hex/rgba color literals. Clarify whether literal colors are acceptable or tighten guidance/enforcement.",
+      "evidence": "src/styles/global.css (commit 739ab91) lines 4677-4749 and 4778-4781 add hardcoded values like `#93c5fd`, `#fbbf24`, `#dc2626`, and multiple rgba literals."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Feature scope is mostly implemented, but the committed RotateKeyset screen test suite contains a blocking assertion/component mismatch, and the review CTA targets a route missing in this commit."
+}
