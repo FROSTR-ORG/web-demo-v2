@@ -1,0 +1,38 @@
+{
+  "featureId": "demo-to-real-app-state-bridge",
+  "reviewedAt": "2026-04-19T18:45:20Z",
+  "commitId": "51ccdb8",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The feature delivers the intended demo→real one-shot sessionStorage handoff and includes strong unit coverage for helper primitives plus provider hydration paths. I found one non-blocking regression risk in runtime polling lifecycle after bridge hydration.",
+    "issues": [
+      {
+        "file": "src/app/AppState.tsx",
+        "line": 335,
+        "severity": "non_blocking",
+        "description": "`bridgeHydrated` is set to true when a bridge snapshot is applied but is never reset. The refresh-loop effect exits early when `bridgeHydrated && !runtimeRef.current` and only re-runs on `[refreshRuntime, bridgeHydrated]` changes; if a real runtime is later created in the same SPA session, `runtimeRef.current` changes alone do not retrigger the effect, so periodic polling can remain disabled."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The assigned `ui-builder` skill is heavily screen/Paper-oriented and does not map cleanly to state-management features like this bridge; the worker necessarily bypassed most UI-specific procedure steps.",
+      "evidence": ".factory/skills/ui-builder/SKILL.md:12 limits scope to screen/route/UI work; :47-49 mandates TDD per new screen component, while this feature changed src/app/AppState.tsx and added src/app/__tests__/appStateBridge.test.tsx."
+    },
+    {
+      "area": "conventions",
+      "observation": "Mission testing convention text is too narrow for non-screen features; it implies tests live under screen tests only.",
+      "evidence": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/AGENTS.md:53 states tests are under `src/screens/__tests__/`, but this feature correctly added state tests at src/app/__tests__/appStateBridge.test.tsx."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Shared architecture notes are now stale relative to the new bridge behavior and conditional polling path in AppStateProvider.",
+      "evidence": ".factory/library/architecture.md:33 and :112 describe IndexedDB-on-mount loading and fixed interval polling; new code adds sessionStorage/event hydration and conditional interval skip in src/app/AppState.tsx:82-110 and :330-340 plus bridge helpers in src/app/appStateBridge.ts."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed handoff, transcript skeleton, and commit 51ccdb8 for demo-to-real-app-state-bridge. Implementation is functionally aligned with expected behavior and well-tested; review passes with one non-blocking runtime polling lifecycle issue and three shared-state documentation/skill observations."
+}

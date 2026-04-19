@@ -1,0 +1,66 @@
+{
+  "milestone": "welcome",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx vitest run --config vitest.config.ts --maxWorkers=4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx tsc -b",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 2,
+    "passed": 1,
+    "failed": 1,
+    "failedFeatures": [
+      "welcome-fidelity"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "welcome-fidelity",
+      "severity": "blocking",
+      "description": "Unlock submit in Welcome navigates to /dashboard/{profileId} but loses demo mock state and bounces to /. Review flagged this as a dead-CTA path relative to VAL-WEL-027."
+    }
+  ],
+  "appliedUpdates": [
+    {
+      "target": "library",
+      "description": "Added .factory/library/app-state-bridge.md documenting the one-shot sessionStorage bridge key/event, consume-on-read semantics, and IndexedDB fallback behavior.",
+      "sourceFeature": "demo-to-real-app-state-bridge"
+    }
+  ],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Broaden test-location guidance to include non-screen architecture work (for example `src/app/__tests__/`) rather than implying all tests live under `src/screens/__tests__/`.",
+      "evidence": "Bridge feature correctly added provider tests in src/app/__tests__/appStateBridge.test.tsx while mission guidance currently points workers at screen tests only.",
+      "isSystemic": true
+    },
+    {
+      "target": ".factory/skills/ui-builder/SKILL.md",
+      "suggestion": "Add an explicit note for demo-to-real-route navigation: when flows leave `/demo/*`, workers must verify app-state handoff (or equivalent) so routed CTAs are not dead due to provider-boundary state loss.",
+      "evidence": "Welcome review flagged dead-CTA behavior when navigating from demo unlock into /dashboard before bridge support; reviewer observed this is not currently called out by the skill.",
+      "isSystemic": true
+    },
+    {
+      "target": ".factory/skills/ui-builder/SKILL.md",
+      "suggestion": "Clarify that architecture/state features outside screen rendering can be valid mission work and should include appropriate non-UI tests.",
+      "evidence": "The bridge feature required AppStateProvider/sessionStorage changes and passed review, but current skill framing is heavily UI-only and can create procedural mismatch.",
+      "isSystemic": false
+    }
+  ],
+  "rejectedObservations": [],
+  "previousRound": null
+}

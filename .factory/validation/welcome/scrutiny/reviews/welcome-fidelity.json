@@ -1,0 +1,33 @@
+{
+  "featureId": "welcome-fidelity",
+  "reviewedAt": "2026-04-19T18:44:45Z",
+  "commitId": "c6b88b2",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The commit delivers most Welcome parity updates (chip-style actions, subtitle format, rotate-first variants, and modal close behavior), but it leaves a blocking dead-CTA path: successful Unlock from the welcome modal does not land on a usable dashboard in the demo validation flow.",
+    "issues": [
+      {
+        "file": "src/screens/WelcomeScreen.tsx",
+        "line": 75,
+        "severity": "blocking",
+        "description": "Unlock submit navigates to `/dashboard/{profileId}`, but this exits the `/demo/*` MockAppStateProvider context. In this commit, real AppStateProvider only reloads IndexedDB on mount (`src/app/AppState.tsx:80-82`) and dashboard hard-redirects when `activeProfile/runtimeStatus` are missing (`src/screens/DashboardScreen.tsx:29-31`), so the flow bounces to `/` instead of showing a running dashboard. This violates the feature expectation to remove dead CTAs / fulfill VAL-WEL-027."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "knowledge",
+      "observation": "A critical demo architecture constraint (navigating from `/demo/*` to absolute app routes drops mock state) was not captured in shared docs, which contributed to the partial Welcome unlock implementation.",
+      "evidence": "Demo wrapper is scoped to scenario rendering only (`src/demo/DemoScenarioPage.tsx:41-43`), while handoff explicitly reports the unblockable VAL-WEL-027 gap caused by leaving MockAppStateProvider."
+    },
+    {
+      "area": "skills",
+      "observation": "The `ui-builder` skill should explicitly warn that click-through checks from demo scenarios into real routes may require a state handoff mechanism; otherwise workers can believe navigation is wired while runtime state is actually lost.",
+      "evidence": "Skill instructions require click-through verification and treat DemoGallery as primary surface, but do not mention provider-boundary handoff risks; worker attempted scenario-state workaround in `src/demo/scenarios.ts:99-107` that could not satisfy `/dashboard/*` runtime requirements."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed worker session 023c7cd8-e023-4814-9403-6ec828ef4719 and commit c6b88b2. Feature is marked fail due to one blocking gap: Unlock navigation from Welcome remains effectively dead in demo flow because mock state is not bridged into real app routes."
+}
