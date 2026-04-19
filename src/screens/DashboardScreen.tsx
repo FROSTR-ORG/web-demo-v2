@@ -537,21 +537,21 @@ const MOCK_SIGNER_RULES = [
   { method: "get_public_key", domain: "primal.net", permission: "Always" as const },
 ];
 
-// Mock data for peer policies
+// Mock data for peer policies — full-length pubkeys truncated via shortHex at render time
 const MOCK_PEER_POLICIES = [
   {
     index: 0,
-    pubkey: "02a3f8...8f2c",
+    pubkey: "02a3f8e4c71b9d0256f8a23e41d7b9c0e5f6a8d3b2c1e0f4a5b6c7d8e9f08f2c",
     permissions: { sign: true, ecdh: true, ping: true, onboard: false },
   },
   {
     index: 1,
-    pubkey: "02d7e1...3b9e",
+    pubkey: "02d7e1b3a94c6f8e2d5a7b0c3e1f4d6a8b9c0e2f3a5b7d8c1e4f6a9b2d73b9e",
     permissions: { sign: true, ecdh: false, ping: true, onboard: true },
   },
   {
     index: 2,
-    pubkey: "029c4a...1f5e",
+    pubkey: "029c4a7e3b1d8f6a2c5e9d0b4f7a1c3e6d8b2f5a9c0e4d7b3a6f1e8c2d91f5e",
     permissions: { sign: false, ecdh: false, ping: false, onboard: false },
   },
 ];
@@ -609,7 +609,7 @@ function PoliciesView({ peers: _peers }: { peers: PeerStatus[] }) {
               <div className="policies-peer-row" key={peer.index}>
                 <div className="policies-peer-info">
                   <span className="policies-peer-name">Peer #{peer.index}</span>
-                  <span className="policies-peer-key">{peer.pubkey}</span>
+                  <span className="policies-peer-key">{shortHex(peer.pubkey, 6, 4)}</span>
                 </div>
                 <div className="policies-peer-badges">
                   <PermissionBadge tone="success" muted={!peer.permissions.sign}>
