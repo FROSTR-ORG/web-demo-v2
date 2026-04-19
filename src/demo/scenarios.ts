@@ -274,6 +274,44 @@ export const demoScenarios: DemoScenario[] = [
   scenario("rotate-keyset-error-wrong-password", "rotate-keyset", "Rotate Keyset - Error: Wrong Password", "screens/rotate-keyset/error-wrong-password", "/rotate-keyset/error-password", dashboardState, "Wrong password"),
   scenario("rotate-keyset-error-group-mismatch", "rotate-keyset", "Rotate Keyset - Error: Group Mismatch", "screens/rotate-keyset/error-group-mismatch", "/rotate-keyset/error-mismatch", dashboardState, "Source Group Mismatch"),
   scenario("rotate-keyset-error-generation-failed", "rotate-keyset", "Rotate Keyset - Error: Generation Failed", "screens/rotate-keyset/error-generation-failed", "/rotate-keyset/error-failed", dashboardState, "Generation Failed"),
+  // Rotate-keyset adaptation scenarios (scaffolded; full content parity handled by rotate-keyset-adaptation-fidelity).
+  // Adapted from Shared flow Paper sources; reference PNGs reused from the Shared flow until dedicated captures exist.
+  {
+    ...scenario(
+      "rotate-keyset-create-profile",
+      "rotate-keyset",
+      "Rotate Keyset - 2. Create Profile (Adaptation)",
+      "screens/shared/2-create-profile",
+      "/rotate-keyset/profile",
+      dashboardState,
+      "Create Profile"
+    ),
+    paperReference: paperReference("shared-create-profile")
+  },
+  {
+    ...scenario(
+      "rotate-keyset-distribute",
+      "rotate-keyset",
+      "Rotate Keyset - 3. Distribute Shares (Adaptation)",
+      "screens/shared/3-distribute-shares",
+      "/rotate-keyset/distribute",
+      dashboardState,
+      "Distribute Shares"
+    ),
+    paperReference: paperReference("shared-distribute-shares")
+  },
+  {
+    ...scenario(
+      "rotate-keyset-complete",
+      "rotate-keyset",
+      "Rotate Keyset - 3b. Distribution Completion (Adaptation)",
+      "screens/shared/3b-distribution-completion",
+      "/rotate-keyset/complete",
+      dashboardState,
+      "Distribution Completion"
+    ),
+    paperReference: paperReference("shared-distribution-completion")
+  },
 
   scenario("rotate-share-enter-package", "rotate-share", "Rotate Share - 1. Enter Rotate Package", "screens/rotate-share/1-enter-rotate-package", "/rotate-share", dashboardState, "Enter Rotate Package", { demoUi: { rotateShare: { packagePreset: DEMO_BFONBOARD, passwordPreset: DEMO_PASSWORD } } }),
   scenario("rotate-share-applying", "rotate-share", "Rotate Share - 2. Applying Share Update", "screens/rotate-share/2-applying-share-update", "/rotate-share/applying", dashboardState, "Applying Share Update", { packageString: DEMO_BFONBOARD, password: DEMO_PASSWORD, demoUi: { progress: { frozen: true }, rotateShare: { packagePreset: DEMO_BFONBOARD } } }),

@@ -18,7 +18,7 @@ describe("demo scenarios", () => {
   it("covers every Paper screen state", () => {
     const canonical = demoScenarios.filter((scenario) => scenario.canonical !== false);
     const variants = demoScenarios.filter((scenario) => scenario.canonical === false);
-    expect(canonical).toHaveLength(44);
+    expect(canonical).toHaveLength(47);
     expect(variants.map((scenario) => scenario.id).sort()).toEqual([
       "import-error-corrupted",
       "onboard-failed-rejected",
@@ -59,6 +59,39 @@ describe("demo scenarios", () => {
       );
 
       expect(screen.getAllByText(new RegExp(escapeRegExp(scenario.expectedText), "i")).length, scenario.id).toBeGreaterThan(0);
+      unmount();
+    }
+  });
+
+  it("rotate-keyset adaptation scenarios render with rotate-keyset stepper variant (VAL-RTK-010)", () => {
+    const adaptationIds = ["rotate-keyset-create-profile", "rotate-keyset-distribute", "rotate-keyset-complete"];
+    const expectedPathnames: Record<string, string> = {
+      "rotate-keyset-create-profile": "/rotate-keyset/profile",
+      "rotate-keyset-distribute": "/rotate-keyset/distribute",
+      "rotate-keyset-complete": "/rotate-keyset/complete"
+    };
+
+    for (const id of adaptationIds) {
+      const scenario = demoScenarios.find((entry) => entry.id === id);
+      expect(scenario, `${id} missing from demoScenarios`).toBeTruthy();
+      expect(scenario!.flow).toBe("rotate-keyset");
+      expect(scenario!.canonical).not.toBe(false);
+      expect(scenario!.location.pathname).toBe(expectedPathnames[id]);
+
+      const { unmount } = render(
+        <MemoryRouter>
+          <MockAppStateProvider value={scenario!.appState}>
+            <CoreRoutes location={scenario!.location} />
+          </MockAppStateProvider>
+        </MemoryRouter>
+      );
+
+      // Rotate-keyset Stepper variant uses the "Rotate Keyset" step-1 label
+      // and the full label triad "Rotate Keyset / Create Profile / Distribute Shares".
+      expect(screen.getAllByText("Rotate Keyset").length, `${id} missing Rotate Keyset step label`).toBeGreaterThan(0);
+      expect(screen.getAllByText("Create Profile").length, `${id} missing Create Profile step label`).toBeGreaterThan(0);
+      expect(screen.getAllByText("Distribute Shares").length, `${id} missing Distribute Shares step label`).toBeGreaterThan(0);
+
       unmount();
     }
   });
