@@ -1,0 +1,159 @@
+{
+  "groupId": "shared-create-profile",
+  "testedAt": "2026-04-19T19:38:39.844978Z",
+  "isolation": {
+    "surface": "browser-ui",
+    "appUrl": "http://127.0.0.1:5173",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "evidencePath": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/create-and-shared-create/shared-create-profile",
+    "browserSession": "shared-create-profile-validator"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-SHR-001",
+      "title": "Shared Create Profile renders content parity",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/shared-create-profile",
+          "expected": "Shared Create Profile content matches contract copy and structure",
+          "observed": "Observed expected top bar, shared stepper labels/states, form sections (Profile Name, Assigned Local Share, Profile Password, Relays, Peer Permissions), and CTA text."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/shared-create-profile/VAL-SHR-001-shared-create-profile-full.png",
+          "create-and-shared-create/shared-create-profile/VAL-SHR-001-shared-create-profile.png"
+        ],
+        "urls": [
+          "http://127.0.0.1:5173/demo/shared-create-profile"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SHR-002",
+      "title": "Shared Create Profile uses \"shared\" Stepper variant",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect stepper on /demo/shared-create-profile",
+          "expected": "Stepper labels are 'Create / Rotate', 'Create Profile', 'Distribute Shares' with step 1 completed check disk and step 2 active",
+          "observed": "Stepper uses shared labels; step 1 is completed with check disk and step 2 is active."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/shared-create-profile/VAL-SHR-002-shared-stepper-variant.png"
+        ],
+        "urls": [
+          "http://127.0.0.1:5173/demo/shared-create-profile"
+        ],
+        "consoleErrors": "not required"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SHR-003",
+      "title": "Shared Create Profile \u2014 password confirmation green check",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Observe preset matching password/confirm values",
+          "expected": "Confirm Password shows valid/checked state",
+          "observed": "DOM shell class for confirm field is `password-shell checked` and matched-state screenshot captured."
+        },
+        {
+          "action": "Change Confirm Password to mismatched value",
+          "expected": "Checked state removed and neutral state restored",
+          "observed": "After entering mismatch, DOM shell class becomes `password-shell` (no checked state), and neutral-state screenshot captured."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/shared-create-profile/VAL-SHR-003-password-match-checked.png",
+          "create-and-shared-create/shared-create-profile/VAL-SHR-003-password-mismatch-neutral.png"
+        ],
+        "urls": [
+          "http://127.0.0.1:5173/demo/shared-create-profile"
+        ],
+        "consoleErrors": "not required"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SHR-004",
+      "title": "Shared Create Profile \u2014 relay add/remove works",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Enter wss://relay.damus.io in relay add input and click Add",
+          "expected": "New relay chip appears with remove control",
+          "observed": "New removable relay chip appears; snapshot shows button `Remove wss://relay.damus.io`."
+        },
+        {
+          "action": "Click remove control for wss://relay.damus.io",
+          "expected": "Relay chip is removed",
+          "observed": "Relay chip disappears; subsequent snapshot no longer shows remove control for damus relay."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/shared-create-profile/VAL-SHR-004-relay-added.png",
+          "create-and-shared-create/shared-create-profile/VAL-SHR-004-relay-removed.png"
+        ],
+        "urls": [
+          "http://127.0.0.1:5173/demo/shared-create-profile"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SHR-005",
+      "title": "Shared Create Profile Continue advances to Distribute Shares",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Navigate to /demo/shared-create-profile",
+          "expected": "Shared Create Profile loads",
+          "observed": "Loaded successfully at /demo/shared-create-profile."
+        },
+        {
+          "action": "Click 'Continue to Distribute Shares'",
+          "expected": "Navigate to /create/distribute with steps 1-2 completed and step 3 active",
+          "observed": "Navigated to /create instead of /create/distribute; expected distribute stepper state not reached."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/shared-create-profile/VAL-SHR-005-before-continue.png",
+          "create-and-shared-create/shared-create-profile/VAL-SHR-005-after-continue.png",
+          "create-and-shared-create/shared-create-profile/VAL-SHR-005-continue-observed-create.png"
+        ],
+        "urls": [
+          "http://127.0.0.1:5173/demo/shared-create-profile",
+          "http://127.0.0.1:5173/create"
+        ],
+        "consoleErrors": "none observed"
+      },
+      "issues": "CTA route behavior does not match contract: expected /create/distribute, observed /create."
+    }
+  ],
+  "frictions": [
+    {
+      "description": "URL wait for expected /create/distribute timed out because CTA navigated to /create.",
+      "resolved": true,
+      "resolution": "Captured observed URL and before/after screenshots, then marked assertion as fail.",
+      "affectedAssertions": [
+        "VAL-SHR-005"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 5 assertions: 4 passed, 1 failed (VAL-SHR-005 route mismatch to /create)."
+}

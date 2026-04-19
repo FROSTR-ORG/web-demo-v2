@@ -1,0 +1,217 @@
+{
+  "groupId": "create-progress-flow",
+  "testedAt": "2026-04-19T19:43:16Z",
+  "isolation": {
+    "surface": "browser-ui",
+    "appUrl": "http://127.0.0.1:5173",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "evidenceDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/create-and-shared-create/create-progress-flow"
+  },
+  "toolsUsed": ["agent-browser"],
+  "assertions": [
+    {
+      "id": "VAL-CRT-007",
+      "title": "Create Keyset Continue hands off to Generation Progress",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Navigate to /demo/create-keyset",
+          "expected": "Create Keyset screen is visible",
+          "observed": "Create Keyset screen is visible"
+        },
+        {
+          "action": "Click 'Create Keyset' once",
+          "expected": "Route advances to /create/progress, then chains to /create/profile",
+          "observed": "Route changed to /create (did not go directly to /create/progress)"
+        },
+        {
+          "action": "Click 'Create Keyset' from /create",
+          "expected": "N/A (single-click handoff already expected)",
+          "observed": "Then advanced through /create/progress and chained into /create/profile"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/create-progress-flow/VAL-CRT-007-after-first-click.png",
+          "create-and-shared-create/create-progress-flow/VAL-CRT-007-eventual-profile.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No /api requests captured"
+      },
+      "issues": "From /demo/create-keyset, one click lands on /create instead of handing off directly to /create/progress."
+    },
+    {
+      "id": "VAL-CRT-010",
+      "title": "Generation Progress renders content parity",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/create-generation-progress",
+          "expected": "Generation Progress heading, subtitle, 3 phases, and overall progress are visible",
+          "observed": "All required copy and phase rows were visible, including '1 of 3 phases'"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/create-progress-flow/VAL-CRT-010-generation-progress.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No /api requests captured"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CRT-011",
+      "title": "Generation Progress stepper matches canonical create labels",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect stepper on /demo/create-generation-progress",
+          "expected": "Stepper labels are Create, Create Profile, Distribute Shares with step 1 active",
+          "observed": "Stepper labels matched canonical sequence and step 1 appeared active"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/create-progress-flow/VAL-CRT-011-stepper-labels.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No /api requests captured"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CRT-012",
+      "title": "Full Create → Shared happy path",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Start at /demo/create-keyset and click 'Create Keyset'",
+          "expected": "Flow transitions to /create/progress then /create/profile",
+          "observed": "First click transitioned to /create; a second click was required to enter /create/progress and then /create/profile"
+        },
+        {
+          "action": "Proceed /create/profile -> /create/distribute -> /create/complete",
+          "expected": "Shared flow steps progress in order with correct stepper states",
+          "observed": "After entering matching passwords and continuing, flow reached /create/distribute and /create/complete with expected headings"
+        },
+        {
+          "action": "Check console during flow",
+          "expected": "No console/page errors",
+          "observed": "No console/page errors recorded"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/create-progress-flow/VAL-CRT-012-step-create.png",
+          "create-and-shared-create/create-progress-flow/VAL-CRT-012-step-profile.png",
+          "create-and-shared-create/create-progress-flow/VAL-CRT-012-step-profile-filled.png",
+          "create-and-shared-create/create-progress-flow/VAL-CRT-012-step-distribute.png",
+          "create-and-shared-create/create-progress-flow/VAL-CRT-012-step-complete.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No /api requests captured"
+      },
+      "issues": "Initial /demo/create-keyset click did not move directly into /create/progress as specified."
+    },
+    {
+      "id": "VAL-CRT-013",
+      "title": "Dynamic help line re-interpolates live",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "On /demo/create-keyset, increase Total Shares from 3 to 4",
+          "expected": "Help text updates to 'Any 2 of 4 shares can sign — min threshold is 2, min shares is 3'",
+          "observed": "Help text updated immediately to 'Any 2 of 4 shares can sign — min threshold is 2, min shares is 3'"
+        },
+        {
+          "action": "Increase Threshold from 2 to 3",
+          "expected": "Help text updates to 'Any 3 of 4 shares can sign — min threshold is 2, min shares is 3'",
+          "observed": "Help text updated immediately to 'Any 3 of 4 shares can sign — min threshold is 2, min shares is 3'"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/create-progress-flow/VAL-CRT-013-initial-2-of-3.png",
+          "create-and-shared-create/create-progress-flow/VAL-CRT-013-after-total-shares-4.png",
+          "create-and-shared-create/create-progress-flow/VAL-CRT-013-after-threshold-3.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No /api requests captured"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-005",
+      "title": "Main app welcome → create happy path",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From / click 'Create New Keyset'",
+          "expected": "Navigate to /create",
+          "observed": "Navigated to /create"
+        },
+        {
+          "action": "Submit create form",
+          "expected": "Navigate to /create/progress then /create/profile",
+          "observed": "Reached /create/progress, then auto-advanced to /create/profile"
+        },
+        {
+          "action": "Submit profile and distribution screens",
+          "expected": "Reach /create/distribute then /create/complete",
+          "observed": "After entering matching profile passwords and completing distribution actions, reached /create/distribute then /create/complete"
+        },
+        {
+          "action": "Confirm completion",
+          "expected": "Navigate to /dashboard/{profileId}",
+          "observed": "Finish Distribution was enabled after distribution completion actions and navigated to /dashboard/bd897be88a4dec0564a21cb138b2fdc1a441915a2e4ebd0d7421a906a149fa54"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/create-progress-flow/VAL-CROSS-005-step-create.png",
+          "create-and-shared-create/create-progress-flow/VAL-CROSS-005-step-progress-or-transition.png",
+          "create-and-shared-create/create-progress-flow/VAL-CROSS-005-step-profile.png",
+          "create-and-shared-create/create-progress-flow/VAL-CROSS-005-step-distribute.png",
+          "create-and-shared-create/create-progress-flow/VAL-CROSS-005-step-distribute-after-actions.png",
+          "create-and-shared-create/create-progress-flow/VAL-CROSS-005-step-complete-after-actions.png",
+          "create-and-shared-create/create-progress-flow/VAL-CROSS-005-step-dashboard.png"
+        ],
+        "urlTrace": [
+          "/",
+          "/create",
+          "/create/progress",
+          "/create/profile",
+          "/create/distribute",
+          "/create/complete",
+          "/dashboard/bd897be88a4dec0564a21cb138b2fdc1a441915a2e4ebd0d7421a906a149fa54"
+        ],
+        "consoleErrors": "none",
+        "network": "No /api requests captured"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "On /demo/create-keyset, clicking 'Create Keyset' once navigates to /create first; another click is required to enter /create/progress.",
+      "resolved": false,
+      "resolution": "Documented as assertion failures for VAL-CRT-007 and VAL-CRT-012.",
+      "affectedAssertions": ["VAL-CRT-007", "VAL-CRT-012"]
+    },
+    {
+      "description": "Create Profile continue CTA is disabled until Password and Confirm Password match.",
+      "resolved": true,
+      "resolution": "Entered matching values in both password fields before submitting.",
+      "affectedAssertions": ["VAL-CRT-012", "VAL-CROSS-005"]
+    },
+    {
+      "description": "Finish Distribution remained disabled until distribution actions were completed (Copy + QR for remote shares, then dismiss QR modal).",
+      "resolved": true,
+      "resolution": "Completed share distribution actions and dismissed QR modal via Done before finishing.",
+      "affectedAssertions": ["VAL-CROSS-005"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 6 assertions: 4 passed, 2 failed, 0 blocked. Failures were VAL-CRT-007 and VAL-CRT-012 due /demo/create-keyset requiring an extra click through /create before reaching /create/progress."
+}

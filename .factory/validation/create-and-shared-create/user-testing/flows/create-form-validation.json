@@ -1,0 +1,246 @@
+{
+  "groupId": "create-form-validation",
+  "testedAt": "2026-04-19T19:37:25Z",
+  "isolation": {
+    "surface": "browser-ui",
+    "appUrl": "http://127.0.0.1:5173",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "evidencePath": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/create-and-shared-create/create-form-validation",
+    "reportPath": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/.factory/validation/create-and-shared-create/user-testing/flows/create-form-validation.json"
+  },
+  "toolsUsed": ["agent-browser", "curl"],
+  "assertions": [
+    {
+      "id": "VAL-CRT-001",
+      "title": "Create Keyset intake — content parity",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/create-keyset and wait for networkidle",
+          "expected": "Create form renders with canonical content, labels, fields, helper copy, stepper, and CTA",
+          "observed": "All required copy rendered, including stepper labels (Create/Create Profile/Distribute Shares), title/subtitle, Keyset Name helper text, nsec section with Generate, threshold/total steppers, dynamic help line, and Create Keyset CTA"
+        },
+        {
+          "action": "Capture screenshot and inspect rendered text",
+          "expected": "Paper-matching text visible on page",
+          "observed": "Rendered text includes: 'Define the group profile for a new keyset...', 'A friendly name for this keyset's group profile. Visible to all peers in the keyset.', and 'Any 2 of 3 shares can sign — min threshold is 2, min shares is 3'"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/create-form-validation/VAL-CRT-001-create-keyset.png"
+        ],
+        "urls": [
+          "http://127.0.0.1:5173/demo/create-keyset"
+        ],
+        "consoleErrors": "none (agent-browser errors --json => [])",
+        "network": "No API calls involved for this assertion; endpoint health checks returned 200 for /demo/create-keyset and static asset /src/assets/igloo-logo.png"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CRT-002",
+      "title": "Create Keyset stepper variant matches canonical labels",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect stepper labels on /demo/create-keyset",
+          "expected": "Labels are exactly 'Create', 'Create Profile', 'Distribute Shares' with step 1 active",
+          "observed": "Stepper labels match exactly and step 1 is active/blue while steps 2 and 3 are inactive"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/create-form-validation/VAL-CRT-002-stepper-labels.png"
+        ],
+        "urls": [
+          "http://127.0.0.1:5173/demo/create-keyset"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CRT-003",
+      "title": "Create Keyset — Keyset Name field details",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect Keyset Name field and helper text",
+          "expected": "Leading pencil icon and full helper text with 'Visible to all peers in the keyset.'",
+          "observed": "Helper text exactly matches expected copy; screenshot confirms iconized input styling and full helper line"
+        },
+        {
+          "action": "Read input placeholder",
+          "expected": "Create-style example placeholder is present",
+          "observed": "Placeholder is 'e.g. My Signing Key, Work Key...'"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/create-form-validation/VAL-CRT-003-keyset-name-field.png"
+        ],
+        "urls": [
+          "http://127.0.0.1:5173/demo/create-keyset"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CRT-004",
+      "title": "Create Keyset — dynamic threshold/shares help line",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect helper line under Threshold/Total Shares",
+          "expected": "Dynamic line reads 'Any {threshold} of {count} shares can sign — min threshold is 2, min shares is 3'",
+          "observed": "Line shown as 'Any 2 of 3 shares can sign — min threshold is 2, min shares is 3'"
+        },
+        {
+          "action": "Check surrounding inline copy",
+          "expected": "No extra static minimum explanation inline",
+          "observed": "Only the dynamic line appears inline beneath steppers"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/create-form-validation/VAL-CRT-004-dynamic-help.png"
+        ],
+        "urls": [
+          "http://127.0.0.1:5173/demo/create-keyset"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CRT-005",
+      "title": "Create Keyset NumberSteppers increment/decrement",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Click Total Shares '+'",
+          "expected": "Total Shares increments and helper line updates live",
+          "observed": "Total Shares changed 3 -> 4 and helper line changed to 'Any 2 of 4 shares can sign — min threshold is 2, min shares is 3'"
+        },
+        {
+          "action": "Click Total Shares '-' and Threshold '+/-'",
+          "expected": "Values decrement/increment with clamping (Total Shares min 3; Threshold min 2; Threshold max Total Shares)",
+          "observed": "Total Shares returned to 3; Threshold changed 2 -> 3; Threshold '+' became disabled at max (3 of 3); Threshold '-' returned to 2 and became disabled at min; Total Shares '-' disabled at min 3"
+        },
+        {
+          "action": "Confirm no navigation while operating steppers",
+          "expected": "Remain on create screen",
+          "observed": "URL stayed at /demo/create-keyset"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/create-form-validation/VAL-CRT-005-stepper-increment.png",
+          "create-and-shared-create/create-form-validation/VAL-CRT-005-threshold-max.png",
+          "create-and-shared-create/create-form-validation/VAL-CRT-005-stepper-clamps.png"
+        ],
+        "urls": [
+          "http://127.0.0.1:5173/demo/create-keyset"
+        ],
+        "consoleErrors": "none",
+        "network": "No assertion-specific API requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CRT-006",
+      "title": "Create Keyset BackLink navigates to Welcome",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Click 'Back' on /demo/create-keyset",
+          "expected": "Navigate to /",
+          "observed": "URL changed to http://127.0.0.1:5173/"
+        },
+        {
+          "action": "Check runtime errors after navigation",
+          "expected": "No console/page errors",
+          "observed": "agent-browser errors --json returned []"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/create-form-validation/VAL-CRT-006-back-to-welcome.png"
+        ],
+        "urls": [
+          "http://127.0.0.1:5173/"
+        ],
+        "consoleErrors": "none (agent-browser errors --json => [])",
+        "network": "Endpoint health check returned 200 for /"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CRT-008",
+      "title": "Validation Error variant renders invalid-nsec content parity",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/create-validation-error",
+          "expected": "Create layout persists with invalid nsec state visible",
+          "observed": "Page shows Create layout with stepper, title, fields, dynamic help, and CTA still present"
+        },
+        {
+          "action": "Inspect nsec validation state",
+          "expected": "Input populated with 'not-a-valid-key' and red helper 'Invalid nsec format. Must be a valid Nostr private key.'",
+          "observed": "Input value is 'not-a-valid-key' and red helper text matches exactly"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/create-form-validation/VAL-CRT-008-validation-error.png"
+        ],
+        "urls": [
+          "http://127.0.0.1:5173/demo/create-validation-error"
+        ],
+        "consoleErrors": "none",
+        "network": "Endpoint health check returned 200 for /demo/create-validation-error"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CRT-009",
+      "title": "Validation Error stepper uses canonical create labels",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect stepper labels on validation-error variant",
+          "expected": "Stepper labels are 'Create', 'Create Profile', 'Distribute Shares'",
+          "observed": "Stepper labels match canonical create labels; no stale labels present"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/create-form-validation/VAL-CRT-009-validation-error-stepper.png"
+        ],
+        "urls": [
+          "http://127.0.0.1:5173/demo/create-validation-error"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "agent-browser network request log was sparse for SPA route transitions (primarily showing static asset requests), so URL and curl status checks were used as supplemental network evidence.",
+      "resolved": true,
+      "resolution": "Captured browser URL transitions/screenshots and verified relevant endpoints with curl (HTTP 200).",
+      "affectedAssertions": [
+        "VAL-CRT-001",
+        "VAL-CRT-005",
+        "VAL-CRT-006",
+        "VAL-CRT-008"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 8 assertions: 8 passed, 0 failed, 0 blocked."
+}

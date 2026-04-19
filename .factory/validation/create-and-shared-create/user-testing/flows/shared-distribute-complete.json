@@ -1,0 +1,219 @@
+{
+  "groupId": "shared-distribute-complete",
+  "testedAt": "2026-04-19T19:39:34Z",
+  "isolation": {
+    "milestone": "create-and-shared-create",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "appUrl": "http://127.0.0.1:5173",
+    "guidanceSection": "Flow Validator Guidance: browser-ui",
+    "browserSurface": "agent-browser session shr-dist-comp-78b31ed8",
+    "assignedAssertions": [
+      "VAL-SHR-006",
+      "VAL-SHR-007",
+      "VAL-SHR-008",
+      "VAL-SHR-009",
+      "VAL-SHR-010",
+      "VAL-SHR-011",
+      "VAL-SHR-012"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-SHR-006",
+      "title": "Shared Distribute Shares renders content parity",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/shared-distribute-shares",
+          "expected": "Shared Distribute screen renders with stepper state, subtitle, 3 share cards, and Continue CTA",
+          "observed": "Rendered top bar, stepper (1+2 complete, 3 active), subtitle copy, Share 1 saved pill, Share 2 not distributed with masked password/copy/QR, Share 3 locked placeholder and disabled copy/QR, and Continue to Completion CTA"
+        },
+        {
+          "action": "Check browser errors",
+          "expected": "No console/page errors",
+          "observed": "none"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/shared-distribute-complete/VAL-SHR-006-shared-distribute-content.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Client-side SPA surface; no API calls relevant to this assertion observed.",
+        "urls": [
+          "http://127.0.0.1:5173/demo/shared-distribute-shares"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SHR-007",
+      "title": "Shared Distribute Shares stepper highlights step 3",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect stepper on /demo/shared-distribute-shares",
+          "expected": "Step 3 Distribute Shares active (blue ring/numeral/label) while steps 1 and 2 are green complete",
+          "observed": "Stepper shows step 1 and step 2 completed with green checks and step 3 highlighted as active"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/shared-distribute-complete/VAL-SHR-007-stepper-active-step3.png"
+        ],
+        "consoleErrors": "none",
+        "network": "N/A",
+        "urls": [
+          "http://127.0.0.1:5173/demo/shared-distribute-shares"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SHR-008",
+      "title": "Shared Distribute Shares locked share gate",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Inspect Share 3 and Share 2 rows on /demo/shared-distribute-shares",
+          "expected": "Share 3 shows dashed placeholder and Copy/QR disabled at 0.4 opacity; Share 2 shows masked password and enabled Copy/QR",
+          "observed": "Share 3 shows dashed 'Enter password to unlock' and disabled Copy/QR; Share 2 shows masked password and enabled Copy/QR. Computed opacity for disabled Copy/QR measured 0.45, not 0.4."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/shared-distribute-complete/VAL-SHR-008-locked-share-gate.png"
+        ],
+        "consoleErrors": "none",
+        "network": "N/A",
+        "urls": [
+          "http://127.0.0.1:5173/demo/shared-distribute-shares"
+        ]
+      },
+      "issues": "Disabled Copy/QR controls on Share 3 are dimmed but computed opacity is 0.45 rather than the assertion's specified 0.4."
+    },
+    {
+      "id": "VAL-SHR-009",
+      "title": "Shared Distribute Shares Continue advances to Completion",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Click Continue to Completion on /demo/shared-distribute-shares",
+          "expected": "Navigate to /create/complete",
+          "observed": "Navigated to http://127.0.0.1:5173/create/complete"
+        },
+        {
+          "action": "Check browser errors after navigation",
+          "expected": "No console/page errors",
+          "observed": "none"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "Route transition handled in SPA; no failing requests observed.",
+        "urls": [
+          "http://127.0.0.1:5173/demo/shared-distribute-shares -> http://127.0.0.1:5173/create/complete"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SHR-010",
+      "title": "Distribution Completion renders content parity",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/shared-distribution-completion",
+          "expected": "Render distribution completion copy, status rows/chips, success panel, and Finish Distribution CTA",
+          "observed": "Rendered title/subtitle, distribution status rows for Member #1 and Member #2 with chips (Copied/QR shown), success panel 'All packages distributed', and Finish Distribution CTA"
+        },
+        {
+          "action": "Check browser errors",
+          "expected": "No console/page errors",
+          "observed": "none"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/shared-distribute-complete/VAL-SHR-010-distribution-completion-content.png"
+        ],
+        "consoleErrors": "none",
+        "network": "SPA asset/document GETs only; no failing requests observed.",
+        "urls": [
+          "http://127.0.0.1:5173/demo/shared-distribution-completion"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SHR-011",
+      "title": "Distribution Completion exits shared flow to dashboard",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Click Finish Distribution on /demo/shared-distribution-completion",
+          "expected": "Navigate to /dashboard/{profileId}",
+          "observed": "Navigated to http://127.0.0.1:5173/ (welcome), not a /dashboard/{profileId} route"
+        },
+        {
+          "action": "Check browser errors after navigation",
+          "expected": "No console/page errors",
+          "observed": "none"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/shared-distribute-complete/VAL-SHR-011-finish-distribution-redirect.png"
+        ],
+        "consoleErrors": "none",
+        "network": "SPA route transition; no error requests observed.",
+        "urls": [
+          "http://127.0.0.1:5173/demo/shared-distribution-completion -> http://127.0.0.1:5173/"
+        ]
+      },
+      "issues": "Finish Distribution does not land on /dashboard/{profileId}; it returns to welcome '/'."
+    },
+    {
+      "id": "VAL-SHR-012",
+      "title": "Confirm Password gate on Continue CTA",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/shared-create-profile and inspect CTA state",
+          "expected": "With matching preset passwords, Continue to Distribute Shares is enabled",
+          "observed": "CTA is enabled in preset state"
+        },
+        {
+          "action": "Clear Confirm Password field",
+          "expected": "Continue CTA becomes disabled (visual disabled state)",
+          "observed": "CTA becomes disabled when Confirm Password is cleared"
+        },
+        {
+          "action": "Set mismatched Confirm Password",
+          "expected": "Continue CTA remains disabled",
+          "observed": "CTA remains disabled with mismatched confirm password"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/shared-distribute-complete/VAL-SHR-012-cta-enabled-matching-passwords.png",
+          "create-and-shared-create/shared-distribute-complete/VAL-SHR-012-cta-disabled-cleared-confirm.png",
+          "create-and-shared-create/shared-distribute-complete/VAL-SHR-012-cta-disabled-mismatched-passwords.png"
+        ],
+        "consoleErrors": "none",
+        "network": "N/A",
+        "urls": [
+          "http://127.0.0.1:5173/demo/shared-create-profile"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 7 assertions: 5 passed, 2 failed, 0 blocked (fails: VAL-SHR-008, VAL-SHR-011)."
+}
