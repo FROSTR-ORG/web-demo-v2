@@ -49,7 +49,14 @@ function validateBackupString(value: string, options: { includeCreatedSuffix?: b
     return { valid: false, message: "" };
   }
   if (value.trim().startsWith("bfprofile1")) {
-    const base = `Valid backup — Group: ${MOCK_REVIEW_DATA.groupName} (${MOCK_REVIEW_DATA.threshold}) · Share ${MOCK_REVIEW_DATA.shareKey}`;
+    /*
+     * Validator copy uses Paper's compact format (`2/3`, `Share #1`) — this
+     * must stay in sync with VAL-IMP-001 / VAL-IMP-002 exactly. The Review
+     * screen's Group / Device Profile cards (VAL-IMP-003) intentionally use
+     * the expanded format (`2 of 3`, `#1 (Index 1)`), so we keep those
+     * strings on `MOCK_REVIEW_DATA` and hardcode the validator format here.
+     */
+    const base = `Valid backup — Group: ${MOCK_REVIEW_DATA.groupName} (2/3) · Share #1`;
     return {
       valid: true,
       message: options.includeCreatedSuffix ? `${base} · Created ${MOCK_REVIEW_DATA.backupCreated}` : base
@@ -79,7 +86,7 @@ export function LoadBackupScreen() {
   return (
     <AppShell mainVariant="flow">
       <div className="screen-column">
-        <BackLink onClick={() => navigate("/")} />
+        <BackLink onClick={() => navigate("/")} label="Back to Welcome" />
         <PageHeading
           title="Load Backup"
           copy="Load a bfprofile1 device profile backup from text or file to continue."
@@ -378,14 +385,26 @@ export function ImportErrorScreen() {
         </div>
 
         <div className="inline-actions">
-          {corrupted ? null : (
-            <Button type="button" onClick={() => navigate("/import/decrypt", { state: { backupString } })}>
-              Try Again
+          {corrupted ? (
+            /*
+             * VAL-IMP-005 — corrupted variant renders a single primary
+             * 'Back to Import' CTA (solid blue), not a secondary/ghost
+             * button. The amber wrong-password variant keeps Try Again as
+             * primary and Back to Import as ghost (VAL-IMP-004).
+             */
+            <Button type="button" onClick={() => navigate("/import")}>
+              Back to Import
             </Button>
+          ) : (
+            <>
+              <Button type="button" onClick={() => navigate("/import/decrypt", { state: { backupString } })}>
+                Try Again
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => navigate("/import")}>
+                Back to Import
+              </Button>
+            </>
           )}
-          <Button type="button" variant="ghost" onClick={() => navigate("/import")}>
-            Back to Import
-          </Button>
         </div>
       </div>
     </AppShell>

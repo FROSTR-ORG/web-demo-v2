@@ -68,7 +68,8 @@ describe("LoadBackupScreen", () => {
     expect(screen.getByPlaceholderText("bfprofile1...")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Upload Backup File/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Continue/i })).toBeInTheDocument();
-    expect(screen.getByText("Back")).toBeInTheDocument();
+    /* VAL-IMP-001: Load Backup uses 'Back to Welcome' label (not default 'Back'). */
+    expect(screen.getByRole("button", { name: "Back to Welcome" })).toBeInTheDocument();
   });
 
   it("Continue CTA is disabled until a valid bfprofile1 backup is entered (VAL-IMP-001)", () => {
@@ -85,7 +86,7 @@ describe("LoadBackupScreen", () => {
     expect(continueBtn).not.toBeDisabled();
   });
 
-  it("shows validation feedback for valid bfprofile1 input", () => {
+  it("shows validation feedback for valid bfprofile1 input (VAL-IMP-001 canonical copy)", () => {
     render(
       <MemoryRouter>
         <LoadBackupScreen />
@@ -93,7 +94,19 @@ describe("LoadBackupScreen", () => {
     );
     const textarea = screen.getByPlaceholderText("bfprofile1...");
     fireEvent.change(textarea, { target: { value: "bfprofile1abc123" } });
-    expect(screen.getByText(/Valid backup/)).toBeInTheDocument();
+    const validator = screen.getByText(/Valid backup/);
+    /*
+     * VAL-IMP-001 requires the compact Paper format here:
+     *   "Valid backup — Group: My Signing Key (2/3) · Share #1"
+     * Not "2 of 3" and not "Share #1 (Index 1)" — those belong only on
+     * the Review & Save Profile cards (VAL-IMP-003).
+     */
+    expect(validator.textContent).toBe(
+      "Valid backup — Group: My Signing Key (2/3) · Share #1"
+    );
+    expect(validator.textContent).not.toContain("2 of 3");
+    expect(validator.textContent).not.toContain("(Index 1)");
+    expect(validator.textContent).not.toContain("· Created");
   });
 
   it("shows error feedback for invalid input", () => {
@@ -123,7 +136,7 @@ describe("DecryptBackupScreen", () => {
     expect(screen.getByText("Back")).toBeInTheDocument();
   });
 
-  it("shows 'Created Mar 8, 2026' suffix in the backup validator (VAL-IMP-002)", () => {
+  it("shows canonical decrypt-validator copy including 'Created Mar 8, 2026' suffix (VAL-IMP-002)", () => {
     mocks.locationState = { backupString: "bfprofile1qvz8k2afcqqszq2v5v5hn" };
     render(
       <MemoryRouter>
@@ -131,9 +144,15 @@ describe("DecryptBackupScreen", () => {
       </MemoryRouter>
     );
     const validator = screen.getByText(/Valid backup/);
-    expect(validator.textContent).toContain("· Created Mar 8, 2026");
-    expect(validator.textContent).toContain("My Signing Key (2 of 3)");
-    expect(validator.textContent).toContain("Share #1 (Index 1)");
+    /*
+     * VAL-IMP-002 requires the exact string:
+     *   "Valid backup — Group: My Signing Key (2/3) · Share #1 · Created Mar 8, 2026"
+     */
+    expect(validator.textContent).toBe(
+      "Valid backup — Group: My Signing Key (2/3) · Share #1 · Created Mar 8, 2026"
+    );
+    expect(validator.textContent).not.toContain("2 of 3");
+    expect(validator.textContent).not.toContain("(Index 1)");
   });
 
   it("Decrypt CTA is disabled until the password field has input (VAL-IMP-002)", () => {
@@ -246,7 +265,7 @@ describe("ReviewSaveScreen", () => {
 });
 
 describe("ImportErrorScreen", () => {
-  it("renders amber wrong-password variant with Try Again + Back to Import (VAL-IMP-004)", () => {
+  it("renders amber wrong-password variant with primary Try Again + ghost Back to Import (VAL-IMP-004)", () => {
     render(
       <MemoryRouter>
         <ImportErrorScreen />
@@ -254,8 +273,13 @@ describe("ImportErrorScreen", () => {
     );
     expect(screen.getByText("Import Error")).toBeInTheDocument();
     expect(screen.getByText("Incorrect Password")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Try Again/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Back to Import/i })).toBeInTheDocument();
+    const tryAgain = screen.getByRole("button", { name: /Try Again/i });
+    const backToImport = screen.getByRole("button", { name: /Back to Import/i });
+    expect(tryAgain).toBeInTheDocument();
+    expect(backToImport).toBeInTheDocument();
+    /* Amber variant: Try Again is primary, Back to Import is secondary/ghost. */
+    expect(tryAgain).toHaveClass("button-primary");
+    expect(backToImport).toHaveClass("button-ghost");
     expect(screen.getByText("Back")).toBeInTheDocument();
 
     const alert = screen.getByText("Incorrect Password").closest(".import-error-alert");
@@ -265,7 +289,7 @@ describe("ImportErrorScreen", () => {
     expect(alert?.className).not.toContain("red");
   });
 
-  it("renders red corrupted variant with only Back to Import (VAL-IMP-005)", () => {
+  it("renders red corrupted variant with a single primary Back to Import CTA (VAL-IMP-005)", () => {
     mocks.locationState = { demoUi: { import: { errorVariant: "corrupted" } } };
     render(
       <MemoryRouter>
@@ -275,7 +299,14 @@ describe("ImportErrorScreen", () => {
     expect(screen.getByText("Backup Corrupted")).toBeInTheDocument();
     expect(screen.getByText(/could not be parsed/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Try Again/i })).toBeNull();
-    expect(screen.getByRole("button", { name: /Back to Import/i })).toBeInTheDocument();
+    const backToImport = screen.getByRole("button", { name: /Back to Import/i });
+    expect(backToImport).toBeInTheDocument();
+    /*
+     * VAL-IMP-005 requires the single CTA to render as the solid-blue
+     * primary button (`button-primary`), not a secondary/ghost.
+     */
+    expect(backToImport).toHaveClass("button-primary");
+    expect(backToImport).not.toHaveClass("button-ghost");
 
     const alert = screen.getByText("Backup Corrupted").closest(".import-error-alert");
     expect(alert).not.toBeNull();
