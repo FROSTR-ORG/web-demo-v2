@@ -40,11 +40,12 @@ export const MOCK_EVENT_LOG_ROWS: Array<[string, string, string]> = [
   ["2:31:45p", "Echo", "Echo published — announced presence on 2 relays"],
 ];
 
-// Mock pending approvals rows shown under the Running state
+// Mock pending approvals rows shown under the Running state.
+// Copy and TTLs quoted directly from Paper `dashboard/1-signer-dashboard/screen.html` (VAL-DSH-003).
 export const MOCK_PENDING_APPROVAL_ROWS: Array<[string, string, string, string, string]> = [
   ["SIGN", "Peer #2", "029c4a...1f5e", "kind:1 Short Text Note", "42s"],
-  ["ECDH", "Peer #1", "02d7e1...3b9e", "nip44_encrypt request", "1m"],
-  ["SIGN", "Peer #0", "02a3f8...8f2c", "kind:9735 Zap Receipt", "2m"],
+  ["ECDH", "Peer #1", "02d7e1...3b9e", "NIP-44 key exchange", "1m 12s"],
+  ["SIGN", "Peer #0", "02a3f8...8f2c", "kind:4 Encrypted DM", "3m 05s"],
 ];
 
 // Mock encrypted backup string shown in the Export Complete modal

@@ -405,6 +405,9 @@ a {
   line-height: 18px;
   font-weight: 500;
 }
+.button-header.button-header-active {
+  color: #93c5fd;
+}
 
 .icon-tile {
   width: 40px;

@@ -12,7 +12,6 @@ export function RunningState({
   pendingOperations,
   paperPanels,
   onStop,
-  onLock,
   onRefresh,
 }: {
   relays: string[];
@@ -22,7 +21,6 @@ export function RunningState({
   pendingOperations: unknown[];
   paperPanels: boolean;
   onStop: () => void;
-  onLock: () => void;
   onRefresh: () => void;
 }) {
   return (
@@ -39,9 +37,6 @@ export function RunningState({
           <div className="inline-actions">
             <Button type="button" variant="danger" onClick={onStop}>
               Stop Signer
-            </Button>
-            <Button type="button" variant="ghost" onClick={onLock}>
-              Lock
             </Button>
           </div>
         </div>

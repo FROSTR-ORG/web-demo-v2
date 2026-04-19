@@ -63,8 +63,14 @@ export function DashboardScreen() {
             <Download size={14} />
             Export
           </Button>
-          <Button type="button" variant="header" onClick={() => setShowPolicies((v) => !v)}>
-            <SlidersHorizontal size={14} />
+          <Button
+            type="button"
+            variant="header"
+            className={showPolicies ? "button-header-active" : undefined}
+            aria-pressed={showPolicies}
+            onClick={() => setShowPolicies((v) => !v)}
+          >
+            <SlidersHorizontal size={14} color={showPolicies ? "#93C5FD" : undefined} />
             Policies
           </Button>
         </>
@@ -106,7 +112,6 @@ export function DashboardScreen() {
                 pendingOperations={runtimeStatus.pending_operations}
                 paperPanels={paperPanels}
                 onStop={() => setMockState("stopped")}
-                onLock={handleLock}
                 onRefresh={refreshRuntime}
               />
             )}
