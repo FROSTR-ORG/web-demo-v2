@@ -19,6 +19,12 @@ import {
   RotateDistributeSharesScreen,
   RotateDistributionCompleteScreen
 } from "../screens/RotateKeysetScreens";
+import {
+  EnterRotatePackageScreen,
+  ApplyingShareUpdateScreen,
+  ShareUpdateFailedScreen,
+  LocalShareUpdatedScreen
+} from "../screens/RotateShareScreens";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
 
 export function App() {
@@ -47,6 +53,10 @@ export function App() {
       <Route path="/rotate-keyset/profile" element={<RotateCreateProfileScreen />} />
       <Route path="/rotate-keyset/distribute" element={<RotateDistributeSharesScreen />} />
       <Route path="/rotate-keyset/complete" element={<RotateDistributionCompleteScreen />} />
+      <Route path="/rotate-share" element={<EnterRotatePackageScreen />} />
+      <Route path="/rotate-share/applying" element={<ApplyingShareUpdateScreen />} />
+      <Route path="/rotate-share/failed" element={<ShareUpdateFailedScreen />} />
+      <Route path="/rotate-share/updated" element={<LocalShareUpdatedScreen />} />
       <Route path="/recover/:profileId" element={<CollectSharesScreen />} />
       <Route path="/recover/:profileId/success" element={<RecoverSuccessScreen />} />
       <Route path="/dashboard/:profileId" element={<DashboardScreen />} />
