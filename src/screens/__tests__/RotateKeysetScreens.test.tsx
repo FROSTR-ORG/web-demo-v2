@@ -16,7 +16,8 @@ import {
 /* ---------- Mocks ---------- */
 
 const mocks = vi.hoisted(() => ({
-  navigate: vi.fn()
+  navigate: vi.fn(),
+  activeProfile: null as { id: string } | null
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -27,12 +28,19 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
+vi.mock("../../app/AppState", () => ({
+  useAppState: () => ({
+    activeProfile: mocks.activeProfile
+  })
+}));
+
 afterEach(() => {
   cleanup();
 });
 
 beforeEach(() => {
   mocks.navigate.mockClear();
+  mocks.activeProfile = null;
 });
 
 /* ==========================================================
@@ -527,7 +535,19 @@ describe("RotateDistributionCompleteScreen", () => {
     expect(screen.getByText("All packages distributed")).toBeInTheDocument();
   });
 
-  it("Finish Distribution button navigates to /", () => {
+  it("Finish Distribution button navigates to /dashboard/{profileId} when active profile exists", () => {
+    mocks.activeProfile = { id: "test-profile-123" };
+    render(
+      <MemoryRouter>
+        <RotateDistributionCompleteScreen />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByText("Finish Distribution"));
+    expect(mocks.navigate).toHaveBeenCalledWith("/dashboard/test-profile-123");
+  });
+
+  it("Finish Distribution button navigates to / as fallback when no active profile", () => {
+    mocks.activeProfile = null;
     render(
       <MemoryRouter>
         <RotateDistributionCompleteScreen />

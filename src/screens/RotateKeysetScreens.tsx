@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Check, Info, Lock, X } from "lucide-react";
+import { useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
 import {
   BackLink,
@@ -759,6 +760,7 @@ export function RotateDistributeSharesScreen() {
 
 export function RotateDistributionCompleteScreen() {
   const navigate = useNavigate();
+  const { activeProfile } = useAppState();
   const [pkgStates] = useState(
     MOCK_REMOTE_PACKAGES.map((p) => ({ ...p, copied: true, qrShown: false }))
   );
@@ -766,6 +768,14 @@ export function RotateDistributionCompleteScreen() {
   const accounted = pkgStates.filter((p) => p.copied || p.qrShown).length;
   const total = pkgStates.length;
   const complete = accounted === total;
+
+  const handleFinish = () => {
+    if (activeProfile) {
+      navigate(`/dashboard/${activeProfile.id}`);
+    } else {
+      navigate("/");
+    }
+  };
 
   return (
     <AppShell headerMeta={MOCK_SOURCE_SHARE_1.label} mainVariant="flow">
@@ -811,7 +821,7 @@ export function RotateDistributionCompleteScreen() {
           </span>
         </div>
 
-        <Button type="button" size="full" onClick={() => navigate("/")}>
+        <Button type="button" size="full" onClick={handleFinish}>
           Finish Distribution
         </Button>
       </section>

@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, Check, Info, QrCode } from "lucide-react";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField } from "../components/ui";
+import { useAppState } from "../app/AppState";
 
 /* ---------- Mock data ---------- */
 
@@ -333,6 +334,16 @@ function LocalShareUpdatedContent({
 }: {
   navigate: ReturnType<typeof useNavigate>;
 }) {
+  const { activeProfile } = useAppState();
+
+  const handleReturnToSigner = () => {
+    if (activeProfile) {
+      navigate(`/dashboard/${activeProfile.id}`);
+    } else {
+      navigate("/");
+    }
+  };
+
   return (
     <AppShell mainVariant="flow" headerMeta={MOCK_KEYSET_NAME}>
       <div className="screen-column">
@@ -401,7 +412,7 @@ function LocalShareUpdatedContent({
           </div>
         </div>
 
-        <Button type="button" size="full" onClick={() => navigate("/")}>
+        <Button type="button" size="full" onClick={handleReturnToSigner}>
           Return to Signer
         </Button>
       </div>

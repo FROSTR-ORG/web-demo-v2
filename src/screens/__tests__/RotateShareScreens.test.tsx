@@ -10,7 +10,8 @@ import {
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
-  locationState: null as Record<string, unknown> | null
+  locationState: null as Record<string, unknown> | null,
+  activeProfile: null as { id: string } | null
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -28,6 +29,12 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
+vi.mock("../../app/AppState", () => ({
+  useAppState: () => ({
+    activeProfile: mocks.activeProfile
+  })
+}));
+
 afterEach(() => {
   cleanup();
 });
@@ -35,6 +42,7 @@ afterEach(() => {
 beforeEach(() => {
   mocks.navigate.mockClear();
   mocks.locationState = null;
+  mocks.activeProfile = null;
 });
 
 /* ==========================================================
@@ -328,8 +336,21 @@ describe("LocalShareUpdatedScreen", () => {
     expect(screen.getByRole("button", { name: /Return to Signer/i })).toBeInTheDocument();
   });
 
-  it("Return to Signer navigates to home", () => {
+  it("Return to Signer navigates to /dashboard/{profileId} when active profile exists", () => {
     mocks.locationState = { fromApplying: true };
+    mocks.activeProfile = { id: "test-profile-456" };
+    render(
+      <MemoryRouter>
+        <LocalShareUpdatedScreen />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Return to Signer/i }));
+    expect(mocks.navigate).toHaveBeenCalledWith("/dashboard/test-profile-456");
+  });
+
+  it("Return to Signer navigates to / as fallback when no active profile", () => {
+    mocks.locationState = { fromApplying: true };
+    mocks.activeProfile = null;
     render(
       <MemoryRouter>
         <LocalShareUpdatedScreen />
