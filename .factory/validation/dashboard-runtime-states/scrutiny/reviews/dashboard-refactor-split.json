@@ -1,0 +1,39 @@
+{
+  "featureId": "dashboard-refactor-split",
+  "reviewedAt": "2026-04-19T23:49:53Z",
+  "commitId": "b0a1059",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The module split and file-size constraints were achieved, but the change set is not a pure behavior-preserving refactor and the added regression tests do not fully enforce the stated parity requirements.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen/states/PoliciesState.tsx",
+        "line": 58,
+        "severity": "blocking",
+        "description": "The refactor changes visible policy-row key copy by switching to hardcoded `displayId` values (from `mocks.ts`) instead of preserving the pre-refactor render path (`shortHex(peer.pubkey, 6, 4)` in the prior monolith). This breaks the feature's stated \"no visible behavior change\" expectation."
+      },
+      {
+        "file": "src/screens/__tests__/DashboardRefactor.test.tsx",
+        "line": 152,
+        "severity": "blocking",
+        "description": "The VAL-DSH-002 regression test explicitly allows Lock alongside Stop and only checks presence of `Stop Signer`; it does not assert CTA exclusivity. The same test file also omits exact VAL-DSH-003 row-copy/TTL assertions, so required parity checks are incomplete."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The `ui-builder` skill's tests-first guidance is underspecified for pure refactor/split features, which led to implementation-first churn and late regression-test tightening.",
+      "evidence": "Transcript skeleton for workerSessionId 39ca7784-c51e-4ee9-b436-4a2cf3fc953d shows large file creation/split work before DashboardRefactor.test.tsx was added and iteratively fixed; handoff.skillFeedback also suggests clarifying this procedure."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Planning artifacts for this feature are ambiguous: feature text says preserve exact behavior, while milestone contract assertions emphasize specific post-refactor audit details/copy. This creates avoidable scope ambiguity for workers.",
+      "evidence": "features.json (`dashboard-refactor-split` expectedBehavior: identical headings/CTAs/body copy before vs after) versus validation-contract.md VAL-DSH-101 audit-detail requirements."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "I reviewed feature metadata, handoff, transcript skeleton, and commit b0a1059. Structure/organization goals were met, but there are blocking parity and test-spec gaps, so this review is marked fail."
+}

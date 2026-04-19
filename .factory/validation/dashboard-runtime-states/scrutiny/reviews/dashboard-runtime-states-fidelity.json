@@ -1,0 +1,21 @@
+{
+  "featureId": "dashboard-runtime-states-fidelity",
+  "reviewedAt": "2026-04-19T23:47:47Z",
+  "commitId": "f0f872099e7313aa00536e914893794cfb7e98b2",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Reviewed the feature handoff, transcript skeleton, and commit diff. The implementation cleanly addresses the targeted fidelity gaps: removed inline Lock CTA from Running state, corrected Pending Approvals subject/TTL copy, added active Policies header affordance, and added focused regression tests for VAL-DSH-002/003/006/019/020 and related runtime states. No actionable code defects were identified in the changed files.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "knowledge",
+      "observation": "Feature metadata has a wording drift for relays-offline behavior: expectedBehavior calls for \"Some relays are offline\" plus an affected-relay list, but the validation contract and Paper-aligned implementation assert the \"All Relays Offline\" degraded-readiness state.",
+      "evidence": "features.json:1270 vs validation-contract.md:470-472; implementation copy in src/screens/DashboardScreen/states/RelaysOfflineState.tsx:44"
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Pass. The reviewed commit implements the intended dashboard runtime-state fidelity fixes and adds durable tests; no blocking or non-blocking defects were found in scope."
+}

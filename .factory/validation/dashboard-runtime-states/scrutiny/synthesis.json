@@ -1,0 +1,59 @@
+{
+  "milestone": "dashboard-runtime-states",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx vitest run --config vitest.config.ts --maxWorkers=4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx tsc -b",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 2,
+    "passed": 1,
+    "failed": 1,
+    "failedFeatures": [
+      "dashboard-refactor-split"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "dashboard-refactor-split",
+      "severity": "blocking",
+      "description": "PoliciesState switched to hardcoded displayId copy instead of preserving pre-refactor peer pubkey rendering path, violating the feature's no-visible-behavior-change requirement."
+    },
+    {
+      "featureId": "dashboard-refactor-split",
+      "severity": "blocking",
+      "description": "DashboardRefactor.test.tsx allows Lock alongside Stop and does not enforce CTA exclusivity or exact pending-approvals row/TTL parity, leaving VAL-DSH-002/003 coverage incomplete."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "skills",
+      "suggestion": "Clarify ui-builder procedure for refactor-only features: require writing/strengthening parity tests before or alongside structural splits so no-behavior-change constraints are enforced early.",
+      "evidence": "Review dashboard-refactor-split found implementation-first refactor churn and late test tightening; review report highlighted insufficient early parity assertions.",
+      "isSystemic": true
+    },
+    {
+      "target": "planning",
+      "suggestion": "Align milestone feature expectedBehavior text with validation-contract copy requirements to avoid ambiguity about what must remain unchanged after refactors.",
+      "evidence": "Reviews flagged mismatch between strict behavior-preservation wording and contract-level audit detail expectations, plus relays-offline wording drift between features.json and validation-contract.md.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [],
+  "previousRound": null
+}
