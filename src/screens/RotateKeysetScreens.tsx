@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Check, Info, Lock, X } from "lucide-react";
 import { useAppState } from "../app/AppState";
+import { shortHex } from "../lib/bifrost/format";
 import { AppShell, PageHeading } from "../components/shell";
 import {
   BackLink,
@@ -23,7 +24,7 @@ import {
 const MOCK_SOURCE_SHARE_1 = {
   label: "My Signing Key",
   deviceName: "Igloo Web",
-  sharePubkey: "02a3f8...8f2c",
+  sharePubkey: "02a3f8d4e1b7c9054f6a2e83d7b1094c5e8f3a6d2b7e4c19085f6d3a2b8e4f2c",
   profileId: "prof_8f2c4a",
   relays: 3
 };
@@ -73,7 +74,7 @@ export function RotateKeysetFormScreen() {
             </div>
             <div className="source-share-detail-row">
               <span className="source-share-detail-key">Share Public Key</span>
-              <span className="source-share-detail-val">{MOCK_SOURCE_SHARE_1.sharePubkey}</span>
+              <span className="source-share-detail-val">{shortHex(MOCK_SOURCE_SHARE_1.sharePubkey)}</span>
             </div>
             <div className="source-share-detail-row">
               <span className="source-share-detail-key">Profile ID</span>
