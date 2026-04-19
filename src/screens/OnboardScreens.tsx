@@ -4,6 +4,7 @@ import { AlertTriangle, Check, QrCode } from "lucide-react";
 import { useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField } from "../components/ui";
+import { useDemoUi } from "../demo/demoUi";
 import { saveProfile } from "../lib/storage/profileStore";
 import type { StoredProfileRecord } from "../lib/bifrost/types";
 
@@ -41,8 +42,9 @@ function validatePackageString(value: string): { valid: boolean; message: string
 
 export function EnterPackageScreen() {
   const navigate = useNavigate();
-  const [packageString, setPackageString] = useState("");
-  const [password, setPassword] = useState("");
+  const demoUi = useDemoUi();
+  const [packageString, setPackageString] = useState(demoUi.onboard?.packagePreset ?? "");
+  const [password, setPassword] = useState(demoUi.onboard?.passwordPreset ?? "");
   const validation = validatePackageString(packageString);
 
   function handleBeginOnboarding() {
@@ -132,14 +134,13 @@ function HandshakeContent({
   packageString: string;
   navigate: ReturnType<typeof useNavigate>;
 }) {
+  const demoUi = useDemoUi();
   const [steps, setSteps] = useState<TimelineStep[]>([
     { label: "Connected to relays", detail: "wss://relay.primal.net, wss://relay.damus.io", state: "done" },
     { label: "Found source device", detail: "02a3f8c2d1...8f2c", state: "done" },
     { label: "Receiving keyset data", state: "active" },
     { label: "Saving to device", state: "pending" }
   ]);
-
-  const [simulateFailure, setSimulateFailure] = useState(false);
 
   const advanceHandshake = useCallback(() => {
     setSteps((prev) => {
@@ -156,6 +157,10 @@ function HandshakeContent({
 
   /* Auto-advance handshake steps every 1.5s */
   useEffect(() => {
+    if (demoUi.progress?.frozen) {
+      return;
+    }
+
     const allDone = steps.every((s) => s.state === "done");
     const hasActive = steps.some((s) => s.state === "active");
 
@@ -167,22 +172,17 @@ function HandshakeContent({
       return () => window.clearTimeout(timer);
     }
 
-    if (simulateFailure && hasActive) {
-      const timer = window.setTimeout(() => {
-        navigate("/onboard/failed", { replace: true });
-      }, 1200);
-      return () => window.clearTimeout(timer);
-    }
-
     if (hasActive) {
       const timer = window.setTimeout(advanceHandshake, 1500);
       return () => window.clearTimeout(timer);
     }
-  }, [steps, simulateFailure, navigate, advanceHandshake]);
+  }, [steps, navigate, advanceHandshake, demoUi.progress?.frozen]);
 
-  const truncatedPackage = packageString.length > 14
-    ? `${packageString.slice(0, 11)}•••`
-    : packageString;
+  const truncatedPackage = demoUi.onboard?.packagePreset
+    ? "bfonboard1•••"
+    : packageString.length > 14
+      ? `${packageString.slice(0, 11)}•••`
+      : packageString;
 
   return (
     <AppShell mainVariant="flow">
@@ -227,16 +227,6 @@ function HandshakeContent({
           Cancel Onboarding
         </Button>
 
-        {/* Simulate failure toggle for testing */}
-        <button
-          type="button"
-          className="button button-chip button-sm"
-          style={{ alignSelf: "center", marginTop: "8px" }}
-          onClick={() => setSimulateFailure(true)}
-          data-testid="simulate-failure"
-        >
-          Simulate Failure
-        </button>
       </div>
     </AppShell>
   );
@@ -266,6 +256,8 @@ function TimelineDot({ state }: { state: HandshakeStep }) {
 
 export function OnboardingFailedScreen() {
   const navigate = useNavigate();
+  const demoUi = useDemoUi();
+  const rejected = demoUi.onboard?.failedVariant === "rejected";
 
   return (
     <AppShell mainVariant="flow">
@@ -280,9 +272,11 @@ export function OnboardingFailedScreen() {
             <AlertTriangle size={14} />
           </div>
           <div className="onboard-error-body">
-            <div className="onboard-error-title">Onboarding Timed Out</div>
+            <div className="onboard-error-title">{rejected ? "Onboarding Rejected" : "Onboarding Timed Out"}</div>
             <div className="onboard-error-description">
-              Onboarding peer did not respond within 30 seconds. They may be offline or unreachable.
+              {rejected
+                ? "Challenge verification failed. You may not have a valid share for this group."
+                : "Onboarding peer did not respond within 30 seconds. They may be offline or unreachable."}
             </div>
           </div>
         </div>
@@ -319,8 +313,10 @@ export function OnboardingCompleteScreen() {
 function OnboardingCompleteContent() {
   const navigate = useNavigate();
   const { reloadProfiles } = useAppState();
-  const [profilePassword, setProfilePassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const demoUi = useDemoUi();
+  const presetPassword = demoUi.onboard?.passwordPreset ?? "";
+  const [profilePassword, setProfilePassword] = useState(presetPassword);
+  const [confirmPassword, setConfirmPassword] = useState(presetPassword);
   const [saving, setSaving] = useState(false);
 
   const passwordsMatch = profilePassword.length > 0 && profilePassword === confirmPassword;
@@ -434,5 +430,3 @@ function OnboardingCompleteContent() {
     </AppShell>
   );
 }
-
-

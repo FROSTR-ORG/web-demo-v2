@@ -3,10 +3,12 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Button, Stepper } from "../components/ui";
+import { useDemoUi } from "../demo/demoUi";
 
 export function DistributionCompleteScreen() {
   const navigate = useNavigate();
   const { createSession, finishDistribution } = useAppState();
+  const demoUi = useDemoUi();
 
   if (!createSession?.createdProfileId) {
     return <Navigate to="/" replace />;
@@ -33,8 +35,13 @@ export function DistributionCompleteScreen() {
         <div className="completion-card">
           <div className="kicker">Distribution Status</div>
           <div className="completion-list">
-            {createSession.onboardingPackages.map((pkg) => {
+            {createSession.onboardingPackages.map((pkg, index) => {
               const distributed = pkg.copied || pkg.qrShown;
+              const paperRows = [
+                { title: "Member #1 - Igloo Mobile", device: "Existing Device", status: "Copied" },
+                { title: "Member #2 - Igloo Desktop", device: "New Device", status: "QR shown" }
+              ];
+              const paperRow = demoUi.shared?.completionPreset ? paperRows[index] : undefined;
               return (
                 <div className="completion-row" key={pkg.idx}>
                   <div className="completion-main">
@@ -42,13 +49,14 @@ export function DistributionCompleteScreen() {
                       <Check size={13} />
                     </span>
                     <span>
-                      <span className="value">Member #{pkg.idx + 1} - Igloo Device</span>
-                      <span className="help">New Device</span>
+                      <span className="value">{paperRow?.title ?? `Member #${pkg.idx + 1} - Igloo Device`}</span>
+                      <span className="help">{paperRow?.device ?? "New Device"}</span>
                     </span>
                   </div>
                   <div className="inline-actions">
-                    {pkg.copied ? <span className="completion-status-ok">Copied</span> : null}
-                    {pkg.qrShown ? <span className="completion-status-ok">QR shown</span> : null}
+                    {paperRow ? <span className="completion-status-ok">{paperRow.status}</span> : null}
+                    {!paperRow && pkg.copied ? <span className="completion-status-ok">Copied</span> : null}
+                    {!paperRow && pkg.qrShown ? <span className="completion-status-ok">QR shown</span> : null}
                     {!distributed ? <span className="help">Pending</span> : null}
                   </div>
                 </div>

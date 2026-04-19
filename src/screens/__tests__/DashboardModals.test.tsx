@@ -79,7 +79,14 @@ afterEach(cleanup);
 
 function renderDashboard() {
   return render(
-    <MemoryRouter initialEntries={["/dashboard/test-profile-id"]}>
+    <MemoryRouter
+      initialEntries={[
+        {
+          pathname: "/dashboard/test-profile-id",
+          state: { demoUi: { dashboard: { showMockControls: true } } },
+        },
+      ]}
+    >
       <Routes>
         <Route path="/dashboard/:profileId" element={<DashboardScreen />} />
       </Routes>
@@ -92,7 +99,7 @@ describe("DashboardScreen — Signer Policy Prompt Modal", () => {
     renderDashboard();
     const triggerBtn = screen.getByLabelText("Open Policy Prompt");
     fireEvent.click(triggerBtn);
-    expect(screen.getByText("Signer Policy")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
@@ -101,7 +108,7 @@ describe("DashboardScreen — Signer Policy Prompt Modal", () => {
     fireEvent.click(screen.getByLabelText("Open Policy Prompt"));
     const dialog = screen.getByRole("dialog");
     // Title
-    expect(screen.getByText("Signer Policy")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
     // Subtitle
     expect(screen.getByText("A peer is requesting permission to sign on your behalf")).toBeInTheDocument();
     // Request badge - use getAllByText since SIGN also appears in peer badges
@@ -244,9 +251,9 @@ describe("DashboardScreen — Modal triggers visible and working", () => {
     renderDashboard();
     // Open and close Policy Prompt
     fireEvent.click(screen.getByLabelText("Open Policy Prompt"));
-    expect(screen.getByText("Signer Policy")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
     fireEvent.click(screen.getByText("Deny"));
-    expect(screen.queryByText("Signer Policy")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Signer Policy" })).not.toBeInTheDocument();
     // Open and close Signing Failed
     fireEvent.click(screen.getByLabelText("Open Signing Failed"));
     // Modal title heading appears

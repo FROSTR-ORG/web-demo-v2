@@ -4,19 +4,24 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAppState } from "../app/AppState";
 import { AppShell } from "../components/shell";
 import { Button } from "../components/ui";
+import { PAPER_MASKED_NSEC, PAPER_RECOVERED_NSEC } from "../demo/fixtures";
+import { useDemoUi } from "../demo/demoUi";
 
 /* ============================
    Mock data for demo
    ============================ */
 
 const MOCK_LOCAL_SHARE = "a3f8c2d1e4b7f9a0c3d2e1b6f8a7c4d2e1b9f3a4c5d6e7f8a9b0c1d2e3f4a5";
-const MOCK_RECOVERED_NSEC = "nsec1qqqqqzpwk6m3ags7frv0j8dkwmxcf0klhfja3yd4rqlzgn64c4hq7y4ms9";
+const MOCK_RECOVERED_NSEC = PAPER_RECOVERED_NSEC;
 
 function maskShare(hex: string): string {
   return hex.slice(0, 12) + "•".repeat(45);
 }
 
 function maskNsec(nsec: string): string {
+  if (nsec === PAPER_RECOVERED_NSEC) {
+    return PAPER_MASKED_NSEC;
+  }
   return nsec.slice(0, 8) + "•".repeat(42) + "...";
 }
 
@@ -40,7 +45,9 @@ export function CollectSharesScreen() {
   const { profileId } = useParams();
   const navigate = useNavigate();
   const { activeProfile } = useAppState();
-  const [pastedShare, setPastedShare] = useState("");
+  const demoUi = useDemoUi();
+  const incompatible = demoUi.recover?.variant === "incompatible-shares";
+  const [pastedShare, setPastedShare] = useState(incompatible ? MOCK_LOCAL_SHARE : "");
 
   if (!profileId || !activeProfile || activeProfile.id !== profileId) {
     return <Navigate to="/" replace />;
@@ -50,7 +57,7 @@ export function CollectSharesScreen() {
   const threshold = activeProfile.threshold;
   const totalShares = activeProfile.memberCount;
   const sharesLoaded = pasteValid ? 2 : 1;
-  const canRecover = sharesLoaded >= threshold;
+  const canRecover = sharesLoaded >= threshold && !incompatible;
 
   function handleRecover() {
     if (canRecover) {
@@ -134,6 +141,24 @@ export function CollectSharesScreen() {
         </Button>
 
         <div className="recover-divider" />
+
+        {incompatible ? (
+          <div className="recover-error-panel">
+            <div className="recover-error-icon">!</div>
+            <div className="recover-error-content">
+              <div className="recover-error-title">Incompatible Shares</div>
+              <div className="recover-error-copy">The provided shares belong to different keysets and cannot be combined.</div>
+              <div className="recover-error-share-row">
+                <span>Share 1:</span>
+                <strong>02a3f8c2d1e4...9k2m</strong>
+              </div>
+              <div className="recover-error-share-row">
+                <span>Share 2:</span>
+                <strong>03b7e1f9d2c8...4j8w</strong>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </AppShell>
   );
@@ -147,8 +172,9 @@ export function RecoverSuccessScreen() {
   const { profileId } = useParams();
   const navigate = useNavigate();
   const { activeProfile } = useAppState();
-  const [copied, setCopied] = useState(false);
-  const [revealed, setRevealed] = useState(false);
+  const demoUi = useDemoUi();
+  const [copied, setCopied] = useState(Boolean(demoUi.recover?.copied));
+  const [revealed, setRevealed] = useState(Boolean(demoUi.recover?.revealed));
   const [cleared, setCleared] = useState(false);
 
   if (!profileId || !activeProfile || activeProfile.id !== profileId) {

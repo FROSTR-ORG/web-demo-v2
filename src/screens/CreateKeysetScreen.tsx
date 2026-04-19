@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Button, NumberStepper, Stepper, TextField } from "../components/ui";
+import { useDemoUi } from "../demo/demoUi";
 
 function validateNsec(value: string): string {
   if (!value.trim()) return "";
@@ -15,12 +16,15 @@ function validateNsec(value: string): string {
 export function CreateKeysetScreen() {
   const navigate = useNavigate();
   const { createKeyset } = useAppState();
-  const [groupName, setGroupName] = useState("My Signing Key");
-  const [nsec, setNsec] = useState("");
+  const demoUi = useDemoUi();
+  const [groupName, setGroupName] = useState(demoUi.create?.keysetNamePreset ?? "My Signing Key");
+  const [nsec, setNsec] = useState(demoUi.create?.nsecPreset ?? (demoUi.create?.validationError ? "not-a-valid-key" : ""));
   const [threshold, setThreshold] = useState(2);
   const [count, setCount] = useState(3);
   const [error, setError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<{ groupName?: string; nsec?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{ groupName?: string; nsec?: string }>(
+    demoUi.create?.validationError ? { nsec: "Invalid nsec format. Must be a valid Nostr private key." } : {}
+  );
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -71,7 +75,7 @@ export function CreateKeysetScreen() {
             setGroupName(event.target.value);
             if (fieldErrors.groupName) setFieldErrors((prev) => ({ ...prev, groupName: undefined }));
           }}
-          help="A friendly name for this keyset's group profile. Visible to all peers in the keyset."
+          help="A friendly name for this keyset's group profile. Visible to all peers."
           error={fieldErrors.groupName}
         />
         <div className="field">
@@ -118,7 +122,7 @@ export function CreateKeysetScreen() {
           />
         </div>
         <div className="help">
-          Any {threshold} of {count} shares can sign - min threshold is 2, min shares is 3.
+          The minimum number of shares required to sign. Must be at least 2 and no more than the total number of keys.
         </div>
         {error ? <div className="error">{error}</div> : null}
         <Button type="submit" size="full" disabled={busy}>

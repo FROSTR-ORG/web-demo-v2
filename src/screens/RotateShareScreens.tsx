@@ -4,6 +4,7 @@ import { AlertTriangle, Check, Info, QrCode } from "lucide-react";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField } from "../components/ui";
 import { useAppState } from "../app/AppState";
+import { useDemoUi } from "../demo/demoUi";
 
 /* ---------- Mock data ---------- */
 
@@ -41,8 +42,9 @@ function validateRotatePackage(value: string): { valid: boolean; message: string
 
 export function EnterRotatePackageScreen() {
   const navigate = useNavigate();
-  const [packageString, setPackageString] = useState("");
-  const [password, setPassword] = useState("");
+  const demoUi = useDemoUi();
+  const [packageString, setPackageString] = useState(demoUi.rotateShare?.packagePreset ?? "");
+  const [password, setPassword] = useState(demoUi.rotateShare?.passwordPreset ?? "");
   const validation = validateRotatePackage(packageString);
 
   function handleApplyShareUpdate() {
@@ -139,14 +141,13 @@ function ApplyingShareUpdateContent({
   packageString: string;
   navigate: ReturnType<typeof useNavigate>;
 }) {
+  const demoUi = useDemoUi();
   const [steps, setSteps] = useState<TimelineStep[]>([
     { label: "Connected to relays", detail: "wss://relay.primal.net, wss://relay.damus.io", state: "done" },
     { label: "Verified rotate package", detail: `${MOCK_KEYSET_NAME} · Share #0 replacement`, state: "done" },
     { label: "Applying local share update", detail: "Replacing Share #0 and refreshing local identity material", state: "active" },
     { label: "Saving updated profile", state: "pending" }
   ]);
-
-  const [simulateFailure, setSimulateFailure] = useState(false);
 
   const advanceTimeline = useCallback(() => {
     setSteps((prev) => {
@@ -162,6 +163,10 @@ function ApplyingShareUpdateContent({
 
   /* Auto-advance timeline steps every 1.5s */
   useEffect(() => {
+    if (demoUi.progress?.frozen) {
+      return;
+    }
+
     const allDone = steps.every((s) => s.state === "done");
     const hasActive = steps.some((s) => s.state === "active");
 
@@ -172,22 +177,17 @@ function ApplyingShareUpdateContent({
       return () => window.clearTimeout(timer);
     }
 
-    if (simulateFailure && hasActive) {
-      const timer = window.setTimeout(() => {
-        navigate("/rotate-share/failed", { replace: true });
-      }, 1200);
-      return () => window.clearTimeout(timer);
-    }
-
     if (hasActive) {
       const timer = window.setTimeout(advanceTimeline, 1500);
       return () => window.clearTimeout(timer);
     }
-  }, [steps, simulateFailure, navigate, advanceTimeline]);
+  }, [steps, navigate, advanceTimeline, demoUi.progress?.frozen]);
 
-  const truncatedPackage = packageString.length > 14
-    ? `${packageString.slice(0, 11)}••••`
-    : packageString;
+  const truncatedPackage = demoUi.rotateShare?.packagePreset
+    ? "bfonboard1••••"
+    : packageString.length > 14
+      ? `${packageString.slice(0, 11)}••••`
+      : packageString;
 
   return (
     <AppShell mainVariant="flow" headerMeta={MOCK_KEYSET_NAME}>
@@ -230,16 +230,6 @@ function ApplyingShareUpdateContent({
           Cancel Share Update
         </Button>
 
-        {/* Simulate failure toggle for testing */}
-        <button
-          type="button"
-          className="button button-chip button-sm"
-          style={{ alignSelf: "center", marginTop: "8px" }}
-          onClick={() => setSimulateFailure(true)}
-          data-testid="simulate-failure"
-        >
-          Simulate Failure
-        </button>
       </div>
     </AppShell>
   );

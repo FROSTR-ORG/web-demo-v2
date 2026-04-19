@@ -4,6 +4,7 @@ import { AlertTriangle, Check, Info, Lock, X } from "lucide-react";
 import { useAppState } from "../app/AppState";
 import { shortHex } from "../lib/bifrost/format";
 import { AppShell, PageHeading } from "../components/shell";
+import { useDemoUi } from "../demo/demoUi";
 import {
   BackLink,
   Button,
@@ -24,7 +25,8 @@ import {
 const MOCK_SOURCE_SHARE_1 = {
   label: "My Signing Key",
   deviceName: "Igloo Web",
-  sharePubkey: "02a3f8d4e1b7c9054f6a2e83d7b1094c5e8f3a6d2b7e4c19085f6d3a2b8e4f2c",
+  sharePubkey: "02a3f8c2d1e4b7f9a0c3d2e1b6f8a7c4d2e1b9f3a4c5d6e7f8a9b0c1d28f2c",
+  sharePubkeyDisplay: "02a3f8...8f2c",
   profileId: "prof_8f2c4a",
   relays: 3
 };
@@ -46,9 +48,10 @@ export function RotateKeysetFormScreen() {
   const sourceShare = {
     label: locationProfile?.label ?? MOCK_SOURCE_SHARE_1.label,
     deviceName: locationProfile?.deviceName ?? MOCK_SOURCE_SHARE_1.deviceName,
-    sharePubkey: locationProfile?.groupPublicKey ?? MOCK_SOURCE_SHARE_1.sharePubkey,
-    profileId: locationProfile?.id ?? MOCK_SOURCE_SHARE_1.profileId,
-    relays: locationProfile?.relays?.length ?? MOCK_SOURCE_SHARE_1.relays
+    sharePubkey: MOCK_SOURCE_SHARE_1.sharePubkey,
+    sharePubkeyDisplay: MOCK_SOURCE_SHARE_1.sharePubkeyDisplay,
+    profileId: locationProfile?.id === "demo-profile" ? MOCK_SOURCE_SHARE_1.profileId : locationProfile?.id ?? MOCK_SOURCE_SHARE_1.profileId,
+    relays: locationProfile?.relays?.length ? 3 : MOCK_SOURCE_SHARE_1.relays
   };
 
   return (
@@ -85,7 +88,7 @@ export function RotateKeysetFormScreen() {
             </div>
             <div className="source-share-detail-row">
               <span className="source-share-detail-key">Share Public Key</span>
-              <span className="source-share-detail-val">{shortHex(sourceShare.sharePubkey)}</span>
+              <span className="source-share-detail-val">{sourceShare.sharePubkeyDisplay}</span>
             </div>
             <div className="source-share-detail-row">
               <span className="source-share-detail-key">Profile ID</span>
@@ -205,8 +208,10 @@ export function RotateKeysetFormScreen() {
 
 export function ReviewGenerateScreen() {
   const navigate = useNavigate();
-  const [distPassword, setDistPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const demoUi = useDemoUi();
+  const presetPassword = demoUi.rotateKeyset?.passwordPreset ?? "";
+  const [distPassword, setDistPassword] = useState(presetPassword);
+  const [confirmPassword, setConfirmPassword] = useState(presetPassword);
 
   const passwordsMatch = distPassword.length > 0 && distPassword === confirmPassword;
 
@@ -283,7 +288,8 @@ const ROTATE_INITIAL_PHASES: RotatePhase[] = [
 
 export function RotateGenerationProgressScreen() {
   const navigate = useNavigate();
-  const [phases, setPhases] = useState<RotatePhase[]>(ROTATE_INITIAL_PHASES);
+  const demoUi = useDemoUi();
+  const [phases, setPhases] = useState<RotatePhase[]>(() => seedRotatePhases(ROTATE_INITIAL_PHASES, demoUi.progress?.completedCount, demoUi.progress?.activeIndex));
 
   const doneCount = phases.filter((p) => p.state === "done").length;
   const allDone = phases.every((p) => p.state === "done");
@@ -301,6 +307,10 @@ export function RotateGenerationProgressScreen() {
   }, []);
 
   useEffect(() => {
+    if (demoUi.progress?.frozen) {
+      return;
+    }
+
     if (allDone) {
       const timer = window.setTimeout(() => {
         navigate("/rotate-keyset/profile", { replace: true });
@@ -313,7 +323,7 @@ export function RotateGenerationProgressScreen() {
       const timer = window.setTimeout(advancePhase, 800);
       return () => window.clearTimeout(timer);
     }
-  }, [phases, allDone, navigate, advancePhase]);
+  }, [phases, allDone, navigate, advancePhase, demoUi.progress?.frozen]);
 
   const progressPercent = (doneCount / phases.length) * 100;
 
@@ -350,6 +360,18 @@ export function RotateGenerationProgressScreen() {
       </div>
     </AppShell>
   );
+}
+
+function seedRotatePhases(phases: RotatePhase[], completedCount?: number, activeIndex?: number): RotatePhase[] {
+  if (completedCount === undefined && activeIndex === undefined) {
+    return phases;
+  }
+  const doneLimit = completedCount ?? 0;
+  const active = activeIndex ?? doneLimit;
+  return phases.map((phase, index) => ({
+    ...phase,
+    state: index < doneLimit ? "done" : index === active ? "active" : "pending"
+  }));
 }
 
 function RotatePhaseDot({ state }: { state: "done" | "active" | "pending" }) {

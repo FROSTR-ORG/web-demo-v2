@@ -164,7 +164,7 @@ describe("RecoverSuccessScreen", () => {
   it("Reveal toggle shows full NSEC", () => {
     renderSuccess();
     fireEvent.click(screen.getByText("Reveal"));
-    expect(screen.getByText(/nsec1qqqqqzpwk6m3ags7frv0j8dkwmxcf0klhfja3yd4rqlzgn64c4hq7y4ms9/)).toBeInTheDocument();
+    expect(screen.getByText(/nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0/)).toBeInTheDocument();
   });
 
   it("Clear button removes NSEC from display", () => {

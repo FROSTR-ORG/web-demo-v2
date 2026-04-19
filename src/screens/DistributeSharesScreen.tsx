@@ -1,13 +1,16 @@
-import { Check, Lock } from "lucide-react";
+import { Copy, Lock } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
-import { BackLink, Button, CopyBlock, QrButton, SecretDisplay, StatusPill, Stepper } from "../components/ui";
+import { BackLink, Button, QrButton, SecretDisplay, StatusPill, Stepper } from "../components/ui";
+import { PAPER_MASKED_PACKAGE } from "../demo/fixtures";
+import { useDemoUi } from "../demo/demoUi";
 import { shortHex } from "../lib/bifrost/format";
 
 export function DistributeSharesScreen() {
   const navigate = useNavigate();
   const { createSession, updatePackageState } = useAppState();
+  const demoUi = useDemoUi();
 
   if (!createSession?.keyset || !createSession.localShare || !createSession.createdProfileId) {
     return <Navigate to="/create" replace />;
@@ -39,6 +42,7 @@ export function DistributeSharesScreen() {
         <div className="package-stack">
           {createSession.onboardingPackages.map((pkg) => {
             const distributed = pkg.copied || pkg.qrShown;
+            const locked = demoUi.shared?.lockedPackageIndexes?.includes(pkg.idx) ?? false;
             return (
               <div className="package-card" key={pkg.idx}>
                 <div className="package-head">
@@ -49,16 +53,34 @@ export function DistributeSharesScreen() {
                   <StatusPill tone={distributed ? "success" : "warning"}>{distributed ? "Distributed" : "Not distributed"}</StatusPill>
                 </div>
                 <div className="help">Member {shortHex(pkg.memberPubkey)}</div>
-                <CopyBlock value={pkg.packageText} onCopied={() => updatePackageState(pkg.idx, { copied: true })} />
+                <div className="copy-block">
+                  <SecretDisplay value={PAPER_MASKED_PACKAGE} />
+                  <Button
+                    type="button"
+                    variant="chip"
+                    size="sm"
+                    disabled={locked}
+                    onClick={() => updatePackageState(pkg.idx, { copied: true })}
+                  >
+                    <Copy size={13} />
+                    Copy
+                  </Button>
+                </div>
                 <div className="field">
                   <span className="kicker">Package Password</span>
                   <div className="password-lock-row">
-                    <SecretDisplay value={pkg.password} masked title="Package password" />
-                    <Lock size={14} color="#64748b" />
+                    {locked ? (
+                      <SecretDisplay value="Enter password to unlock" dashed />
+                    ) : (
+                      <>
+                        <SecretDisplay value="••••••••" title="Package password" />
+                        <Lock size={14} color="#64748b" />
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="package-actions">
-                  <QrButton value={pkg.packageText} onShown={() => updatePackageState(pkg.idx, { qrShown: true })} />
+                  <QrButton value={pkg.packageText} disabled={locked} onShown={() => updatePackageState(pkg.idx, { qrShown: true })} />
                 </div>
               </div>
             );

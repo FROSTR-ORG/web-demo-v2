@@ -5,6 +5,8 @@ import { useAppState } from "../app/AppState";
 import { AppShell } from "../components/shell";
 import { PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField } from "../components/ui";
+import { DEMO_BFPROFILE } from "../demo/fixtures";
+import { useDemoUi } from "../demo/demoUi";
 import { saveProfile } from "../lib/storage/profileStore";
 import type { StoredProfileRecord } from "../lib/bifrost/types";
 
@@ -43,7 +45,8 @@ function validateBackupString(value: string): { valid: boolean; message: string 
 
 export function LoadBackupScreen() {
   const navigate = useNavigate();
-  const [backupString, setBackupString] = useState("");
+  const demoUi = useDemoUi();
+  const [backupString, setBackupString] = useState(demoUi.import?.backupPreset ?? "");
   const validation = validateBackupString(backupString);
 
   function handleContinue() {
@@ -98,8 +101,9 @@ export function LoadBackupScreen() {
 export function DecryptBackupScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const backupString = (location.state as { backupString?: string } | null)?.backupString ?? "";
-  const [password, setPassword] = useState("");
+  const demoUi = useDemoUi();
+  const backupString = (location.state as { backupString?: string } | null)?.backupString ?? demoUi.import?.backupPreset ?? "";
+  const [password, setPassword] = useState(demoUi.import?.passwordPreset ?? "");
 
   /* Guard: redirect if no backup loaded */
   if (!backupString) {
@@ -162,13 +166,15 @@ export function ReviewSaveScreen() {
   const navigate = useNavigate();
   const location = useLocation();
   const { reloadProfiles } = useAppState();
+  const demoUi = useDemoUi();
   const state = location.state as { backupString?: string; password?: string } | null;
-  const [profilePassword, setProfilePassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const presetPassword = demoUi.import?.profilePasswordPreset ?? "";
+  const [profilePassword, setProfilePassword] = useState(presetPassword);
+  const [confirmPassword, setConfirmPassword] = useState(presetPassword);
   const [saving, setSaving] = useState(false);
 
   /* Guard: redirect if no prior decrypt step */
-  if (!state?.backupString) {
+  if (!state?.backupString && !demoUi.import?.backupPreset) {
     return <Navigate to="/import" replace />;
   }
 
@@ -207,7 +213,7 @@ export function ReviewSaveScreen() {
   return (
     <AppShell mainVariant="flow">
       <div className="screen-column">
-        <BackLink onClick={() => navigate("/import/decrypt", { state: { backupString: state.backupString } })} />
+        <BackLink onClick={() => navigate("/import/decrypt", { state: { backupString: state?.backupString ?? demoUi.import?.backupPreset ?? DEMO_BFPROFILE } })} />
         <PageHeading
           title="Review & Save Profile"
           copy="Review the imported profile and set a local password before launching the signer."
@@ -293,7 +299,9 @@ export function ReviewSaveScreen() {
 export function ImportErrorScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const backupString = (location.state as { backupString?: string } | null)?.backupString ?? "";
+  const demoUi = useDemoUi();
+  const backupString = (location.state as { backupString?: string } | null)?.backupString ?? DEMO_BFPROFILE;
+  const corrupted = demoUi.import?.errorVariant === "corrupted";
 
   return (
     <AppShell mainVariant="flow">
@@ -304,22 +312,26 @@ export function ImportErrorScreen() {
           copy="We couldn't import this profile backup. Resolve the issue below and try again."
         />
 
-        <div className="import-error-alert">
+        <div className={`import-error-alert ${corrupted ? "red" : ""}`}>
           <div className="import-error-icon">
             <AlertTriangle size={14} />
           </div>
           <div className="import-error-body">
-            <div className="import-error-title">Incorrect Password</div>
+            <div className="import-error-title">{corrupted ? "Backup Corrupted" : "Incorrect Password"}</div>
             <div className="import-error-description">
-              The password you entered could not decrypt this backup. Check the backup password and try again.
+              {corrupted
+                ? "The backup could not be parsed. It may be damaged or incomplete."
+                : "The password you entered could not decrypt this backup. Check the backup password and try again."}
             </div>
           </div>
         </div>
 
         <div className="inline-actions">
-          <Button type="button" onClick={() => navigate("/import/decrypt", { state: { backupString } })}>
-            Try Again
-          </Button>
+          {corrupted ? null : (
+            <Button type="button" onClick={() => navigate("/import/decrypt", { state: { backupString } })}>
+              Try Again
+            </Button>
+          )}
           <Button type="button" variant="ghost" onClick={() => navigate("/import")}>
             Back to Import
           </Button>
@@ -334,5 +346,3 @@ export function ImportErrorScreen() {
 function truncate(str: string, len: number) {
   return str.length > len ? str.slice(0, len) + "..." : str;
 }
-
-

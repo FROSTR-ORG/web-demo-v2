@@ -131,10 +131,12 @@ export function NumberStepper({
 
 export function Stepper({ current, variant = "create" }: { current: 1 | 2 | 3; variant?: "create" | "shared" | "rotate-keyset" }) {
   const step1Label = variant === "rotate-keyset" ? "Rotate Keyset" : variant === "create" ? "Create" : "Create / Rotate";
+  const step2Label = variant === "create" ? "Setup Profile" : "Create Profile";
+  const step3Label = variant === "create" ? "Onboard Devices" : "Distribute Shares";
   const steps = [
     { n: 1, label: step1Label },
-    { n: 2, label: "Create Profile" },
-    { n: 3, label: "Distribute Shares" }
+    { n: 2, label: step2Label },
+    { n: 3, label: step3Label }
   ] as const;
   return (
     <div className={`stepper stepper-${variant}`} aria-label="Create progress">

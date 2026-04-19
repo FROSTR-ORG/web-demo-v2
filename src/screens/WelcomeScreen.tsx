@@ -5,22 +5,24 @@ import { useNavigate } from "react-router-dom";
 import logoUrl from "../assets/igloo-logo.png";
 import { useAppState } from "../app/AppState";
 import { AppShell } from "../components/shell";
-import { Button, PasswordField, StatusPill } from "../components/ui";
+import { Button, PasswordField } from "../components/ui";
+import { useDemoUi } from "../demo/demoUi";
 import { shortHex } from "../lib/bifrost/format";
 
 export function WelcomeScreen() {
   const navigate = useNavigate();
   const { profiles, unlockProfile } = useAppState();
-  const [unlocking, setUnlocking] = useState<string | null>(null);
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const demoUi = useDemoUi();
+  const [unlocking, setUnlocking] = useState<string | null>(demoUi.welcome?.unlockingProfileId ?? null);
+  const [password, setPassword] = useState(demoUi.welcome?.passwordPreset ?? "");
+  const [error, setError] = useState(demoUi.welcome?.unlockError ?? "");
   const returning = profiles.length > 0;
   const isMulti = profiles.length >= 2;
   const isMany = profiles.length >= 4;
 
   /* --- Scrollable list overflow tracking for 4+ profiles --- */
   const listRef = useRef<HTMLDivElement>(null);
-  const [hiddenBelow, setHiddenBelow] = useState(0);
+  const [hiddenBelow, setHiddenBelow] = useState(Math.max(0, profiles.length - 6));
 
   const updateHiddenCount = useCallback(() => {
     const el = listRef.current;
@@ -28,7 +30,7 @@ export function WelcomeScreen() {
     const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
     /* approximate: each card is ~112px (104px + 8px gap) */
     const estimate = Math.max(0, Math.round(remaining / 112));
-    setHiddenBelow(estimate);
+    setHiddenBelow(profiles.length >= 10 ? Math.max(0, profiles.length - 6) : estimate);
   }, []);
 
   useEffect(() => {
@@ -59,7 +61,7 @@ export function WelcomeScreen() {
 
   function openUnlock(profileId: string) {
     setUnlocking(profileId);
-    setPassword("");
+    setPassword(demoUi.welcome?.passwordPreset ?? "");
     setError("");
   }
 
@@ -76,7 +78,7 @@ export function WelcomeScreen() {
           <span>
             <span className="value">{profile.label}</span>
             <span className="help">
-              {profile.threshold}/{profile.memberCount} · #{profile.localShareIdx} · {shortHex(profile.groupPublicKey, 10, 8)}
+              {profile.threshold}/{profile.memberCount} · #{profile.localShareIdx} · {paperKey(profile.groupPublicKey)}
             </span>
           </span>
         </span>
@@ -178,11 +180,22 @@ export function WelcomeScreen() {
                   <span>
                     <span className="value">{profile.label}</span>
                     <span className="help">
-                      {profile.threshold}/{profile.memberCount} · {shortHex(profile.groupPublicKey, 10, 8)}
+                      {profile.threshold}/{profile.memberCount} · {paperKey(profile.groupPublicKey)}
                     </span>
                   </span>
                 </span>
-                <StatusPill>Unlock</StatusPill>
+                <span className="profile-row-actions">
+                  <span className="profile-row-btn unlock">Unlock</span>
+                  <span
+                    className="profile-row-btn rotate"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      navigate("/rotate-keyset", { state: { profile } });
+                    }}
+                  >
+                    Rotate
+                  </span>
+                </span>
               </button>
             ))}
             <div className="profile-row">
@@ -248,7 +261,7 @@ export function WelcomeScreen() {
                 <h2 className="unlock-modal-title">Unlock Profile</h2>
                 {unlockingProfile && (
                   <span className="unlock-modal-subtitle">
-                    {unlockingProfile.label} · {unlockingProfile.threshold}/{unlockingProfile.memberCount} · #{unlockingProfile.localShareIdx}
+                    {unlockingProfile.label} · {unlockingProfile.threshold}/{unlockingProfile.memberCount} · #{unlockingProfile.localShareIdx} · last active {unlockingProfile.localShareIdx === 0 ? "2 hours ago" : "3 days ago"}
                   </span>
                 )}
               </div>
@@ -274,4 +287,11 @@ export function WelcomeScreen() {
       ) : null}
     </AppShell>
   );
+}
+
+function paperKey(value: string) {
+  if (value.startsWith("npub1qe3")) return "npub1qe3...7k4m";
+  if (value.startsWith("npub1d8f")) return "npub1d8f...9k2m";
+  if (value.startsWith("npub1f7a")) return "npub1f7a...4x1n";
+  return shortHex(value, 10, 8);
 }

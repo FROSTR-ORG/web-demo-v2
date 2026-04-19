@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Stepper } from "../components/ui";
+import { useDemoUi } from "../demo/demoUi";
 
 interface Phase {
   label: string;
@@ -34,7 +35,8 @@ function GenerationProgressContent({
   navigate: ReturnType<typeof useNavigate>;
   groupName: string;
 }) {
-  const [phases, setPhases] = useState<Phase[]>(INITIAL_PHASES);
+  const demoUi = useDemoUi();
+  const [phases, setPhases] = useState<Phase[]>(() => seedPhases(INITIAL_PHASES, demoUi.progress?.completedCount, demoUi.progress?.activeIndex));
 
   const doneCount = phases.filter((p) => p.state === "done").length;
   const allDone = phases.every((p) => p.state === "done");
@@ -53,6 +55,10 @@ function GenerationProgressContent({
 
   /* Auto-advance phases */
   useEffect(() => {
+    if (demoUi.progress?.frozen) {
+      return;
+    }
+
     if (allDone) {
       const timer = window.setTimeout(() => {
         navigate("/create/profile", { replace: true });
@@ -65,7 +71,7 @@ function GenerationProgressContent({
       const timer = window.setTimeout(advancePhase, 800);
       return () => window.clearTimeout(timer);
     }
-  }, [phases, allDone, navigate, advancePhase]);
+  }, [phases, allDone, navigate, advancePhase, demoUi.progress?.frozen]);
 
   const progressPercent = (doneCount / phases.length) * 100;
 
@@ -102,6 +108,18 @@ function GenerationProgressContent({
       </div>
     </AppShell>
   );
+}
+
+function seedPhases(phases: Phase[], completedCount?: number, activeIndex?: number): Phase[] {
+  if (completedCount === undefined && activeIndex === undefined) {
+    return phases;
+  }
+  const doneLimit = completedCount ?? 0;
+  const active = activeIndex ?? doneLimit;
+  return phases.map((phase, index) => ({
+    ...phase,
+    state: index < doneLimit ? "done" : index === active ? "active" : "pending"
+  }));
 }
 
 function PhaseDot({ state }: { state: "done" | "active" | "pending" }) {

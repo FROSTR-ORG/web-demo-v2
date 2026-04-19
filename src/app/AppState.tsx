@@ -34,7 +34,7 @@ export interface ProfileDraft {
   relays: string[];
 }
 
-interface CreateSession {
+export interface CreateSession {
   draft: CreateDraft;
   keyset?: KeysetBundle;
   localShare?: SharePackageWire;
@@ -42,7 +42,7 @@ interface CreateSession {
   createdProfileId?: string;
 }
 
-interface AppStateValue {
+export interface AppStateValue {
   profiles: StoredProfileSummary[];
   activeProfile: StoredProfileSummary | null;
   runtimeStatus: RuntimeStatusSummary | null;
@@ -342,6 +342,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }
 
+export function MockAppStateProvider({ value, children }: { value: AppStateValue; children: ReactNode }) {
+  return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
+}
+
 export function useAppState(): AppStateValue {
   const value = useContext(AppStateContext);
   if (!value) {
@@ -358,4 +362,3 @@ export function defaultProfileDraft(): ProfileDraft {
     relays: DEFAULT_RELAYS
   };
 }
-

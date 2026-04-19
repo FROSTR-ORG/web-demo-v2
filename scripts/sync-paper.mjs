@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,5 +22,17 @@ for (const [from, to] of copies) {
   copyFileSync(resolve(paperRoot, from), dest);
 }
 
-console.log(`Synced ${copies.length} Paper assets.`);
+const scenariosSource = readFileSync(resolve(repoRoot, "src/demo/scenarios.ts"), "utf8");
+const scenarioPattern = /scenario\(\s*"([^"]+)"[\s\S]*?"(screens\/[^"]+)"/g;
+const scenarioCopies = [...scenariosSource.matchAll(scenarioPattern)].map((match) => ({
+  id: match[1],
+  paperPath: match[2]
+}));
 
+for (const { id, paperPath } of scenarioCopies) {
+  const dest = resolve(repoRoot, "public/paper-reference", `${id}.png`);
+  mkdirSync(dirname(dest), { recursive: true });
+  copyFileSync(resolve(paperRoot, paperPath, "screenshot.png"), dest);
+}
+
+console.log(`Synced ${copies.length} core Paper assets and ${scenarioCopies.length} screen references.`);

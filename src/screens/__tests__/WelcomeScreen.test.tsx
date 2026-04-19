@@ -73,7 +73,7 @@ describe("WelcomeScreen", () => {
     expect(screen.getByRole("button", { name: /New Keyset/i })).toBeInTheDocument();
   });
 
-  it("renders single returning profile with Unlock pill", () => {
+  it("renders single returning profile with Unlock and Rotate actions", () => {
     mocks.profiles = [makeProfile("p1", "My Signing Key")];
     render(
       <MemoryRouter>
@@ -83,8 +83,7 @@ describe("WelcomeScreen", () => {
     expect(screen.getByText("Welcome back.")).toBeInTheDocument();
     expect(screen.getByText("My Signing Key")).toBeInTheDocument();
     expect(screen.getByText("Unlock")).toBeInTheDocument();
-    // Should NOT have a Rotate button for single profile
-    expect(screen.queryByText("Rotate")).not.toBeInTheDocument();
+    expect(screen.getByText("Rotate")).toBeInTheDocument();
   });
 
   it("renders multi returning (2-3 profiles) with Unlock and Rotate buttons", () => {

@@ -4,6 +4,7 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAppState } from "../app/AppState";
 import { AppShell } from "../components/shell";
 import { Button, PermissionBadge, StatusPill } from "../components/ui";
+import { useDemoUi } from "../demo/demoUi";
 import { shortHex } from "../lib/bifrost/format";
 import type { PeerStatus } from "../lib/bifrost/types";
 
@@ -14,10 +15,13 @@ export function DashboardScreen() {
   const { profileId } = useParams();
   const navigate = useNavigate();
   const { activeProfile, runtimeStatus, lockProfile, clearCredentials, refreshRuntime } = useAppState();
-  const [mockState, setMockState] = useState<DashboardState>("running");
-  const [showPolicies, setShowPolicies] = useState(false);
-  const [activeModal, setActiveModal] = useState<ModalState>("none");
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const demoUi = useDemoUi();
+  const [mockState, setMockState] = useState<DashboardState>(demoUi.dashboard?.state ?? "running");
+  const [showPolicies, setShowPolicies] = useState(Boolean(demoUi.dashboard?.showPolicies));
+  const [activeModal, setActiveModal] = useState<ModalState>(demoUi.dashboard?.modal ?? "none");
+  const [settingsOpen, setSettingsOpen] = useState(Boolean(demoUi.dashboard?.settingsOpen));
+  const showMockControls = Boolean(demoUi.dashboard?.showMockControls);
+  const paperPanels = Boolean(demoUi.dashboard?.paperPanels);
 
   if (!profileId) {
     return <Navigate to="/" replace />;
@@ -68,7 +72,7 @@ export function DashboardScreen() {
     >
       <section className="dashboard-column">
         {/* Mock State Toggle */}
-        <div className="dash-state-toggle">
+        {showMockControls ? <div className="dash-state-toggle">
           <label className="dash-state-toggle-label" htmlFor="mock-state-select">
             Mock State
           </label>
@@ -104,7 +108,7 @@ export function DashboardScreen() {
               Signing Failed
             </button>
           </div>
-        </div>
+        </div> : null}
 
         {/* Summary bar — shared across all states */}
         <div className="dashboard-summary">
@@ -115,13 +119,13 @@ export function DashboardScreen() {
               {activeProfile.threshold}/{activeProfile.memberCount}
             </span>
             <span className="help">·</span>
-            <span className="dashboard-key">{shortHex(activeProfile.groupPublicKey, 12, 8)}</span>
+            <span className="dashboard-key">{paperGroupKey(activeProfile.groupPublicKey)}</span>
           </div>
           <div className="dashboard-summary-separator" />
           <div className="dashboard-summary-share">
             <span className="help">Share #{runtimeStatus.metadata.member_idx}</span>
             <span className="help">·</span>
-            <span className="dashboard-key">{shortHex(runtimeStatus.metadata.share_public_key, 10, 8)}</span>
+            <span className="dashboard-key">{paperShareKey(runtimeStatus.metadata.share_public_key)}</span>
           </div>
         </div>
 
@@ -137,6 +141,7 @@ export function DashboardScreen() {
                 signReadyLabel={signReadyLabel}
                 peers={runtimeStatus.peers}
                 pendingOperations={runtimeStatus.pending_operations}
+                paperPanels={paperPanels}
                 onStop={handleStopSigner}
                 onLock={() => {
                   lockProfile();
@@ -237,6 +242,7 @@ function RunningState({
   signReadyLabel,
   peers,
   pendingOperations,
+  paperPanels,
   onStop,
   onLock,
   onRefresh,
@@ -246,6 +252,7 @@ function RunningState({
   signReadyLabel: string;
   peers: PeerStatus[];
   pendingOperations: unknown[];
+  paperPanels: boolean;
   onStop: () => void;
   onLock: () => void;
   onRefresh: () => void;
@@ -283,8 +290,8 @@ function RunningState({
             <StatusPill>{peers.length} total</StatusPill>
           </div>
           <div className="peers-badges">
-            <StatusPill tone="info">{signReadyLabel}</StatusPill>
-            <StatusPill>Avg: --</StatusPill>
+            <StatusPill tone="info">{paperPanels ? "~186 ready" : signReadyLabel}</StatusPill>
+            <StatusPill>{paperPanels ? "Avg: 31ms" : "Avg: --"}</StatusPill>
             <Button type="button" variant="header" size="icon" onClick={onRefresh} aria-label="Refresh peers">
               <RotateCw size={16} />
             </Button>
@@ -292,12 +299,17 @@ function RunningState({
         </div>
         <div className="peer-list">
           {peers.map((peer) => (
-            <PeerRow key={peer.pubkey} peer={peer} />
+            <PeerRow key={peer.pubkey} peer={peer} paper={paperPanels} />
           ))}
         </div>
       </div>
 
-      {pendingOperations.length > 0 ? (
+      {paperPanels ? (
+        <>
+          <EventLogPanel />
+          <PendingApprovalsPanel />
+        </>
+      ) : pendingOperations.length > 0 ? (
         <div className="panel panel-pad">
           <div className="value">Pending Operations</div>
           <div className="help">{pendingOperations.length} operation(s) currently pending.</div>
@@ -324,9 +336,9 @@ function ConnectingState({ relays }: { relays: string[] }) {
           </p>
         </div>
         <div className="dash-hero-action">
-          <Button type="button" variant="ghost" className="dash-connecting-badge">
+          <span className="button button-ghost button-md dash-connecting-badge" role="status" aria-live="polite">
             Connecting...
-          </Button>
+          </span>
         </div>
       </div>
 
@@ -687,7 +699,7 @@ function PoliciesView({ peers: _peers }: { peers: PeerStatus[] }) {
 /* ========================================
    Peer Row (reused in Running state)
    ======================================== */
-function PeerRow({ peer }: { peer: PeerStatus }) {
+function PeerRow({ peer, paper }: { peer: PeerStatus; paper?: boolean }) {
   const incomingPct = Math.min(100, peer.incoming_available);
   const outgoingPct = Math.min(100, peer.outgoing_available);
   const lowPool = peer.online && Math.min(peer.incoming_available, peer.outgoing_available) < 25;
@@ -703,7 +715,7 @@ function PeerRow({ peer }: { peer: PeerStatus }) {
       <div className="peer-main">
         <span className="peer-index">#{peer.idx}</span>
         <span className="help">·</span>
-        <span className="peer-key">{shortHex(peer.pubkey, 12, 8)}</span>
+        <span className="peer-key">{paper ? paperPeerKey(peer.idx, peer.pubkey) : shortHex(peer.pubkey, 12, 8)}</span>
         {peer.online ? (
           <span className="inline-actions">
             {peer.can_sign ? <PermissionBadge>SIGN</PermissionBadge> : null}
@@ -731,9 +743,95 @@ function PeerRow({ peer }: { peer: PeerStatus }) {
           <span className="help">--</span>
         )}
       </div>
-      <div className="latency-slot">{peer.online ? "Ready" : "Offline"}</div>
+      <div className="latency-slot">{peer.online ? (paper ? paperLatency(peer.idx) : "Ready") : "Offline"}</div>
     </div>
   );
+}
+
+function EventLogPanel() {
+  const events = [
+    ["2:34:15p", "Sync", "Pool sync with peer #0 — 50 received · 50 sent"],
+    ["2:34:12p", "Sign", "Signature request received from 02a3f8...8f2c"],
+    ["2:34:12p", "Sign", "Partial signature sent — aggregation complete"],
+    ["2:33:48p", "Ecdh", "ECDH request processed for 02d7e1b9...3b9e"],
+    ["2:33:45p", "Signer Policy", "ECDH request from peer #2 — signer policy required"],
+    ["2:32:01p", "Ping", "Ping sweep — 2/3 online (avg 31ms) · pools balanced"],
+    ["2:31:45p", "Echo", "Echo published — announced presence on 2 relays"]
+  ];
+  return (
+    <div className="event-log-panel">
+      <div className="event-log-header">
+        <ChevronDown size={12} color="#93c5fd" />
+        <div className="event-log-title">Event Log</div>
+        <StatusPill>8 events</StatusPill>
+        <span className="event-log-spacer" />
+        <button type="button" className="event-log-link">Clear</button>
+        <button type="button" className="event-log-filter">Filter</button>
+      </div>
+      {events.map(([time, type, copy]) => (
+        <div className="event-log-row" key={`${time}-${type}-${copy}`}>
+          <span className="event-log-time">{time}</span>
+          <span className={`event-log-type ${type.toLowerCase().replace(/\s+/g, "-")}`}>{type}</span>
+          <span className="event-log-copy">{copy}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PendingApprovalsPanel() {
+  const rows = [
+    ["SIGN", "Peer #2", "029c4a...1f5e", "kind:1 Short Text Note", "42s"],
+    ["ECDH", "Peer #1", "02d7e1...3b9e", "nip44_encrypt request", "1m"],
+    ["SIGN", "Peer #0", "02a3f8...8f2c", "kind:9735 Zap Receipt", "2m"]
+  ];
+  return (
+    <div className="pending-approvals-panel">
+      <div className="pending-approvals-header">
+        <span className="pending-star">✦</span>
+        <div className="pending-title">Pending Approvals</div>
+        <StatusPill tone="warning">3 pending</StatusPill>
+        <span className="event-log-spacer" />
+        <Clock size={12} />
+        <span className="pending-nearest">Nearest: 42s</span>
+        <ChevronDown size={14} />
+      </div>
+      {rows.map(([kind, peer, key, detail, ttl]) => (
+        <div className="pending-row" key={`${kind}-${peer}-${detail}`}>
+          <span className="pending-dot" />
+          <span className={`pending-kind ${kind.toLowerCase()}`}>{kind}</span>
+          <span className="pending-peer">{peer}</span>
+          <span className="pending-key">{key}</span>
+          <span className="pending-detail">{detail}</span>
+          <span className="pending-ttl">{ttl}</span>
+          <button type="button" className="pending-open">Open</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function paperGroupKey(value: string) {
+  if (value.startsWith("npub1qe3")) return "npub1qe3...7k4m";
+  return shortHex(value, 12, 8);
+}
+
+function paperShareKey(value: string) {
+  if (value.startsWith("02a3f8")) return "02a3f8...8f2c";
+  return shortHex(value, 10, 8);
+}
+
+function paperPeerKey(index: number, fallback: string) {
+  if (index === 0) return "02a3f8c2d1...8f2c4a";
+  if (index === 1) return "02d7e1b9f3...3b9e7d";
+  if (index === 2) return "029c4a8e2f...6a1f5e";
+  return shortHex(fallback, 12, 8);
+}
+
+function paperLatency(index: number) {
+  if (index === 0) return "24ms";
+  if (index === 1) return "38ms";
+  return "Ready";
 }
 
 /* ========================================
@@ -1016,7 +1114,7 @@ function SettingsSidebar({
               </div>
               <div className="settings-row">
                 <span className="settings-row-label">Keyset npub</span>
-                <span className="settings-row-npub">{shortHex(groupPublicKey, 10, 8)}</span>
+                <span className="settings-row-npub">{paperGroupKey(groupPublicKey)}</span>
               </div>
               <div className="settings-row">
                 <span className="settings-row-label">Threshold</span>

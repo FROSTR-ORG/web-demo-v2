@@ -77,9 +77,16 @@ import { DashboardScreen } from "../DashboardScreen";
 
 afterEach(cleanup);
 
-function renderDashboard() {
+function renderDashboard({ showMockControls = true }: { showMockControls?: boolean } = {}) {
   return render(
-    <MemoryRouter initialEntries={["/dashboard/test-profile-id"]}>
+    <MemoryRouter
+      initialEntries={[
+        {
+          pathname: "/dashboard/test-profile-id",
+          state: showMockControls ? { demoUi: { dashboard: { showMockControls: true } } } : undefined,
+        },
+      ]}
+    >
       <Routes>
         <Route path="/dashboard/:profileId" element={<DashboardScreen />} />
       </Routes>
@@ -88,6 +95,11 @@ function renderDashboard() {
 }
 
 describe("DashboardScreen — state toggle", () => {
+  it("does not render mock state controls in the normal product route", () => {
+    renderDashboard({ showMockControls: false });
+    expect(screen.queryByLabelText("Mock State")).not.toBeInTheDocument();
+  });
+
   it("renders mock state toggle with all 5 state options", () => {
     renderDashboard();
     const select = screen.getByLabelText("Mock State");

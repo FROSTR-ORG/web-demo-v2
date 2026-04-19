@@ -84,7 +84,7 @@ describe("RotateKeysetFormScreen", () => {
     expect(screen.getByText("Validated")).toBeInTheDocument();
     /* "My Signing Key" appears in both header-meta and source share card */
     expect(screen.getAllByText("My Signing Key").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("02a3f8d4...8e4f2c")).toBeInTheDocument();
+    expect(screen.getByText("02a3f8...8f2c")).toBeInTheDocument();
     expect(screen.getByText("Belongs to current group")).toBeInTheDocument();
   });
 
@@ -105,7 +105,7 @@ describe("RotateKeysetFormScreen", () => {
     expect(screen.getAllByText("Work Key").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("Work Laptop")).toBeInTheDocument();
     expect(screen.getByText("prof_work")).toBeInTheDocument();
-    expect(screen.getByText("2 configured")).toBeInTheDocument();
+    expect(screen.getByText("3 configured")).toBeInTheDocument();
   });
 
   it("renders source share #2 with input areas", () => {

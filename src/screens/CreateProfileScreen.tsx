@@ -5,13 +5,22 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { defaultProfileDraft, useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField, PermissionBadge, SectionHeader, Stepper, TextField } from "../components/ui";
+import { useDemoUi } from "../demo/demoUi";
 import { shortHex } from "../lib/bifrost/format";
 
 export function CreateProfileScreen() {
   const navigate = useNavigate();
   const { createSession, createProfile } = useAppState();
-  const [draft, setDraft] = useState(defaultProfileDraft);
-  const [relayInput, setRelayInput] = useState("wss://");
+  const demoUi = useDemoUi();
+  const presetPassword = demoUi.shared?.passwordPreset ?? "";
+  const [draft, setDraft] = useState(() => ({
+    ...defaultProfileDraft(),
+    deviceName: demoUi.shared?.profileNamePreset ?? defaultProfileDraft().deviceName,
+    password: presetPassword,
+    confirmPassword: presetPassword,
+    relays: demoUi.shared?.relayPreset ? ["wss://relay.primal.net", "wss://relay.damus.io", demoUi.shared.relayPreset] : defaultProfileDraft().relays
+  }));
+  const [relayInput, setRelayInput] = useState(demoUi.shared?.relayPreset ?? "wss://");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
