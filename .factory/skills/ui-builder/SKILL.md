@@ -73,6 +73,8 @@ describe("NewScreen", () => {
 
 Run `npx vitest run --config vitest.config.ts` to verify tests FAIL before implementation.
 
+**TDD ordering note.** Strict tests-first is preferred when feasible. Iterative workflows (sketching component structure, then writing tests, then refining) are acceptable for exploratory work. What is NOT acceptable: shipping an implementation without tests that pin the behavioral assertions the feature claims in `fulfills`. Every VAL-* ID in the feature's `fulfills` array should have at least one dedicated test case (unit or integration) in the final commit.
+
 ### 4. Implement Screen Components
 
 Create new screen files in `src/screens/`. Follow existing patterns:
