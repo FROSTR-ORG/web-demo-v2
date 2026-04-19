@@ -155,24 +155,37 @@ describe("RecoverSuccessScreen", () => {
     // Mock clipboard API
     Object.assign(navigator, { clipboard: { writeText: vi.fn(() => Promise.resolve()) } });
     renderSuccess();
+    // Copy button label stays "Copy to Clipboard" (static per Paper); a
+    // separate "Copied!" pill appears alongside it after clicking.
     fireEvent.click(screen.getByText("Copy to Clipboard"));
     await waitFor(() => {
-      expect(screen.getAllByText("Copied!").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText("Copied!")).toBeInTheDocument();
     });
+    // The Copy button itself retains its label.
+    expect(screen.getByText("Copy to Clipboard")).toBeInTheDocument();
   });
 
-  it("Reveal toggle shows full NSEC", () => {
+  it("Reveal click shows full NSEC and keeps 'Reveal' label", () => {
     renderSuccess();
     fireEvent.click(screen.getByText("Reveal"));
     expect(screen.getByText(/nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0/)).toBeInTheDocument();
+    // VAL-REC-002 requires the outlined button label stays "Reveal" (no toggle to "Hide").
+    expect(screen.getByText("Reveal")).toBeInTheDocument();
   });
 
-  it("Clear button removes NSEC from display", () => {
+  it("Clear button re-masks the revealed NSEC (VAL-REC-003)", () => {
     renderSuccess();
+    // First reveal the full nsec.
+    fireEvent.click(screen.getByText("Reveal"));
+    expect(screen.getByText(/nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0/)).toBeInTheDocument();
+    // Then clear — the revealed text is removed and the display returns
+    // to the masked state (not blanked to "—").
     fireEvent.click(screen.getByText("Clear"));
-    // After clearing, both nsec display areas should show "—"
-    const dashes = screen.getAllByText("—");
-    expect(dashes.length).toBe(2);
+    expect(screen.queryByText(/nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0/)).not.toBeInTheDocument();
+    // Both labels are still present; the revealed panel shows the masked
+    // form instead of the full nsec.
+    expect(screen.getByText("Recovered NSEC:")).toBeInTheDocument();
+    expect(screen.getByText("Recovered NSEC (revealed):")).toBeInTheDocument();
   });
 
   it("renders Back to Signer link", () => {

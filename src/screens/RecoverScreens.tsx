@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, ChevronLeft, Copy, Eye, EyeOff, Lock } from "lucide-react";
+import { AlertTriangle, Check, ChevronLeft, Copy, Eye, Lock } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAppState } from "../app/AppState";
@@ -175,7 +175,6 @@ export function RecoverSuccessScreen() {
   const demoUi = useDemoUi();
   const [copied, setCopied] = useState(Boolean(demoUi.recover?.copied));
   const [revealed, setRevealed] = useState(Boolean(demoUi.recover?.revealed));
-  const [cleared, setCleared] = useState(false);
 
   if (!profileId || !activeProfile || activeProfile.id !== profileId) {
     return <Navigate to="/" replace />;
@@ -185,7 +184,6 @@ export function RecoverSuccessScreen() {
   const totalShares = activeProfile.memberCount;
 
   async function handleCopy() {
-    if (cleared) return;
     try {
       await navigator.clipboard?.writeText(MOCK_RECOVERED_NSEC);
     } catch {
@@ -195,8 +193,14 @@ export function RecoverSuccessScreen() {
     window.setTimeout(() => setCopied(false), 2000);
   }
 
+  function handleReveal() {
+    setRevealed(true);
+  }
+
   function handleClear() {
-    setCleared(true);
+    // Per VAL-REC-003: Clear removes the revealed text and returns the
+    // display to the masked state (NOT blank). Both nsec panels continue
+    // to render; the second panel flips back to the masked form.
     setRevealed(false);
   }
 
@@ -276,47 +280,32 @@ export function RecoverSuccessScreen() {
         <div className="recover-nsec-block">
           <span className="recover-nsec-label">Recovered NSEC:</span>
           <div className="recover-nsec-display">
-            <span className="recover-nsec-masked">
-              {cleared ? "—" : maskNsec(MOCK_RECOVERED_NSEC)}
-            </span>
+            <span className="recover-nsec-masked">{maskNsec(MOCK_RECOVERED_NSEC)}</span>
           </div>
         </div>
 
-        {/* Recovered NSEC — Revealed */}
+        {/* Recovered NSEC — Revealed (or masked when not revealed) */}
         <div className="recover-nsec-block">
           <span className="recover-nsec-label">Recovered NSEC (revealed):</span>
           <div className="recover-nsec-display">
             <span className="recover-nsec-revealed">
-              {cleared ? "—" : (revealed ? MOCK_RECOVERED_NSEC : maskNsec(MOCK_RECOVERED_NSEC))}
+              {revealed ? MOCK_RECOVERED_NSEC : maskNsec(MOCK_RECOVERED_NSEC)}
             </span>
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons — labels are static per Paper; "Copied!" confirmation
+            is an additional green pill that appears after clicking Copy. */}
         <div className="recover-actions">
-          <button type="button" className="recover-btn-copy" onClick={handleCopy} disabled={cleared}>
-            {copied ? (
-              <>
-                <Check size={14} strokeWidth={2.5} />
-                Copied!
-              </>
-            ) : (
-              <>
-                <Copy size={14} />
-                Copy to Clipboard
-              </>
-            )}
+          <button type="button" className="recover-btn-copy" onClick={handleCopy}>
+            <Copy size={14} />
+            Copy to Clipboard
           </button>
-          <button
-            type="button"
-            className="recover-btn-reveal"
-            onClick={() => setRevealed((v) => !v)}
-            disabled={cleared}
-          >
-            {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
-            {revealed ? "Hide" : "Reveal"}
+          <button type="button" className="recover-btn-reveal" onClick={handleReveal}>
+            <Eye size={14} />
+            Reveal
           </button>
-          <button type="button" className="recover-btn-clear" onClick={handleClear} disabled={cleared}>
+          <button type="button" className="recover-btn-clear" onClick={handleClear}>
             Clear
           </button>
           {copied ? (
