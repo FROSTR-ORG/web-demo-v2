@@ -1,0 +1,54 @@
+{
+  "groupId": "recover-rec002-r2",
+  "milestone": "recover",
+  "testedAt": "2026-04-19T22:26:49Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "appUrl": "http://127.0.0.1:5173",
+    "assertionIds": [
+      "VAL-REC-002"
+    ],
+    "browserSession": "recover-rec002-r2"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-REC-002",
+      "title": "Recover Success renders with copy/reveal interactions",
+      "status": "pass",
+      "reason": "On /demo/recover-success, initial state showed masked NSEC (no full nsec1 string present). Clicking Reveal exposed full nsec text, and clicking Copy to Clipboard surfaced Copied! confirmation.",
+      "steps": [
+        {
+          "action": "Open /demo/recover-success and capture initial state",
+          "expected": "Recover success view renders with masked/private-key safety UI",
+          "observed": "View rendered with security warning, action row, and masked key content."
+        },
+        {
+          "action": "Click Reveal",
+          "expected": "NSEC visibility toggles from hidden/masked to shown",
+          "observed": "Post-click state contained a full nsec1 value (initial state did not)."
+        },
+        {
+          "action": "Click Copy to Clipboard",
+          "expected": "Copy action confirms success",
+          "observed": "Copied! confirmation appeared and was captured."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "recover/recover-rec002-r2/VAL-REC-002-initial.png",
+          "recover/recover-rec002-r2/VAL-REC-002-after-reveal.png",
+          "recover/recover-rec002-r2/VAL-REC-002-after-copy.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API/XHR required for this assertion; page load requests were static Vite/module assets from 127.0.0.1:5173."
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Validated VAL-REC-002 as passing: Recover Success renders correctly, Reveal exposes the NSEC from masked state, and Copy shows Copied! confirmation with no browser errors."
+}

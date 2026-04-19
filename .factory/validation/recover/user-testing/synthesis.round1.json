@@ -1,0 +1,27 @@
+{
+  "milestone": "recover",
+  "round": 1,
+  "status": "fail",
+  "assertionsSummary": {
+    "total": 3,
+    "passed": 1,
+    "failed": 2,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-REC-003"
+  ],
+  "failedAssertions": [
+    {
+      "id": "VAL-REC-001",
+      "reason": "Expected paste input on /demo/recover-collect-shares was not present (no textbox/input found)."
+    },
+    {
+      "id": "VAL-REC-002",
+      "reason": "Reveal interaction on /demo/recover-success did not toggle NSEC visibility; full NSEC remained visible before and after click."
+    }
+  ],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "previousRound": null
+}

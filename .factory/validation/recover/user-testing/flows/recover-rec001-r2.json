@@ -1,0 +1,47 @@
+{
+  "groupId": "recover-rec001-r2",
+  "testedAt": "2026-04-19T22:26:25Z",
+  "isolation": {
+    "appUrl": "http://127.0.0.1:5173",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "assertionIds": ["VAL-REC-001"],
+    "browserSession": "rec001-r2"
+  },
+  "toolsUsed": ["agent-browser"],
+  "assertionResults": [
+    {
+      "id": "VAL-REC-001",
+      "title": "Recover Collect Shares renders incompatible-shares variant",
+      "status": "pass",
+      "reason": "The page rendered all required incompatible-shares variant content and the paste input accepted typed text.",
+      "steps": [
+        {
+          "action": "Navigate to /demo/recover-collect-shares",
+          "expected": "Recover NSEC screen with incompatible-shares variant content is visible",
+          "observed": "Header/back link, Recover NSEC title/subtitle, local and pasted loaded share rows, disabled Recover NSEC button, incompatible-shares alert, and both share chips were visible."
+        },
+        {
+          "action": "Enter text into paste input",
+          "expected": "Paste input accepts text",
+          "observed": "Textbox 'Paste share hex' accepted value deadbeefcafebabe1234567890."
+        },
+        {
+          "action": "Check browser errors",
+          "expected": "No console/page errors",
+          "observed": "agent-browser errors returned none."
+        }
+      ],
+      "evidence": {
+        "url": "http://127.0.0.1:5173/demo/recover-collect-shares",
+        "screenshots": [
+          "recover/recover-rec001-r2/VAL-REC-001-initial.png",
+          "recover/recover-rec001-r2/VAL-REC-001-paste-input-filled.png"
+        ],
+        "consoleErrors": "none"
+      }
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 1 assertion (VAL-REC-001): passed."
+}
