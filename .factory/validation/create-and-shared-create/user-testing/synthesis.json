@@ -1,59 +1,29 @@
 {
   "milestone": "create-and-shared-create",
-  "round": 1,
+  "round": 2,
   "status": "fail",
   "assertionsSummary": {
-    "total": 26,
-    "passed": 21,
-    "failed": 5,
+    "total": 5,
+    "passed": 4,
+    "failed": 1,
     "blocked": 0
   },
   "passedAssertions": [
-    "VAL-CROSS-005",
-    "VAL-CRT-001",
-    "VAL-CRT-002",
-    "VAL-CRT-003",
-    "VAL-CRT-004",
-    "VAL-CRT-005",
-    "VAL-CRT-006",
-    "VAL-CRT-008",
-    "VAL-CRT-009",
-    "VAL-CRT-010",
-    "VAL-CRT-011",
-    "VAL-CRT-013",
-    "VAL-SHR-001",
-    "VAL-SHR-002",
-    "VAL-SHR-003",
-    "VAL-SHR-004",
-    "VAL-SHR-006",
-    "VAL-SHR-007",
-    "VAL-SHR-009",
-    "VAL-SHR-010",
-    "VAL-SHR-012"
+    "VAL-CRT-007",
+    "VAL-SHR-005",
+    "VAL-SHR-008",
+    "VAL-SHR-011"
   ],
   "failedAssertions": [
     {
-      "id": "VAL-CRT-007",
-      "reason": "From /demo/create-keyset, first click on Create Keyset goes to /create instead of /create/progress."
-    },
-    {
       "id": "VAL-CRT-012",
-      "reason": "Full create flow from /demo/create-keyset requires an extra click through /create before /create/progress."
-    },
-    {
-      "id": "VAL-SHR-005",
-      "reason": "Continue to Distribute Shares from /demo/shared-create-profile routes to /create instead of /create/distribute."
-    },
-    {
-      "id": "VAL-SHR-008",
-      "reason": "Share #3 disabled Copy/QR controls render at computed opacity 0.45 instead of expected 0.4."
-    },
-    {
-      "id": "VAL-SHR-011",
-      "reason": "Finish Distribution from /demo/shared-distribution-completion navigates to / instead of /dashboard/{profileId}."
+      "reason": "Flow did not progress beyond /create/profile, so stepper progression to /create/distribute and /create/complete could not be validated."
     }
   ],
   "blockedAssertions": [],
   "appliedUpdates": [],
-  "previousRound": null
+  "previousRound": ".factory/validation/create-and-shared-create/user-testing/synthesis.round1.json",
+  "flowReports": [
+    ".factory/validation/create-and-shared-create/user-testing/flows/rerun-round2-core.json"
+  ]
 }

@@ -1,0 +1,143 @@
+{
+  "groupId": "rerun-round2-core",
+  "testedAt": "2026-04-19T20:05:54Z",
+  "isolation": {
+    "surface": "browser-ui",
+    "appUrl": "http://127.0.0.1:5173",
+    "browserSession": "rerun-round2-core",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db"
+  },
+  "toolsUsed": [
+    "agent-browser",
+    "curl"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-CRT-007",
+      "title": "Create Keyset Continue hands off to Generation Progress",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/create-keyset and click 'Create Keyset'",
+          "expected": "Navigate to /create/progress",
+          "observed": "Navigated to http://127.0.0.1:5173/create/progress"
+        },
+        {
+          "action": "Wait for auto-chain",
+          "expected": "Auto-advance to /create/profile",
+          "observed": "Auto-advanced to http://127.0.0.1:5173/create/profile"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/rerun-round2-core/VAL-CRT-007-progress.png",
+          "create-and-shared-create/rerun-round2-core/VAL-CRT-007-profile.png"
+        ],
+        "consoleErrors": "not required for this assertion (no page errors observed during this flow)",
+        "network": "not captured (UI route validation)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CRT-012",
+      "title": "Full Create → Shared happy path",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Start from /demo/create-keyset and click 'Create Keyset'",
+          "expected": "/create/progress -> /create/profile -> /create/distribute -> /create/complete",
+          "observed": "Reached /create/progress and then /create/profile"
+        },
+        {
+          "action": "Fill Password and Confirm Password on /create/profile and click Continue",
+          "expected": "Navigate to /create/distribute",
+          "observed": "Stayed on /create/profile; page displayed error text: 'invalid input: Invalid group package: invalid byte length: expected 33, got 19'"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/rerun-round2-core/VAL-CRT-012-start-create-keyset.png",
+          "create-and-shared-create/rerun-round2-core/VAL-CRT-012-profile-step2.png",
+          "create-and-shared-create/rerun-round2-core/debug-create-profile-after-click.png"
+        ],
+        "consoleErrors": "none",
+        "network": "not captured (UI route validation)"
+      },
+      "issues": "Flow did not progress beyond /create/profile, so stepper progression to /create/distribute and /create/complete could not be validated."
+    },
+    {
+      "id": "VAL-SHR-005",
+      "title": "Shared Create Profile Continue advances to Distribute Shares",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/shared-create-profile and click 'Continue to Distribute Shares'",
+          "expected": "Navigate to /create/distribute with shared stepper at step 3 active",
+          "observed": "Navigated to http://127.0.0.1:5173/create/distribute; destination screenshot shows Distribute Shares screen with step 3 active and steps 1-2 completed"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/rerun-round2-core/VAL-SHR-005-start-shared-create-profile.png",
+          "create-and-shared-create/rerun-round2-core/VAL-SHR-005-distribute.png"
+        ],
+        "consoleErrors": "none",
+        "network": "not captured (UI route validation)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SHR-008",
+      "title": "Shared Distribute Shares locked share gate",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/shared-distribute-shares",
+          "expected": "Share 3 shows 'Enter password to unlock' with disabled Copy/QR; Share 2 Copy/QR enabled",
+          "observed": "Body text includes 'Enter password to unlock' under Share 3; interactive state checks returned Share2 Copy=true, Share2 QR=true, Share3 Copy=false, Share3 QR=false"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/rerun-round2-core/VAL-SHR-008-locked-gate.png"
+        ],
+        "consoleErrors": "not required for this assertion (no page errors observed)",
+        "network": "not captured (UI route validation)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SHR-011",
+      "title": "Distribution Completion exits shared flow to dashboard",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/shared-distribution-completion and click 'Finish Distribution'",
+          "expected": "Exit to /dashboard/{profileId} with no console errors",
+          "observed": "Navigated to http://127.0.0.1:5173/dashboard/demo-profile; no console/page errors reported"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "create-and-shared-create/rerun-round2-core/VAL-SHR-011-start-completion.png",
+          "create-and-shared-create/rerun-round2-core/VAL-SHR-011-dashboard.png"
+        ],
+        "consoleErrors": "none",
+        "network": "not captured (UI route validation)"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "On /create/profile during VAL-CRT-012, continuing the flow required manual password entry and still surfaced an inline package-validation error that prevented navigation.",
+      "resolved": false,
+      "resolution": "Attempted password + confirm fill and retry; flow remained blocked at /create/profile.",
+      "affectedAssertions": [
+        "VAL-CRT-012"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Retested 5 assertions: 4 passed (VAL-CRT-007, VAL-SHR-005, VAL-SHR-008, VAL-SHR-011) and 1 failed (VAL-CRT-012 blocked in-flow at /create/profile due invalid group package error)."
+}
