@@ -12,7 +12,8 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   locationState: null as Record<string, unknown> | null,
   reloadProfiles: vi.fn().mockResolvedValue(undefined),
-  mockSaveProfile: vi.fn().mockResolvedValue(undefined)
+  createKeyset: vi.fn().mockResolvedValue(undefined),
+  createProfile: vi.fn().mockResolvedValue("profile-abc123")
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -31,11 +32,11 @@ vi.mock("react-router-dom", async () => {
 });
 
 vi.mock("../../app/AppState", () => ({
-  useAppState: () => ({ reloadProfiles: mocks.reloadProfiles })
-}));
-
-vi.mock("../../lib/storage/profileStore", () => ({
-  saveProfile: mocks.mockSaveProfile
+  useAppState: () => ({
+    reloadProfiles: mocks.reloadProfiles,
+    createKeyset: mocks.createKeyset,
+    createProfile: mocks.createProfile
+  })
 }));
 
 afterEach(() => {
@@ -44,6 +45,9 @@ afterEach(() => {
 
 beforeEach(() => {
   mocks.navigate.mockClear();
+  mocks.createKeyset.mockClear();
+  mocks.createProfile.mockClear();
+  mocks.createProfile.mockResolvedValue("profile-abc123");
   mocks.locationState = null;
 });
 
@@ -59,7 +63,8 @@ describe("EnterPackageScreen", () => {
     expect(screen.getByText("Scan QR")).toBeInTheDocument();
     expect(screen.getByLabelText("Package Password")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Begin Onboarding/i })).toBeInTheDocument();
-    expect(screen.getByText("Back")).toBeInTheDocument();
+    /* VAL-ONB-001: Enter Package uses 'Back to Welcome' label (not default 'Back'). */
+    expect(screen.getByRole("button", { name: "Back to Welcome" })).toBeInTheDocument();
   });
 
   it("shows validation feedback for valid bfonboard1 input", () => {
@@ -102,8 +107,19 @@ describe("EnterPackageScreen", () => {
         <EnterPackageScreen />
       </MemoryRouter>
     );
-    fireEvent.click(screen.getByText("Back"));
+    fireEvent.click(screen.getByRole("button", { name: "Back to Welcome" }));
     expect(mocks.navigate).toHaveBeenCalledWith("/");
+  });
+
+  it("renders inline help icons on Onboarding Package and Package Password labels (VAL-ONB-001)", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <EnterPackageScreen />
+      </MemoryRouter>
+    );
+    /* Both labels live inside import-label-row wrappers that contain help icons. */
+    const helpIcons = container.querySelectorAll(".import-label-help-icon");
+    expect(helpIcons.length).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -123,6 +139,17 @@ describe("HandshakeScreen", () => {
     expect(screen.getByRole("button", { name: /Cancel Onboarding/i })).toBeInTheDocument();
   });
 
+  it("does not render a Back link (VAL-ONB-002)", () => {
+    mocks.locationState = { packageString: "bfonboard1abc123", password: "test" };
+    render(
+      <MemoryRouter>
+        <HandshakeScreen />
+      </MemoryRouter>
+    );
+    expect(screen.queryByRole("button", { name: /^Back$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Back to/i })).not.toBeInTheDocument();
+  });
+
   it("guard redirects to /onboard if no state", () => {
     mocks.locationState = null;
     const { container } = render(
@@ -137,7 +164,7 @@ describe("HandshakeScreen", () => {
 
 describe("OnboardingFailedScreen", () => {
   it("renders warning alert with timeout message and action buttons", () => {
-    render(
+    const { container } = render(
       <MemoryRouter>
         <OnboardingFailedScreen />
       </MemoryRouter>
@@ -147,6 +174,11 @@ describe("OnboardingFailedScreen", () => {
     expect(screen.getByText(/peer did not respond/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Retry/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Back to Onboarding/i })).toBeInTheDocument();
+    /* VAL-ONB-003: amber/timeout variant carries Paper's exact Tailwind tokens. */
+    const alert = container.querySelector(".onboard-error-alert");
+    expect(alert?.className).toContain("bg-[#EAB3081A]");
+    expect(alert?.className).toContain("border-[#EAB30840]");
+    expect(alert?.className).not.toContain("red");
   });
 
   it("Retry button navigates to handshake", () => {
@@ -209,7 +241,7 @@ describe("OnboardingCompleteScreen", () => {
     expect(screen.queryByText("Back")).not.toBeInTheDocument();
   });
 
-  it("Save & Launch Signer saves profile and navigates to home", async () => {
+  it("Save & Launch Signer creates keyset + profile and navigates to dashboard (VAL-ONB-005 / VAL-CROSS-007)", async () => {
     mocks.locationState = { fromHandshake: true };
     render(
       <MemoryRouter>
@@ -218,10 +250,13 @@ describe("OnboardingCompleteScreen", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /Save & Launch Signer/i }));
     await waitFor(() => {
-      expect(mocks.mockSaveProfile).toHaveBeenCalled();
+      expect(mocks.createKeyset).toHaveBeenCalled();
     });
     await waitFor(() => {
-      expect(mocks.navigate).toHaveBeenCalledWith("/");
+      expect(mocks.createProfile).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(mocks.navigate).toHaveBeenCalledWith("/dashboard/profile-abc123");
     });
   });
 });

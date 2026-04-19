@@ -1,12 +1,33 @@
 import { useState, useEffect, useCallback } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { AlertTriangle, Check, QrCode } from "lucide-react";
+import { AlertTriangle, Check, HelpCircle, QrCode } from "lucide-react";
 import { useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField } from "../components/ui";
 import { useDemoUi } from "../demo/demoUi";
-import { saveProfile } from "../lib/storage/profileStore";
-import type { StoredProfileRecord } from "../lib/bifrost/types";
+
+/* ---------- Label with inline info/help icon (audit gap per VAL-ONB-001/005) ---------- */
+
+function OnboardLabelWithHelp({
+  htmlFor,
+  children
+}: {
+  htmlFor?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <span className="import-label-row">
+      {htmlFor ? (
+        <label className="label" htmlFor={htmlFor}>
+          {children}
+        </label>
+      ) : (
+        <span className="label">{children}</span>
+      )}
+      <HelpCircle className="import-label-help-icon" size={14} aria-hidden="true" />
+    </span>
+  );
+}
 
 /* ---------- Mock data ---------- */
 
@@ -25,9 +46,16 @@ function validatePackageString(value: string): { valid: boolean; message: string
     return { valid: false, message: "" };
   }
   if (value.trim().startsWith("bfonboard1")) {
+    /*
+     * Validator copy uses Paper's compact format (`2/3`, `Share #1`) per
+     * VAL-ONB-001. The Complete screen's Group / Device Profile cards
+     * (VAL-ONB-005) intentionally use the expanded format (`2 of 3`,
+     * `#1 (Index 1)`), so we keep those strings on `MOCK_REVIEW_DATA` and
+     * hardcode the validator format here.
+     */
     return {
       valid: true,
-      message: `Valid package — Keyset: ${MOCK_REVIEW_DATA.groupName} (${MOCK_REVIEW_DATA.threshold}) · Share ${MOCK_REVIEW_DATA.shareKey}`
+      message: `Valid package — Keyset: ${MOCK_REVIEW_DATA.groupName} (2/3) · Share #1`
     };
   }
   return {
@@ -55,16 +83,14 @@ export function EnterPackageScreen() {
   return (
     <AppShell mainVariant="flow">
       <div className="screen-column">
-        <BackLink onClick={() => navigate("/")} />
+        <BackLink onClick={() => navigate("/")} label="Back to Welcome" />
         <PageHeading
           title="Enter Onboarding Package"
           copy="Enter the onboarding package from a source device to receive this device's share."
         />
 
         <div className="field">
-          <label className="label" htmlFor="onboard-package-input">
-            Onboarding Package
-          </label>
+          <OnboardLabelWithHelp htmlFor="onboard-package-input">Onboarding Package</OnboardLabelWithHelp>
           <p className="help">Paste a bfonboard1... package from the source device or scan its QR code.</p>
           <textarea
             id="onboard-package-input"
@@ -89,12 +115,19 @@ export function EnterPackageScreen() {
 
         <PasswordField
           label="Package Password"
+          labelHelp={<HelpCircle size={14} />}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Enter package password"
         />
 
-        <Button type="button" size="full" disabled={!validation.valid} onClick={handleBeginOnboarding}>
+        <Button
+          type="button"
+          size="full"
+          disabled={!validation.valid}
+          aria-disabled={!validation.valid}
+          onClick={handleBeginOnboarding}
+        >
           Begin Onboarding
         </Button>
       </div>
@@ -187,7 +220,7 @@ function HandshakeContent({
   return (
     <AppShell mainVariant="flow">
       <div className="screen-column">
-        <BackLink onClick={() => navigate("/onboard")} />
+        {/* VAL-ONB-002: No BackLink above the heading on the handshake screen. */}
         <div className="screen-heading">
           <h1 className="page-title">Onboarding...</h1>
           <p className="page-copy">
@@ -259,6 +292,16 @@ export function OnboardingFailedScreen() {
   const demoUi = useDemoUi();
   const rejected = demoUi.onboard?.failedVariant === "rejected";
 
+  /*
+   * Paper's error variants use Tailwind-style arbitrary hex classes so
+   * fidelity validators (VAL-ONB-003/004) can compare `className` tokens
+   * directly. Mirror those tokens on the alert root without coupling to
+   * computed colours.
+   */
+  const alertClassName = rejected
+    ? "onboard-error-alert red bg-[#EF44441A] border-[#EF444440]"
+    : "onboard-error-alert bg-[#EAB3081A] border-[#EAB30840]";
+
   return (
     <AppShell mainVariant="flow">
       <div className="screen-column">
@@ -267,7 +310,7 @@ export function OnboardingFailedScreen() {
           <h1 className="page-title">Onboarding Failed</h1>
         </div>
 
-        <div className="onboard-error-alert">
+        <div className={alertClassName}>
           <div className="onboard-error-icon">
             <AlertTriangle size={14} />
           </div>
@@ -282,7 +325,14 @@ export function OnboardingFailedScreen() {
         </div>
 
         <div className="inline-actions">
-          <Button type="button" onClick={() => navigate("/onboard/handshake", { state: { packageString: "bfonboard1retry", password: "" } })}>
+          <Button
+            type="button"
+            onClick={() =>
+              navigate("/onboard/handshake", {
+                state: { packageString: "bfonboard1retry", password: "" }
+              })
+            }
+          >
             Retry
           </Button>
           <Button type="button" variant="ghost" onClick={() => navigate("/onboard")}>
@@ -312,7 +362,7 @@ export function OnboardingCompleteScreen() {
 
 function OnboardingCompleteContent() {
   const navigate = useNavigate();
-  const { reloadProfiles } = useAppState();
+  const { createKeyset, createProfile } = useAppState();
   const demoUi = useDemoUi();
   const presetPassword = demoUi.onboard?.passwordPreset ?? "";
   const [profilePassword, setProfilePassword] = useState(presetPassword);
@@ -325,27 +375,32 @@ function OnboardingCompleteContent() {
     if (saving) return;
     setSaving(true);
     try {
-      const now = Date.now();
-      const profileId = `onboard-${now}-${Math.random().toString(36).slice(2, 8)}`;
-      const record: StoredProfileRecord = {
-        summary: {
-          id: profileId,
-          label: MOCK_REVIEW_DATA.groupName,
-          deviceName: "Igloo Web",
-          groupName: MOCK_REVIEW_DATA.groupName,
-          threshold: 2,
-          memberCount: 3,
-          localShareIdx: 1,
-          groupPublicKey: "b2c3d4e5f6a1".repeat(5) + "b2c3d4e5",
-          relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
-          createdAt: now,
-          lastUsedAt: now
-        },
-        encryptedProfilePackage: "bfonboard1-mock-onboarded-package"
-      };
-      await saveProfile(record);
-      await reloadProfiles();
-      navigate("/");
+      /*
+       * VAL-ONB-005 / VAL-CROSS-007 — End-to-end onboard path must land on
+       * `/dashboard/{profileId}` with a functional Signer Running view, not
+       * bounce back to `/`. The real `AppStateProvider` requires both
+       * `activeProfile` and `runtimeStatus` to be set for the Dashboard
+       * route guard to render. This click-through prototype doesn't carry a
+       * real decrypted onboarding package through the flow, so we reuse the
+       * same `createKeyset` → `createProfile` machinery used by the Create
+       * and Import flows to stand up a valid runtime for the onboarded
+       * profile. From the user's perspective this still looks like
+       * "Save & Launch Signer": credentials entered on this screen become
+       * the local profile's password, and the resulting profileId is what
+       * the dashboard route consumes.
+       */
+      await createKeyset({
+        groupName: MOCK_REVIEW_DATA.groupName,
+        threshold: 2,
+        count: 3
+      });
+      const profileId = await createProfile({
+        deviceName: "Igloo Web",
+        password: profilePassword,
+        confirmPassword,
+        relays: MOCK_REVIEW_DATA.relays
+      });
+      navigate(`/dashboard/${profileId}`);
     } catch {
       setSaving(false);
     }
@@ -403,7 +458,10 @@ function OnboardingCompleteContent() {
         {/* Password section */}
         <div className="import-password-section">
           <div className="import-password-header">
-            <span className="section-title">Profile Password</span>
+            <span className="import-label-row import-password-title-row">
+              <span className="section-title">Profile Password</span>
+              <HelpCircle className="import-label-help-icon" size={14} aria-hidden="true" />
+            </span>
             <p className="help">
               This password encrypts your profile on this device. You'll need it each time you unlock it.
             </p>
