@@ -1,7 +1,7 @@
 {
   "milestone": "dashboard-states",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -20,46 +20,34 @@
     }
   },
   "reviewsSummary": {
-    "total": 4,
-    "passed": 3,
-    "failed": 1,
-    "failedFeatures": [
-      "dashboard-policies"
-    ]
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "failedFeatures": []
   },
-  "blockingIssues": [
-    {
-      "featureId": "dashboard-policies",
-      "severity": "blocking",
-      "description": "Peer policy rows use a fixed masked placeholder (\"*************\") for pubkeys instead of truncated per-peer pubkey values expected by the feature contract."
-    }
-  ],
+  "blockingIssues": [],
   "appliedUpdates": [],
   "suggestedGuidanceUpdates": [
     {
       "target": "validation-contract.md",
-      "suggestion": "Tighten VAL-DASH-006 to explicitly require peer rows to show truncated pubkeys, not just badge rows.",
-      "evidence": "Feature expectedBehavior for dashboard-policies requires truncated pubkeys, but VAL-DASH-006 only checks for peer rows and permission badges; this allowed placeholder pubkeys to pass until scrutiny.",
+      "suggestion": "Tighten VAL-DASH-006 to explicitly require peer rows to show truncated pubkeys (and not placeholders) to align with dashboard-policies expected behavior.",
+      "evidence": "The original dashboard-policies review failed due to placeholder pubkeys, and the fix review notes automated checks can still miss this without explicit assertion language in the contract.",
       "isSystemic": false
-    },
-    {
-      "target": "AGENTS.md",
-      "suggestion": "Add an explicit icon-source convention (e.g., prefer lucide-react unless a design-exact custom glyph is required and justified).",
-      "evidence": "Architecture guidance states lucide-react usage, but AGENTS.md omits this rule; dashboard-modals implemented an inline SVG warning icon.",
-      "isSystemic": false
-    },
-    {
-      "target": "ui-builder skill",
-      "suggestion": "Clarify or enforce the tests-first procedure so reported compliance aligns with observed execution order.",
-      "evidence": "ui-builder skill requires tests-first, but dashboard-modals transcript shows implementation edits before creating tests while handoff marked followedProcedure=true.",
-      "isSystemic": true
     }
   ],
   "rejectedObservations": [
     {
       "observation": "Undocumented nuance that using Distribute screen Copy actions may leave Finish Distribution disabled while QR flow enables progression.",
       "reason": "ambiguous and environment-dependent behavior from a single transcript; needs broader confirmation before adding shared guidance."
+    },
+    {
+      "observation": "Add AGENTS.md guidance to prefer lucide-react over inline SVG icons.",
+      "reason": "non-blocking convention note already captured in prior synthesis round and not newly evidenced by this fix re-review."
+    },
+    {
+      "observation": "ui-builder tests-first process drift in dashboard-modals transcript.",
+      "reason": "process observation already captured in prior synthesis round and not newly evidenced by this fix re-review."
     }
   ],
-  "previousRound": null
+  "previousRound": ".factory/validation/dashboard-states/scrutiny/synthesis.round1.json"
 }

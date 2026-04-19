@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-policies-peer-pubkeys",
+  "reviewedAt": "2026-04-19T00:37:29Z",
+  "commitId": "d5837d4ad7cd47e2f4f55579e8c43821d2ca9c66",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Reviewed both diffs (original failure commit 43efb15 and fix commit d5837d4). The fix directly addresses the blocking issue by replacing placeholder peer pubkeys in mock data and rendering each row with shortHex(peer.pubkey, 6, 4), producing distinct truncated values per peer.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "knowledge",
+      "observation": "Automated test coverage still does not explicitly assert rendered truncated pubkey text in the Peer Policies rows, so this requirement can regress without test failures.",
+      "evidence": "src/screens/__tests__/DashboardPolicies.test.tsx:128-145 validates peer labels and badge counts, but has no assertion for .policies-peer-key content; prior failure in .factory/validation/dashboard-states/scrutiny/reviews/dashboard-policies.json was caused by missing this exact check."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/dashboard-states/scrutiny/reviews/dashboard-policies.json",
+  "summary": "Pass. The fix feature adequately resolves the prior blocking failure: Peer Policies no longer render a fixed placeholder and now display per-peer truncated pubkeys derived from mock keys."
+}
