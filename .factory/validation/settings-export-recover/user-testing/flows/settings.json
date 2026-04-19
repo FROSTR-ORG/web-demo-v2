@@ -1,0 +1,241 @@
+{
+  "groupId": "settings",
+  "testedAt": "2026-04-19T01:45:07.059017Z",
+  "isolation": {
+    "milestone": "settings-export-recover",
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "appUrl": "http://127.0.0.1:5173",
+    "browserSession": "settings-group"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-DASH-011",
+      "title": "Dashboard header buttons (Recover, Export, Policies, Settings) are enabled and clickable",
+      "status": "pass",
+      "reason": "All four header actions were present, had no disabled attribute/disabled property, and each click produced its expected action.",
+      "steps": [
+        {
+          "action": "Inspect Recover/Export/Policies/Settings buttons on dashboard header",
+          "expected": "Buttons exist and are enabled without disabled attribute",
+          "observed": "All four buttons exist with hasDisabledAttr=false and disabledProp=false"
+        },
+        {
+          "action": "Click Recover",
+          "expected": "Navigate to Recover flow",
+          "observed": "Navigated to /recover/{profileId}"
+        },
+        {
+          "action": "Click Export",
+          "expected": "Open Export modal",
+          "observed": "Export modal opened with password fields and controls"
+        },
+        {
+          "action": "Click Policies",
+          "expected": "Activate policies view",
+          "observed": "Policies view content rendered"
+        },
+        {
+          "action": "Click Settings",
+          "expected": "Open settings sidebar",
+          "observed": "Settings sidebar opened"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/settings/VAL-DASH-011-header.png",
+          "settings-export-recover/settings/VAL-DASH-011-recover-click.png",
+          "settings-export-recover/settings/VAL-DASH-011-export-click.png",
+          "settings-export-recover/settings/VAL-DASH-011-policies-click.png",
+          "settings-export-recover/settings/VAL-DASH-011-settings-click.png"
+        ],
+        "consoleErrors": "none",
+        "network": "none captured by agent-browser (client-side route/modal actions)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-001",
+      "title": "Settings gear opens slide-over sidebar with all sections",
+      "status": "pass",
+      "reason": "Clicking the gear opened a right-side settings panel with all required sections and an active scrim over dashboard content.",
+      "steps": [
+        {
+          "action": "Click dashboard Settings gear",
+          "expected": "Slide-over sidebar opens with required sections and scrim",
+          "observed": "Sidebar opened with Device Profile, Relays, Group Profile, Rotate Share, Export & Backup, Profile Security; scrim candidate overlay present"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/settings/VAL-SETTINGS-001-sidebar-open.png"
+        ],
+        "consoleErrors": "none",
+        "network": "none captured by agent-browser (UI-only sidebar open)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-002",
+      "title": "Sidebar close button (X) dismisses sidebar and removes scrim",
+      "status": "pass",
+      "reason": "Close settings (X) dismissed the panel and returned to fully interactive dashboard view.",
+      "steps": [
+        {
+          "action": "Open settings sidebar",
+          "expected": "Sidebar visible",
+          "observed": "Sidebar visible"
+        },
+        {
+          "action": "Click X close button",
+          "expected": "Sidebar and scrim removed",
+          "observed": "Sidebar removed; dashboard-only interactive controls remained"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/settings/VAL-SETTINGS-002-before-close.png",
+          "settings-export-recover/settings/VAL-SETTINGS-002-after-close.png"
+        ],
+        "consoleErrors": "none",
+        "network": "none captured by agent-browser (UI-only dismiss)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-003",
+      "title": "Lock Profile button in sidebar navigates to Welcome (/)",
+      "status": "pass",
+      "reason": "Lock from Profile Security returned to / with Welcome screen and no active dashboard.",
+      "steps": [
+        {
+          "action": "Open settings sidebar and click Profile Security Lock",
+          "expected": "Navigate to / Welcome and close sidebar",
+          "observed": "Navigated to / and saw Welcome with unlockable profile row"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/settings/VAL-SETTINGS-003-locked-welcome.png"
+        ],
+        "consoleErrors": "none",
+        "network": "none captured by agent-browser (client-side navigation)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-004",
+      "title": "Clear Credentials button opens destructive confirmation modal with red styling",
+      "status": "pass",
+      "reason": "Clicking Clear opened confirmation modal with destructive red confirm styling and warning copy.",
+      "steps": [
+        {
+          "action": "Click Profile Security Clear",
+          "expected": "Open destructive confirmation modal",
+          "observed": "Modal opened with Clear Credentials title, warning text, and red confirm button (rgb(220, 38, 38))"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/settings/VAL-SETTINGS-004-clear-modal.png"
+        ],
+        "consoleErrors": "none",
+        "network": "none captured by agent-browser (UI-only modal open)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-005",
+      "title": "Clear Credentials Confirm clears data and navigates to Welcome, Cancel dismisses modal",
+      "status": "pass",
+      "reason": "Cancel kept user on dashboard/sidebar without data loss; confirm removed saved profile and returned to first-time Welcome; no console errors observed.",
+      "steps": [
+        {
+          "action": "Open Clear Credentials modal and click Cancel",
+          "expected": "Modal closes, remain on dashboard/settings",
+          "observed": "Modal dismissed, remained at /dashboard/{profileId} with settings sidebar still open"
+        },
+        {
+          "action": "Open Clear Credentials modal and click red Clear Credentials confirm",
+          "expected": "Credentials cleared and navigate to first-time Welcome",
+          "observed": "Navigated to / with first-time Welcome variant (no profile row)"
+        },
+        {
+          "action": "Check console errors during cancel/confirm paths",
+          "expected": "No console errors",
+          "observed": "No errors reported"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/settings/VAL-SETTINGS-005-cancel-sidebar.png",
+          "settings-export-recover/settings/VAL-SETTINGS-005-confirm-welcome.png"
+        ],
+        "consoleErrors": "none",
+        "network": "none captured by agent-browser (client-side modal/navigation flow)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-006",
+      "title": "Sidebar scrim blocks dashboard interaction beneath it",
+      "status": "pass",
+      "reason": "Clicking scrim area closed sidebar without triggering underlying dashboard actions.",
+      "steps": [
+        {
+          "action": "Open settings sidebar",
+          "expected": "Dashboard controls behind scrim are blocked",
+          "observed": "Scrim overlay active while sidebar open"
+        },
+        {
+          "action": "Click left-side scrim area over dashboard",
+          "expected": "Sidebar closes only; no dashboard action triggered",
+          "observed": "Sidebar closed and dashboard remained in Running state (no Recover/Stop action fired)"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/settings/VAL-SETTINGS-001-sidebar-open.png",
+          "settings-export-recover/settings/VAL-SETTINGS-006-after-scrim-click.png"
+        ],
+        "consoleErrors": "none",
+        "network": "none captured by agent-browser (UI-only overlay interaction)"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "To create isolated dashboard state, Finish Distribution was initially disabled until both remote share QR modals were opened and dismissed in Create > Distribute Shares.",
+      "resolved": true,
+      "resolution": "Opened each QR modal and clicked Done, then Finish Distribution became enabled.",
+      "affectedAssertions": [
+        "VAL-DASH-011",
+        "VAL-SETTINGS-001",
+        "VAL-SETTINGS-002",
+        "VAL-SETTINGS-003",
+        "VAL-SETTINGS-004",
+        "VAL-SETTINGS-005",
+        "VAL-SETTINGS-006"
+      ]
+    },
+    {
+      "description": "agent-browser network capture returned no requests for these client-side UI transitions/modals.",
+      "resolved": true,
+      "resolution": "Used screenshot + URL + console evidence as primary signal for each assertion.",
+      "affectedAssertions": [
+        "VAL-DASH-011",
+        "VAL-SETTINGS-001",
+        "VAL-SETTINGS-002",
+        "VAL-SETTINGS-003",
+        "VAL-SETTINGS-004",
+        "VAL-SETTINGS-005",
+        "VAL-SETTINGS-006"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 7 assertions (VAL-DASH-011, VAL-SETTINGS-001..006): 7 passed, 0 failed, 0 blocked."
+}

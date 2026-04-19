@@ -1,0 +1,167 @@
+{
+  "groupId": "export",
+  "testedAt": "2026-04-19T01:42:54Z",
+  "isolation": {
+    "milestone": "settings-export-recover",
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "appUrl": "http://127.0.0.1:5173",
+    "sessionName": "export-group",
+    "assignedAssertions": [
+      "VAL-EXPORT-001",
+      "VAL-EXPORT-002",
+      "VAL-EXPORT-003",
+      "VAL-EXPORT-004",
+      "VAL-EXPORT-005"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-EXPORT-001",
+      "title": "Export Profile modal renders with password inputs, strength indicator, Cancel and Export buttons",
+      "status": "pass",
+      "reason": "Header Export button opened modal with close icon, Export Password and Confirm Password fields, Cancel and Export actions visible; strength indicator visible in screenshot.",
+      "steps": [
+        {
+          "action": "From dashboard, click header Export button",
+          "expected": "Export Profile modal opens with required fields and controls",
+          "observed": "Modal opened on dashboard with Close modal button, Export Password + Confirm Password inputs, Cancel and Export buttons."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/export/VAL-EXPORT-001-export-modal-header.png"
+        ],
+        "consoleErrors": "none observed during this assertion",
+        "network": "No requests captured (UI-only modal render)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EXPORT-002",
+      "title": "Export Complete renders with masked backup string, Copy/Download buttons, warning text, Done button",
+      "status": "pass",
+      "reason": "Submitting matching export passwords transitioned to Backup Ready/Export Complete view with reveal toggle, Copy, Download, and Done controls; warning text and success styling visible in screenshot.",
+      "steps": [
+        {
+          "action": "Fill matching export passwords and click Export",
+          "expected": "Export Complete view appears with masked backup string and required actions",
+          "observed": "Export Complete view displayed with Reveal backup string toggle, Copy/Download, and Done button."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/export/VAL-EXPORT-002-export-complete.png"
+        ],
+        "consoleErrors": "none observed during this assertion",
+        "network": "No requests captured (UI-only transition)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EXPORT-003",
+      "title": "Done button on Export Complete dismisses and returns to dashboard",
+      "status": "pass",
+      "reason": "Clicking Done closed the export overlay and returned to interactive dashboard state on same profile URL.",
+      "steps": [
+        {
+          "action": "Click Done on Export Complete",
+          "expected": "Export view dismissed and dashboard visible/interactive",
+          "observed": "Overlay dismissed; dashboard controls visible and interactive at /dashboard/{profileId}."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/export/VAL-EXPORT-003-dashboard-after-done.png"
+        ],
+        "consoleErrors": "none observed during this assertion",
+        "network": "No requests captured (UI-only dismissal)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EXPORT-004",
+      "title": "Export accessible from both dashboard header button and Settings sidebar Export button",
+      "status": "pass",
+      "reason": "Export modal was opened successfully from both the dashboard header Export button and Settings sidebar Export button; resulting modal structure matched.",
+      "steps": [
+        {
+          "action": "Open Export from dashboard header",
+          "expected": "Export modal appears",
+          "observed": "Export modal appeared from header path."
+        },
+        {
+          "action": "Open Settings sidebar, click sidebar Export",
+          "expected": "Same Export modal appears",
+          "observed": "Export modal appeared from sidebar path with same password fields and actions."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/export/VAL-EXPORT-001-export-modal-header.png",
+          "settings-export-recover/export/VAL-EXPORT-004-settings-sidebar-open.png",
+          "settings-export-recover/export/VAL-EXPORT-004-export-modal-settings.png"
+        ],
+        "consoleErrors": "none observed during this assertion",
+        "network": "No requests captured (UI-only modal opens)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EXPORT-005",
+      "title": "Copy shows visual confirmation and Download triggers file save",
+      "status": "pass",
+      "reason": "Copy changed button text to 'Copied!' (visual confirmation), reveal toggle switched between reveal/hide states, and Download created a file in the configured download directory.",
+      "steps": [
+        {
+          "action": "Click Reveal backup string toggle",
+          "expected": "Backup text reveals and toggle changes state",
+          "observed": "Toggle label changed to 'Hide backup string'."
+        },
+        {
+          "action": "Click Copy",
+          "expected": "Visual copy confirmation appears",
+          "observed": "Copy button label changed to 'Copied!'."
+        },
+        {
+          "action": "Click Hide backup string toggle",
+          "expected": "Backup text re-masked",
+          "observed": "Toggle label returned to 'Reveal backup string'."
+        },
+        {
+          "action": "Click Download",
+          "expected": "File save/download is triggered",
+          "observed": "Download file created in evidence download directory."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/export/VAL-EXPORT-005-revealed.png",
+          "settings-export-recover/export/VAL-EXPORT-005-copy-confirmation.png",
+          "settings-export-recover/export/VAL-EXPORT-005-hidden-again.png",
+          "settings-export-recover/export/VAL-EXPORT-005-after-download-click.png"
+        ],
+        "consoleErrors": "Failed to execute 'writeText' on 'Clipboard': Write permission denied.",
+        "network": "No requests captured (download produced local file artifact)",
+        "downloadArtifacts": [
+          "settings-export-recover/export/downloads/f5940617-ad4a-4711-8578-992c0c0e96bb"
+        ]
+      },
+      "issues": "Clipboard write permission denied in headless browser console during Copy action, despite visual 'Copied!' confirmation."
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Headless browser clipboard permissions caused a console error during Copy testing ('writeText' permission denied), while UI still showed 'Copied!'.",
+      "resolved": false,
+      "resolution": "Recorded as environment friction and kept assertion result based on required visual confirmation contract.",
+      "affectedAssertions": [
+        "VAL-EXPORT-005"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 5 export assertions: 5 passed, 0 failed, 0 blocked. Export modal and completion flows worked from both entry points; copy/reveal/download behaviors were observed with one clipboard-permission console friction in headless mode."
+}

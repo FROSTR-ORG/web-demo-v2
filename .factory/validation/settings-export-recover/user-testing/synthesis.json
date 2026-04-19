@@ -1,0 +1,40 @@
+{
+  "milestone": "settings-export-recover",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 17,
+    "passed": 17,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-DASH-011",
+    "VAL-SETTINGS-001",
+    "VAL-SETTINGS-002",
+    "VAL-SETTINGS-003",
+    "VAL-SETTINGS-004",
+    "VAL-SETTINGS-005",
+    "VAL-SETTINGS-006",
+    "VAL-EXPORT-001",
+    "VAL-EXPORT-002",
+    "VAL-EXPORT-003",
+    "VAL-EXPORT-004",
+    "VAL-EXPORT-005",
+    "VAL-RECOVER-001",
+    "VAL-RECOVER-002",
+    "VAL-RECOVER-003",
+    "VAL-RECOVER-004",
+    "VAL-RECOVER-005"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Added settings-export-recover notes about headless clipboard permission warnings and SPA evidence strategy when network capture is empty.",
+      "source": "flow-report"
+    }
+  ],
+  "previousRound": null
+}

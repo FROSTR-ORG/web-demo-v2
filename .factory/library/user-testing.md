@@ -56,3 +56,8 @@ Testing surface, tools, and resource cost classification.
 
 - For clean-session setup, the fastest path to Dashboard is: create profile in Create flow, return to Welcome, then unlock the newly saved profile.
 - In headless runs, Create > Distribution Completion may keep **Finish Distribution** disabled until each remote share's QR modal is opened and dismissed with **Done**.
+
+## Settings-Export-Recover Validation Notes
+
+- In headless `agent-browser`, the Export flow's **Copy** action may log a clipboard-permission console warning (`writeText` denied) even when UI feedback correctly changes to **Copied!**.
+- For Settings/Export/Recover SPA-only transitions, `agent-browser` network capture often returns no requests; prefer URL checks, screenshots, and console error checks as primary evidence.

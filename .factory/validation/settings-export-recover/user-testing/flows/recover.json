@@ -1,0 +1,186 @@
+{
+  "groupId": "recover",
+  "testedAt": "2026-04-19T01:44:35Z",
+  "isolation": {
+    "milestone": "settings-export-recover",
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "appUrl": "http://127.0.0.1:5173",
+    "sessionName": "recover-group",
+    "assignedAssertions": [
+      "VAL-RECOVER-001",
+      "VAL-RECOVER-002",
+      "VAL-RECOVER-003",
+      "VAL-RECOVER-004",
+      "VAL-RECOVER-005"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-RECOVER-001",
+      "title": "Collect Shares screen renders with preloaded local share, additional share input, threshold indicator, Recover button",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate from Dashboard to Recover",
+          "expected": "Collect Shares screen appears",
+          "observed": "Navigated to /recover/{profileId} with Recover NSEC screen"
+        },
+        {
+          "action": "Inspect Collect Shares content",
+          "expected": "Local Share #0 loaded, additional share input, 2 of 3 threshold indicator, Recover button present",
+          "observed": "Screen text showed preloaded local share (Loaded), paste input for Share #1, and 'requires 2 of your 3 shares' messaging with Recover NSEC action"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/recover/VAL-RECOVER-001-collect-shares.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API requests captured; flow appears client-side"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-RECOVER-002",
+      "title": "Recover Success shows security warning panel with amber styling and recovered NSEC (masked + revealed)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Enter additional share and click Recover NSEC",
+          "expected": "Recover Success screen renders",
+          "observed": "Navigated to /recover/{profileId}/success"
+        },
+        {
+          "action": "Verify warning and key display",
+          "expected": "Amber security warning plus masked and revealed NSEC fields",
+          "observed": "Security Warning panel displayed; masked NSEC shown; revealed field showed full nsec after clicking Reveal"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/recover/VAL-RECOVER-002-success-initial.png",
+          "settings-export-recover/recover/VAL-RECOVER-002-success-revealed.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API requests captured; flow appears client-side"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-RECOVER-003",
+      "title": "Copy to Clipboard provides visual feedback, Clear button removes NSEC from display",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Click Copy to Clipboard",
+          "expected": "Visual copied confirmation appears",
+          "observed": "Button label changed to 'Copied!'"
+        },
+        {
+          "action": "Click Clear",
+          "expected": "Recovered NSEC removed from masked and revealed fields",
+          "observed": "Both fields changed to em-dash placeholders and copy/reveal actions disabled"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/recover/VAL-RECOVER-003-copied-feedback.png",
+          "settings-export-recover/recover/VAL-RECOVER-003-after-clear.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API requests captured; flow appears client-side"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-RECOVER-004",
+      "title": "Full recover flow navigable from Dashboard and back (Dashboard → Recover → Success → Back to Signer)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Start on Dashboard and open Recover",
+          "expected": "Collect Shares screen renders",
+          "observed": "Moved from /dashboard/{profileId} to /recover/{profileId}"
+        },
+        {
+          "action": "Submit Recover flow",
+          "expected": "Success screen renders",
+          "observed": "Moved to /recover/{profileId}/success with success UI"
+        },
+        {
+          "action": "Use Back to Signer",
+          "expected": "Return to Dashboard",
+          "observed": "Returned to /dashboard/{profileId}"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/recover/VAL-RECOVER-004-dashboard-start.png",
+          "settings-export-recover/recover/VAL-RECOVER-004-collect-shares.png",
+          "settings-export-recover/recover/VAL-RECOVER-002-success-initial.png",
+          "settings-export-recover/recover/VAL-RECOVER-005-back-from-success-dashboard.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API requests captured; flow appears client-side"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-RECOVER-005",
+      "title": "Back to Signer link on both Collect Shares and Success returns to Dashboard",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Click Back to Signer on Collect Shares",
+          "expected": "Navigate to /dashboard/{profileId}",
+          "observed": "Returned to dashboard URL"
+        },
+        {
+          "action": "Click Back to Signer on Recover Success",
+          "expected": "Navigate to /dashboard/{profileId}",
+          "observed": "Returned to dashboard URL"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "settings-export-recover/recover/VAL-RECOVER-001-collect-shares.png",
+          "settings-export-recover/recover/VAL-RECOVER-005-back-from-collect-dashboard.png",
+          "settings-export-recover/recover/VAL-RECOVER-002-success-initial.png",
+          "settings-export-recover/recover/VAL-RECOVER-005-back-from-success-dashboard.png",
+          "settings-export-recover/recover/VAL-RECOVER-005-back-from-success-dashboard-2.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API requests captured; flow appears client-side"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "agent-browser wait --url checks timed out on some SPA transitions even though route changed successfully",
+      "resolved": true,
+      "resolution": "Verified transitions using get url + snapshot after click with short waits",
+      "affectedAssertions": [
+        "VAL-RECOVER-004",
+        "VAL-RECOVER-005"
+      ]
+    },
+    {
+      "description": "agent-browser network request capture returned no requests for this recover flow",
+      "resolved": true,
+      "resolution": "Used URL transitions, screenshots, and console checks as primary evidence",
+      "affectedAssertions": [
+        "VAL-RECOVER-001",
+        "VAL-RECOVER-002",
+        "VAL-RECOVER-003",
+        "VAL-RECOVER-004",
+        "VAL-RECOVER-005"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 5 recover assertions: 5 passed, 0 failed, 0 blocked. Recover collect/success/back navigation and copy/clear behaviors all matched expected contract behavior with no console errors observed."
+}
