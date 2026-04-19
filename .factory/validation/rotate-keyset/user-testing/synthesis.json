@@ -1,0 +1,28 @@
+{
+  "milestone": "rotate-keyset",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 11,
+    "passed": 11,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-RTK-001",
+    "VAL-RTK-002",
+    "VAL-RTK-003",
+    "VAL-RTK-004",
+    "VAL-RTK-005",
+    "VAL-RTK-006",
+    "VAL-RTK-007",
+    "VAL-RTK-008",
+    "VAL-RTK-009",
+    "VAL-RTK-010",
+    "VAL-RTK-011"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "previousRound": null
+}

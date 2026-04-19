@@ -1,0 +1,143 @@
+{
+  "groupId": "rtk-core-scenarios",
+  "testedAt": "2026-04-19T22:56:39Z",
+  "isolation": {
+    "milestone": "rotate-keyset",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "appUrl": "http://127.0.0.1:5173",
+    "browserSession": "rtk-core-scenarios-20260419",
+    "assignedAssertions": [
+      "VAL-RTK-001",
+      "VAL-RTK-002",
+      "VAL-RTK-003",
+      "VAL-RTK-010"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser",
+    "grep"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-RTK-001",
+      "title": "Rotate Keyset intake renders with disabled Validate & Continue CTA",
+      "status": "pass",
+      "reason": "All required intake sections, source-share rows, progress/help copy, configuration steppers, info banner, and disabled CTA state rendered as specified.",
+      "steps": [
+        {
+          "action": "Navigate to /demo/rotate-keyset-intake and wait for networkidle",
+          "expected": "Rotate keyset intake screen renders with rotate stepper and source-share content",
+          "observed": "Rendered at /demo/rotate-keyset-intake with step labels Rotate Keyset / Create Profile / Distribute Shares and all specified source-share fields."
+        },
+        {
+          "action": "Inspect CTA state and styles",
+          "expected": "\"Validate & Continue\" is disabled with muted visual",
+          "observed": "Snapshot marked button disabled; computed styles: color rgba(255,255,255,0.4), background rgba(37,99,235,0.25)."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotate-keyset/rtk-core-scenarios/VAL-RTK-001-intake.png"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-RTK-002",
+      "title": "Rotate Keyset Review & Generate renders warning + password pair + destructive CTA",
+      "status": "pass",
+      "reason": "Review screen showed required irreversible-step copy, amber warning panel text, password/confirm inputs, and red destructive primary CTA.",
+      "steps": [
+        {
+          "action": "Navigate to /demo/rotate-keyset-review-generate and wait for networkidle",
+          "expected": "Review & Generate screen with warning copy and distribution password section",
+          "observed": "Page rendered with expected heading/description, warning panel title/body, and password + confirm-password inputs."
+        },
+        {
+          "action": "Inspect primary CTA style",
+          "expected": "\"Rotate & Generate Keyset\" uses destructive red styling",
+          "observed": "Computed button background rgb(220, 38, 38) with white text."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotate-keyset/rtk-core-scenarios/VAL-RTK-002-review-generate.png"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-RTK-003",
+      "title": "Rotate Keyset Generation Progress renders 4 phases with outlined active ring",
+      "status": "pass",
+      "reason": "Generation progress screen rendered all four required phases, 2-of-4 progress row, active outlined indicator with inner square, and pending outlined indicator without inner element.",
+      "steps": [
+        {
+          "action": "Navigate to /demo/rotate-keyset-generation-progress and read page text",
+          "expected": "Four phases in order with overall progress \"2 of 4 phases\"",
+          "observed": "Phase labels and statuses matched: Process Source Shares (Done), Recover Existing Key (Done), Generate Fresh Shares (Processing...), Prepare Rotated Shares; progress shows \"2 of 4 phases\"."
+        },
+        {
+          "action": "Inspect active/pending phase marker styles",
+          "expected": "Active marker is outlined blue ring with inner square; pending marker is outlined with no inner marker",
+          "observed": "Active marker computed border is 2px blue and ::after pseudo-element is 8x8 with rgb(96,165,250); pending marker is outlined and has no ::after content."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotate-keyset/rtk-core-scenarios/VAL-RTK-003-generation-progress.png"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-RTK-010",
+      "title": "Rotate-keyset adaptation scenarios exist in demoScenarios",
+      "status": "pass",
+      "reason": "All three required rotate-keyset adaptation scenarios are registered with expected IDs/pathnames and load correctly in DemoGallery with rotate-keyset stepper variant (no redirect to /).",
+      "steps": [
+        {
+          "action": "Inspect src/demo/scenarios.ts entries",
+          "expected": "demoScenarios includes rotate-keyset-create-profile/distribute/complete with pathnames /rotate-keyset/profile, /rotate-keyset/distribute, /rotate-keyset/complete and canonical not false",
+          "observed": "Found all 3 entries with matching IDs/pathnames; scenario() default sets canonical: options.canonical ?? true, and these entries do not override canonical to false."
+        },
+        {
+          "action": "Navigate to /demo/rotate-keyset-create-profile",
+          "expected": "Scenario page loads without redirect and shows rotate-keyset stepper variant",
+          "observed": "URL remained /demo/rotate-keyset-create-profile; stepper text shows Rotate Keyset / Create Profile / Distribute Shares."
+        },
+        {
+          "action": "Navigate to /demo/rotate-keyset-distribute",
+          "expected": "Scenario page loads without redirect and shows rotate-keyset stepper variant",
+          "observed": "URL remained /demo/rotate-keyset-distribute; stepper text shows rotate-keyset variant with step 3 active."
+        },
+        {
+          "action": "Navigate to /demo/rotate-keyset-complete",
+          "expected": "Scenario page loads without redirect and shows rotate-keyset stepper variant",
+          "observed": "URL remained /demo/rotate-keyset-complete; rotate-keyset stepper labels present with completion screen content."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotate-keyset/rtk-core-scenarios/VAL-RTK-010-create-profile-scenario.png",
+          "rotate-keyset/rtk-core-scenarios/VAL-RTK-010-distribute-scenario.png",
+          "rotate-keyset/rtk-core-scenarios/VAL-RTK-010-complete-scenario.png"
+        ],
+        "consoleErrors": "none",
+        "grep": [
+          "src/demo/scenarios.ts:281 \"rotate-keyset-create-profile\" with pathname \"/rotate-keyset/profile\"",
+          "src/demo/scenarios.ts:293 \"rotate-keyset-distribute\" with pathname \"/rotate-keyset/distribute\"",
+          "src/demo/scenarios.ts:305 \"rotate-keyset-complete\" with pathname \"/rotate-keyset/complete\"",
+          "src/demo/scenarios.ts:72 canonical default is options.canonical ?? true"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 4 assertions (VAL-RTK-001, VAL-RTK-002, VAL-RTK-003, VAL-RTK-010): 4 passed, 0 failed, 0 blocked."
+}

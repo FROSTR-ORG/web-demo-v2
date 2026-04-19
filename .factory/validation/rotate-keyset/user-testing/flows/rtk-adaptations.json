@@ -1,0 +1,132 @@
+{
+  "groupId": "rtk-adaptations",
+  "testedAt": "2026-04-19T22:55:10Z",
+  "isolation": {
+    "milestone": "rotate-keyset",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "appUrl": "http://127.0.0.1:5173",
+    "assignedAssertions": [
+      "VAL-RTK-004",
+      "VAL-RTK-005",
+      "VAL-RTK-006"
+    ],
+    "sessionName": "rtk-adaptations-78b31ed8",
+    "evidenceDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/rotate-keyset/rtk-adaptations"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-RTK-004",
+      "title": "Rotate Keyset Create Profile adaptation renders with rotate stepper",
+      "status": "pass",
+      "reason": "Both /demo/rotate-keyset-create-profile and /rotate-keyset/profile were reachable and rendered rotate-keyset adaptation content including rotate stepper label, assigned local share panel, and Continue CTA.",
+      "steps": [
+        {
+          "action": "Navigate to /demo/rotate-keyset-create-profile",
+          "expected": "Create Profile adaptation renders with rotate-keyset stepper variant",
+          "observed": "Page loaded with Create Profile content, Rotate Keyset stepper label, Assigned Local Share section, and Continue to Distribute Shares CTA."
+        },
+        {
+          "action": "Capture screenshot + check browser errors on demo route",
+          "expected": "Screenshot captured and no console/page errors",
+          "observed": "Screenshot saved and agent-browser errors output was empty."
+        },
+        {
+          "action": "Navigate to /rotate-keyset/profile",
+          "expected": "Direct route is reachable and shows same adaptation screen",
+          "observed": "Direct route stayed at /rotate-keyset/profile and rendered matching Create Profile adaptation content."
+        },
+        {
+          "action": "Capture screenshot + check browser errors on direct route",
+          "expected": "Screenshot captured and no console/page errors",
+          "observed": "Screenshot saved and agent-browser errors output was empty."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotate-keyset/rtk-adaptations/VAL-RTK-004-demo-rotate-keyset-create-profile.png",
+          "rotate-keyset/rtk-adaptations/VAL-RTK-004-direct-rotate-keyset-profile.png"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-RTK-005",
+      "title": "Rotate Keyset Distribute Shares adaptation renders with rotate stepper",
+      "status": "pass",
+      "reason": "Both /demo/rotate-keyset-distribute and /rotate-keyset/distribute were reachable and rendered rotate-stepper adaptation content with expected share cards, locked password placeholder, and completion CTA.",
+      "steps": [
+        {
+          "action": "Navigate to /demo/rotate-keyset-distribute",
+          "expected": "Distribute Shares adaptation renders with rotate-keyset stepper and expected share states",
+          "observed": "Page loaded with Rotate Keyset + Distribute Shares labels, Saved to Igloo Web pill, Enter password to unlock placeholder, and Continue to Completion CTA."
+        },
+        {
+          "action": "Capture screenshot + check browser errors on demo route",
+          "expected": "Screenshot captured and no console/page errors",
+          "observed": "Screenshot saved and agent-browser errors output was empty."
+        },
+        {
+          "action": "Navigate to /rotate-keyset/distribute",
+          "expected": "Direct route is reachable and shows same adaptation screen",
+          "observed": "Direct route stayed at /rotate-keyset/distribute and rendered matching Distribute Shares adaptation content."
+        },
+        {
+          "action": "Capture screenshot + check browser errors on direct route",
+          "expected": "Screenshot captured and no console/page errors",
+          "observed": "Screenshot saved and agent-browser errors output was empty."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotate-keyset/rtk-adaptations/VAL-RTK-005-demo-rotate-keyset-distribute.png",
+          "rotate-keyset/rtk-adaptations/VAL-RTK-005-direct-rotate-keyset-distribute.png"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-RTK-006",
+      "title": "Rotate Keyset Complete adaptation renders",
+      "status": "pass",
+      "reason": "Both /demo/rotate-keyset-complete and /rotate-keyset/complete were reachable and rendered the completion adaptation with rotate stepper labels, distribution status rows, success card, and Finish Distribution CTA.",
+      "steps": [
+        {
+          "action": "Navigate to /demo/rotate-keyset-complete",
+          "expected": "Distribution Completion adaptation renders with rotate-keyset stepper and completion content",
+          "observed": "Page loaded with Rotate Keyset + Distribution Completion labels, Igloo Mobile/Igloo Desktop status rows, All packages distributed panel, and Finish Distribution CTA."
+        },
+        {
+          "action": "Capture screenshot + check browser errors on demo route",
+          "expected": "Screenshot captured and no console/page errors",
+          "observed": "Screenshot saved and agent-browser errors output was empty."
+        },
+        {
+          "action": "Navigate to /rotate-keyset/complete",
+          "expected": "Direct route is reachable and shows same adaptation screen",
+          "observed": "Direct route stayed at /rotate-keyset/complete and rendered matching Distribution Completion adaptation content."
+        },
+        {
+          "action": "Capture screenshot + check browser errors on direct route",
+          "expected": "Screenshot captured and no console/page errors",
+          "observed": "Screenshot saved and agent-browser errors output was empty."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotate-keyset/rtk-adaptations/VAL-RTK-006-demo-rotate-keyset-complete.png",
+          "rotate-keyset/rtk-adaptations/VAL-RTK-006-direct-rotate-keyset-complete.png"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 3 assertions: 3 passed, 0 failed, 0 blocked."
+}

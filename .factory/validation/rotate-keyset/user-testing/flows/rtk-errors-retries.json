@@ -1,0 +1,152 @@
+{
+  "groupId": "rtk-errors-retries",
+  "testedAt": "2026-04-19T22:55:44.721184+00:00",
+  "isolation": {
+    "milestone": "rotate-keyset",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "appUrl": "http://127.0.0.1:5173",
+    "flowGuidance": ".factory/library/user-testing.md#flow-validator-guidance-browser-ui",
+    "session": "rtk-errors-retries-20260419-01",
+    "evidenceDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/rotate-keyset/rtk-errors-retries"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-RTK-007",
+      "title": "Rotate Keyset Error \u2014 Wrong Password renders with Retry CTA",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/rotate-keyset-error-wrong-password",
+          "expected": "Wrong-password error variant renders with stepper, Back link, Source Share Error copy, red wrong-password banner, amber relay-backup banner, and Retry CTA.",
+          "observed": "Page rendered all required copy and controls; interactive snapshot included Back and Retry buttons."
+        },
+        {
+          "action": "Capture evidence screenshot",
+          "expected": "Screenshot records the rendered variant.",
+          "observed": "Screenshot captured successfully."
+        },
+        {
+          "action": "Check browser errors",
+          "expected": "No console/page errors.",
+          "observed": "No agent-browser page errors; console had only Vite debug + React DevTools informational message."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotate-keyset/rtk-errors-retries/VAL-RTK-007-wrong-password.png"
+        ],
+        "consoleErrors": "none (no agent-browser errors; only non-error Vite debug + React DevTools info)"
+      },
+      "issues": null,
+      "reason": "All required wrong-password error-state elements and Retry CTA were present and matched the contract."
+    },
+    {
+      "id": "VAL-RTK-008",
+      "title": "Rotate Keyset Error \u2014 Group Mismatch renders without top BackLink",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/rotate-keyset-error-group-mismatch",
+          "expected": "Group mismatch variant renders with no top BackLink, mismatch card, explanatory copy, and Back to Source Intake CTA.",
+          "observed": "Group mismatch copy and CTA rendered; interactive snapshot showed no in-flow Back link, only Back to Source Intake button."
+        },
+        {
+          "action": "Capture evidence screenshot",
+          "expected": "Screenshot records no-top-BackLink variant.",
+          "observed": "Screenshot captured successfully."
+        },
+        {
+          "action": "Check browser errors",
+          "expected": "No console/page errors.",
+          "observed": "No agent-browser page errors; console had only Vite debug + React DevTools informational message."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotate-keyset/rtk-errors-retries/VAL-RTK-008-group-mismatch.png"
+        ],
+        "consoleErrors": "none (no agent-browser errors; only non-error Vite debug + React DevTools info)"
+      },
+      "issues": null,
+      "reason": "The group-mismatch error screen matched required content and omitted the top BackLink as specified."
+    },
+    {
+      "id": "VAL-RTK-009",
+      "title": "Rotate Keyset Error \u2014 Generation Failed renders phase list",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/rotate-keyset-error-generation-failed",
+          "expected": "Generation-failed variant renders Back link, failure description, full phase list with reconstruct-signing-key failed, reassurance banner, and Retry Generation CTA.",
+          "observed": "All required phase rows and reassurance text were visible with Retry Generation CTA."
+        },
+        {
+          "action": "Capture evidence screenshot",
+          "expected": "Screenshot records generation-failed phase list.",
+          "observed": "Screenshot captured successfully."
+        },
+        {
+          "action": "Check browser errors",
+          "expected": "No console/page errors.",
+          "observed": "No agent-browser page errors; console had only Vite debug + React DevTools informational message."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotate-keyset/rtk-errors-retries/VAL-RTK-009-generation-failed.png"
+        ],
+        "consoleErrors": "none (no agent-browser errors; only non-error Vite debug + React DevTools info)"
+      },
+      "issues": null,
+      "reason": "Generation-failed error page contained the required four-phase status list and retry messaging."
+    },
+    {
+      "id": "VAL-RTK-011",
+      "title": "Error retry CTAs navigate correctly",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From /demo/rotate-keyset-error-wrong-password, click Retry",
+          "expected": "Navigates to /rotate-keyset.",
+          "observed": "Navigated from /demo/rotate-keyset-error-wrong-password to /rotate-keyset."
+        },
+        {
+          "action": "From /demo/rotate-keyset-error-group-mismatch, click Back to Source Intake",
+          "expected": "Navigates to /rotate-keyset.",
+          "observed": "Navigated from /demo/rotate-keyset-error-group-mismatch to /rotate-keyset."
+        },
+        {
+          "action": "From /demo/rotate-keyset-error-generation-failed, click Retry Generation",
+          "expected": "Navigates to /rotate-keyset/review.",
+          "observed": "Navigated from /demo/rotate-keyset-error-generation-failed to /rotate-keyset/review."
+        },
+        {
+          "action": "Capture destination screenshots and check browser errors",
+          "expected": "Screenshots captured; no console/page errors.",
+          "observed": "All destination screenshots captured; no agent-browser page errors and only non-error Vite/React DevTools console messages."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotate-keyset/rtk-errors-retries/VAL-RTK-011-retry-from-wrong-password-destination.png",
+          "rotate-keyset/rtk-errors-retries/VAL-RTK-011-retry-from-group-mismatch-destination.png",
+          "rotate-keyset/rtk-errors-retries/VAL-RTK-011-retry-from-generation-failed-destination.png"
+        ],
+        "consoleErrors": "none (no agent-browser errors; only non-error Vite debug + React DevTools info)",
+        "urlTrace": [
+          "http://127.0.0.1:5173/demo/rotate-keyset-error-wrong-password -> http://127.0.0.1:5173/rotate-keyset",
+          "http://127.0.0.1:5173/demo/rotate-keyset-error-group-mismatch -> http://127.0.0.1:5173/rotate-keyset",
+          "http://127.0.0.1:5173/demo/rotate-keyset-error-generation-failed -> http://127.0.0.1:5173/rotate-keyset/review"
+        ]
+      },
+      "issues": null,
+      "reason": "All three retry-path CTAs routed to the exact destinations required by the contract."
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 4 assigned rotate-keyset assertions; 4 passed, 0 failed, 0 blocked. Error-variant rendering and retry navigation destinations matched the contract."
+}
