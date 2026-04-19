@@ -65,5 +65,10 @@
     }
   ],
   "rejectedObservations": [],
-  "previousRound": null
+  "previousRound": null,
+  "orchestratorOverride": {
+    "overriddenAt": "2026-04-19T22:12:00Z",
+    "overriddenBy": "orchestrator",
+    "justification": "All 4 blocking issues are false positives. Reviewer used the feature description (speculative planning copy that mentioned /reveal and threshold-progress UI) instead of the validation contract. Contract VAL-REC-001..003 explicitly defines a 2-screen flow: (1) recover-collect-shares with paste input + disabled CTA + incompatible-shares alert (no password fields, no threshold-progress); (2) recover-success which IS the reveal screen (Security Warning + masked + revealed panels + Copy/Reveal/Clear actions). Worker correctly followed Paper + contract, explicitly noting the mismatch in discoveredIssues. Scrutiny synthesis's own suggestedGuidanceUpdates acknowledge this is a mission-artifact conflict. Actions taken: (a) rewrote recover-fidelity feature description to match contract; (b) added contract-vs-description escalation rule to ui-builder skill; (c) override applied to unblock user-testing. Future recover-related reviews should use the contract as ground truth."
+  }
 }

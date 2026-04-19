@@ -21,6 +21,13 @@ Expected copy in the validation contract is quoted directly from `igloo-paper/sc
 
 **Non-UI feature scope.** Some mission features are architecture/state/provider work (e.g. app-state bridge, route plumbing) rather than screen rendering. These are valid ui-builder features. When working on one, place tests under `src/app/__tests__/` or next to the module being changed, and focus on provider/hook/helper unit tests rather than Paper-copy assertions.
 
+**Contract-vs-feature-description conflicts (IMPORTANT).** The validation contract (`/Users/plebdev/.factory/missions/{missionId}/validation-contract.md`) is ALWAYS the single source of truth for what to build. Feature descriptions in features.json are guidance that may have speculative or outdated copy. When you notice a conflict between the feature description and the contract, DO NOT silently narrow or expand scope. Instead:
+1. Identify the conflict explicitly in your handoff's `discoveredIssues` with the exact phrases that disagree.
+2. Implement what the CONTRACT specifies (since assertions in the contract are what validators test).
+3. Note the deviation from the feature description in `whatWasImplemented` so the orchestrator can update the description.
+
+This keeps you aligned with validators while flagging the planning-artifact drift for the orchestrator to address.
+
 ## Required Skills
 
 - `agent-browser` — Used for manual visual verification of built screens. Invoke after implementation to navigate the app and confirm screens render correctly and navigation works.
