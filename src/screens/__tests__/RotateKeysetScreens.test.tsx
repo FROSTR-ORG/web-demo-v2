@@ -147,6 +147,19 @@ describe("RotateKeysetFormScreen", () => {
     fireEvent.click(screen.getByText(/Validate & Continue/));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/review");
   });
+
+  /* VAL-RTK-001: Validate & Continue CTA shows disabled visual when only 1 of
+     2 required source shares are collected — bg-[#2563EB40] + aria-disabled. */
+  it("Validate & Continue renders with disabled visual (aria-disabled + bg-[#2563EB40])", () => {
+    render(
+      <MemoryRouter>
+        <RotateKeysetFormScreen />
+      </MemoryRouter>
+    );
+    const button = screen.getByText(/Validate & Continue/).closest("button")!;
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(button.className).toContain("bg-[#2563EB40]");
+  });
 });
 
 /* ==========================================================
@@ -214,6 +227,19 @@ describe("ReviewGenerateScreen", () => {
     fireEvent.click(screen.getByText(/Rotate & Generate Keyset/));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/progress");
   });
+
+  /* VAL-RTK-002: destructive "Rotate & Generate Keyset" CTA is rendered on
+     solid #DC2626 via the rotate-generate-btn class. */
+  it("Rotate & Generate Keyset button is styled as the destructive #DC2626 variant", () => {
+    render(
+      <MemoryRouter>
+        <ReviewGenerateScreen />
+      </MemoryRouter>
+    );
+    const button = screen.getByText(/Rotate & Generate Keyset/).closest("button")!;
+    expect(button.className).toContain("rotate-generate-btn");
+    expect(button.className).toContain("button-full");
+  });
 });
 
 /* ==========================================================
@@ -261,6 +287,18 @@ describe("RotateGenerationProgressScreen", () => {
     );
     fireEvent.click(screen.getByText("Back"));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/review");
+  });
+
+  /* VAL-RTK-003: active phase uses outlined ring (.generation-phase-dot.active),
+     not a plain solid dot. Pending phases use the thin outline variant. */
+  it("renders outlined active-ring indicator on the active phase", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <RotateGenerationProgressScreen />
+      </MemoryRouter>
+    );
+    expect(container.querySelector(".generation-phase-dot.active")).toBeTruthy();
+    expect(container.querySelector(".generation-phase-dot.pending")).toBeTruthy();
   });
 });
 
@@ -358,14 +396,16 @@ describe("RotateGroupMismatchScreen", () => {
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset");
   });
 
-  it("back link navigates to /rotate-keyset", () => {
-    render(
+  /* VAL-RTK-008: Group mismatch screen must NOT render a top BackLink — the
+     only way out is the primary "Back to Source Intake" CTA. */
+  it("does NOT render a top BackLink (audit gap)", () => {
+    const { container } = render(
       <MemoryRouter>
         <RotateGroupMismatchScreen />
       </MemoryRouter>
     );
-    fireEvent.click(screen.getByText("Back"));
-    expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset");
+    expect(container.querySelector(".back-link")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
   });
 });
 

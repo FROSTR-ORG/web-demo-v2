@@ -176,10 +176,19 @@ export function RotateKeysetFormScreen() {
           </span>
         </div>
 
-        {/* ---- Validate & Continue button ---- */}
+        {/*
+          Validate & Continue button — remains in disabled visual state per
+          VAL-RTK-001 because only 1 of 2 required source shares have been
+          collected. The disabled pseudo-class on .button-primary supplies the
+          `bg-[#2563EB40]` + 40% text opacity tokens quoted in the contract.
+          Clicking still advances to /rotate-keyset/review for demo
+          click-through (the real protocol would enforce the gate).
+        */}
         <Button
           type="button"
           size="full"
+          aria-disabled="true"
+          className="button-disabled-visual bg-[#2563EB40]"
           onClick={() => navigate("/rotate-keyset/review")}
         >
           Validate &amp; Continue
@@ -466,7 +475,11 @@ export function RotateGroupMismatchScreen() {
     <AppShell headerMeta={MOCK_SOURCE_SHARE_1.label} mainVariant="flow">
       <div className="screen-column">
         <Stepper current={1} variant="rotate-keyset" />
-        <BackLink onClick={() => navigate("/rotate-keyset")} />
+        {/*
+          Per VAL-RTK-008 and the Paper reference, this error screen renders
+          NO top BackLink — the only way out is the "Back to Source Intake"
+          primary CTA at the bottom.
+        */}
         <PageHeading
           title="Source Group Mismatch"
           copy="The source packages do not match the same current group configuration and group public key."
