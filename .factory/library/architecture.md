@@ -126,7 +126,10 @@ The `igloo-paper` repository is the **design source of truth**. It contains:
 | `design-system/tokens/` | Extracted design token values. |
 | `design-system/patterns/` | Reusable layout patterns (e.g. form groups, card grids). |
 
-**Workers building new screens should reference the corresponding `igloo-paper/screens/<name>/screen.html`** for layout structure, content, and component usage guidance.
+**Workers building new screens should reference the corresponding `igloo-paper/screens/<flow>/<screen>/screen.html`** for layout structure, content, and component usage guidance.
+
+> Path nuance: many Paper screen folders are numerically prefixed (for example `igloo-paper/screens/shared/2-create-profile/screen.html`).  
+> If a guessed path does not exist, list the flow directory first and use the numbered folder name.
 
 ## Key Conventions
 
