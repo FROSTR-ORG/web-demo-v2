@@ -1,0 +1,15 @@
+{
+  "featureId": "recover-flow",
+  "reviewedAt": "2026-04-19T01:29:57Z",
+  "commitId": "d6973aa",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The feature implementation covers the Recover flow requirements end-to-end: dashboard entry, collect-shares screen, success screen interactions (copy/reveal/clear), routing, and Back to Signer navigation on both screens. The commit is aligned with the feature description and validation contract assertions for VAL-RECOVER-001 through VAL-RECOVER-005.",
+    "issues": []
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": null,
+  "summary": "PASS — recover-flow is implemented as specified, transcript skeleton and commit diff were reviewed, and no high-confidence actionable issues were found."
+}

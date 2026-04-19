@@ -1,0 +1,28 @@
+{
+  "featureId": "settings-sidebar",
+  "reviewedAt": "2026-04-19T01:29:47Z",
+  "commitId": "35f32413fccde91d1db2ddbc98a32b02c532154e",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature implements the settings sidebar, scrim behavior, lock flow, and clear-credentials modal, but misses a required Rotate Share interaction behavior.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen.tsx",
+        "line": 1051,
+        "severity": "blocking",
+        "description": "The Rotate Share button is rendered as an enabled action but has no click handler and is not disabled. The feature description requires this control to either navigate to `/rotate-share` or be presented as a disabled placeholder."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The `ui-builder` skill requires invoking the `agent-browser` skill for manual verification, but workers are using direct `agent-browser` CLI commands and still marking procedure as followed. The skill procedure likely needs to reflect actual expected tooling usage.",
+      "evidence": ".factory/skills/ui-builder/SKILL.md (Required Skills + Step 8) vs worker transcript skeleton for session `2ada3707-89c7-474c-b5a8-81ff36eebe7f` in mission `worker-transcripts.jsonl`, which contains many `agent-browser --session ...` Execute commands and no `Skill {\"skill\": \"agent-browser\"}` invocation."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Fail: found one blocking issue — Rotate Share is neither wired to navigation nor marked disabled as a placeholder. Shared-state note: ui-builder skill guidance and observed transcript practice diverge for agent-browser usage."
+}

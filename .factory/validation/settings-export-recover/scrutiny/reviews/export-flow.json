@@ -1,0 +1,28 @@
+{
+  "featureId": "export-flow",
+  "reviewedAt": "2026-04-19T01:29:55Z",
+  "commitId": "f7b4173",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The export flow implementation matches the feature description and expected behavior: both entry points open Export Profile, Export transitions to Export Complete, reveal toggle and Copy feedback are present, and Done dismisses back to dashboard. One non-blocking robustness gap was identified in the copy handler.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen.tsx",
+        "line": 1325,
+        "severity": "non_blocking",
+        "description": "The copy action calls `navigator.clipboard?.writeText(...)` without awaiting/catching failures and immediately shows success feedback. If clipboard write is rejected (permission/security constraints), users still see success and an unhandled promise rejection may surface in console. Wrap in try/catch and only show success feedback on resolved write."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-builder skill says to invoke agent-browser for manual verification, but it does not document the concrete CLI subcommands used in practice. The worker initially tried an invalid `agent-browser ... launch` command and had to inspect help before using `open`.",
+      "evidence": "Transcript skeleton around lines 0536-0562 shows `agent-browser ... launch` failing with 'Unknown command: launch', followed by `agent-browser --help` and successful `agent-browser ... open`."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "PASS with one non-blocking issue: copy success feedback is shown without handling clipboard write failures. Feature coverage is otherwise complete and aligned with expected behavior."
+}

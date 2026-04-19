@@ -1,0 +1,53 @@
+{
+  "milestone": "settings-export-recover",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx vitest run --config vitest.config.ts --maxWorkers=4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx tsc -b",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 3,
+    "passed": 2,
+    "failed": 1,
+    "failedFeatures": [
+      "settings-sidebar"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "settings-sidebar",
+      "severity": "blocking",
+      "description": "Rotate Share button in Settings sidebar is enabled but has no click handler and is not disabled placeholder, violating requirement to either navigate to /rotate-share or be disabled."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "skills/ui-builder",
+      "suggestion": "Clarify expected browser validation interface: either require Skill invocation for agent-browser, or explicitly document direct `agent-browser --session ...` CLI workflow and valid subcommands (`open`, `close`, etc.).",
+      "evidence": "Both settings-sidebar and export-flow reviewers observed workers using direct `agent-browser` CLI commands (including initial `launch` misuse and subsequent help discovery) while marking skill procedure as followed.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "ui-builder skill and actual agent-browser usage are mismatched (duplicate statement from second review).",
+      "reason": "duplicate"
+    }
+  ],
+  "previousRound": null
+}
