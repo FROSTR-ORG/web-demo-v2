@@ -6,6 +6,30 @@ const now = Date.UTC(2026, 2, 8, 12, 0, 0);
 export const DEMO_PROFILE_ID = "demo-profile";
 export const DEMO_GROUP_PK = "npub1qe3abcdefghijklmnopqrstuvwx7k4m";
 export const DEMO_SHARE_PK = "02a3f8c2d1e2f3a4b5c6d7e8f9a0b1c28f2c4a";
+
+/**
+ * Protocol-grade identifiers used inside the mock `demoKeyset`. The bifrost
+ * WASM bridge validates that every `group_pk` is 32 bytes (64 hex chars,
+ * x-only) and every member `pubkey` is 33 bytes (66 hex chars, compressed
+ * secp256k1). Without this, the Create → Create Profile flow entered from
+ * `/demo/create-keyset` fails with
+ * "invalid input: Invalid group package: invalid byte length: expected 33,
+ * got 19" the moment `createProfile` calls `create_profile_package_pair`.
+ *
+ * These values are synthetic — they pass the bridge's byte-length and
+ * uniqueness checks but are not derived from any real share secret. The
+ * bridge does not cross-validate member pubkeys against share secrets during
+ * profile creation or runtime bootstrap, so synthetic keys are safe for the
+ * click-through demo.
+ */
+export const DEMO_GROUP_PK_HEX =
+  "3a4e7c1fa9b2c5d8e0f3a6b9c2d5e8f1a4b7c0d3e6f9a2b5c8dbe0f3a6b9ccff";
+export const DEMO_SHARE_PK_HEX_0 =
+  "02a3f8c2d1e2f3a4b5c6d7e8f9a0b1c28f2c4a0000000000000000000000000000";
+export const DEMO_SHARE_PK_HEX_1 =
+  "02d7e1b9f3a4c5d6e7f8a9b0c1d2e33b9e7d000000000000000000000000000000";
+export const DEMO_SHARE_PK_HEX_2 =
+  "029c4a8e2f3b4c5d6e7f8a9b0c1d26a1f5e0000000000000000000000000000000";
 export const DEMO_BFPROFILE = "bfprofile1qvz8k2afcqqszq2v5v5hnpfdk2auecfnhge355m0dh8g6ms4e2f4j9p0x7z";
 export const DEMO_BFONBOARD = "bfonboard1qxy7k2afcqqszq2v5v5hnpfdk2auecfnhge355m0dh8g6ms4e";
 export const DEMO_BFSHARE = "bfshare1qvz8k2afcqqszq2v5v5hnpfdk2auecfnhge355m0dh8g6ms4e";
@@ -81,12 +105,19 @@ export const demoProfiles: StoredProfileSummary[] = [
 export const demoKeyset: KeysetBundle = {
   group: {
     group_name: "My Signing Key",
-    group_pk: DEMO_GROUP_PK,
+    // NOTE: `group_pk` must be a 32-byte x-only hex string and member
+    // `pubkey`s must be 33-byte compressed-secp256k1 hex strings so the
+    // bifrost WASM bridge's byte-length check passes when `createProfile`
+    // runs after the demo handoff from `/demo/create-keyset`. Display code
+    // uses hardcoded paper strings (see `paperGroupKey`/`paperPeerKey` in
+    // DashboardScreen and WelcomeScreen) keyed off index/prefix, so the
+    // raw hex values below never surface in content-parity assertions.
+    group_pk: DEMO_GROUP_PK_HEX,
     threshold: 2,
     members: [
-      { idx: 0, pubkey: DEMO_SHARE_PK },
-      { idx: 1, pubkey: "02d7e1b9f3a4c5d6e7f8a9b0c1d2e33b9e7d" },
-      { idx: 2, pubkey: "029c4a8e2f3b4c5d6e7f8a9b0c1d26a1f5e" }
+      { idx: 0, pubkey: DEMO_SHARE_PK_HEX_0 },
+      { idx: 1, pubkey: DEMO_SHARE_PK_HEX_1 },
+      { idx: 2, pubkey: DEMO_SHARE_PK_HEX_2 }
     ]
   },
   shares: [
