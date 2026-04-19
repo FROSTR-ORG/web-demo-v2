@@ -281,7 +281,7 @@ export const demoScenarios: DemoScenario[] = [
   scenario("rotate-share-updated", "rotate-share", "Rotate Share - 3. Local Share Updated", "screens/rotate-share/3-local-share-updated", "/rotate-share/updated", dashboardState, "Local Share Updated", { fromApplying: true }),
 
   scenario("recover-collect-shares", "recover", "Recover - 1. Collect Shares", "screens/recover/1-collect-shares", `/recover/${DEMO_PROFILE_ID}`, dashboardState, "Recover NSEC", { demoUi: { recover: { variant: "incompatible-shares" } } }),
-  scenario("recover-success", "recover", "Recover - 1b. Recover Success", "screens/recover/1b-recover-success", `/recover/${DEMO_PROFILE_ID}/success`, dashboardState, "Security Warning", { demoUi: { recover: { variant: "success", revealed: true, copied: true } } })
+  scenario("recover-success", "recover", "Recover - 1b. Recover Success", "screens/recover/1b-recover-success", `/recover/${DEMO_PROFILE_ID}/success`, dashboardState, "Security Warning", { demoUi: { recover: { variant: "success", copied: true } } })
 ];
 
 export const demoScenarioById = new Map(demoScenarios.map((entry) => [entry.id, entry]));

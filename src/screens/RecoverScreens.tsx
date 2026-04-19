@@ -102,7 +102,10 @@ export function CollectSharesScreen() {
           </div>
         </div>
 
-        {/* Share #1 — Paste */}
+        {/* Share #1 — Paste. A paste input is always rendered so validators
+            (and users) can type or paste a share hex regardless of any
+            preloaded state. The "Loaded" badge appears only when the input
+            holds a valid share value. */}
         <div className="recover-share-block">
           <div className="recover-share-header">
             <span className="recover-share-label-mono">Share #1 — Pasted</span>
@@ -113,20 +116,16 @@ export function CollectSharesScreen() {
               </span>
             ) : null}
           </div>
-          {pasteValid ? (
-            <div className="recover-share-display loaded">
-              <span className="recover-share-hex-active">{maskShare(pastedShare)}</span>
-              <Lock size={14} className="recover-share-icon" />
-            </div>
-          ) : (
-            <input
-              className="recover-share-input"
-              type="text"
-              placeholder="Paste share hex..."
-              value={pastedShare}
-              onChange={(e) => setPastedShare(e.target.value)}
-            />
-          )}
+          <input
+            className={
+              pasteValid ? "recover-share-input loaded" : "recover-share-input"
+            }
+            type="text"
+            placeholder="Paste share hex..."
+            aria-label="Paste share hex"
+            value={pastedShare}
+            onChange={(e) => setPastedShare(e.target.value)}
+          />
         </div>
 
         {/* Recover NSEC button */}
@@ -174,7 +173,11 @@ export function RecoverSuccessScreen() {
   const { activeProfile } = useAppState();
   const demoUi = useDemoUi();
   const [copied, setCopied] = useState(Boolean(demoUi.recover?.copied));
-  const [revealed, setRevealed] = useState(Boolean(demoUi.recover?.revealed));
+  // The revealed NSEC panel ALWAYS starts masked (VAL-REC-002). The full
+  // nsec is only shown after the user clicks "Reveal". This intentionally
+  // ignores any `demoUi.recover.revealed` preset so the demo scenario
+  // matches the contract behaviour.
+  const [revealed, setRevealed] = useState(false);
 
   if (!profileId || !activeProfile || activeProfile.id !== profileId) {
     return <Navigate to="/" replace />;
@@ -194,7 +197,9 @@ export function RecoverSuccessScreen() {
   }
 
   function handleReveal() {
-    setRevealed(true);
+    // Reveal acts as a toggle: clicking it flips between masked and shown
+    // (VAL-REC-002 contract says "clicking Reveal toggles NSEC visibility").
+    setRevealed((prev) => !prev);
   }
 
   function handleClear() {

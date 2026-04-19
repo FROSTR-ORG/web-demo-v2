@@ -108,6 +108,33 @@ describe("CollectSharesScreen", () => {
     fireEvent.click(screen.getByText("Back to Signer"));
     expect(mockNavigate).toHaveBeenCalledWith("/dashboard/test-profile-id");
   });
+
+  // VAL-REC-001 regression: even when the incompatible-shares demo preset
+  // preloads Share #1 with a mock value, the paste input must still render
+  // and accept user input (validators expect a textbox to type into).
+  it("renders the paste input even when Share #1 is preloaded in the incompatible-shares variant", () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: "/recover/test-profile-id",
+            state: { demoUi: { recover: { variant: "incompatible-shares" } } },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/recover/:profileId" element={<CollectSharesScreen />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    const input = screen.getByPlaceholderText("Paste share hex...") as HTMLInputElement;
+    expect(input).toBeInTheDocument();
+    // The input should accept typed text (the paste/typing interaction).
+    fireEvent.change(input, { target: { value: "new-share-value" } });
+    expect(input.value).toBe("new-share-value");
+    // The incompatible alert is still rendered alongside the paste input.
+    expect(screen.getByText("Incompatible Shares")).toBeInTheDocument();
+  });
 });
 
 /* ============================
@@ -197,5 +224,44 @@ describe("RecoverSuccessScreen", () => {
     renderSuccess();
     fireEvent.click(screen.getByText("Back to Signer"));
     expect(mockNavigate).toHaveBeenCalledWith("/dashboard/test-profile-id");
+  });
+
+  // VAL-REC-002 regression: the "Recovered NSEC (revealed):" panel must
+  // START masked. The full nsec is only shown after clicking "Reveal",
+  // and clicking "Reveal" a second time toggles the panel back to masked.
+  it("starts with the revealed nsec panel masked, then toggles on Reveal click", () => {
+    renderSuccess();
+    const fullNsec = /nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0/;
+    // Before any click the full nsec must NOT be visible anywhere.
+    expect(screen.queryByText(fullNsec)).not.toBeInTheDocument();
+    // First click: the revealed panel now shows the full nsec.
+    fireEvent.click(screen.getByText("Reveal"));
+    expect(screen.getByText(fullNsec)).toBeInTheDocument();
+    // Second click: toggles back to masked.
+    fireEvent.click(screen.getByText("Reveal"));
+    expect(screen.queryByText(fullNsec)).not.toBeInTheDocument();
+  });
+
+  // VAL-REC-002 regression: even when the demo scenario attempts to preset
+  // `revealed: true`, the component must still render masked by default so
+  // that the Reveal click has observable effect for validators.
+  it("ignores demoUi.recover.revealed preset and starts masked", () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: "/recover/test-profile-id/success",
+            state: { demoUi: { recover: { variant: "success", revealed: true } } },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/recover/:profileId/success" element={<RecoverSuccessScreen />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(
+      screen.queryByText(/nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0/)
+    ).not.toBeInTheDocument();
   });
 });
