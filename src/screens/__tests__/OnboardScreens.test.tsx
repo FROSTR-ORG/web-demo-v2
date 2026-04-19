@@ -220,6 +220,62 @@ describe("OnboardingFailedScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /Back to Onboarding/i }));
     expect(mocks.navigate).toHaveBeenCalledWith("/onboard");
   });
+
+  it("renders rejected variant with red alert styling (VAL-ONB-004)", () => {
+    mocks.locationState = { demoUi: { onboard: { failedVariant: "rejected" } } };
+    const { container } = render(
+      <MemoryRouter>
+        <OnboardingFailedScreen />
+      </MemoryRouter>
+    );
+    /* Copy parity: rejected variant uses different title/body than timeout. */
+    expect(screen.getByText("Onboarding Rejected")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Challenge verification failed. You may not have a valid share for this group."
+      )
+    ).toBeInTheDocument();
+    /* Class tokens the validator inspects for Paper parity. */
+    const alert = container.querySelector(".onboard-error-alert");
+    expect(alert).not.toBeNull();
+    expect(alert?.className).toContain("red");
+    expect(alert?.className).toContain("bg-[#EF44441A]");
+    expect(alert?.className).toContain("border-[#EF444440]");
+    /* Guard: rejected variant must not leak amber tokens from the timeout variant. */
+    expect(alert?.className).not.toContain("EAB308");
+  });
+});
+
+/*
+ * VAL-ONB-004 relies on the explicit `.onboard-error-alert.red` CSS rule
+ * (Tailwind-style arbitrary utilities are not compiled in this project).
+ * Pin the rule text here so a future refactor cannot silently drop the
+ * override that makes the red variant visually distinct from the amber
+ * timeout variant.
+ */
+describe("onboard-error-alert red variant CSS rule (VAL-ONB-004)", () => {
+  it("declares red background, border, title, and body colors", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require("node:fs") as typeof import("node:fs");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const path = require("node:path") as typeof import("node:path");
+    const cssPath = path.resolve(__dirname, "../../styles/global.css");
+    const css = fs.readFileSync(cssPath, "utf-8");
+    /* Rule that wins specificity over the base amber styles. */
+    expect(css).toMatch(
+      /\.onboard-error-alert\.red\s*{[^}]*background:\s*rgba\(\s*239\s*,\s*68\s*,\s*68\s*,\s*0?\.1\s*\)/
+    );
+    expect(css).toMatch(
+      /\.onboard-error-alert\.red\s*{[^}]*border-color:\s*rgba\(\s*239\s*,\s*68\s*,\s*68\s*,\s*0?\.25\s*\)/
+    );
+    /* Title color #F87171 and body color #FCA5A5 per validation contract. */
+    expect(css).toMatch(
+      /\.onboard-error-alert\.red\s+\.onboard-error-title\s*{[^}]*color:\s*#f87171/i
+    );
+    expect(css).toMatch(
+      /\.onboard-error-alert\.red\s+\.onboard-error-description\s*{[^}]*color:\s*#fca5a5/i
+    );
+  });
 });
 
 describe("OnboardingCompleteScreen", () => {

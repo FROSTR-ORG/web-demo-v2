@@ -2153,6 +2153,32 @@ a {
   border: 1px solid rgba(234, 179, 8, 0.25);
 }
 
+/*
+ * Red "rejected" variant (VAL-ONB-004). Paper encodes the variant via
+ * Tailwind-style arbitrary-hex tokens (`bg-[#EF44441A] border-[#EF444440]`),
+ * but this project does not compile Tailwind utilities, so those tokens
+ * are className parity markers only. The explicit `.red` rules below are
+ * what actually win specificity over the base amber styles and produce
+ * the computed red backgroundColor/borderColor the validator reads.
+ */
+.onboard-error-alert.red {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.onboard-error-alert.red .onboard-error-icon {
+  background: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.onboard-error-alert.red .onboard-error-title {
+  color: #f87171;
+}
+
+.onboard-error-alert.red .onboard-error-description {
+  color: #fca5a5;
+}
+
 .onboard-error-icon {
   width: 20px;
   height: 20px;
