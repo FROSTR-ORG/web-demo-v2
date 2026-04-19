@@ -17,6 +17,10 @@ All fidelity assertions in this mission are validated against the **DemoGallery*
 
 Expected copy in the validation contract is quoted directly from `igloo-paper/screens/{flow}/{screen}/screen.html`. Match that copy character-for-character for headings, labels, CTAs, help text, and error messages. Structural fidelity (sections, order, visual hierarchy) is required; pixel-perfect fidelity is not.
 
+**Provider boundary warning (demo → real-app navigation).** DemoGallery scenarios mount under `MockAppStateProvider`, but real-app routes (`/dashboard/{id}`, `/create`, `/rotate-keyset`, etc.) mount under the real `AppStateProvider`. Click-throughs that cross this boundary drop the mock state unless the app-state bridge is used to hand off state between providers (see `.factory/library/app-state-bridge.md`). If a feature wires a CTA from `/demo/*` into a real-app route, verify the destination renders the expected unlocked/runtime state — NOT a redirect back to `/`. A "click goes to the right URL" check is NOT sufficient; the destination must be functional.
+
+**Non-UI feature scope.** Some mission features are architecture/state/provider work (e.g. app-state bridge, route plumbing) rather than screen rendering. These are valid ui-builder features. When working on one, place tests under `src/app/__tests__/` or next to the module being changed, and focus on provider/hook/helper unit tests rather than Paper-copy assertions.
+
 ## Required Skills
 
 - `agent-browser` — Used for manual visual verification of built screens. Invoke after implementation to navigate the app and confirm screens render correctly and navigation works.

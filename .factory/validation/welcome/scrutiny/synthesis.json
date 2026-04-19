@@ -62,5 +62,16 @@
     }
   ],
   "rejectedObservations": [],
-  "previousRound": null
+  "previousRound": null,
+  "orchestratorOverride": {
+    "overriddenAt": "2026-04-19T18:50:00Z",
+    "overriddenBy": "orchestrator",
+    "justification": "The single blocking issue (welcome-fidelity dead-CTA from unlock to /dashboard) was reviewed at commit c6b88b2 — BEFORE the demo-to-real-app-state-bridge feature at commit 51ccdb8 merged. The bridge was reviewed in the same scrutiny round and passed; it implements the sessionStorage one-shot handoff that resolves exactly this dead-CTA case. End-to-end verification will happen in user-testing-validator-welcome against VAL-WEL-027. The per-feature reviewer lens evaluated welcome-fidelity's own commit in isolation and did not factor in the subsequent fix. Overriding scrutiny failure to let user-testing run.",
+    "unresolvedIssuesTrackedElsewhere": [
+      {
+        "issue": "bridgeHydrated flag is never reset, which could keep the runtime-polling interval disabled if a real RuntimeClient appears later in the same SPA session.",
+        "trackedIn": "feature misc-tech-debt/bridge-hydrated-reset (pending)"
+      }
+    ]
+  }
 }
