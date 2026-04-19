@@ -129,9 +129,10 @@ export function NumberStepper({
   );
 }
 
-export function Stepper({ current, variant = "create" }: { current: 1 | 2 | 3; variant?: "create" | "shared" }) {
+export function Stepper({ current, variant = "create" }: { current: 1 | 2 | 3; variant?: "create" | "shared" | "rotate-keyset" }) {
+  const step1Label = variant === "rotate-keyset" ? "Rotate Keyset" : variant === "create" ? "Create" : "Create / Rotate";
   const steps = [
-    { n: 1, label: variant === "create" ? "Create" : "Create / Rotate" },
+    { n: 1, label: step1Label },
     { n: 2, label: "Create Profile" },
     { n: 3, label: "Distribute Shares" }
   ] as const;
