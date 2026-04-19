@@ -1,4 +1,4 @@
-import { ChevronDown, Clock, Download, FileText, HelpCircle, RotateCw, Settings, SlidersHorizontal, Trash2, X, XCircle } from "lucide-react";
+import { Check, ChevronDown, Clock, Copy, Download, Eye, EyeOff, FileText, HelpCircle, RotateCw, Settings, SlidersHorizontal, Trash2, X, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAppState } from "../app/AppState";
@@ -8,7 +8,7 @@ import { shortHex } from "../lib/bifrost/format";
 import type { PeerStatus } from "../lib/bifrost/types";
 
 type DashboardState = "running" | "connecting" | "stopped" | "relays-offline" | "signing-blocked";
-type ModalState = "none" | "policy-prompt" | "signing-failed" | "clear-credentials";
+type ModalState = "none" | "policy-prompt" | "signing-failed" | "clear-credentials" | "export-profile" | "export-complete";
 
 export function DashboardScreen() {
   const { profileId } = useParams();
@@ -50,7 +50,7 @@ export function DashboardScreen() {
             <FileText size={14} />
             Recover
           </Button>
-          <Button type="button" variant="header">
+          <Button type="button" variant="header" onClick={() => setActiveModal("export-profile")}>
             <Download size={14} />
             Export
           </Button>
@@ -187,6 +187,21 @@ export function DashboardScreen() {
           }}
         />
       )}
+      {activeModal === "export-profile" && (
+        <ExportProfileModal
+          groupName={activeProfile.groupName}
+          threshold={activeProfile.threshold}
+          memberCount={activeProfile.memberCount}
+          shareIdx={runtimeStatus.metadata.member_idx}
+          relayCount={activeProfile.relays.length}
+          peerCount={runtimeStatus.peers.length}
+          onCancel={() => setActiveModal("none")}
+          onExport={() => setActiveModal("export-complete")}
+        />
+      )}
+      {activeModal === "export-complete" && (
+        <ExportCompleteModal onDone={() => setActiveModal("none")} />
+      )}
 
       {/* Settings sidebar */}
       {settingsOpen && (
@@ -203,6 +218,10 @@ export function DashboardScreen() {
             navigate("/");
           }}
           onClearCredentials={() => setActiveModal("clear-credentials")}
+          onExport={() => {
+            setSettingsOpen(false);
+            setActiveModal("export-profile");
+          }}
         />
       )}
     </AppShell>
@@ -870,6 +889,7 @@ interface SettingsSidebarProps {
   onClose: () => void;
   onLock: () => void;
   onClearCredentials: () => void;
+  onExport: () => void;
 }
 
 function SettingsSidebar({
@@ -882,6 +902,7 @@ function SettingsSidebar({
   onClose,
   onLock,
   onClearCredentials,
+  onExport,
 }: SettingsSidebarProps) {
   const [relays, setRelays] = useState(initialRelays);
   const [newRelay, setNewRelay] = useState("");
@@ -1045,7 +1066,7 @@ function SettingsSidebar({
                     Encrypted backup of your share and configuration
                   </div>
                 </div>
-                <button type="button" className="settings-btn-blue">Export</button>
+                <button type="button" className="settings-btn-blue" onClick={onExport}>Export</button>
               </div>
               <div className="settings-action-row">
                 <div className="settings-action-info">
@@ -1152,6 +1173,217 @@ function ClearCredentialsModal({
             Clear Credentials
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========================================
+   Export Profile Modal
+   ======================================== */
+function getPasswordStrength(pw: string): number {
+  if (pw.length === 0) return 0;
+  let score = 0;
+  if (pw.length >= 6) score += 1;
+  if (pw.length >= 10) score += 1;
+  if (/[A-Z]/.test(pw) && /[0-9]/.test(pw)) score += 1;
+  return Math.min(score, 3);
+}
+
+function ExportProfileModal({
+  groupName,
+  threshold,
+  memberCount,
+  shareIdx,
+  relayCount,
+  peerCount,
+  onCancel,
+  onExport,
+}: {
+  groupName: string;
+  threshold: number;
+  memberCount: number;
+  shareIdx: number;
+  relayCount: number;
+  peerCount: number;
+  onCancel: () => void;
+  onExport: () => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const passwordsMatch = password.length > 0 && password === confirm;
+  const strength = getPasswordStrength(password);
+
+  const strengthColors = ["#EF4444", "#F59E0B", "#22C55E"];
+  const canExport = passwordsMatch && password.length >= 1;
+
+  return (
+    <div className="export-modal-backdrop" role="dialog" aria-modal="true" data-testid="export-profile-modal">
+      <div className="export-modal" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="export-modal-header">
+          <div className="export-modal-title">Export Profile</div>
+          <button
+            type="button"
+            className="export-modal-close"
+            onClick={onCancel}
+            aria-label="Close modal"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Description */}
+        <p className="export-modal-description">
+          Create an encrypted backup of your share and all configuration. You'll need this password to restore on another device.
+        </p>
+
+        {/* Profile summary */}
+        <div className="export-modal-summary">
+          Share #{shareIdx} (Index {shareIdx}) · Keyset: {groupName} · {relayCount} relays · {peerCount} peers
+        </div>
+
+        {/* Password fields */}
+        <div className="export-field">
+          <label className="export-field-label" htmlFor="export-password">Export Password</label>
+          <div className="export-input-shell">
+            <input
+              id="export-password"
+              className="export-input"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter export password"
+              autoComplete="new-password"
+            />
+          </div>
+        </div>
+
+        <div className="export-field">
+          <label className="export-field-label" htmlFor="export-confirm">Confirm Password</label>
+          <div className={`export-input-shell ${passwordsMatch ? "matched" : ""}`}>
+            <input
+              id="export-confirm"
+              className="export-input"
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder="Confirm password"
+              autoComplete="new-password"
+            />
+            {passwordsMatch && (
+              <span className="export-match-icon">
+                <Check size={14} />
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Strength bar */}
+        <div className="export-strength-bar" data-testid="password-strength-bar">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="export-strength-segment"
+              style={{ background: i < strength ? strengthColors[strength - 1] : "#374151" }}
+            />
+          ))}
+        </div>
+
+        {/* Actions */}
+        <div className="export-modal-actions">
+          <button type="button" className="export-btn-cancel" onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="export-btn-submit"
+            disabled={!canExport}
+            onClick={onExport}
+          >
+            Export
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========================================
+   Export Complete Modal
+   ======================================== */
+const MOCK_BACKUP_STRING = "bfprofile1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4q9xgclkz4f5e0r8p2d7y6m3n0w1x4c5v6b7n8m9k0j";
+
+function ExportCompleteModal({ onDone }: { onDone: () => void }) {
+  const [revealed, setRevealed] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const maskedValue = `${MOCK_BACKUP_STRING.slice(0, 10)}${"•".repeat(28)}`;
+  const displayValue = revealed ? MOCK_BACKUP_STRING : maskedValue;
+
+  function handleCopy() {
+    navigator.clipboard?.writeText(MOCK_BACKUP_STRING);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleDownload() {
+    const blob = new Blob([MOCK_BACKUP_STRING], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "igloo-profile-backup.txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="export-modal-backdrop" role="dialog" aria-modal="true" data-testid="export-complete-modal">
+      <div className="export-modal" onClick={(e) => e.stopPropagation()}>
+        {/* Header with green checkmark */}
+        <div className="export-complete-header">
+          <div className="export-complete-icon">
+            <Check size={12} strokeWidth={3} />
+          </div>
+          <div className="export-complete-title">Backup Ready</div>
+        </div>
+
+        {/* Backup string with reveal toggle */}
+        <div className="export-backup-field">
+          <span className="export-backup-text" data-testid="backup-string">{displayValue}</span>
+          <button
+            type="button"
+            className="export-backup-toggle"
+            onClick={() => setRevealed((v) => !v)}
+            aria-label={revealed ? "Hide backup string" : "Reveal backup string"}
+          >
+            {revealed ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
+
+        {/* Copy + Download buttons */}
+        <div className="export-complete-actions-row">
+          <button type="button" className="export-action-btn" onClick={handleCopy}>
+            <Copy size={14} />
+            {copied ? "Copied!" : "Copy"}
+          </button>
+          <button type="button" className="export-action-btn" onClick={handleDownload}>
+            <Download size={14} />
+            Download
+          </button>
+        </div>
+
+        {/* Security warning */}
+        <p className="export-security-warning">
+          Store this backup in a safe place. Anyone with this file and the password can control your share.
+        </p>
+
+        {/* Done button */}
+        <button type="button" className="export-done-btn" onClick={onDone}>
+          Done
+        </button>
       </div>
     </div>
   );

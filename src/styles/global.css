@@ -3688,3 +3688,318 @@ a {
 .clear-creds-confirm:hover {
   background: #b91c1c;
 }
+
+/* ============================================
+   Export Profile / Export Complete Modals
+   ============================================ */
+
+.export-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(11, 17, 32, 0.8);
+  z-index: 200;
+}
+
+.export-modal {
+  display: flex;
+  flex-direction: column;
+  width: 440px;
+  border-radius: 16px;
+  background: #0f172a;
+  border: 1px solid var(--ig-border);
+  padding: 28px;
+  gap: 20px;
+}
+
+.export-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.export-modal-title {
+  color: #e2e8f0;
+  font-family: 'Share Tech Mono', system-ui, sans-serif;
+  font-size: 18px;
+  line-height: 24px;
+}
+
+.export-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0;
+}
+
+.export-modal-close:hover {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+}
+
+.export-modal-description {
+  color: #94a3b8;
+  font-family: var(--font-inter, Inter, system-ui, sans-serif);
+  font-size: 13px;
+  line-height: 20px;
+  margin: 0;
+}
+
+.export-modal-summary {
+  color: #64748b;
+  font-family: var(--font-inter, Inter, system-ui, sans-serif);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.export-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.export-field-label {
+  color: rgba(147, 197, 253, 0.8);
+  font-family: var(--font-inter, Inter, system-ui, sans-serif);
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.export-input-shell {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 40px;
+  border-radius: 6px;
+  padding: 0 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(30, 58, 138, 0.2);
+}
+
+.export-input-shell.matched {
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
+.export-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #e2e8f0;
+  font-family: var(--font-inter, Inter, system-ui, sans-serif);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.export-input::placeholder {
+  color: #475569;
+}
+
+.export-match-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #22c55e;
+}
+
+.export-strength-bar {
+  display: flex;
+  gap: 4px;
+}
+
+.export-strength-segment {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: #374151;
+  transition: background 0.2s;
+}
+
+.export-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.export-btn-cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  padding: 10px 20px;
+  border: 1px solid var(--ig-border);
+  background: transparent;
+  color: #94a3b8;
+  font-family: var(--font-inter, Inter, system-ui, sans-serif);
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.export-btn-cancel:hover {
+  background: rgba(148, 163, 184, 0.06);
+  color: #e2e8f0;
+}
+
+.export-btn-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  padding: 10px 20px;
+  background: #2563eb;
+  border: none;
+  color: white;
+  font-family: var(--font-inter, Inter, system-ui, sans-serif);
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.export-btn-submit:hover {
+  background: #1d4ed8;
+}
+
+.export-btn-submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Export Complete */
+
+.export-complete-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.export-complete-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #22c55e;
+  color: white;
+}
+
+.export-complete-title {
+  color: #e2e8f0;
+  font-family: 'Share Tech Mono', system-ui, sans-serif;
+  font-size: 18px;
+  line-height: 24px;
+}
+
+.export-backup-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(30, 58, 138, 0.2);
+}
+
+.export-backup-text {
+  color: #94a3b8;
+  font-family: 'Share Tech Mono', system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 18px;
+  word-break: break-all;
+  flex: 1;
+  margin-right: 8px;
+}
+
+.export-backup-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0;
+}
+
+.export-backup-toggle:hover {
+  color: #94a3b8;
+}
+
+.export-complete-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.export-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  border-radius: 8px;
+  padding: 10px 20px;
+  gap: 8px;
+  border: 1px solid var(--ig-border);
+  background: transparent;
+  color: #94a3b8;
+  font-family: var(--font-inter, Inter, system-ui, sans-serif);
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 18px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.export-action-btn:hover {
+  background: rgba(148, 163, 184, 0.06);
+  color: #e2e8f0;
+}
+
+.export-security-warning {
+  color: rgba(245, 158, 11, 0.5);
+  font-family: var(--font-inter, Inter, system-ui, sans-serif);
+  font-size: 12px;
+  line-height: 18px;
+  margin: 0;
+}
+
+.export-done-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border-radius: 8px;
+  padding: 10px 20px;
+  border: 1px solid var(--ig-border);
+  background: transparent;
+  color: #94a3b8;
+  font-family: var(--font-inter, Inter, system-ui, sans-serif);
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.export-done-btn:hover {
+  background: rgba(148, 163, 184, 0.06);
+  color: #e2e8f0;
+}
