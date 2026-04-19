@@ -1,0 +1,46 @@
+{
+  "featureId": "import-fidelity",
+  "reviewedAt": "2026-04-19T20:54:43Z",
+  "commitId": "d3acd68",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The implementation improves import-flow fidelity and cross-flow navigation, but it still misses several Paper/validation-contract parity requirements in import copy and CTA styling.",
+    "issues": [
+      {
+        "file": "src/screens/ImportScreens.tsx",
+        "line": 82,
+        "severity": "blocking",
+        "description": "Load Backup uses the default BackLink label ('Back') instead of the required 'Back to Welcome'. This fails VAL-IMP-001 copy parity and does not match Paper import/1-load-backup." 
+      },
+      {
+        "file": "src/screens/ImportScreens.tsx",
+        "line": 38,
+        "severity": "blocking",
+        "description": "Import validator copy is still driven by '2 of 3' and 'Share #1 (Index 1)', producing text that does not match the required Paper/contract strings ('2/3' and 'Share #1') for both load and decrypt validators." 
+      },
+      {
+        "file": "src/screens/ImportScreens.tsx",
+        "line": 386,
+        "severity": "blocking",
+        "description": "Corrupted error variant renders 'Back to Import' as a ghost/secondary button, but VAL-IMP-005 and Paper require a single primary CTA for this variant." 
+      },
+      {
+        "file": "src/screens/__tests__/ImportScreens.test.tsx",
+        "line": 133,
+        "severity": "non_blocking",
+        "description": "Tests codify non-canonical validator strings ('2 of 3', 'Share #1 (Index 1)') and do not assert the red-variant CTA is primary, so current assertions would miss the above fidelity regressions." 
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Import copy expectations are inconsistent across mission artifacts, which increases the chance of implementing and testing non-canonical strings.",
+      "evidence": "features.json:912-914 uses phrasing like '(2 of 3) · Share #1 (Index 1)', while validation-contract.md:273/278 and Paper import screen HTML require '(2/3) · Share #1'."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Fail: despite substantial improvements, the feature still misses blocking Paper/contract parity details (Load Backup back-label, validator copy format, and corrupted-variant primary CTA)."
+}
