@@ -1,0 +1,69 @@
+{
+  "milestone": "recover",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx vitest run --config vitest.config.ts --maxWorkers=4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx tsc -b",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "failedFeatures": [
+      "recover-fidelity"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "recover-fidelity",
+      "severity": "blocking",
+      "description": "Missing dedicated /recover/{profileId}/reveal route in CoreRoutes; only collect and success routes exist."
+    },
+    {
+      "featureId": "recover-fidelity",
+      "severity": "blocking",
+      "description": "Missing recover-reveal-nsec DemoGallery scenario, so required reveal step cannot be validated."
+    },
+    {
+      "featureId": "recover-fidelity",
+      "severity": "blocking",
+      "description": "Recover success route currently renders reveal/security-warning UI instead of success confirmation content and CTA."
+    },
+    {
+      "featureId": "recover-fidelity",
+      "severity": "blocking",
+      "description": "Collect shares screen lacks expected password fields and threshold-progress section required by feature contract."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Reconcile Recover flow shape across mission artifacts so feature expectedBehavior, AGENTS guidance, validation-contract assertions, and Paper references define the same screen set.",
+      "evidence": "features.json and AGENTS.md describe a 3-step recover flow (collect/reveal/success), while validation-contract and Paper references cover collect and success only; this mismatch caused a completed implementation to pass local checks but fail scrutiny feature contract review.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills/ui-builder",
+      "suggestion": "Add an explicit escalation rule: when feature expectedBehavior conflicts with validation-contract/Paper, workers must return to orchestrator instead of silently narrowing scope.",
+      "evidence": "recover-fidelity handoff documented omission of /reveal due to Paper/contract mismatch, yet feature metadata still required it; lack of enforced escalation allowed contract drift to pass implementation phase.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [],
+  "previousRound": null
+}

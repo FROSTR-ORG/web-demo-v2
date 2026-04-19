@@ -1,0 +1,51 @@
+{
+  "featureId": "recover-fidelity",
+  "reviewedAt": "2026-04-19T22:05:57Z",
+  "commitId": "9e569032325de057695e8d83c1993290e885d4a0",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The commit improves RecoverSuccess copy/reveal/clear behavior against VAL-REC-002/003, but the implementation does not satisfy the feature contract for a 3-step recover flow (collect -> reveal -> success). Required reveal route/scenario and success-completion content are missing, and collect-screen intake content does not match the feature's expected behavior.",
+    "issues": [
+      {
+        "file": "src/app/CoreRoutes.tsx",
+        "line": 69,
+        "severity": "blocking",
+        "description": "Feature expects a dedicated `/recover/{profileId}/reveal` step, but routes only register `/recover/:profileId` and `/recover/:profileId/success`; there is no reveal route."
+      },
+      {
+        "file": "src/demo/scenarios.ts",
+        "line": 284,
+        "severity": "blocking",
+        "description": "Feature preconditions/expected behavior require `recover-reveal-nsec`, but demo scenarios only include `recover-collect-shares` and `recover-success`, so the required reveal screen is not testable from DemoGallery."
+      },
+      {
+        "file": "src/screens/RecoverScreens.tsx",
+        "line": 266,
+        "severity": "blocking",
+        "description": "The `/recover/:profileId/success` screen renders the reveal/security-warning UI instead of the expected success confirmation state (`NSEC Recovered` green card + `Return to Dashboard` CTA), so the feature's success-step requirements are not implemented."
+      },
+      {
+        "file": "src/screens/RecoverScreens.tsx",
+        "line": 125,
+        "severity": "blocking",
+        "description": "Collect Shares intake does not implement the expected password fields and threshold-progress section (it currently renders only a paste-share text input and a `Recover NSEC` CTA), so `/recover/{profileId}` is not at the specified content parity."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Mission artifacts conflict on Recover flow shape: feature metadata expects 3 screens (`collect`, `reveal`, `success`) while validation contract and Paper references cover only 2 (`collect`, `success`). This led to a worker handoff that marked success while explicitly omitting `/reveal`.",
+      "evidence": "features.json:1097-1114 expects `/recover/{profileId}/reveal` + `recover-reveal-nsec`; AGENTS.md:15 says 'Collect Shares / Reveal NSEC / Success'; validation-contract.md:330-707 defines only VAL-REC-001..003 for collect/success; igloo-paper/screens/recover contains only `1-collect-shares` and `1b-recover-success`; handoff file line 67 states `/reveal` was intentionally not added."
+    },
+    {
+      "area": "skills",
+      "observation": "The ui-builder skill strongly prioritizes validation-contract/Paper parity, but does not enforce escalation when feature expectedBehavior conflicts with those sources; in this case the worker followed contract-only scope and completed without feature-level parity.",
+      "evidence": ".factory/skills/ui-builder/SKILL.md:18 says expected copy comes from validation contract; handoff line 67 documents omission of `/reveal` due Paper/contract mismatch while feature metadata still required it."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review failed: recover-fidelity commit is internally consistent with current VAL-REC checks, but it does not meet the feature contract requiring a dedicated reveal step and success-completion screen/content parity."
+}
