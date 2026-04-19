@@ -1,0 +1,67 @@
+{
+  "groupId": "onboard-rejected-red-variant",
+  "testedAt": "2026-04-19T21:53:49Z",
+  "isolation": {
+    "milestone": "onboard",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "appUrl": "http://127.0.0.1:5173",
+    "surface": "browser-ui",
+    "session": "onboard-rejected-red-variant",
+    "assignedAssertions": [
+      "VAL-ONB-004"
+    ],
+    "allowedOrigin": "http://127.0.0.1:5173"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-ONB-004",
+      "title": "Onboard Failed (rejected, red) renders",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/onboard-failed",
+          "expected": "Timeout variant shows amber alert with title 'Onboarding Timed Out' and timeout body copy.",
+          "observed": "Observed amber alert with background rgba(234, 179, 8, 0.1), border rgba(234, 179, 8, 0.25), title color rgb(250, 204, 21), body color rgb(253, 230, 138)."
+        },
+        {
+          "action": "Navigate to /demo/onboard-failed-rejected",
+          "expected": "Rejected variant shows red alert with title 'Onboarding Rejected', body 'Challenge verification failed. You may not have a valid share for this group.', and CTAs 'Retry' + 'Back to Onboarding'.",
+          "observed": "Observed required title/body copy and both CTAs. Alert styles were background rgba(239, 68, 68, 0.1), border rgba(239, 68, 68, 0.25), title color rgb(248, 113, 113), body color rgb(252, 165, 165)."
+        },
+        {
+          "action": "Compare timeout and rejected variants",
+          "expected": "Rejected alert styling is visually distinct red from timeout amber.",
+          "observed": "Comparison confirms distinct color families: timeout uses amber (234/179/8, 250/204/21, 253/230/138) while rejected uses red (239/68/68, 248/113/113, 252/165/165)."
+        },
+        {
+          "action": "Check console/page errors on both pages",
+          "expected": "No console errors and no unhandled page errors.",
+          "observed": "No page errors (errors: []). Console contained only Vite debug connect logs and React DevTools info message; no error-level logs."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "onboard/onboard-rejected-red-variant/VAL-ONB-004-timeout-amber.png",
+          "onboard/onboard-rejected-red-variant/VAL-ONB-004-rejected-red.png"
+        ],
+        "consoleErrors": {
+          "/demo/onboard-failed": "none",
+          "/demo/onboard-failed-rejected": "none"
+        },
+        "pageErrors": {
+          "/demo/onboard-failed": "none",
+          "/demo/onboard-failed-rejected": "none"
+        },
+        "network": "No relevant API requests for this assertion; SPA document/assets only."
+      },
+      "issues": null,
+      "rationale": "VAL-ONB-004 contract requirements were fully met: rejected variant rendered required red styling, exact copy, and required CTAs; red variant is clearly distinct from timeout amber variant."
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 1 assertion (VAL-ONB-004): passed. Rejected failure variant is correctly red and visually distinct from timeout amber variant, with no console/page errors."
+}
