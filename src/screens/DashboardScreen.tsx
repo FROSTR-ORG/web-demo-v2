@@ -46,7 +46,7 @@ export function DashboardScreen() {
       mainVariant="dashboard"
       headerActions={
         <>
-          <Button type="button" variant="header">
+          <Button type="button" variant="header" onClick={() => navigate(`/recover/${profileId}`)}>
             <FileText size={14} />
             Recover
           </Button>

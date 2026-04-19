@@ -6,6 +6,7 @@ import { DistributeSharesScreen } from "../screens/DistributeSharesScreen";
 import { DistributionCompleteScreen } from "../screens/DistributionCompleteScreen";
 import { LoadBackupScreen, DecryptBackupScreen, ReviewSaveScreen, ImportErrorScreen } from "../screens/ImportScreens";
 import { EnterPackageScreen, HandshakeScreen, OnboardingFailedScreen, OnboardingCompleteScreen } from "../screens/OnboardScreens";
+import { CollectSharesScreen, RecoverSuccessScreen } from "../screens/RecoverScreens";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
 
 export function App() {
@@ -24,6 +25,8 @@ export function App() {
       <Route path="/onboard/handshake" element={<HandshakeScreen />} />
       <Route path="/onboard/failed" element={<OnboardingFailedScreen />} />
       <Route path="/onboard/complete" element={<OnboardingCompleteScreen />} />
+      <Route path="/recover/:profileId" element={<CollectSharesScreen />} />
+      <Route path="/recover/:profileId/success" element={<RecoverSuccessScreen />} />
       <Route path="/dashboard/:profileId" element={<DashboardScreen />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
