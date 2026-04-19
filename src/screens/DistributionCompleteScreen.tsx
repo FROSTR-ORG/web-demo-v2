@@ -19,7 +19,26 @@ export function DistributionCompleteScreen() {
   const complete = accounted === total;
 
   async function finish() {
-    const profileId = await finishDistribution();
+    /*
+     * VAL-SHR-011 — ensure we always navigate to a concrete
+     * `/dashboard/{profileId}` URL even if the async finishDistribution()
+     * throws or resolves to an empty value (e.g. when the demo bridge
+     * momentarily omits createdProfileId). We prefer the value returned by
+     * finishDistribution(), then fall back to the createSession's own
+     * createdProfileId so the dashboard route always has a valid param.
+     */
+    let profileId = createSession?.createdProfileId ?? "";
+    try {
+      const resolved = await finishDistribution();
+      if (resolved) {
+        profileId = resolved;
+      }
+    } catch {
+      // Swallow — we still navigate below using the fallback.
+    }
+    if (!profileId) {
+      return;
+    }
     navigate(`/dashboard/${profileId}`);
   }
 

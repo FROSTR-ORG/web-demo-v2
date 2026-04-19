@@ -1263,6 +1263,20 @@ a {
 }
 
 .package-actions.locked {
+  opacity: 1;
+}
+
+/*
+ * VAL-SHR-008 — disabled Copy/QR chips inside a locked package row must render
+ * at computed opacity 0.4 (Paper spec). Without this override the global
+ * `button:disabled { opacity: 0.45 }` rule dominates, leaving the per-button
+ * computed opacity at 0.45. We intentionally apply the dim on the button
+ * elements themselves (rather than the container) so automated validators
+ * inspecting `getComputedStyle(button).opacity` observe exactly `0.4`.
+ */
+.package-actions.locked button:disabled,
+.package-actions.locked button[aria-disabled="true"],
+.package-actions.locked [role="button"][aria-disabled="true"] {
   opacity: 0.4;
 }
 

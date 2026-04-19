@@ -111,9 +111,22 @@ const dashboardState = createDemoAppState({
   runtimeStatus: demoRuntimeStatus
 });
 const createKeysetState = createDemoAppState({ createSession: createDemoSession() });
-const sharedProfileState = createDemoAppState({ createSession: createDemoSession() });
+// Shared Create Profile — retains the create-session keyset/localShare, but also
+// marks the profile as created so the bridge snapshot carries `createdProfileId`
+// forward. Without this, clicking "Continue to Distribute Shares" exits the
+// demo shell into the real `AppStateProvider` where `DistributeSharesScreen`'s
+// guard would short-circuit to `/create` (VAL-SHR-005).
+const sharedProfileState = createDemoAppState({ activeProfile: demoProfile, createSession: createDemoSession({ profileCreated: true }) });
 const sharedDistributeState = createDemoAppState({ activeProfile: demoProfile, createSession: createDemoSession({ profileCreated: true }) });
-const sharedCompleteState = createDemoAppState({ activeProfile: demoProfile, createSession: createDemoSession({ profileCreated: true, distributed: true }) });
+// Distribution Completion — includes `runtimeStatus` so that when the user
+// clicks "Finish Distribution" the real `AppStateProvider` bridge carries the
+// runtime status forward and `DashboardScreen` can render without redirecting
+// back to `/` (VAL-SHR-011).
+const sharedCompleteState = createDemoAppState({
+  activeProfile: demoProfile,
+  runtimeStatus: demoRuntimeStatus,
+  createSession: createDemoSession({ profileCreated: true, distributed: true })
+});
 
 export const demoScenarios: DemoScenario[] = [
   scenario("welcome-first-time", "welcome", "Welcome - 1. Welcome", "screens/welcome/1-welcome", "/", noProfiles, "Igloo Web"),
@@ -211,7 +224,13 @@ export const demoScenarios: DemoScenario[] = [
     { fromHandshake: true, demoUi: { onboard: { passwordPreset: DEMO_PASSWORD } } }
   ),
 
-  scenario("create-keyset", "create", "Create - 1. Create Keyset", "screens/create/1-create-keyset", "/create", noProfiles, "Create New Keyset"),
+  // `createKeysetState` (not `noProfiles`) primes the mock with a valid
+  // createSession so that after the user submits the form, the bridge
+  // snapshot carries enough state for the real app's GenerationProgressScreen
+  // to render at /create/progress without bouncing back to /create (VAL-CRT-007,
+  // VAL-CRT-012). The Create Keyset form itself does not read createSession,
+  // so all existing content-parity assertions continue to hold.
+  scenario("create-keyset", "create", "Create - 1. Create Keyset", "screens/create/1-create-keyset", "/create", createKeysetState, "Create New Keyset"),
   scenario(
     "create-validation-error",
     "create",
