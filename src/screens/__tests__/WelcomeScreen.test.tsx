@@ -62,7 +62,7 @@ beforeEach(() => {
 });
 
 describe("WelcomeScreen", () => {
-  it("renders first-time welcome with New Keyset button", () => {
+  it("renders first-time welcome with Create New Keyset CTA and chip-style secondary actions", () => {
     render(
       <MemoryRouter>
         <WelcomeScreen />
@@ -70,10 +70,44 @@ describe("WelcomeScreen", () => {
     );
     expect(screen.getByText("Igloo Web")).toBeInTheDocument();
     expect(screen.getByText("Split your Nostr key. Sign from anywhere.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /New Keyset/i })).toBeInTheDocument();
+    // Primary CTA reads exactly "Create New Keyset"
+    expect(screen.getByRole("button", { name: "Create New Keyset" })).toBeInTheDocument();
+    // Chip-style secondary actions
+    expect(screen.getByRole("button", { name: "Import Device Profile" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Onboard" })).toBeInTheDocument();
   });
 
-  it("renders single returning profile with Unlock and Rotate actions", () => {
+  it("first-time CTA navigates to /create on click", () => {
+    render(
+      <MemoryRouter>
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Create New Keyset" }));
+    expect(mocks.navigate).toHaveBeenCalledWith("/create");
+  });
+
+  it("first-time chip 'Import Device Profile' navigates to /import", () => {
+    render(
+      <MemoryRouter>
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Import Device Profile" }));
+    expect(mocks.navigate).toHaveBeenCalledWith("/import");
+  });
+
+  it("first-time chip 'Onboard' navigates to /onboard", () => {
+    render(
+      <MemoryRouter>
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Onboard" }));
+    expect(mocks.navigate).toHaveBeenCalledWith("/onboard");
+  });
+
+  it("renders single returning profile with subtitle, Unlock + Rotate, and chip-style 'or' row", () => {
     mocks.profiles = [makeProfile("p1", "My Signing Key")];
     render(
       <MemoryRouter>
@@ -84,6 +118,12 @@ describe("WelcomeScreen", () => {
     expect(screen.getByText("My Signing Key")).toBeInTheDocument();
     expect(screen.getByText("Unlock")).toBeInTheDocument();
     expect(screen.getByText("Rotate")).toBeInTheDocument();
+    // Subtitle includes `· #{localShareIdx}` segment
+    expect(screen.getByText(/2\/3 · #0 · npub/)).toBeInTheDocument();
+    // chip-style "or" row with all three returning chips
+    expect(screen.getByRole("button", { name: "New Keyset" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Import Device Profile" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Onboard" })).toBeInTheDocument();
   });
 
   it("renders multi returning (2-3 profiles) with Unlock and Rotate buttons", () => {
@@ -159,8 +199,8 @@ describe("WelcomeScreen", () => {
         <WelcomeScreen />
       </MemoryRouter>
     );
-    // Open unlock modal by clicking the profile row (single profile — clicks the row button)
-    fireEvent.click(screen.getByText("My Signing Key"));
+    // Open unlock modal by clicking the explicit Unlock button on the profile row
+    fireEvent.click(screen.getByText("Unlock"));
     // Type a password
     const passwordInput = screen.getByLabelText("Profile Password");
     fireEvent.change(passwordInput, { target: { value: "wrongpass" } });
@@ -223,5 +263,83 @@ describe("WelcomeScreen", () => {
     expect(chipBtns).toHaveLength(1);
     fireEvent.click(chipBtns[0]);
     expect(mocks.navigate).toHaveBeenCalledWith("/create");
+  });
+
+  it("clicking the modal scrim closes the unlock modal", () => {
+    mocks.profiles = [makeProfile("p1", "My Signing Key")];
+    render(
+      <MemoryRouter>
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByText("Unlock"));
+    expect(screen.getByText("Unlock Profile")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    // Click directly on the backdrop element (event.target === currentTarget)
+    fireEvent.click(dialog);
+    expect(screen.queryByText("Unlock Profile")).not.toBeInTheDocument();
+  });
+
+  it("pressing Escape closes the unlock modal", () => {
+    mocks.profiles = [makeProfile("p1", "My Signing Key")];
+    render(
+      <MemoryRouter>
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByText("Unlock"));
+    expect(screen.getByText("Unlock Profile")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByText("Unlock Profile")).not.toBeInTheDocument();
+  });
+
+  it("rotate-share-first variant renders chip-pair entry without Create CTA", () => {
+    mocks.profiles = [];
+    // Render with the rotate-share-first variant via location state
+    render(
+      <MemoryRouter
+        initialEntries={[
+          { pathname: "/", state: { demoUi: { welcome: { variant: "rotate-share-first" } } } }
+        ]}
+      >
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    // No "Create New Keyset" CTA visible
+    expect(screen.queryByRole("button", { name: "Create New Keyset" })).not.toBeInTheDocument();
+    // Onboard + Rotate Share chip pair visible
+    expect(screen.getByRole("button", { name: "Onboard" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rotate Share" })).toBeInTheDocument();
+  });
+
+  it("rotate-share-first 'Rotate Share' chip navigates to /rotate-share", () => {
+    mocks.profiles = [];
+    render(
+      <MemoryRouter
+        initialEntries={[
+          { pathname: "/", state: { demoUi: { welcome: { variant: "rotate-share-first" } } } }
+        ]}
+      >
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Rotate Share" }));
+    expect(mocks.navigate).toHaveBeenCalledWith("/rotate-share");
+  });
+
+  it("rotate-keyset-first variant renders saved-first layout with Rotate CTA", () => {
+    mocks.profiles = [makeProfile("p1", "My Signing Key")];
+    render(
+      <MemoryRouter
+        initialEntries={[
+          { pathname: "/", state: { demoUi: { welcome: { variant: "rotate-keyset-first" } } } }
+        ]}
+      >
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    expect(screen.getByText("Welcome back.")).toBeInTheDocument();
+    expect(screen.getByText("My Signing Key")).toBeInTheDocument();
+    expect(screen.getByText("Rotate")).toBeInTheDocument();
   });
 });

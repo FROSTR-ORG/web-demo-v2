@@ -35,7 +35,7 @@ export const demoProfiles: StoredProfileSummary[] = [
     id: "work-profile",
     label: "Work Key",
     deviceName: "Work Laptop",
-    localShareIdx: 1,
+    localShareIdx: 0,
     groupPublicKey: "npub1d8fabcdefghijklmnopqrstuvw9k2m"
   },
   {
@@ -43,6 +43,8 @@ export const demoProfiles: StoredProfileSummary[] = [
     id: "backup-profile",
     label: "Backup Key",
     deviceName: "Vault Browser",
+    threshold: 3,
+    memberCount: 5,
     localShareIdx: 2,
     groupPublicKey: "npub1f7aabcdefghijklmnopqrstuvw4x1n"
   },
@@ -67,7 +69,7 @@ export const demoProfiles: StoredProfileSummary[] = [
     deviceName: "Shared Workstation",
     groupPublicKey: "npub1jointabcdefghijklmnopqrstuv5m8t"
   },
-  ...Array.from({ length: 7 }, (_, index) => ({
+  ...Array.from({ length: 6 }, (_, index) => ({
     ...demoProfile,
     id: `archive-profile-${index + 1}`,
     label: `Archive Key ${index + 1}`,

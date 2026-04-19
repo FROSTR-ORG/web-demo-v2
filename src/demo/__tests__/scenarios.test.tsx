@@ -19,7 +19,12 @@ describe("demo scenarios", () => {
     const canonical = demoScenarios.filter((scenario) => scenario.canonical !== false);
     const variants = demoScenarios.filter((scenario) => scenario.canonical === false);
     expect(canonical).toHaveLength(44);
-    expect(variants.map((scenario) => scenario.id)).toEqual(["import-error-corrupted", "onboard-failed-rejected"]);
+    expect(variants.map((scenario) => scenario.id).sort()).toEqual([
+      "import-error-corrupted",
+      "onboard-failed-rejected",
+      "welcome-rotate-keyset-first",
+      "welcome-rotate-share-first"
+    ]);
     expect(new Set(demoScenarios.map((scenario) => scenario.id)).size).toBe(demoScenarios.length);
     expect(demoFlows).toEqual(["welcome", "import", "onboard", "create", "shared", "dashboard", "rotate-keyset", "rotate-share", "recover"]);
   });

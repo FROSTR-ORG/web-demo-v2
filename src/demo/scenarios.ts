@@ -96,6 +96,15 @@ const noProfiles = createDemoAppState({ profiles: [] });
 const oneProfile = createDemoAppState({ profiles: [demoProfile] });
 const multiProfiles = createDemoAppState({ profiles: demoProfiles.slice(0, 3) });
 const manyProfiles = createDemoAppState({ profiles: demoProfiles });
+/**
+ * Used by the welcome-unlock-modal scenarios so that submitting the modal navigates
+ * cleanly into a runnable dashboard view (per VAL-WEL-027).
+ */
+const multiProfilesWithActive = createDemoAppState({
+  profiles: demoProfiles.slice(0, 3),
+  activeProfile: demoProfile,
+  runtimeStatus: demoRuntimeStatus
+});
 const dashboardState = createDemoAppState({
   profiles: [demoProfile],
   activeProfile: demoProfile,
@@ -117,7 +126,7 @@ export const demoScenarios: DemoScenario[] = [
     "Welcome - 1c-1. Unlock Profile (Modal)",
     "screens/welcome/1c-1-unlock-profile-modal",
     "/",
-    multiProfiles,
+    multiProfilesWithActive,
     "Unlock Profile",
     { demoUi: { welcome: { unlockingProfileId: DEMO_PROFILE_ID, passwordPreset: DEMO_PASSWORD } } }
   ),
@@ -127,9 +136,31 @@ export const demoScenarios: DemoScenario[] = [
     "Welcome - 1c-2. Unlock Error (Modal)",
     "screens/welcome/1c-2-unlock-error-modal",
     "/",
-    multiProfiles,
+    multiProfilesWithActive,
     "Incorrect password",
     { demoUi: { welcome: { unlockingProfileId: DEMO_PROFILE_ID, unlockError: "Incorrect password. Please try again.", passwordPreset: DEMO_PASSWORD } } }
+  ),
+  variantScenario(
+    "welcome-rotate-keyset-first",
+    "welcome-returning-single",
+    "welcome",
+    "Welcome - Rotate Keyset First",
+    "screens/welcome/1b-returning",
+    "/",
+    oneProfile,
+    "Welcome back.",
+    { demoUi: { welcome: { variant: "rotate-keyset-first" } } }
+  ),
+  variantScenario(
+    "welcome-rotate-share-first",
+    "welcome-first-time",
+    "welcome",
+    "Welcome - Rotate Share First",
+    "screens/welcome/1-welcome",
+    "/",
+    noProfiles,
+    "Replace a Share",
+    { demoUi: { welcome: { variant: "rotate-share-first" } } }
   ),
 
   scenario("import-load-backup", "import", "Import - 1. Load Backup", "screens/import/1-load-backup", "/import", noProfiles, "Load Backup", { demoUi: { import: { backupPreset: DEMO_BFPROFILE } } }),

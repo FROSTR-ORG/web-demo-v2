@@ -8,6 +8,7 @@ export interface DemoUiState {
     unlockingProfileId?: string;
     unlockError?: string;
     passwordPreset?: string;
+    variant?: "rotate-keyset-first" | "rotate-share-first";
   };
   create?: {
     validationError?: boolean;
