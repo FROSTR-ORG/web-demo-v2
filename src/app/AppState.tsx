@@ -20,6 +20,7 @@ import type {
 } from "../lib/bifrost/types";
 import { LocalRuntimeSimulator } from "../lib/relay/localSimulator";
 import { getProfile, listProfiles, removeProfile, saveProfile, touchProfile } from "../lib/storage/profileStore";
+import { BRIDGE_EVENT, consumeBridgeSnapshot, snapshotFromAppState, writeBridgeSnapshot } from "./appStateBridge";
 
 export interface CreateDraft {
   groupName: string;
@@ -70,6 +71,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [runtimeStatus, setRuntimeStatus] = useState<RuntimeStatusSummary | null>(null);
   const [signerPaused, setSignerPausedState] = useState(false);
   const [createSession, setCreateSession] = useState<CreateSession | null>(null);
+  const [bridgeHydrated, setBridgeHydrated] = useState(false);
   const runtimeRef = useRef<RuntimeClient | null>(null);
   const simulatorRef = useRef<LocalRuntimeSimulator | null>(null);
 
@@ -77,8 +79,34 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setProfiles(await listProfiles());
   }, []);
 
+  // On mount — and whenever a demo MockAppStateProvider announces a new snapshot
+  // via BRIDGE_EVENT — consume the sessionStorage bridge if present. When no
+  // bridge exists on initial mount, fall back to the original IndexedDB reload.
   useEffect(() => {
-    void reloadProfiles();
+    function applyBridge(): boolean {
+      const snapshot = consumeBridgeSnapshot();
+      if (!snapshot) {
+        return false;
+      }
+      setProfiles(Array.isArray(snapshot.profiles) ? snapshot.profiles : []);
+      setActiveProfile(snapshot.activeProfile ?? null);
+      setRuntimeStatus(snapshot.runtimeStatus ?? null);
+      setSignerPausedState(Boolean(snapshot.signerPaused));
+      setCreateSession(snapshot.createSession ?? null);
+      setBridgeHydrated(true);
+      return true;
+    }
+
+    const hydratedOnMount = applyBridge();
+    if (!hydratedOnMount) {
+      void reloadProfiles();
+    }
+
+    function onBridgeUpdate() {
+      applyBridge();
+    }
+    window.addEventListener(BRIDGE_EVENT, onBridgeUpdate);
+    return () => window.removeEventListener(BRIDGE_EVENT, onBridgeUpdate);
   }, [reloadProfiles]);
 
   const setRuntime = useCallback((runtime: RuntimeClient, simulator?: LocalRuntimeSimulator) => {
@@ -298,9 +326,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [signerPaused]);
 
   useEffect(() => {
+    // When the provider was hydrated from the demo bridge there is no real
+    // RuntimeClient backing the visible runtimeStatus — running the tick loop
+    // would immediately null it out and force a redirect to "/". Skip the
+    // interval in that case; a live unlock from the real flow resets
+    // `bridgeHydrated` to false implicitly by replacing `runtimeStatus` before
+    // the next scheduling pass.
+    if (bridgeHydrated && !runtimeRef.current) {
+      return;
+    }
     const timer = window.setInterval(refreshRuntime, 2500);
     return () => window.clearInterval(timer);
-  }, [refreshRuntime]);
+  }, [refreshRuntime, bridgeHydrated]);
 
   const value = useMemo<AppStateValue>(
     () => ({
@@ -342,7 +379,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }
 
-export function MockAppStateProvider({ value, children }: { value: AppStateValue; children: ReactNode }) {
+export function MockAppStateProvider({
+  value,
+  children,
+  bridge = true
+}: {
+  value: AppStateValue;
+  children: ReactNode;
+  /**
+   * When true (default), the mock provider writes a sessionStorage bridge
+   * snapshot on mount and whenever `value` changes, so the real
+   * AppStateProvider can rehydrate if the user navigates out of `/demo/*`
+   * into a real application route like `/dashboard/:id`. Pass `false` in
+   * isolated test setups where the bridge would be noise.
+   */
+  bridge?: boolean;
+}) {
+  useEffect(() => {
+    if (!bridge) return;
+    writeBridgeSnapshot(snapshotFromAppState(value));
+  }, [value, bridge]);
+
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }
 
