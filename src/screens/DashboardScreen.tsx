@@ -1,4 +1,4 @@
-import { ChevronDown, Download, FileText, HelpCircle, RotateCw, Settings, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, Download, FileText, HelpCircle, RotateCw, Settings, SlidersHorizontal, X } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAppState } from "../app/AppState";
@@ -14,6 +14,7 @@ export function DashboardScreen() {
   const navigate = useNavigate();
   const { activeProfile, runtimeStatus, lockProfile, refreshRuntime } = useAppState();
   const [mockState, setMockState] = useState<DashboardState>("running");
+  const [showPolicies, setShowPolicies] = useState(false);
 
   if (!profileId) {
     return <Navigate to="/" replace />;
@@ -50,7 +51,7 @@ export function DashboardScreen() {
             <Download size={14} />
             Export
           </Button>
-          <Button type="button" variant="header">
+          <Button type="button" variant="header" onClick={() => setShowPolicies((v) => !v)}>
             <SlidersHorizontal size={14} />
             Policies
           </Button>
@@ -102,40 +103,46 @@ export function DashboardScreen() {
           </div>
         </div>
 
-        {/* Conditional state rendering */}
-        {mockState === "running" && (
-          <RunningState
-            relays={activeProfile.relays}
-            onlineCount={onlineCount}
-            signReadyLabel={signReadyLabel}
-            peers={runtimeStatus.peers}
-            pendingOperations={runtimeStatus.pending_operations}
-            onStop={handleStopSigner}
-            onLock={() => {
-              lockProfile();
-              navigate("/");
-            }}
-            onRefresh={refreshRuntime}
-          />
-        )}
+        {/* Conditional rendering: Policies view OR dashboard state */}
+        {showPolicies ? (
+          <PoliciesView peers={runtimeStatus.peers} />
+        ) : (
+          <>
+            {mockState === "running" && (
+              <RunningState
+                relays={activeProfile.relays}
+                onlineCount={onlineCount}
+                signReadyLabel={signReadyLabel}
+                peers={runtimeStatus.peers}
+                pendingOperations={runtimeStatus.pending_operations}
+                onStop={handleStopSigner}
+                onLock={() => {
+                  lockProfile();
+                  navigate("/");
+                }}
+                onRefresh={refreshRuntime}
+              />
+            )}
 
-        {mockState === "connecting" && (
-          <ConnectingState relays={activeProfile.relays} />
-        )}
+            {mockState === "connecting" && (
+              <ConnectingState relays={activeProfile.relays} />
+            )}
 
-        {mockState === "stopped" && (
-          <StoppedState onStart={handleStartSigner} />
-        )}
+            {mockState === "stopped" && (
+              <StoppedState onStart={handleStartSigner} />
+            )}
 
-        {mockState === "relays-offline" && (
-          <RelaysOfflineState
-            onStop={handleStopSigner}
-            onRetry={handleRetryConnections}
-          />
-        )}
+            {mockState === "relays-offline" && (
+              <RelaysOfflineState
+                onStop={handleStopSigner}
+                onRetry={handleRetryConnections}
+              />
+            )}
 
-        {mockState === "signing-blocked" && (
-          <SigningBlockedState onStop={handleStopSigner} />
+            {mockState === "signing-blocked" && (
+              <SigningBlockedState onStop={handleStopSigner} />
+            )}
+          </>
         )}
       </section>
     </AppShell>
@@ -483,6 +490,114 @@ function SigningBlockedState({ onStop }: { onStop: () => void }) {
                 Review Approvals
               </Button>
             </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ========================================
+   Policies View
+   ======================================== */
+
+// Mock data for signer policy rules
+const MOCK_SIGNER_RULES = [
+  { method: "sign_event:1", domain: "primal.net", permission: "Always" as const },
+  { method: "nip44_encrypt", domain: "primal.net", permission: "Allow once" as const },
+  { method: "get_public_key", domain: "primal.net", permission: "Always" as const },
+];
+
+// Mock data for peer policies
+const MOCK_PEER_POLICIES = [
+  {
+    index: 0,
+    pubkey: "02a3f8...8f2c",
+    permissions: { sign: true, ecdh: true, ping: true, onboard: false },
+  },
+  {
+    index: 1,
+    pubkey: "02d7e1...3b9e",
+    permissions: { sign: true, ecdh: false, ping: true, onboard: true },
+  },
+  {
+    index: 2,
+    pubkey: "029c4a...1f5e",
+    permissions: { sign: false, ecdh: false, ping: false, onboard: false },
+  },
+];
+
+function PoliciesView({ peers: _peers }: { peers: PeerStatus[] }) {
+  return (
+    <>
+      {/* Signer Policies Panel */}
+      <div className="policies-panel">
+        <div className="policies-panel-header">
+          <div className="policies-panel-title">Signer Policies</div>
+          <div className="policies-header-right">
+            <span className="policies-default-label">Default policy</span>
+            <div className="policies-dropdown">
+              <span className="policies-dropdown-text">Ask every time</span>
+              <span className="policies-dropdown-caret">▾</span>
+            </div>
+          </div>
+        </div>
+        <div className="policies-panel-body">
+          <p className="policies-description">
+            Controls how this signer responds to external signing and encryption requests.
+          </p>
+          <div className="policies-rules-list">
+            {MOCK_SIGNER_RULES.map((rule) => (
+              <div className="policies-rule-row" key={rule.method}>
+                <span className="policies-method">{rule.method}</span>
+                <span className="policies-domain">{rule.domain}</span>
+                <span className="policies-rule-divider" />
+                <span
+                  className={`policies-permission-badge ${rule.permission === "Always" ? "always" : "allow-once"}`}
+                >
+                  {rule.permission}
+                </span>
+                <button type="button" className="policies-remove-btn" aria-label="Remove rule">
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Peer Policies Panel */}
+      <div className="policies-panel">
+        <div className="policies-panel-header">
+          <div className="policies-panel-title">Peer Policies</div>
+        </div>
+        <div className="policies-panel-body">
+          <p className="policies-description">
+            Review which request types each peer is allowed to make from this signer.
+          </p>
+          <div className="policies-peer-list">
+            {MOCK_PEER_POLICIES.map((peer) => (
+              <div className="policies-peer-row" key={peer.index}>
+                <div className="policies-peer-info">
+                  <span className="policies-peer-name">Peer #{peer.index}</span>
+                  <span className="policies-peer-key">{peer.pubkey}</span>
+                </div>
+                <div className="policies-peer-badges">
+                  <PermissionBadge tone="success" muted={!peer.permissions.sign}>
+                    SIGN
+                  </PermissionBadge>
+                  <PermissionBadge tone="info" muted={!peer.permissions.ecdh}>
+                    ECDH
+                  </PermissionBadge>
+                  <PermissionBadge tone="ping" muted={!peer.permissions.ping}>
+                    PING
+                  </PermissionBadge>
+                  <PermissionBadge tone="onboard" muted={!peer.permissions.onboard}>
+                    ONBOARD
+                  </PermissionBadge>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
