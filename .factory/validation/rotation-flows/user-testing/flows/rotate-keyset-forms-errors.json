@@ -1,0 +1,191 @@
+{
+  "groupId": "rotate-keyset-forms-errors",
+  "testedAt": "2026-04-19T03:03:11Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "appUrl": "http://127.0.0.1:5173",
+    "browserSession": "rkf-forms-errors",
+    "storageReset": "cookies, localStorage, sessionStorage, IndexedDB cleared before testing"
+  },
+  "toolsUsed": ["agent-browser"],
+  "assertions": [
+    {
+      "id": "VAL-WELCOME-010",
+      "title": "Rotate button on profile row navigates to Rotate Keyset",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Open returning-user Welcome at / with one saved profile",
+          "expected": "Profile row shows a distinct Rotate button",
+          "observed": "Profile row showed only Unlock action; no Rotate button present"
+        },
+        {
+          "action": "Click profile row action area",
+          "expected": "Rotate action navigates to /rotate-keyset with selected keyset name preloaded",
+          "observed": "Unlock modal opened on / and did not navigate to Rotate Keyset"
+        }
+      ],
+      "evidence": {
+        "urls": [
+          "http://127.0.0.1:5173/"
+        ],
+        "screenshots": [
+          "rotation-flows/rotate-keyset-forms-errors/VAL-WELCOME-010-welcome-row-no-rotate-button.png",
+          "rotation-flows/rotate-keyset-forms-errors/VAL-WELCOME-010-profile-row-click-result.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No /api requests captured; SPA state only"
+      },
+      "issues": "Rotate button required by contract was not rendered in returning-user profile row; navigation target could not be triggered from Welcome."
+    },
+    {
+      "id": "VAL-ROTATEKS-001",
+      "title": "Rotate Keyset form renders with source share cards, new config controls, 3-step stepper, info callout",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /rotate-keyset",
+          "expected": "Rotate Keyset form renders all specified controls and callout",
+          "observed": "Form rendered with 3-step stepper (step 1 active), Source Share #1 validated card, Source Share #2 inputs, Shares Collected bar, threshold/total steppers, Validate & Continue button, and blue info callout"
+        }
+      ],
+      "evidence": {
+        "urls": [
+          "http://127.0.0.1:5173/rotate-keyset"
+        ],
+        "screenshots": [
+          "rotation-flows/rotate-keyset-forms-errors/VAL-ROTATEKS-001-rotate-keyset-form.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No /api requests captured; route render is SPA-driven"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ROTATEKS-002",
+      "title": "Review & Generate screen renders with amber warning, distribution password inputs, red action button",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From /rotate-keyset, click Validate & Continue to reach /rotate-keyset/review",
+          "expected": "Review screen shows amber warning, password + confirm inputs, red Rotate & Generate Keyset button, step 1 active",
+          "observed": "All required elements rendered, including amber warning callout, both password fields, and destructive red action button"
+        }
+      ],
+      "evidence": {
+        "urls": [
+          "http://127.0.0.1:5173/rotate-keyset/review"
+        ],
+        "screenshots": [
+          "rotation-flows/rotate-keyset-forms-errors/VAL-ROTATEKS-002-review-generate.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No /api requests captured; SPA route transition"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ROTATEKS-003",
+      "title": "Rotation Generation Progress renders with 4-phase checklist (differs from Create's 3 phases)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /rotate-keyset/progress",
+          "expected": "Progress card shows 4 named phases and 'N of 4 phases'",
+          "observed": "Displayed phases: Process Source Shares, Recover Existing Key, Generate Fresh Shares, Prepare Rotated Shares; overall progress showed 0 of 4 phases"
+        }
+      ],
+      "evidence": {
+        "urls": [
+          "http://127.0.0.1:5173/rotate-keyset/progress"
+        ],
+        "screenshots": [
+          "rotation-flows/rotate-keyset-forms-errors/VAL-ROTATEKS-003-generation-progress.png",
+          "rotation-flows/rotate-keyset-forms-errors/VAL-ROTATEKS-003-generation-progress-phases.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No /api requests captured"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ROTATEKS-004",
+      "title": "Wrong Password error screen renders with failed source share details and retry button",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /rotate-keyset/error-password",
+          "expected": "Source Share Error screen with failed share details, wrong-password banner, and Retry button",
+          "observed": "Rendered Source Share Error title, failed Source Share #2 card, wrong-password error message, and Retry button with back navigation present"
+        }
+      ],
+      "evidence": {
+        "urls": [
+          "http://127.0.0.1:5173/rotate-keyset/error-password"
+        ],
+        "screenshots": [
+          "rotation-flows/rotate-keyset-forms-errors/VAL-ROTATEKS-004-wrong-password-error.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No /api requests captured"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ROTATEKS-005",
+      "title": "Group Mismatch error screen renders with contrasting group key display and back navigation",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /rotate-keyset/error-mismatch",
+          "expected": "Source Group Mismatch screen with contrasting group-key displays and back action",
+          "observed": "Rendered mismatch card with two contrasting group key values and Back to Source Intake button"
+        }
+      ],
+      "evidence": {
+        "urls": [
+          "http://127.0.0.1:5173/rotate-keyset/error-mismatch"
+        ],
+        "screenshots": [
+          "rotation-flows/rotate-keyset-forms-errors/VAL-ROTATEKS-005-group-mismatch-error.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No /api requests captured"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ROTATEKS-006",
+      "title": "Generation Failed error screen renders with failed phase highlighted and safety reassurance banner",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /rotate-keyset/error-failed",
+          "expected": "Generation Failed screen with failed phase highlighted, completed phases, green reassurance banner, Retry Generation button",
+          "observed": "Rendered failed phase with Failed label, completed phases above, green reassurance banner, and Retry Generation button"
+        }
+      ],
+      "evidence": {
+        "urls": [
+          "http://127.0.0.1:5173/rotate-keyset/error-failed"
+        ],
+        "screenshots": [
+          "rotation-flows/rotate-keyset-forms-errors/VAL-ROTATEKS-006-generation-failed-error.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No /api requests captured"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "To create returning-user state in headless flow, Finish Distribution remained disabled until each QR modal in Create/Distribute was opened and dismissed with Done.",
+      "resolved": true,
+      "resolution": "Opened and dismissed both QR modals, then completed distribution and locked dashboard to return to Welcome.",
+      "affectedAssertions": ["VAL-WELCOME-010"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 7 assigned assertions: 6 passed and 1 failed. Failure was VAL-WELCOME-010 because Rotate action was not available on the returning-user profile row and click path opened Unlock modal instead of navigating to Rotate Keyset."
+}

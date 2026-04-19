@@ -1,0 +1,251 @@
+{
+  "groupId": "rotate-share-cross",
+  "testedAt": "2026-04-19T03:06:40Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "appUrl": "http://127.0.0.1:5173",
+    "browserSession": "rotate-share-cross-f2366386",
+    "baseline": "Started in isolated session; cleared cookies/localStorage before tests; built profile/dashboard state in-session via Create flow"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-ROTATESH-001",
+      "title": "Enter Rotate Package renders with package input, QR button, password, Apply button, back to settings",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate from Dashboard Settings -> Rotate Share",
+          "expected": "Enter Rotate Package screen renders",
+          "observed": "Opened http://127.0.0.1:5173/rotate-share with Back to Settings link, Rotate Package input, Scan QR button, Package Password field, and disabled Apply Share Update button until valid package"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/rotate-share-cross/VAL-ROTATESH-001-enter-rotate-package.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json: [])",
+        "network": "No requests captured by agent-browser network logger (requests --json: [])"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ROTATESH-002",
+      "title": "Applying Share Update renders with vertical step timeline showing progress",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Enter valid package (bfonboard1...) and password, click Apply Share Update",
+          "expected": "Navigate to Applying Share Update with mixed done/active/pending timeline states",
+          "observed": "Opened http://127.0.0.1:5173/rotate-share/applying with vertical timeline (first steps done, local share update active, profile saving pending), package summary bar, and Cancel Share Update button"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/rotate-share-cross/VAL-ROTATESH-002-applying-share-update.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json: [])",
+        "network": "No requests captured by agent-browser network logger (requests --json: [])"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ROTATESH-003",
+      "title": "Share Update Failed renders with amber warning and retry/back buttons",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From Applying Share Update click Simulate Failure",
+          "expected": "Navigate to Share Update Failed with amber warning and recovery actions",
+          "observed": "Opened http://127.0.0.1:5173/rotate-share/failed showing amber warning callout ('Rotate package did not apply'), Retry, and Back to Rotate Share actions"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/rotate-share-cross/VAL-ROTATESH-003-share-update-failed.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json: [])",
+        "network": "No requests captured by agent-browser network logger (requests --json: [])"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ROTATESH-004",
+      "title": "Local Share Updated renders with green success banner and identity changes card (old/new values)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run successful apply path and wait for completion",
+          "expected": "Navigate to Local Share Updated with success banner and old/new identity rows",
+          "observed": "Opened http://127.0.0.1:5173/rotate-share/updated with green success banner and Identity Changes card showing Group Public Key unchanged plus Share Public Key and Profile ID old/new comparisons"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/rotate-share-cross/VAL-ROTATESH-004-local-share-updated.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json: [])",
+        "network": "No requests captured by agent-browser network logger (requests --json: [])"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ROTATESH-005",
+      "title": "Full Rotate Share happy path navigable (Settings -> Enter -> Applying -> Updated -> Dashboard)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open Settings sidebar from dashboard",
+          "expected": "Rotate Share entry point available",
+          "observed": "Settings opened on dashboard route and showed Rotate Share button"
+        },
+        {
+          "action": "Navigate Settings -> Enter Rotate Package -> Applying Share Update -> Local Share Updated",
+          "expected": "Each route renders expected screen",
+          "observed": "Progressed through /rotate-share -> /rotate-share/applying -> /rotate-share/updated"
+        },
+        {
+          "action": "Click Return to Signer",
+          "expected": "Navigate back to dashboard",
+          "observed": "Returned to http://127.0.0.1:5173/dashboard/755b39a9f2654768072db90be8038f6039172021aae5c311ed8a448fd26cfed2"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/rotate-share-cross/VAL-ROTATESH-005-settings-sidebar-entry.png",
+          "rotation-flows/rotate-share-cross/VAL-ROTATESH-001-enter-rotate-package.png",
+          "rotation-flows/rotate-share-cross/VAL-ROTATESH-002-applying-share-update.png",
+          "rotation-flows/rotate-share-cross/VAL-ROTATESH-004-local-share-updated.png",
+          "rotation-flows/rotate-share-cross/VAL-ROTATESH-005-dashboard-after-return.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json: [])",
+        "network": "No requests captured by agent-browser network logger (requests --json: [])"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ROTATESH-006",
+      "title": "Rotate Share failure path navigable (Enter -> Applying -> Failed -> retry/back)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Enter valid package and apply, then trigger Simulate Failure",
+          "expected": "Reach Share Update Failed",
+          "observed": "Reached /rotate-share/failed from /rotate-share/applying"
+        },
+        {
+          "action": "Click Retry on failed screen",
+          "expected": "Re-attempt update by returning to applying",
+          "observed": "Retry navigated to /rotate-share/applying"
+        },
+        {
+          "action": "Click Back to Rotate Share on failed screen",
+          "expected": "Return to Enter Rotate Package",
+          "observed": "Back action navigated to /rotate-share"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/rotate-share-cross/VAL-ROTATESH-006-applying-before-failure.png",
+          "rotation-flows/rotate-share-cross/VAL-ROTATESH-003-share-update-failed.png",
+          "rotation-flows/rotate-share-cross/VAL-ROTATESH-006-retry-to-applying.png",
+          "rotation-flows/rotate-share-cross/VAL-ROTATESH-006-back-to-enter.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json: [])",
+        "network": "No requests captured by agent-browser network logger (requests --json: [])"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-006",
+      "title": "Header (Igloo branding) and footer (icon links) present on all screens",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Capture full-page screenshots on required representative screens",
+          "expected": "Header branding and footer icon-links visible across screen areas",
+          "observed": "Verified on Welcome (/), Dashboard (/dashboard/{profileId}), Create Keyset (/create), Import Load Backup (/import), Onboard Enter Package (/onboard), Recover Collect Shares (/recover/{profileId}), and Rotate Keyset form (/rotate-keyset)"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/rotate-share-cross/VAL-CROSS-006-welcome-header-footer.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-006-dashboard-header-footer.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-006-create-header-footer.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-006-import-header-footer.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-006-onboard-header-footer.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-006-recover-header-footer.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-006-rotate-keyset-header-footer.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json: [])",
+        "network": "No requests captured by agent-browser network logger (requests --json: [])"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-007",
+      "title": "Back navigation links work correctly across all flow screens",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Back-link checks on representative flow screens",
+          "expected": "Back actions return to documented parent routes",
+          "observed": "Import /import -> /, Onboard /onboard -> /, Rotate Keyset /rotate-keyset -> /, Rotate Share /rotate-share -> /dashboard/{profileId} when entered from dashboard settings"
+        },
+        {
+          "action": "Guard redirect checks on deep links without required state",
+          "expected": "Guarded routes redirect to fallback",
+          "observed": "Direct /rotate-share/applying redirected to /rotate-share; direct /rotate-share/updated redirected to /rotate-share; direct /create/profile redirected to /create"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/rotate-share-cross/VAL-CROSS-007-import-before-back.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-007-import-after-back.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-007-onboard-before-back.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-007-onboard-after-back.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-007-rotate-keyset-before-back.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-007-rotate-keyset-after-back.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-007-rotate-share-before-back.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-007-rotate-share-after-back.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-007-guard-applying-redirect.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-007-guard-updated-redirect.png",
+          "rotation-flows/rotate-share-cross/VAL-CROSS-007-guard-create-profile-redirect.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json: [])",
+        "network": "No requests captured by agent-browser network logger (requests --json: [])"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Applying Share Update auto-advances quickly; failure path can be missed unless Simulate Failure is clicked immediately after entering /rotate-share/applying.",
+      "resolved": true,
+      "resolution": "Triggered failure via immediate click on Simulate Failure after route transition.",
+      "affectedAssertions": [
+        "VAL-ROTATESH-003",
+        "VAL-ROTATESH-006"
+      ]
+    },
+    {
+      "description": "agent-browser network request capture returned empty arrays for these SPA route transitions.",
+      "resolved": true,
+      "resolution": "Used URL transitions, route observations, screenshots, and explicit network logger output ([]) as evidence.",
+      "affectedAssertions": [
+        "VAL-ROTATESH-001",
+        "VAL-ROTATESH-002",
+        "VAL-ROTATESH-003",
+        "VAL-ROTATESH-004",
+        "VAL-ROTATESH-005",
+        "VAL-ROTATESH-006",
+        "VAL-CROSS-006",
+        "VAL-CROSS-007"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 8 assertions for rotate-share-cross: 8 passed, 0 failed, 0 blocked. Rotate Share happy/failure paths and cross-area header/footer + back/guard behaviors validated with screenshot evidence."
+}

@@ -1,0 +1,21 @@
+{
+  "milestone": "rotation-flows",
+  "round": 2,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-WELCOME-010"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "previousRound": ".factory/validation/rotation-flows/user-testing/synthesis.round1.json",
+  "flowReports": [
+    ".factory/validation/rotation-flows/user-testing/flows/welcome-rotate-retest-r2.json"
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "groupId": "welcome-rotate-retest",
+  "testedAt": "2026-04-19T03:11:51Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "appUrl": "http://127.0.0.1:5173",
+    "session": "welcome-rotate-retest",
+    "cleanContext": true,
+    "storageCleared": ["cookies", "localStorage", "sessionStorage", "IndexedDB"]
+  },
+  "toolsUsed": ["agent-browser"],
+  "assertions": [
+    {
+      "id": "VAL-WELCOME-010",
+      "title": "Rotate button on profile row navigates to Rotate Keyset",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Prepare returning-user list in clean isolated session with at least two saved profiles",
+          "expected": "Welcome returning list variant renders rows with explicit Rotate buttons",
+          "observed": "Returning list rendered with two rows: 'Rotate Retest Beta ...' and 'Rotate Retest Alpha ...', each with Unlock and Rotate buttons"
+        },
+        {
+          "action": "From Welcome returning list, click Rotate on the specific 'Rotate Retest Alpha' row (not row body/unlock)",
+          "expected": "Navigate to /rotate-keyset",
+          "observed": "Navigation succeeded to http://127.0.0.1:5173/rotate-keyset"
+        },
+        {
+          "action": "Verify selected row keyset preloads on Rotate Keyset form",
+          "expected": "Rotate form preloaded keyset name matches selected row keyset ('Rotate Retest Alpha')",
+          "observed": "Rotate form Source Share #1 card showed 'Saved Profile My Signing Key', not the selected row keyset 'Rotate Retest Alpha'"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/welcome-rotate-retest/VAL-WELCOME-010-returning-list-before-rotate.png",
+          "rotation-flows/welcome-rotate-retest/VAL-WELCOME-010-rotate-form-selected-alpha.png"
+        ],
+        "url": {
+          "beforeClick": "http://127.0.0.1:5173/",
+          "afterClick": "http://127.0.0.1:5173/rotate-keyset"
+        },
+        "consoleErrors": "none after clearing error log before the assertion run",
+        "network": "No requests captured (client-side SPA route transition)"
+      },
+      "issues": "Preloaded keyset/profile name on Rotate Keyset form does not correspond to the selected Welcome row; appears hardcoded/stale as 'My Signing Key'."
+    }
+  ],
+  "frictions": [
+    {
+      "description": "To create setup profiles in headless mode, Distribution Completion's Finish button remained disabled until each remote share QR modal was opened/dismissed.",
+      "resolved": true,
+      "resolution": "Opened both QR modals and clicked Done for each profile setup run.",
+      "affectedAssertions": ["VAL-WELCOME-010"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Retested 1 assertion (VAL-WELCOME-010): navigation via row Rotate button passed, but selected-row keyset preload failed (form showed 'My Signing Key' instead of selected row keyset)."
+}

@@ -1,0 +1,148 @@
+{
+  "groupId": "shared-guards",
+  "testedAt": "2026-04-19T03:02:28Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "appUrl": "http://127.0.0.1:5173",
+    "browserSession": "shared-guards-f2366386",
+    "cleanBaseline": "Cleared cookies, localStorage, sessionStorage, and IndexedDB before testing"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-SHARED-001",
+      "title": "Create Profile screen renders with all form sections",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From Welcome, clicked \"New Keyset\" then clicked \"Create Keyset\" to establish create-flow state",
+          "expected": "Navigate to Create Profile screen",
+          "observed": "Navigated to http://127.0.0.1:5173/create/profile"
+        },
+        {
+          "action": "Verified visible screen content",
+          "expected": "Heading, profile input, assigned local share card, password/confirm fields, relays with Add, peer permissions badges, Back link, and 3-step stepper with step 2 active",
+          "observed": "All required sections and controls were visible on the Create Profile screen"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/shared-guards/VAL-SHARED-001-create-profile.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No requests captured in agent-browser request log (client-side SPA transitions).",
+        "urls": [
+          "http://127.0.0.1:5173/create/profile"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SHARED-002",
+      "title": "Distribute Shares screen renders with local and remote share cards",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Filled Profile Name, Password, Confirm Password and clicked \"Continue to Distribute Shares\"",
+          "expected": "Navigate to Distribute Shares screen",
+          "observed": "Navigated to http://127.0.0.1:5173/create/distribute"
+        },
+        {
+          "action": "Verified visible screen content",
+          "expected": "Local share card marked \"Saved to Igloo Web\", remote share cards with bfonboard package, Package Password, Copy and QR buttons, distribution status, Continue to Completion button, and stepper step 3 active",
+          "observed": "All required cards, package/password fields, Copy+QR controls, statuses, stepper, and Continue button were visible"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/shared-guards/VAL-SHARED-002-distribute-shares.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No requests captured in agent-browser request log (client-side SPA transitions).",
+        "urls": [
+          "http://127.0.0.1:5173/create/distribute"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SHARED-003",
+      "title": "Distribution Completion screen renders with status panel and finish button",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From Distribute Shares, opened each remote share QR modal and clicked \"Done\", then clicked \"Continue to Completion\"",
+          "expected": "Navigate to Distribution Completion with distributed status state",
+          "observed": "Navigated to http://127.0.0.1:5173/create/complete with remote entries marked \"QR shown\" and success state"
+        },
+        {
+          "action": "Verified visible screen content",
+          "expected": "Distribution Completion heading, Distribution Status panel with member rows/status icons, success banner indicating all packages distributed, Finish Distribution button, Back link, and stepper",
+          "observed": "All required completion screen elements were visible, including \"All packages distributed\" and \"Finish Distribution\" button"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/shared-guards/VAL-SHARED-003-distribution-complete.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No requests captured in agent-browser request log (client-side SPA transitions).",
+        "urls": [
+          "http://127.0.0.1:5173/create/complete"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-010",
+      "title": "Guard redirects work (deep linking to flow screens without required state redirects properly)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Deep-linked to http://127.0.0.1:5173/create/profile from clean baseline without keyset state",
+          "expected": "Guard redirect to fallback create screen",
+          "observed": "Redirected to http://127.0.0.1:5173/create"
+        },
+        {
+          "action": "Deep-linked to http://127.0.0.1:5173/create/distribute from clean baseline without profile state",
+          "expected": "Guard redirect to fallback create screen",
+          "observed": "Redirected to http://127.0.0.1:5173/create"
+        },
+        {
+          "action": "Deep-linked to http://127.0.0.1:5173/dashboard/test-profile without active session",
+          "expected": "Guard redirect to welcome fallback",
+          "observed": "Redirected to http://127.0.0.1:5173/"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/shared-guards/VAL-CROSS-010-guard-create-profile.png",
+          "rotation-flows/shared-guards/VAL-CROSS-010-guard-create-distribute.png",
+          "rotation-flows/shared-guards/VAL-CROSS-010-guard-dashboard.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No requests captured in agent-browser request log during guard redirect checks.",
+        "urls": [
+          "http://127.0.0.1:5173/create/profile -> http://127.0.0.1:5173/create",
+          "http://127.0.0.1:5173/create/distribute -> http://127.0.0.1:5173/create",
+          "http://127.0.0.1:5173/dashboard/test-profile -> http://127.0.0.1:5173/"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "To reach the \"All packages distributed\" completion state, each remote share QR modal had to be opened and dismissed with \"Done\" before continuing.",
+      "resolved": true,
+      "resolution": "Opened both QR modals on /create/distribute and clicked \"Done\" for each before clicking \"Continue to Completion\".",
+      "affectedAssertions": [
+        "VAL-SHARED-003"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 4 assertions (VAL-SHARED-001, VAL-SHARED-002, VAL-SHARED-003, VAL-CROSS-010): 4 passed, 0 failed, 0 blocked."
+}

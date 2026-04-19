@@ -1,0 +1,62 @@
+{
+  "milestone": "rotation-flows",
+  "round": 1,
+  "status": "fail",
+  "assertionsSummary": {
+    "total": 27,
+    "passed": 26,
+    "failed": 1,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-CREATE-001",
+    "VAL-CREATE-002",
+    "VAL-CREATE-003",
+    "VAL-CREATE-004",
+    "VAL-CROSS-002",
+    "VAL-CROSS-006",
+    "VAL-CROSS-007",
+    "VAL-CROSS-010",
+    "VAL-ROTATEKS-001",
+    "VAL-ROTATEKS-002",
+    "VAL-ROTATEKS-003",
+    "VAL-ROTATEKS-004",
+    "VAL-ROTATEKS-005",
+    "VAL-ROTATEKS-006",
+    "VAL-ROTATEKS-007",
+    "VAL-ROTATEKS-008",
+    "VAL-ROTATESH-001",
+    "VAL-ROTATESH-002",
+    "VAL-ROTATESH-003",
+    "VAL-ROTATESH-004",
+    "VAL-ROTATESH-005",
+    "VAL-ROTATESH-006",
+    "VAL-SHARED-001",
+    "VAL-SHARED-002",
+    "VAL-SHARED-003",
+    "VAL-SHARED-004"
+  ],
+  "failedAssertions": [
+    {
+      "id": "VAL-WELCOME-010",
+      "reason": "Welcome row Rotate navigates to /rotate-keyset, but the Rotate Keyset form does not preload the selected row keyset name (observed static \"My Signing Key\" instead of selected profile keyset)."
+    }
+  ],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Added rotation-flows notes clarifying VAL-WELCOME-010 setup (2+ profiles) and the observed selected-row preload mismatch on Rotate Keyset form.",
+      "source": "flow-report"
+    }
+  ],
+  "previousRound": null,
+  "flowReports": [
+    ".factory/validation/rotation-flows/user-testing/flows/create-core.json",
+    ".factory/validation/rotation-flows/user-testing/flows/shared-guards.json",
+    ".factory/validation/rotation-flows/user-testing/flows/rotate-keyset-forms-errors.json",
+    ".factory/validation/rotation-flows/user-testing/flows/rotate-keyset-completion-nav.json",
+    ".factory/validation/rotation-flows/user-testing/flows/rotate-share-cross.json",
+    ".factory/validation/rotation-flows/user-testing/flows/welcome-rotate-retest.json"
+  ]
+}

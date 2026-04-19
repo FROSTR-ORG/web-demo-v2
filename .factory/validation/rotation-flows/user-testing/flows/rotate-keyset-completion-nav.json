@@ -1,0 +1,167 @@
+{
+  "groupId": "rotate-keyset-completion-nav",
+  "testedAt": "2026-04-19T03:05:07Z",
+  "isolation": {
+    "appUrl": "http://127.0.0.1:5173",
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "browserSession": "rotate-keyset-completion-nav",
+    "cleanBaseline": "Cleared cookies, localStorage, sessionStorage, and IndexedDB at session start; recreated required flow state in-session."
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-SHARED-004",
+      "title": "Stepper shows correct labels in Create context vs Rotate Keyset context",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /create and inspect stepper",
+          "expected": "Step 1 label is Create (or Create / Rotate); steps 2 and 3 are Create Profile and Distribute Shares",
+          "observed": "At http://127.0.0.1:5173/create, body text showed \"1 Create 2 Create Profile 3 Distribute Shares\"; screenshot confirms step 1 active in Create context."
+        },
+        {
+          "action": "Navigate to /rotate-keyset and inspect stepper",
+          "expected": "Step 1 label is Rotate Keyset; steps 2 and 3 match Create context",
+          "observed": "At http://127.0.0.1:5173/rotate-keyset, body text showed \"1 Rotate Keyset 2 Create Profile 3 Distribute Shares\"; screenshot confirms step 1 active in Rotate context."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/rotate-keyset-completion-nav/VAL-SHARED-004-create-stepper.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-SHARED-004-rotate-stepper.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API/XHR required for this assertion; local SPA/document/script requests only."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ROTATEKS-007",
+      "title": "Full Rotate Keyset happy path navigable (form → review → progress → profile → distribute → dashboard)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From Welcome (multi-profile), click Rotate",
+          "expected": "Navigate to Rotate Keyset form with step 1 active",
+          "observed": "Navigated to http://127.0.0.1:5173/rotate-keyset with step 1 active."
+        },
+        {
+          "action": "Click Validate & Continue",
+          "expected": "Navigate to Review & Generate with step 1 active",
+          "observed": "Navigated to http://127.0.0.1:5173/rotate-keyset/review with step 1 active."
+        },
+        {
+          "action": "Click Rotate & Generate Keyset",
+          "expected": "Navigate to Generation Progress with step 1 active",
+          "observed": "Navigated to http://127.0.0.1:5173/rotate-keyset/progress with 4-phase progress UI and step 1 active."
+        },
+        {
+          "action": "Wait for auto-advance",
+          "expected": "Navigate to Create Profile with step 2 active",
+          "observed": "Auto-navigated to http://127.0.0.1:5173/rotate-keyset/profile with step 2 active."
+        },
+        {
+          "action": "Click Continue to Distribute Shares",
+          "expected": "Navigate to Distribute Shares with step 3 active",
+          "observed": "Navigated to http://127.0.0.1:5173/rotate-keyset/distribute with step 3 active."
+        },
+        {
+          "action": "Click Continue to Completion, then Finish Distribution",
+          "expected": "Flow completes at dashboard",
+          "observed": "Navigated through http://127.0.0.1:5173/rotate-keyset/complete and finished at http://127.0.0.1:5173/dashboard/347899c57a4321d5f40e2032b8fa5725d72ad8707a378ed3164a8fc900685cc5."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-007-01-form.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-007-02-review.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-007-03-progress.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-007-04-profile.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-007-05-distribute.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-007-06-complete.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-007-07-dashboard.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No requests captured during this SPA transition sequence (expected for local route-only transitions in this app)."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ROTATEKS-008",
+      "title": "Back navigation works at each Rotate Keyset step",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Back on /rotate-keyset",
+          "expected": "Navigate to Dashboard or Welcome",
+          "observed": "Back navigated from /rotate-keyset to http://127.0.0.1:5173/."
+        },
+        {
+          "action": "Back on /rotate-keyset/review",
+          "expected": "Navigate to /rotate-keyset",
+          "observed": "Back navigated to http://127.0.0.1:5173/rotate-keyset."
+        },
+        {
+          "action": "Back on /rotate-keyset/error-password",
+          "expected": "Navigate to /rotate-keyset",
+          "observed": "Back navigated to http://127.0.0.1:5173/rotate-keyset."
+        },
+        {
+          "action": "Back on /rotate-keyset/error-mismatch",
+          "expected": "Navigate to /rotate-keyset",
+          "observed": "Back navigated to http://127.0.0.1:5173/rotate-keyset."
+        },
+        {
+          "action": "Back on /rotate-keyset/error-failed",
+          "expected": "Navigate to /rotate-keyset",
+          "observed": "Back navigated to http://127.0.0.1:5173/rotate-keyset."
+        },
+        {
+          "action": "Back on /rotate-keyset/profile",
+          "expected": "Navigate to /rotate-keyset/progress",
+          "observed": "Back navigated to http://127.0.0.1:5173/rotate-keyset/progress."
+        },
+        {
+          "action": "Back on /rotate-keyset/distribute",
+          "expected": "Navigate to /rotate-keyset/profile",
+          "observed": "Back navigated to http://127.0.0.1:5173/rotate-keyset/profile."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-008-01-form-before.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-008-01-form-after-back.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-008-02-review-before.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-008-02-review-after-back.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-008-03-error-password-before.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-008-03-error-password-after-back.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-008-04-error-mismatch-before.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-008-04-error-mismatch-after-back.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-008-05-error-failed-before.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-008-05-error-failed-after-back.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-008-06-profile-before.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-008-06-profile-after-back.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-008-07-distribute-before.png",
+          "rotation-flows/rotate-keyset-completion-nav/VAL-ROTATEKS-008-07-distribute-after-back.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Captured only local GET document/script/image requests on route loads (no API failures observed)."
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Using direct route opens (agent-browser open /rotate-keyset...) performs full-page reload and clears in-memory activeProfile, which made an initial rotate completion land on Welcome instead of Dashboard.",
+      "resolved": true,
+      "resolution": "Re-ran VAL-ROTATEKS-007 entering Rotate via the Welcome page Rotate button in the same session so in-memory state remained intact.",
+      "affectedAssertions": [
+        "VAL-ROTATEKS-007"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 3 assertions (VAL-SHARED-004, VAL-ROTATEKS-007, VAL-ROTATEKS-008): all passed with required UI screenshots, URL observations, console checks, and network notes."
+}

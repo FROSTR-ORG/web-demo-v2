@@ -1,0 +1,182 @@
+{
+  "groupId": "create-core",
+  "testedAt": "2026-04-19T03:03:29Z",
+  "isolation": {
+    "appUrl": "http://127.0.0.1:5173",
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "browserSession": "rotation-create-core",
+    "cleanBaseline": "Cleared cookies, localStorage, sessionStorage, and IndexedDB before testing"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-CREATE-001",
+      "title": "Generation Progress screen renders after Create Keyset form with phase checklist and progress bar",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /create and submit Create Keyset form with keyset name and blank nsec",
+          "expected": "Navigation to Generation Progress screen",
+          "observed": "Navigated to http://127.0.0.1:5173/create/progress"
+        },
+        {
+          "action": "Inspect Generation Progress content",
+          "expected": "Shows title, stepper with step 1 active, 3 phases, and overall progress",
+          "observed": "Screen showed heading 'Generation Progress' with phases 'Generate New Key', 'Split Initial Shares', 'Prepare Shares for Setup' and text '0 of 3 phases'"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/create-core/VAL-CREATE-001-generation-progress.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Route transition to /create/progress on SPA"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CREATE-002",
+      "title": "Generation Progress auto-transitions to Create Profile screen on completion",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Wait on /create/progress for simulated generation completion",
+          "expected": "Automatic navigation to Create Profile",
+          "observed": "Auto-transitioned to http://127.0.0.1:5173/create/profile"
+        },
+        {
+          "action": "Inspect Create Profile stepper state",
+          "expected": "Step 2 (Create Profile / Setup Profile) active",
+          "observed": "Create Profile screen rendered with stepper showing progression to step 2"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/create-core/VAL-CREATE-002-create-profile-auto-transition.png"
+        ],
+        "consoleErrors": "none",
+        "network": "SPA transition to /create/profile"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CREATE-003",
+      "title": "Full Create flow including generation progress produces no console errors",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run full flow: /create -> /create/progress -> /create/profile -> /create/distribute -> /create/complete -> /dashboard/{profileId}",
+          "expected": "Flow completes end-to-end with no console errors or unhandled exceptions",
+          "observed": "Flow completed to dashboard; browser errors output remained empty"
+        },
+        {
+          "action": "Check browser error log after completing flow",
+          "expected": "No console errors",
+          "observed": "No errors captured (recorded as 'none')"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/create-core/VAL-CROSS-002-03-generation-progress.png",
+          "rotation-flows/create-core/VAL-CROSS-002-04-create-profile.png",
+          "rotation-flows/create-core/VAL-CROSS-002-05-distribute-shares.png",
+          "rotation-flows/create-core/VAL-CROSS-002-06-distribution-complete.png",
+          "rotation-flows/create-core/VAL-CROSS-002-07-dashboard.png"
+        ],
+        "consoleErrors": "rotation-flows/create-core/VAL-CREATE-003-console-errors.txt",
+        "network": "rotation-flows/create-core/VAL-CROSS-002-network-requests.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CREATE-004",
+      "title": "Create Keyset form shows inline validation errors",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "On /create, enter invalid nsec (not-a-valid-nsec) and submit",
+          "expected": "Inline validation appears and page does not navigate",
+          "observed": "Stayed on http://127.0.0.1:5173/create with inline error text 'Invalid nsec format. Must be a valid Nostr private key.'"
+        },
+        {
+          "action": "Inspect form after submission",
+          "expected": "Affected field shows error state (red border/error text)",
+          "observed": "Error text rendered below nsec field and form remained on Create Keyset"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/create-core/VAL-CREATE-004-inline-validation.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No route transition away from /create"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-002",
+      "title": "Full Create-to-Dashboard flow works end-to-end (Welcome -> Create -> Profile -> Distribute -> Complete -> Dashboard)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Start at Welcome and click New Keyset",
+          "expected": "Navigate to Create Keyset",
+          "observed": "Welcome at / then Create Keyset at http://127.0.0.1:5173/create"
+        },
+        {
+          "action": "Complete Create flow screens",
+          "expected": "Progress through Generation Progress, Create Profile, Distribute Shares, Distribution Complete",
+          "observed": "Reached /create/progress, /create/profile, /create/distribute, and /create/complete in sequence"
+        },
+        {
+          "action": "Finish distribution and land on dashboard",
+          "expected": "Dashboard shows correct group name and signer status",
+          "observed": "Reached /dashboard/1c549e12cc85d7e1c8ff1087b1e3ba688ab794b630042fc2775f65a6282be0b9 with 'Create Core Group' and signer status 'Running'"
+        },
+        {
+          "action": "Check for console errors across flow",
+          "expected": "No console errors",
+          "observed": "No console errors captured"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/create-core/VAL-CROSS-002-01-welcome.png",
+          "rotation-flows/create-core/VAL-CROSS-002-02-create-keyset-filled.png",
+          "rotation-flows/create-core/VAL-CROSS-002-03-generation-progress.png",
+          "rotation-flows/create-core/VAL-CROSS-002-04-create-profile.png",
+          "rotation-flows/create-core/VAL-CROSS-002-05-distribute-shares.png",
+          "rotation-flows/create-core/VAL-CROSS-002-06-distribution-complete.png",
+          "rotation-flows/create-core/VAL-CROSS-002-07-dashboard.png"
+        ],
+        "consoleErrors": "rotation-flows/create-core/VAL-CREATE-003-console-errors.txt",
+        "network": "rotation-flows/create-core/VAL-CROSS-002-network-requests.txt"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "On Distribution Complete, 'Finish Distribution' was initially disabled until each remote share QR modal was opened and dismissed with 'Done' on Distribute Shares.",
+      "resolved": true,
+      "resolution": "Returned to /create/distribute, opened both QR modals, clicked Done for each, then continued to /create/complete where Finish Distribution became enabled.",
+      "affectedAssertions": [
+        "VAL-CREATE-003",
+        "VAL-CROSS-002"
+      ]
+    },
+    {
+      "description": "Generation Progress auto-transition is quick, making it easy to miss evidence capture if delayed.",
+      "resolved": true,
+      "resolution": "Captured screenshot immediately after reaching /create/progress and before waiting for auto-transition.",
+      "affectedAssertions": [
+        "VAL-CREATE-001",
+        "VAL-CREATE-002"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 5 assertions (VAL-CREATE-001/002/003/004 and VAL-CROSS-002): all 5 passed. Full create-to-dashboard path is navigable in isolated session with no console errors observed."
+}

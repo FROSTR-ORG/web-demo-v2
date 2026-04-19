@@ -61,3 +61,8 @@ Testing surface, tools, and resource cost classification.
 
 - In headless `agent-browser`, the Export flow's **Copy** action may log a clipboard-permission console warning (`writeText` denied) even when UI feedback correctly changes to **Copied!**.
 - For Settings/Export/Recover SPA-only transitions, `agent-browser` network capture often returns no requests; prefer URL checks, screenshots, and console error checks as primary evidence.
+
+## Rotation-Flows Validation Notes
+
+- For `VAL-WELCOME-010`, create **2+ saved profiles** in-session before testing. The single-profile returning variant can show only Unlock, while the multi-profile returning rows expose explicit **Rotate** buttons.
+- In this round, selecting **Rotate** from a specific Welcome profile row navigated correctly to `/rotate-keyset`, but the form preloaded a non-selected source label (`"My Signing Key"`). Retest should verify selected-row keyset preload after fix.

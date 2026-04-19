@@ -1,0 +1,69 @@
+{
+  "groupId": "welcome-rotate-retest-r2",
+  "testedAt": "2026-04-19T03:29:29Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/f2366386-40de-4673-bd17-df5899440e59",
+    "appUrl": "http://127.0.0.1:5173",
+    "surface": "agent-browser",
+    "session": "welcome-rotate-retest-r2",
+    "cleanContext": true,
+    "storageCleared": [
+      "cookies",
+      "localStorage",
+      "sessionStorage",
+      "IndexedDB"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-WELCOME-010",
+      "title": "Rotate button on profile row navigates to Rotate Keyset",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Create returning-multi welcome state in-session (3 profiles: Rotate Retest Gamma, Rotate Retest Beta, Rotate Retest Alpha)",
+          "expected": "Welcome shows 2+ profile rows with Unlock and Rotate actions",
+          "observed": "Welcome rendered three rows in order Gamma, Beta, Alpha, each with Unlock and Rotate"
+        },
+        {
+          "action": "Click Rotate on a non-first row (second row: Rotate Retest Beta)",
+          "expected": "Navigation to /rotate-keyset",
+          "observed": "Navigated from / to http://127.0.0.1:5173/rotate-keyset"
+        },
+        {
+          "action": "Verify Rotate Keyset form preload",
+          "expected": "Source Share #1 preloads selected row keyset name (Rotate Retest Beta)",
+          "observed": "Rotate Keyset form header and Source Share #1 showed 'Rotate Retest Beta', matching selected row"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "rotation-flows/welcome-rotate-retest-r2/VAL-WELCOME-010-returning-multi-before-rotate.png",
+          "rotation-flows/welcome-rotate-retest-r2/VAL-WELCOME-010-rotate-form-preload-beta.png"
+        ],
+        "url": {
+          "beforeClick": "http://127.0.0.1:5173/",
+          "afterClick": "http://127.0.0.1:5173/rotate-keyset"
+        },
+        "consoleErrors": "none (agent-browser errors returned empty array after flow)",
+        "network": "No requests captured for this client-side SPA route transition"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Profile setup precondition required opening and dismissing each remote share QR modal before downstream completion controls were reliably enabled in headless flow setup.",
+      "resolved": true,
+      "resolution": "Opened both QR modals and clicked Done for each profile creation run.",
+      "affectedAssertions": [
+        "VAL-WELCOME-010"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Retested 1 assertion (VAL-WELCOME-010): pass. Rotate on a non-first Welcome row navigated to /rotate-keyset and preloaded the selected profile keyset name correctly."
+}
