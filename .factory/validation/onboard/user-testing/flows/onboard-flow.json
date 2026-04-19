@@ -1,0 +1,92 @@
+{
+  "flowId": "onboard-flow",
+  "surface": "browser-ui",
+  "assertions": [
+    {
+      "id": "VAL-ONB-001",
+      "status": "pass",
+      "summary": "Enter Package screen matches required content and Begin Onboarding routes to handshake.",
+      "evidence": [
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-ONB-001-enter-package.png",
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-ONB-002-handshake.png"
+      ],
+      "details": "Validated /demo/onboard-enter-package text and controls (Onboarding Package, validator line, Package Password, Begin Onboarding). DOM check confirmed both label rows contain inline SVG help icons. Clicking Begin Onboarding transitioned to http://127.0.0.1:5173/onboard/handshake. Console/page errors: none observed. Network: no relevant API calls; SPA/document requests only."
+    },
+    {
+      "id": "VAL-ONB-002",
+      "status": "pass",
+      "summary": "Handshake variant renders correctly without top BackLink.",
+      "evidence": [
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-ONB-002-handshake.png"
+      ],
+      "details": "On /demo/onboard-handshake, observed heading/subtitle, 4-step timeline, package status row, and Cancel Onboarding control. Button/link inventory showed only demo toolbar links plus Cancel Onboarding; no Back/Back to Welcome control present above H1. Console/page errors: none. Network: no relevant API calls."
+    },
+    {
+      "id": "VAL-ONB-003",
+      "status": "pass",
+      "summary": "Timeout failed variant content and amber styling are present.",
+      "evidence": [
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-ONB-003-failed-timeout.png"
+      ],
+      "details": "On /demo/onboard-failed, observed Onboarding Failed + Onboarding Timed Out copy with Retry and Back to Onboarding CTAs. Style inspection showed onboard-error-alert class tokens bg-[#EAB3081A] border-[#EAB30840] with computed amber background/border values. Console/page errors: none. Network: no relevant API calls."
+    },
+    {
+      "id": "VAL-ONB-004",
+      "status": "fail",
+      "summary": "Rejected variant copy is correct but alert styling is not visually distinct red from timeout variant.",
+      "evidence": [
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-ONB-004-failed-rejected.png",
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-ONB-003-failed-timeout.png"
+      ],
+      "details": "On /demo/onboard-failed-rejected, observed required title/body copy and both CTAs. However, style inspection of .onboard-error-alert reported class tokens including red variant but computed colors remained amber-like (same amber background/border family as timeout variant), so the required red visual distinction was not satisfied. Console/page errors: none. Network: no relevant API calls."
+    },
+    {
+      "id": "VAL-ONB-005",
+      "status": "pass",
+      "summary": "Onboarding Complete screen content parity verified, including Profile Password help icon.",
+      "evidence": [
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-ONB-005-complete.png"
+      ],
+      "details": "On /demo/onboard-complete, verified success heading/body, Group Profile and Device Profile cards, password/confirm fields with Save & Launch Signer CTA. DOM check on .import-password-title-row confirmed inline SVG help icon next to Profile Password heading. Console/page errors: none. Network: no relevant API calls."
+    },
+    {
+      "id": "VAL-ONB-006",
+      "status": "pass",
+      "summary": "Failed-screen CTAs navigate correctly for both timeout and rejected variants.",
+      "evidence": [
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-ONB-006-timeout-retry-handshake.png",
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-ONB-006-timeout-back-onboarding.png",
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-ONB-006-rejected-retry-handshake.png",
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-ONB-006-rejected-back-onboarding.png"
+      ],
+      "details": "From /demo/onboard-failed and /demo/onboard-failed-rejected: Retry navigated to http://127.0.0.1:5173/onboard/handshake; Back to Onboarding navigated to http://127.0.0.1:5173/onboard for both variants. Console/page errors: none. Network: no relevant API calls."
+    },
+    {
+      "id": "VAL-CROSS-007",
+      "status": "pass",
+      "summary": "Main-app welcome onboarding path and failed route accessibility were verified end-to-end.",
+      "evidence": [
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-CROSS-007-main-onboard-entry.png",
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-CROSS-007-main-onboard-filled.png",
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-CROSS-007-main-handshake.png",
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-CROSS-007-main-complete.png",
+        "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/onboard/onboard-flow/VAL-CROSS-007-main-error-path.png"
+      ],
+      "details": "From /, clicked Onboard action to reach /onboard. After providing package + password (Begin is disabled until required fields are populated), Begin Onboarding navigated /onboard/handshake and auto-advanced to /onboard/complete. Error path was reachable directly at /onboard/failed. URL trace observed: / -> /onboard -> /onboard/handshake -> /onboard/complete, plus /onboard/failed reachable. Console/page errors: none. Network: no API/XHR failures observed."
+    }
+  ],
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "frictions": [
+    {
+      "description": "In main-app onboarding flow, Begin Onboarding is initially disabled on /onboard until package and password are entered.",
+      "resolved": true,
+      "resolution": "Filled onboarding package and package password fields before continuing.",
+      "affectedAssertions": [
+        "VAL-CROSS-007"
+      ]
+    }
+  ],
+  "blockers": []
+}
