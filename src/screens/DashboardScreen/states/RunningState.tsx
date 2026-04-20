@@ -11,6 +11,7 @@ export function RunningState({
   peers,
   pendingOperations,
   paperPanels,
+  sidebarOpen,
   onStop,
   onRefresh,
 }: {
@@ -20,6 +21,7 @@ export function RunningState({
   peers: PeerStatus[];
   pendingOperations: unknown[];
   paperPanels: boolean;
+  sidebarOpen?: boolean;
   onStop: () => void;
   onRefresh: () => void;
 }) {
@@ -47,6 +49,7 @@ export function RunningState({
         onlineCount={onlineCount}
         signReadyLabel={signReadyLabel}
         paperPanels={paperPanels}
+        sidebarOpen={sidebarOpen}
         onRefresh={onRefresh}
       />
 

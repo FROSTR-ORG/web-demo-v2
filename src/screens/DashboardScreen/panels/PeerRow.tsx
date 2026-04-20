@@ -3,7 +3,7 @@ import { shortHex } from "../../../lib/bifrost/format";
 import type { PeerStatus } from "../../../lib/bifrost/types";
 import { paperLatency, paperPeerKey } from "../mocks";
 
-export function PeerRow({ peer, paper }: { peer: PeerStatus; paper?: boolean }) {
+export function PeerRow({ peer, paper, sidebarOpen }: { peer: PeerStatus; paper?: boolean; sidebarOpen?: boolean }) {
   const incomingPct = Math.min(100, peer.incoming_available);
   const outgoingPct = Math.min(100, peer.outgoing_available);
   const lowPool = peer.online && Math.min(peer.incoming_available, peer.outgoing_available) < 25;
@@ -48,6 +48,30 @@ export function PeerRow({ peer, paper }: { peer: PeerStatus; paper?: boolean }) 
         )}
       </div>
       <div className="latency-slot">{peer.online ? (paper ? paperLatency(peer.idx) : "Ready") : "Offline"}</div>
+      {sidebarOpen ? (
+        <div className="peer-row-trailing" data-testid={`peer-row-trailing-${peer.idx}`}>
+          <button
+            type="button"
+            className="peer-row-trailing-btn"
+            aria-label={`Peer #${peer.idx} actions`}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+              <circle cx="7" cy="7" r="1.2" fill="#93C5FD80" />
+              <circle cx="7" cy="3" r="1.2" fill="#93C5FD80" />
+              <circle cx="7" cy="11" r="1.2" fill="#93C5FD80" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="peer-row-trailing-btn"
+            aria-label={`Open peer #${peer.idx}`}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+              <path d="M4.5 2.5L10.5 7L4.5 11.5V2.5Z" fill="#93C5FD80" />
+            </svg>
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

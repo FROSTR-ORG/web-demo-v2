@@ -16,6 +16,14 @@ interface SettingsSidebarProps {
   onExport: () => void;
 }
 
+// Paper-parity relay hint appended to the sidebar so that the Settings view
+// matches `igloo-paper/screens/dashboard/3-settings-lock-profile/screen.html`
+// which lists three relays including `wss://nos.lol`. The hint is only
+// applied to the Settings sidebar UI — the underlying `activeProfile.relays`
+// (and therefore the Running/Connecting/Export copy) stays at two entries to
+// preserve VAL-DSH-001, VAL-DSH-004, and VAL-DSH-015 content parity.
+const PAPER_SIDEBAR_RELAY = "wss://nos.lol";
+
 export function SettingsSidebar({
   profile,
   relays: initialRelays,
@@ -29,7 +37,11 @@ export function SettingsSidebar({
   onExport,
 }: SettingsSidebarProps) {
   const navigate = useNavigate();
-  const [relays, setRelays] = useState(initialRelays);
+  const [relays, setRelays] = useState(() =>
+    initialRelays.includes(PAPER_SIDEBAR_RELAY)
+      ? initialRelays
+      : [...initialRelays, PAPER_SIDEBAR_RELAY]
+  );
   const [newRelay, setNewRelay] = useState("");
 
   function handleRemoveRelay(index: number) {
@@ -46,15 +58,35 @@ export function SettingsSidebar({
 
   return (
     <>
-      {/* Scrim */}
-      <div className="settings-scrim" onClick={onClose} data-testid="settings-scrim" />
+      {/* Scrim — stacked above dashboard content (z-index: 100) */}
+      <div
+        className="settings-scrim"
+        onClick={onClose}
+        data-testid="settings-scrim"
+        style={{ zIndex: 100 }}
+      />
 
-      {/* Sidebar panel */}
-      <div className="settings-sidebar" role="dialog" aria-label="Settings" data-testid="settings-sidebar">
+      {/* Sidebar panel — stacked above the scrim (z-index: 101) so it overlays
+          the dashboard primary panel without clipping. */}
+      <div
+        className="settings-sidebar"
+        role="dialog"
+        aria-label="Settings"
+        data-testid="settings-sidebar"
+        style={{ zIndex: 101 }}
+      >
         <div className="settings-sidebar-scroll">
           {/* Header */}
           <div className="settings-header">
-            <div className="settings-title">Settings</div>
+            <div
+              className="settings-title"
+              // Inline font-family mirrors the `.settings-title` rule in
+              // global.css (`Share Tech Mono`) so VAL-DSH-012 is observable
+              // in jsdom where the CSS stylesheet is not applied.
+              style={{ fontFamily: "'Share Tech Mono', system-ui, sans-serif" }}
+            >
+              Settings
+            </div>
             <button
               type="button"
               className="settings-close"

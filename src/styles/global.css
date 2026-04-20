@@ -1629,6 +1629,34 @@ a {
   text-align: right;
 }
 
+/* Peer row trailing action icons — rendered only when the Settings sidebar is
+   open, per Paper `dashboard/3-settings-lock-profile/screen.html` (VAL-DSH-013). */
+.peer-row-trailing {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.peer-row-trailing-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(30, 58, 138, 0.25);
+  background: transparent;
+  color: #93c5fd;
+  cursor: pointer;
+  padding: 0;
+}
+
+.peer-row-trailing-btn:hover {
+  background: rgba(148, 163, 184, 0.06);
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

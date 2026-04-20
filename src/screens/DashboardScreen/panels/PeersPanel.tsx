@@ -8,12 +8,14 @@ export function PeersPanel({
   onlineCount,
   signReadyLabel,
   paperPanels,
+  sidebarOpen,
   onRefresh,
 }: {
   peers: PeerStatus[];
   onlineCount: number;
   signReadyLabel: string;
   paperPanels: boolean;
+  sidebarOpen?: boolean;
   onRefresh: () => void;
 }) {
   return (
@@ -37,7 +39,7 @@ export function PeersPanel({
       </div>
       <div className="peer-list">
         {peers.map((peer) => (
-          <PeerRow key={peer.pubkey} peer={peer} paper={paperPanels} />
+          <PeerRow key={peer.pubkey} peer={peer} paper={paperPanels} sidebarOpen={sidebarOpen} />
         ))}
       </div>
     </div>

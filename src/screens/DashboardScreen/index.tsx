@@ -111,6 +111,7 @@ export function DashboardScreen() {
                 peers={runtimeStatus.peers}
                 pendingOperations={runtimeStatus.pending_operations}
                 paperPanels={paperPanels}
+                sidebarOpen={settingsOpen}
                 onStop={() => setMockState("stopped")}
                 onRefresh={refreshRuntime}
               />
