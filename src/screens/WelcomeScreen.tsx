@@ -1,7 +1,7 @@
 import type { FormEvent } from "react";
 import { ArrowDown, Info, Lock, Plus, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import logoUrl from "../assets/igloo-logo.png";
 import { useAppState } from "../app/AppState";
 import { AppShell } from "../components/shell";
@@ -11,8 +11,10 @@ import { shortHex } from "../lib/bifrost/format";
 
 export function WelcomeScreen() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { profiles, unlockProfile } = useAppState();
   const demoUi = useDemoUi();
+  const setupNotice = (location.state as { setupNotice?: { code?: string; message?: string } } | null)?.setupNotice;
   const variant = demoUi.welcome?.variant;
   const [unlocking, setUnlocking] = useState<string | null>(demoUi.welcome?.unlockingProfileId ?? null);
   const [password, setPassword] = useState(demoUi.welcome?.passwordPreset ?? "");
@@ -112,7 +114,7 @@ export function WelcomeScreen() {
           <button
             type="button"
             className="profile-row-btn rotate"
-            onClick={() => navigate("/rotate-keyset", { state: { profile } })}
+            onClick={() => navigate("/rotate-keyset", { state: { profileId: profile.id } })}
           >
             Rotate
           </button>
@@ -164,6 +166,12 @@ export function WelcomeScreen() {
             <p className="hero-subtitle">{returning ? "Welcome back." : "Split your Nostr key. Sign from anywhere."}</p>
           </div>
         </div>
+
+        {setupNotice?.code === "rotate_selection_missing" ? (
+          <div className="import-validation-error" role="status">
+            {setupNotice.message ?? "Choose a saved profile before rotating its keyset."}
+          </div>
+        ) : null}
 
         {/* ---- First-time welcome (no profiles) ---- */}
         {!returning && !showRotateShareFirst && (
@@ -316,4 +324,3 @@ function paperKey(value: string) {
   if (value.startsWith("npub1f7a")) return "npub1f7a...4x1n";
   return shortHex(value, 10, 8);
 }
-

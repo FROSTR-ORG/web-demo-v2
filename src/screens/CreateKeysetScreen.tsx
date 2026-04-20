@@ -1,17 +1,13 @@
 import type { FormEvent } from "react";
-import { EyeOff, Pencil } from "lucide-react";
+import { Eye, EyeOff, Pencil } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Button, NumberStepper, Stepper, TextField } from "../components/ui";
 import { useDemoUi } from "../demo/demoUi";
-
-function validateNsec(value: string): string {
-  if (!value.trim()) return "";
-  if (/^nsec1[a-z0-9]{58}$/i.test(value.trim())) return "";
-  return "Invalid nsec format. Must be a valid Nostr private key.";
-}
+import { generateNsec } from "../lib/bifrost/packageService";
+import type { GeneratedNsecResult } from "../lib/bifrost/types";
 
 export function CreateKeysetScreen() {
   const navigate = useNavigate();
@@ -23,9 +19,33 @@ export function CreateKeysetScreen() {
   const [count, setCount] = useState(3);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{ groupName?: string; nsec?: string }>(
-    demoUi.create?.validationError ? { nsec: "Invalid nsec format. Must be a valid Nostr private key." } : {}
+    demoUi.create?.validationError ? { nsec: "Existing nsec splitting is not supported yet." } : {}
   );
   const [busy, setBusy] = useState(false);
+  const [generatedNsec, setGeneratedNsec] = useState<GeneratedNsecResult | null>(null);
+  const [showGeneratedNsec, setShowGeneratedNsec] = useState(false);
+  const [generatingNsec, setGeneratingNsec] = useState(false);
+
+  async function handleGenerateNsec() {
+    setGeneratingNsec(true);
+    setError("");
+    setFieldErrors((prev) => ({ ...prev, nsec: undefined }));
+    try {
+      const result = await generateNsec();
+      setNsec(result.nsec);
+      setGeneratedNsec(result);
+      setShowGeneratedNsec(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to generate nsec.");
+    } finally {
+      setGeneratingNsec(false);
+    }
+  }
+
+  function clearGeneratedNsec() {
+    setGeneratedNsec(null);
+    setShowGeneratedNsec(false);
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -36,9 +56,9 @@ export function CreateKeysetScreen() {
     if (!groupName.trim()) {
       errors.groupName = "Keyset name is required.";
     }
-    const nsecError = validateNsec(nsec);
-    if (nsecError) {
-      errors.nsec = nsecError;
+    const generatedValue = generatedNsec?.nsec ?? "";
+    if (nsec.trim() && nsec.trim() !== generatedValue) {
+      errors.nsec = "Existing nsec splitting is not supported yet.";
     }
 
     if (Object.keys(errors).length > 0) {
@@ -49,7 +69,8 @@ export function CreateKeysetScreen() {
 
     setFieldErrors({});
     try {
-      await createKeyset({ groupName, threshold, count });
+      await createKeyset({ groupName, threshold, count, generatedNsec: generatedNsec?.nsec });
+      clearGeneratedNsec();
       navigate("/create/progress");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create keyset.");
@@ -62,7 +83,12 @@ export function CreateKeysetScreen() {
     <AppShell mainVariant="flow">
       <form className="screen-column" onSubmit={submit}>
         <Stepper current={1} variant="create" />
-        <BackLink onClick={() => navigate("/")} />
+        <BackLink
+          onClick={() => {
+            clearGeneratedNsec();
+            navigate("/");
+          }}
+        />
         <PageHeading
           title="Create New Keyset"
           copy="Define the group profile for a new keyset. After creation, you'll create the local profile and distribute shares to the remaining devices."
@@ -85,25 +111,36 @@ export function CreateKeysetScreen() {
             <span className="input-shell">
               <input
                 className={`input${fieldErrors.nsec ? " input-error" : ""}`}
-                placeholder="Paste your existing nsec or generate a new one"
+                placeholder="Paste existing nsec (unsupported)"
+                type={showGeneratedNsec ? "text" : "password"}
                 value={nsec}
                 onChange={(event) => {
-                  setNsec(event.target.value);
+                  const next = event.target.value;
+                  setNsec(next);
+                  if (generatedNsec && next !== generatedNsec.nsec) clearGeneratedNsec();
                   if (fieldErrors.nsec) setFieldErrors((prev) => ({ ...prev, nsec: undefined }));
                 }}
               />
-              <span className="input-trailing">
-                <EyeOff size={16} />
-              </span>
+              <button
+                type="button"
+                className="password-toggle"
+                aria-label={showGeneratedNsec ? "Hide nsec" : "Reveal nsec"}
+                onClick={() => setShowGeneratedNsec((shown) => !shown)}
+                disabled={!nsec}
+              >
+                {showGeneratedNsec ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </span>
-            <Button type="button" variant="secondary" title="A fresh key is generated when you create the keyset.">
-              Generate
+            <Button type="button" variant="secondary" disabled={generatingNsec || busy} onClick={handleGenerateNsec}>
+              {generatingNsec ? "Generating..." : "Generate NSEC"}
             </Button>
           </div>
           {fieldErrors.nsec ? (
             <span className="field-error-text">{fieldErrors.nsec}</span>
           ) : (
-            <span className="help">Paste your existing nsec or leave blank to generate a new one.</span>
+            <span className="help">
+              Generate a new nsec here to split that exact key. Manually pasted nsec splitting is not supported yet.
+            </span>
           )}
         </div>
         <div className="field-row">
@@ -112,7 +149,7 @@ export function CreateKeysetScreen() {
           <NumberStepper
             label="Total Shares"
             value={count}
-            min={3}
+            min={threshold}
             max={10}
             onChange={(next) => {
               setCount(next);
@@ -123,7 +160,7 @@ export function CreateKeysetScreen() {
           />
         </div>
         <div className="help">
-          Any {threshold} of {count} shares can sign — min threshold is 2, min shares is 3
+          Any {threshold} of {count} shares can sign — min threshold is 2, min shares is 2
         </div>
         {error ? <div className="error">{error}</div> : null}
         <Button type="submit" size="full" disabled={busy}>

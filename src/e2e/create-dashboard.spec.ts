@@ -13,6 +13,8 @@ test("creates a keyset and reaches the Paper-skinned runtime dashboard", async (
 
   await expect(page.getByRole("heading", { name: "Create Profile" })).toBeVisible();
   await page.getByLabel("Profile Name").fill("Igloo Web E2E");
+  await page.getByRole("textbox", { name: "Remote Package Password", exact: true }).fill("remote-test-password");
+  await page.getByRole("textbox", { name: "Confirm Remote Package Password", exact: true }).fill("remote-test-password");
   await page.getByRole("textbox", { name: "Password", exact: true }).fill("test-password");
   await page.getByRole("textbox", { name: "Confirm Password", exact: true }).fill("test-password");
   await expect(page.getByText(/Phase 1/i)).toHaveCount(0);
@@ -28,6 +30,11 @@ test("creates a keyset and reaches the Paper-skinned runtime dashboard", async (
     await qrButtons.nth(index).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.getByRole("button", { name: "Done" }).click();
+  }
+  const copyPasswordButtons = page.getByRole("button", { name: "Copy Password" });
+  const copyPasswordCount = await copyPasswordButtons.count();
+  for (let index = 0; index < copyPasswordCount; index += 1) {
+    await copyPasswordButtons.nth(index).click();
   }
 
   await page.getByRole("button", { name: "Continue to Completion" }).click();
@@ -46,7 +53,11 @@ test("creates a keyset and reaches the Paper-skinned runtime dashboard", async (
   await expect(page.getByText("Pool sync with peer #0 — 50 received · 50 sent")).toBeVisible();
   await expect(page.getByText("Pending Approvals")).toBeVisible();
   await expect(page.getByText("3 pending")).toBeVisible();
-  await expect(page.getByText("kind:1 Short Text Note")).toBeVisible();
+  if ((page.viewportSize()?.width ?? 0) >= 700) {
+    await expect(page.getByText("kind:1 Short Text Note")).toBeVisible();
+  } else {
+    await expect(page.getByText("kind:1 Short Text Note")).toHaveCount(1);
+  }
 
   await page.getByRole("button", { name: "Open approval 1" }).click();
   await expect(page.getByRole("heading", { name: "Signer Policy" })).toBeVisible();

@@ -226,8 +226,30 @@ describe("WelcomeScreen", () => {
     const rotateButtons = screen.getAllByText("Rotate");
     fireEvent.click(rotateButtons[0]);
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset", {
-      state: { profile: mocks.profiles[0] }
+      state: { profileId: "p1" }
     });
+  });
+
+  it("renders a safe rotate selection notice from route state", () => {
+    mocks.profiles = [makeProfile("p1", "My Signing Key")];
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: "/",
+            state: {
+              setupNotice: {
+                code: "rotate_selection_missing",
+                message: "Choose a saved profile before rotating its keyset."
+              }
+            }
+          }
+        ]}
+      >
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Choose a saved profile before rotating its keyset.");
   });
 
   it("Rotate button passes correct profile for non-first profile", () => {
@@ -243,7 +265,7 @@ describe("WelcomeScreen", () => {
     const rotateButtons = screen.getAllByText("Rotate");
     fireEvent.click(rotateButtons[1]);
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset", {
-      state: { profile: mocks.profiles[1] }
+      state: { profileId: "p2" }
     });
   });
 

@@ -49,24 +49,39 @@ export interface BifrostBridgeModule {
   bfshare_prefix(): string;
   bfonboard_prefix(): string;
   bfprofile_prefix(): string;
+  default_event_kind(): bigint;
   encode_bfshare_package(payloadJson: string, password: string): string;
   decode_bfshare_package(packageText: string, password: string): string;
+  decode_bfshare_package_result(packageText: string, password: string): string;
   encode_bfonboard_package(payloadJson: string, password: string): string;
   decode_bfonboard_package(packageText: string, password: string): string;
+  decode_bfonboard_package_result(packageText: string, password: string): string;
   encode_bfprofile_package(payloadJson: string, password: string): string;
   decode_bfprofile_package(packageText: string, password: string): string;
+  decode_bfprofile_package_result(packageText: string, password: string): string;
   derive_profile_id_from_share_secret(shareSecret: string): string;
   derive_profile_id_from_share_pubkey(sharePubkey: string): string;
   create_profile_package_pair(payloadJson: string, password: string): string;
   create_keyset_bundle(configJson: string): string;
+  generate_nsec(): string;
+  create_keyset_bundle_from_nsec(inputJson: string): string;
   rotate_keyset_bundle(inputJson: string): string;
+  recover_nsec_from_shares(inputJson: string): string;
   derive_group_id(groupJson: string): string;
+  resolve_share_index(groupJson: string, shareSecret: string): number;
   create_encrypted_profile_backup(profileJson: string): string;
   create_onboarding_request_bundle(
     shareSecret: string,
     peerPubkey32Hex: string,
     eventKind: bigint | number,
     sentAtSeconds?: number
+  ): string;
+  decode_onboarding_response_event_result(
+    eventJson: string,
+    shareSecret: string,
+    expectedPeerPubkey32Hex: string,
+    expectedLocalPubkey32Hex: string,
+    requestId: string
   ): string;
   build_onboarding_runtime_snapshot(
     groupJson: string,

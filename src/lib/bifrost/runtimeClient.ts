@@ -6,6 +6,7 @@ import type {
   RuntimeEvent,
   RuntimeMetadata,
   RuntimeSnapshotExport,
+  RuntimeSnapshotInput,
   RuntimeStatusSummary
 } from "./types";
 import { loadBridge, normalizeBifrostError, parseJsonResult, type WasmBridgeRuntimeLike } from "../wasm/loadBridge";
@@ -31,7 +32,7 @@ export class RuntimeClient {
     }
   }
 
-  async restore(config: RuntimeConfigInput, snapshot: RuntimeSnapshotExport): Promise<void> {
+  async restore(config: RuntimeConfigInput, snapshot: RuntimeSnapshotInput | RuntimeSnapshotExport): Promise<void> {
     try {
       const bridge = await loadBridge();
       this.runtime = new bridge.WasmBridgeRuntime();

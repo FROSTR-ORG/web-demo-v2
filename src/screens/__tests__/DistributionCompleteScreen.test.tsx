@@ -9,6 +9,7 @@ import { DEMO_PROFILE_ID } from "../../demo/fixtures";
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   finishDistribution: vi.fn().mockResolvedValue("demo-profile"),
+  clearCreateSession: vi.fn(),
   createSession: null as {
     draft: { groupName: string; threshold: number; count: number };
     createdProfileId?: string;
@@ -30,9 +31,10 @@ vi.mock("../../app/AppState", async () => {
   return {
     ...actual,
     useAppState: () => ({
-      createSession: mocks.createSession,
-      finishDistribution: mocks.finishDistribution
-    })
+	      createSession: mocks.createSession,
+	      finishDistribution: mocks.finishDistribution,
+	      clearCreateSession: mocks.clearCreateSession
+	    })
   };
 });
 
@@ -54,6 +56,7 @@ beforeEach(() => {
   mocks.navigate.mockClear();
   mocks.finishDistribution.mockReset();
   mocks.finishDistribution.mockResolvedValue(DEMO_PROFILE_ID);
+  mocks.clearCreateSession.mockClear();
   mocks.createSession = {
     draft: { groupName: "My Signing Key", threshold: 2, count: 3 },
     createdProfileId: DEMO_PROFILE_ID,

@@ -9,6 +9,7 @@ import { GenerationProgressScreen } from "../GenerationProgressScreen";
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   createKeyset: vi.fn().mockResolvedValue(undefined),
+  generateNsec: vi.fn(),
   createSession: null as {
     draft: { groupName: string; threshold: number; count: number };
     keyset?: Record<string, unknown>;
@@ -32,6 +33,10 @@ vi.mock("../../app/AppState", () => ({
   })
 }));
 
+vi.mock("../../lib/bifrost/packageService", () => ({
+  generateNsec: mocks.generateNsec
+}));
+
 afterEach(() => {
   cleanup();
 });
@@ -39,6 +44,11 @@ afterEach(() => {
 beforeEach(() => {
   mocks.navigate.mockClear();
   mocks.createKeyset.mockClear();
+  mocks.generateNsec.mockReset();
+  mocks.generateNsec.mockResolvedValue({
+    nsec: "nsec1generatedtestkey0000000000000000000000000000000000000000000000",
+    signing_key_hex: "a".repeat(64)
+  });
   mocks.createSession = null;
 });
 
@@ -59,19 +69,19 @@ describe("CreateKeysetScreen", () => {
     expect(screen.getByText("Create Keyset")).toBeInTheDocument();
   });
 
-  it("shows inline validation error for invalid nsec", async () => {
+  it("blocks existing nsec input because splitting is not supported yet", async () => {
     render(
       <MemoryRouter>
         <CreateKeysetScreen />
       </MemoryRouter>
     );
 
-    const nsecInput = screen.getByPlaceholderText("Paste your existing nsec or generate a new one");
+    const nsecInput = screen.getByPlaceholderText("Paste existing nsec (unsupported)");
     fireEvent.change(nsecInput, { target: { value: "not-a-valid-key" } });
     fireEvent.click(screen.getByText("Create Keyset"));
 
     await waitFor(() => {
-      expect(screen.getByText("Invalid nsec format. Must be a valid Nostr private key.")).toBeInTheDocument();
+      expect(screen.getByText("Existing nsec splitting is not supported yet.")).toBeInTheDocument();
     });
 
     expect(nsecInput).toHaveClass("input-error");
@@ -96,6 +106,52 @@ describe("CreateKeysetScreen", () => {
       });
     });
 
+    expect(mocks.navigate).toHaveBeenCalledWith("/create/progress");
+  });
+
+  it("generates a real nsec into the same input field", async () => {
+    const generated = "nsec1generatedtestkey0000000000000000000000000000000000000000000000";
+
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate NSEC" }));
+
+    await waitFor(() => {
+      expect(mocks.generateNsec).toHaveBeenCalled();
+      expect(screen.getByPlaceholderText("Paste existing nsec (unsupported)")).toHaveValue(generated);
+    });
+
+    const nsecInput = screen.getByPlaceholderText("Paste existing nsec (unsupported)");
+    expect(nsecInput).toHaveAttribute("type", "password");
+    fireEvent.click(screen.getByRole("button", { name: "Reveal nsec" }));
+    expect(nsecInput).toHaveAttribute("type", "text");
+  });
+
+  it("submits a generated nsec without storing it in the create draft", async () => {
+    const generated = "nsec1generatedtestkey0000000000000000000000000000000000000000000000";
+
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate NSEC" }));
+    await waitFor(() => expect(screen.getByPlaceholderText("Paste existing nsec (unsupported)")).toHaveValue(generated));
+    fireEvent.click(screen.getByText("Create Keyset"));
+
+    await waitFor(() => {
+      expect(mocks.createKeyset).toHaveBeenCalledWith({
+        groupName: "My Signing Key",
+        threshold: 2,
+        count: 3,
+        generatedNsec: generated
+      });
+    });
     expect(mocks.navigate).toHaveBeenCalledWith("/create/progress");
   });
 
@@ -146,20 +202,45 @@ describe("CreateKeysetScreen", () => {
       </MemoryRouter>
     );
     expect(
-      screen.getByText("Any 2 of 3 shares can sign — min threshold is 2, min shares is 3")
+      screen.getByText("Any 2 of 3 shares can sign — min threshold is 2, min shares is 2")
     ).toBeInTheDocument();
 
-    // Click the Total Shares + button to go 3 -> 4
+    fireEvent.click(screen.getByLabelText("Decrease Total Shares"));
+    expect(
+      screen.getByText("Any 2 of 2 shares can sign — min threshold is 2, min shares is 2")
+    ).toBeInTheDocument();
+
+    // Click the Total Shares + button twice to go 2 -> 4
+    fireEvent.click(screen.getByLabelText("Increase Total Shares"));
     fireEvent.click(screen.getByLabelText("Increase Total Shares"));
     expect(
-      screen.getByText("Any 2 of 4 shares can sign — min threshold is 2, min shares is 3")
+      screen.getByText("Any 2 of 4 shares can sign — min threshold is 2, min shares is 2")
     ).toBeInTheDocument();
 
     // Click Threshold + to go 2 -> 3
     fireEvent.click(screen.getByLabelText("Increase Threshold"));
     expect(
-      screen.getByText("Any 3 of 4 shares can sign — min threshold is 2, min shares is 3")
+      screen.getByText("Any 3 of 4 shares can sign — min threshold is 2, min shares is 2")
     ).toBeInTheDocument();
+  });
+
+  it("allows a 2-of-2 keyset", async () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByLabelText("Decrease Total Shares"));
+    fireEvent.click(screen.getByText("Create Keyset"));
+
+    await waitFor(() => {
+      expect(mocks.createKeyset).toHaveBeenCalledWith({
+        groupName: "My Signing Key",
+        threshold: 2,
+        count: 2
+      });
+    });
   });
 });
 

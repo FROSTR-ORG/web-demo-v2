@@ -45,17 +45,29 @@ export function create_encrypted_profile_backup(profile_json: string): string;
 
 export function create_keyset_bundle(config_json: string): string;
 
+export function create_keyset_bundle_from_nsec(input_json: string): string;
+
 export function create_onboarding_request_bundle(share_secret: string, peer_pubkey32_hex: string, event_kind: bigint, sent_at_seconds?: number | null): string;
 
 export function create_profile_package_pair(payload_json: string, password: string): string;
 
 export function decode_bfonboard_package(package_text: string, password: string): string;
 
+export function decode_bfonboard_package_result(package_text: string, password: string): string;
+
 export function decode_bfprofile_package(package_text: string, password: string): string;
+
+export function decode_bfprofile_package_result(package_text: string, password: string): string;
 
 export function decode_bfshare_package(package_text: string, password: string): string;
 
+export function decode_bfshare_package_result(package_text: string, password: string): string;
+
+export function decode_onboarding_response_event_result(event_json: string, share_secret: string, expected_peer_pubkey32_hex: string, expected_local_pubkey32_hex: string, request_id: string): string;
+
 export function decrypt_profile_backup_content(ciphertext: string, share_secret: string): string;
+
+export function default_event_kind(): bigint;
 
 export function derive_group_id(group_json: string): string;
 
@@ -73,11 +85,17 @@ export function encode_bfshare_package(payload_json: string, password: string): 
 
 export function encrypt_profile_backup_content(backup_json: string, share_secret: string): string;
 
+export function generate_nsec(): string;
+
 export function parse_profile_backup_event(event_json: string, share_secret: string): string;
 
 export function profile_backup_event_kind(): number;
 
 export function profile_backup_key_domain(): string;
+
+export function recover_nsec_from_shares(input_json: string): string;
+
+export function resolve_share_index(group_json: string, share_secret: string): number;
 
 export function rotate_keyset_bundle(input_json: string): string;
 
@@ -94,12 +112,18 @@ export interface InitOutput {
     readonly build_profile_backup_event: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly create_encrypted_profile_backup: (a: number, b: number) => [number, number, number, number];
     readonly create_keyset_bundle: (a: number, b: number) => [number, number, number, number];
+    readonly create_keyset_bundle_from_nsec: (a: number, b: number) => [number, number, number, number];
     readonly create_onboarding_request_bundle: (a: number, b: number, c: number, d: number, e: bigint, f: number) => [number, number, number, number];
     readonly create_profile_package_pair: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly decode_bfonboard_package: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly decode_bfonboard_package_result: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly decode_bfprofile_package: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly decode_bfprofile_package_result: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly decode_bfshare_package: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly decode_bfshare_package_result: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly decode_onboarding_response_event_result: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => [number, number, number, number];
     readonly decrypt_profile_backup_content: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly default_event_kind: () => bigint;
     readonly derive_group_id: (a: number, b: number) => [number, number, number, number];
     readonly derive_profile_backup_conversation_key_hex: (a: number, b: number) => [number, number, number, number];
     readonly derive_profile_id_from_share_pubkey: (a: number, b: number) => [number, number, number, number];
@@ -108,9 +132,12 @@ export interface InitOutput {
     readonly encode_bfprofile_package: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly encode_bfshare_package: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly encrypt_profile_backup_content: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly generate_nsec: () => [number, number, number, number];
     readonly parse_profile_backup_event: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly profile_backup_event_kind: () => number;
     readonly profile_backup_key_domain: () => [number, number];
+    readonly recover_nsec_from_shares: (a: number, b: number) => [number, number, number, number];
+    readonly resolve_share_index: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly rotate_keyset_bundle: (a: number, b: number) => [number, number, number, number];
     readonly wasmbridgeruntime_clear_policy_overrides: (a: number) => [number, number];
     readonly wasmbridgeruntime_drain_completions: (a: number) => [number, number, number, number];

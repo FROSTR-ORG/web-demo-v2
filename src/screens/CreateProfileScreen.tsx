@@ -2,7 +2,7 @@ import type { FormEvent } from "react";
 import { Check, X } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { defaultProfileDraft, useAppState } from "../app/AppState";
+import { defaultCreateProfileDraft, useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField, PermissionBadge, SectionHeader, Stepper, TextField } from "../components/ui";
 import { useDemoUi } from "../demo/demoUi";
@@ -14,11 +14,13 @@ export function CreateProfileScreen() {
   const demoUi = useDemoUi();
   const presetPassword = demoUi.shared?.passwordPreset ?? "";
   const [draft, setDraft] = useState(() => ({
-    ...defaultProfileDraft(),
-    deviceName: demoUi.shared?.profileNamePreset ?? defaultProfileDraft().deviceName,
+    ...defaultCreateProfileDraft(),
+    deviceName: demoUi.shared?.profileNamePreset ?? defaultCreateProfileDraft().deviceName,
     password: presetPassword,
     confirmPassword: presetPassword,
-    relays: demoUi.shared?.relayPreset ? ["wss://relay.primal.net", demoUi.shared.relayPreset] : defaultProfileDraft().relays
+    distributionPassword: presetPassword,
+    confirmDistributionPassword: presetPassword,
+    relays: demoUi.shared?.relayPreset ? ["wss://relay.primal.net", demoUi.shared.relayPreset] : defaultCreateProfileDraft().relays
   }));
   const [relayInput, setRelayInput] = useState("wss://");
   const [error, setError] = useState("");
@@ -45,6 +47,8 @@ export function CreateProfileScreen() {
   const localShare = createSession.localShare;
   const members = createSession.keyset.group.members;
   const confirmMatches = draft.password.length > 0 && draft.password === draft.confirmPassword;
+  const distributionPasswordMatches =
+    draft.distributionPassword.length > 0 && draft.distributionPassword === draft.confirmDistributionPassword;
 
   return (
     <AppShell headerMeta={createSession.draft.groupName} mainVariant="flow">
@@ -77,6 +81,27 @@ export function CreateProfileScreen() {
               <div className="kicker">Keyset</div>
               <div className="value">{createSession.keyset.group.group_name}</div>
             </div>
+          </div>
+        </div>
+
+        <div className="password-group">
+          <SectionHeader
+            title="Remote Package Password"
+            copy="This password decrypts every remote bfonboard package you distribute from this setup."
+            infoIcon
+          />
+          <div className="profile-password-row">
+            <PasswordField
+              label="Remote Package Password"
+              value={draft.distributionPassword}
+              onChange={(event) => setDraft((current) => ({ ...current, distributionPassword: event.target.value }))}
+            />
+            <PasswordField
+              label="Confirm Remote Package Password"
+              value={draft.confirmDistributionPassword}
+              checked={distributionPasswordMatches}
+              onChange={(event) => setDraft((current) => ({ ...current, confirmDistributionPassword: event.target.value }))}
+            />
           </div>
         </div>
 
@@ -134,30 +159,30 @@ export function CreateProfileScreen() {
 
         <SectionHeader title="Peer Permissions" copy="Set default permissions for each peer. You can change these later in Settings." />
         <div className="permission-list">
-          {members.map((member, index) => (
+          {members.map((member) => (
             <div className="permission-row" key={member.pubkey}>
               <div className="permission-main">
                 <span className="value">Peer #{member.idx}</span>
                 {member.idx === localShare.idx ? null : <span className="help">{shortHex(member.pubkey, 8, 4)}</span>}
               </div>
               <div className="inline-actions">
-                <PermissionBadge>SIGN</PermissionBadge>
-                <PermissionBadge tone="info" muted={index === 1}>
-                  ECDH
-                </PermissionBadge>
-                <PermissionBadge tone="ping" muted={index === 2}>
-                  PING
-                </PermissionBadge>
-                <PermissionBadge tone="onboard" muted={member.idx === localShare.idx || index === 2}>
-                  ONBOARD
-                </PermissionBadge>
+                {member.idx === localShare.idx ? (
+                  <span className="help">Local profile</span>
+                ) : (
+                  <>
+                    <PermissionBadge>SIGN</PermissionBadge>
+                    <PermissionBadge tone="info">ECDH</PermissionBadge>
+                    <PermissionBadge tone="ping">PING</PermissionBadge>
+                    <PermissionBadge tone="onboard">ONBOARD</PermissionBadge>
+                  </>
+                )}
               </div>
             </div>
           ))}
         </div>
 
         {error ? <div className="error">{error}</div> : null}
-        <Button type="submit" size="full" disabled={busy || !confirmMatches}>
+        <Button type="submit" size="full" disabled={busy || !confirmMatches || !distributionPasswordMatches}>
           {busy ? "Creating Profile..." : "Continue to Distribute Shares"}
         </Button>
       </form>

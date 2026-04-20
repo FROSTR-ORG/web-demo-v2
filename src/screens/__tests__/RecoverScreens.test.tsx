@@ -1,8 +1,13 @@
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { RecoverSession } from "../../app/AppState";
 
 const mockNavigate = vi.fn();
+const mockApp = vi.hoisted(() => ({
+  state: {} as any
+}));
+
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return { ...actual, useNavigate: () => mockNavigate };
@@ -14,35 +19,94 @@ const fakeProfile = {
   deviceName: "Igloo Web",
   groupName: "My Signing Key",
   threshold: 2,
-  memberCount: 3,
+  memberCount: 2,
   localShareIdx: 0,
   groupPublicKey: "npub1qe3abcdef1234567890abcdef7k4m",
   relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
   createdAt: Date.now(),
-  lastUsedAt: Date.now(),
+  lastUsedAt: Date.now()
 };
 
+function recoveredSession(overrides: Partial<RecoverSession> = {}): RecoverSession {
+  return {
+    sourceProfile: fakeProfile,
+    sourcePayload: {
+      profile_id: fakeProfile.id,
+      version: 1,
+      device: {
+        name: "Igloo Web",
+        share_secret: "a".repeat(64),
+        manual_peer_policy_overrides: [],
+        relays: fakeProfile.relays
+      },
+      group_package: {
+        group_name: fakeProfile.groupName,
+        group_pk: "b".repeat(64),
+        threshold: 2,
+        members: [
+          { idx: 1, pubkey: `02${"c".repeat(64)}` },
+          { idx: 2, pubkey: `02${"d".repeat(64)}` }
+        ]
+      }
+    },
+    localShare: { idx: 1, seckey: "a".repeat(64) },
+    externalShares: [{ idx: 2, seckey: "b".repeat(64) }],
+    sources: [
+      { idx: 1, memberPubkey: "c".repeat(64), relays: fakeProfile.relays },
+      { idx: 2, memberPubkey: "d".repeat(64), relays: fakeProfile.relays }
+    ],
+    ...overrides
+  };
+}
+
 vi.mock("../../app/AppState", () => ({
-  useAppState: () => ({
-    activeProfile: fakeProfile,
-  }),
+  useAppState: () => mockApp.state
 }));
 
 import { CollectSharesScreen, RecoverSuccessScreen } from "../RecoverScreens";
 
+beforeEach(() => {
+  mockApp.state = {
+    activeProfile: fakeProfile,
+    recoverSession: null,
+    validateRecoverSources: vi.fn(async () => {
+      mockApp.state.recoverSession = recoveredSession();
+    }),
+    recoverNsec: vi.fn(async () => {
+      const recovered = {
+        nsec: "nsec1realrecoveredprivatekey0000000000000000000000000000000000",
+        signing_key_hex: "f".repeat(64)
+      };
+      mockApp.state.recoverSession = recoveredSession({
+        recovered,
+        expiresAt: Date.now() + 60_000
+      });
+      return recovered;
+    }),
+    clearRecoverSession: vi.fn(() => {
+      mockApp.state.recoverSession = null;
+    }),
+    expireRecoveredNsec: vi.fn(() => {
+      mockApp.state.recoverSession = null;
+    })
+  };
+});
+
 afterEach(() => {
   cleanup();
   mockNavigate.mockClear();
+  vi.useRealTimers();
 });
 
-/* ============================
-   Collect Shares Screen
-   ============================ */
-
 describe("CollectSharesScreen", () => {
-  function renderCollect() {
+  /**
+   * Product-vs-demo isolation: product recovery must require AppState-backed
+   * source validation before real recovery is enabled. The raw-share shortcut
+   * exists only for scripted gallery demos and stays behind demoUi.recover.
+   */
+  function renderCollect(routeState?: unknown) {
     return render(
-      <MemoryRouter initialEntries={["/recover/test-profile-id"]}>
+      <MemoryRouter initialEntries={[{ pathname: "/recover/test-profile-id", state: routeState }]}>
         <Routes>
           <Route path="/recover/:profileId" element={<CollectSharesScreen />} />
         </Routes>
@@ -50,101 +114,84 @@ describe("CollectSharesScreen", () => {
     );
   }
 
-  it("renders Recover NSEC heading", () => {
+  it("renders real recovery inputs for the saved profile and required bfshare slot", () => {
     renderCollect();
     expect(screen.getByRole("heading", { name: "Recover NSEC" })).toBeInTheDocument();
+    expect(screen.getByText(/requires 2 of your 2 shares/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Saved profile password")).toBeInTheDocument();
+    expect(screen.getByLabelText("Source Share #2 bfshare package")).toBeInTheDocument();
+    expect(screen.getByLabelText("Source Share #2 package password")).toBeInTheDocument();
+    expect(screen.queryByText("Loaded")).not.toBeInTheDocument();
   });
 
-  it("renders threshold description with correct numbers", () => {
+  it("validates sources before enabling real recovery", async () => {
     renderCollect();
-    expect(screen.getByText(/requires 2 of your 3 shares/)).toBeInTheDocument();
-  });
+    expect(screen.getByRole("button", { name: "Validate Sources" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Recover NSEC" })).toBeDisabled();
 
-  it("renders preloaded local share (#0 — This Browser)", () => {
-    renderCollect();
-    expect(screen.getByText("Share #0 — This Browser")).toBeInTheDocument();
-    expect(screen.getByText("Loaded")).toBeInTheDocument();
-  });
+    fireEvent.change(screen.getByLabelText("Saved profile password"), { target: { value: "local-password" } });
+    fireEvent.change(screen.getByLabelText("Source Share #2 bfshare package"), { target: { value: "bfshare1package" } });
+    fireEvent.change(screen.getByLabelText("Source Share #2 package password"), { target: { value: "source-password" } });
 
-  it("renders additional share input (Share #1 — Pasted)", () => {
-    renderCollect();
-    expect(screen.getByText("Share #1 — Pasted")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Paste share hex...")).toBeInTheDocument();
-  });
+    fireEvent.click(screen.getByRole("button", { name: "Validate Sources" }));
+    await waitFor(() => expect(mockApp.state.validateRecoverSources).toHaveBeenCalledWith({
+      profileId: "test-profile-id",
+      profilePassword: "local-password",
+      sourcePackages: [{ packageText: "bfshare1package", password: "source-password" }]
+    }));
+    await waitFor(() => expect(screen.getAllByText("Loaded")).toHaveLength(2));
 
-  it("renders Recover NSEC button disabled initially", () => {
-    renderCollect();
-    const buttons = screen.getAllByText("Recover NSEC");
-    const recoverBtn = buttons.find((el) => el.closest("button[type='button']") && el.closest(".button-full"));
-    expect(recoverBtn?.closest("button")).toBeDisabled();
-  });
-
-  it("enables Recover NSEC button when valid share is pasted", () => {
-    renderCollect();
-    const input = screen.getByPlaceholderText("Paste share hex...");
-    fireEvent.change(input, { target: { value: "a3f8c2d1e4b7f9a0c3d2e1b6f8a7c4d2e1b9f3a4" } });
-    const buttons = screen.getAllByText("Recover NSEC");
-    const recoverBtn = buttons.find((el) => el.closest("button") && el.closest(".button-full"));
-    expect(recoverBtn?.closest("button")).not.toBeDisabled();
-  });
-
-  it("navigates to success screen on Recover NSEC click with valid share", () => {
-    renderCollect();
-    const input = screen.getByPlaceholderText("Paste share hex...");
-    fireEvent.change(input, { target: { value: "a3f8c2d1e4b7f9a0c3d2e1b6f8a7c4d2e1b9f3a4" } });
-    const buttons = screen.getAllByText("Recover NSEC");
-    const recoverBtn = buttons.find((el) => el.closest("button") && el.closest(".button-full"));
-    fireEvent.click(recoverBtn!.closest("button")!);
+    fireEvent.click(screen.getByRole("button", { name: "Recover NSEC" }));
+    await waitFor(() => expect(mockApp.state.recoverNsec).toHaveBeenCalled());
     expect(mockNavigate).toHaveBeenCalledWith("/recover/test-profile-id/success");
   });
 
-  it("renders Back to Signer link", () => {
+  it("renders real AppState validation errors", async () => {
+    mockApp.state.validateRecoverSources = vi.fn(async () => {
+      throw new Error("The profile password could not decrypt Source Share #1.");
+    });
     renderCollect();
-    expect(screen.getByText("Back to Signer")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Saved profile password"), { target: { value: "wrong-password" } });
+    fireEvent.change(screen.getByLabelText("Source Share #2 bfshare package"), { target: { value: "bfshare1package" } });
+    fireEvent.change(screen.getByLabelText("Source Share #2 package password"), { target: { value: "source-password" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Validate Sources" }));
+    await waitFor(() => {
+      expect(screen.getByText("Recovery Error")).toBeInTheDocument();
+      expect(screen.getByText("The profile password could not decrypt Source Share #1.")).toBeInTheDocument();
+    });
   });
 
-  it("navigates back to dashboard on Back to Signer click", () => {
+  it("clears recovery state and navigates back to the dashboard", () => {
     renderCollect();
     fireEvent.click(screen.getByText("Back to Signer"));
+    expect(mockApp.state.clearRecoverSession).toHaveBeenCalled();
     expect(mockNavigate).toHaveBeenCalledWith("/dashboard/test-profile-id");
   });
 
-  // VAL-REC-001 regression: even when the incompatible-shares demo preset
-  // preloads Share #1 with a mock value, the paste input must still render
-  // and accept user input (validators expect a textbox to type into).
-  it("renders the paste input even when Share #1 is preloaded in the incompatible-shares variant", () => {
-    render(
-      <MemoryRouter
-        initialEntries={[
-          {
-            pathname: "/recover/test-profile-id",
-            state: { demoUi: { recover: { variant: "incompatible-shares" } } },
-          },
-        ]}
-      >
-        <Routes>
-          <Route path="/recover/:profileId" element={<CollectSharesScreen />} />
-        </Routes>
-      </MemoryRouter>
-    );
+  it("keeps the demo-only raw-share click-through isolated behind demo state", () => {
+    // Demo raw-share behavior must not leak into product recovery because it
+    // bypasses package validation and exists only for paper/demo continuity.
+    renderCollect({ demoUi: { recover: { variant: "incompatible-shares" } } });
     const input = screen.getByPlaceholderText("Paste share hex...") as HTMLInputElement;
     expect(input).toBeInTheDocument();
-    // The input should accept typed text (the paste/typing interaction).
     fireEvent.change(input, { target: { value: "new-share-value" } });
     expect(input.value).toBe("new-share-value");
-    // The incompatible alert is still rendered alongside the paste input.
     expect(screen.getByText("Incompatible Shares")).toBeInTheDocument();
   });
 });
 
-/* ============================
-   Recover Success Screen
-   ============================ */
-
 describe("RecoverSuccessScreen", () => {
-  function renderSuccess() {
+  /**
+   * Recovered-key security contract: product success masks recovered nsec by
+   * default, requires an explicit reveal action, supports user-initiated copy
+   * and clear, and auto-expires the in-memory recovered key.
+   */
+  const fullNsec = "nsec1realrecoveredprivatekey0000000000000000000000000000000000";
+
+  function renderSuccess(routeState?: unknown) {
     return render(
-      <MemoryRouter initialEntries={["/recover/test-profile-id/success"]}>
+      <MemoryRouter initialEntries={[{ pathname: "/recover/test-profile-id/success", state: routeState }]}>
         <Routes>
           <Route path="/recover/:profileId/success" element={<RecoverSuccessScreen />} />
         </Routes>
@@ -152,116 +199,65 @@ describe("RecoverSuccessScreen", () => {
     );
   }
 
-  it("renders Recover NSEC heading", () => {
-    renderSuccess();
-    expect(screen.getByRole("heading", { name: "Recover NSEC" })).toBeInTheDocument();
+  beforeEach(() => {
+    mockApp.state.recoverSession = recoveredSession({
+      recovered: {
+        nsec: fullNsec,
+        signing_key_hex: "f".repeat(64)
+      },
+      expiresAt: Date.now() + 60_000
+    });
   });
 
-  it("renders Security Warning panel with amber styling", () => {
+  it("renders the real recovered nsec masked by default", () => {
     renderSuccess();
     expect(screen.getByText("Security Warning")).toBeInTheDocument();
-    expect(screen.getByText("Your private key will auto-clear in 60 seconds")).toBeInTheDocument();
-    expect(screen.getByText("Do not screenshot or share this key")).toBeInTheDocument();
-    expect(screen.getByText("Copy to a secure password manager")).toBeInTheDocument();
-  });
-
-  it("renders masked and revealed NSEC labels", () => {
-    renderSuccess();
+    expect(screen.getByText(/auto-clear in 60 seconds/)).toBeInTheDocument();
     expect(screen.getByText("Recovered NSEC:")).toBeInTheDocument();
-    expect(screen.getByText("Recovered NSEC (revealed):")).toBeInTheDocument();
+    expect(screen.queryByText(fullNsec)).not.toBeInTheDocument();
   });
 
-  it("renders Copy to Clipboard, Reveal, and Clear buttons", () => {
-    renderSuccess();
-    expect(screen.getByText("Copy to Clipboard")).toBeInTheDocument();
-    expect(screen.getByText("Reveal")).toBeInTheDocument();
-    expect(screen.getByText("Clear")).toBeInTheDocument();
-  });
-
-  it("Copy to Clipboard shows Copied! feedback", async () => {
-    // Mock clipboard API
+  it("copies, reveals, and clears the real recovered nsec", async () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn(() => Promise.resolve()) } });
     renderSuccess();
-    // Copy button label stays "Copy to Clipboard" (static per Paper); a
-    // separate "Copied!" pill appears alongside it after clicking.
+
     fireEvent.click(screen.getByText("Copy to Clipboard"));
-    await waitFor(() => {
-      expect(screen.getByText("Copied!")).toBeInTheDocument();
-    });
-    // The Copy button itself retains its label.
-    expect(screen.getByText("Copy to Clipboard")).toBeInTheDocument();
-  });
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(fullNsec));
+    expect(screen.getByText("Copied!")).toBeInTheDocument();
 
-  it("Reveal click shows full NSEC and keeps 'Reveal' label", () => {
-    renderSuccess();
     fireEvent.click(screen.getByText("Reveal"));
-    expect(screen.getByText(/nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0/)).toBeInTheDocument();
-    // VAL-REC-002 requires the outlined button label stays "Reveal" (no toggle to "Hide").
-    expect(screen.getByText("Reveal")).toBeInTheDocument();
-  });
+    expect(screen.getByText(fullNsec)).toBeInTheDocument();
 
-  it("Clear button re-masks the revealed NSEC (VAL-REC-003)", () => {
-    renderSuccess();
-    // First reveal the full nsec.
-    fireEvent.click(screen.getByText("Reveal"));
-    expect(screen.getByText(/nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0/)).toBeInTheDocument();
-    // Then clear — the revealed text is removed and the display returns
-    // to the masked state (not blanked to "—").
     fireEvent.click(screen.getByText("Clear"));
-    expect(screen.queryByText(/nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0/)).not.toBeInTheDocument();
-    // Both labels are still present; the revealed panel shows the masked
-    // form instead of the full nsec.
-    expect(screen.getByText("Recovered NSEC:")).toBeInTheDocument();
-    expect(screen.getByText("Recovered NSEC (revealed):")).toBeInTheDocument();
-  });
-
-  it("renders Back to Signer link", () => {
-    renderSuccess();
-    expect(screen.getByText("Back to Signer")).toBeInTheDocument();
-  });
-
-  it("navigates back to dashboard on Back to Signer click", () => {
-    renderSuccess();
-    fireEvent.click(screen.getByText("Back to Signer"));
+    expect(mockApp.state.clearRecoverSession).toHaveBeenCalled();
     expect(mockNavigate).toHaveBeenCalledWith("/dashboard/test-profile-id");
   });
 
-  // VAL-REC-002 regression: the "Recovered NSEC (revealed):" panel must
-  // START masked. The full nsec is only shown after clicking "Reveal",
-  // and clicking "Reveal" a second time toggles the panel back to masked.
-  it("starts with the revealed nsec panel masked, then toggles on Reveal click", () => {
+  it("auto-clears the recovered nsec after 60 seconds", async () => {
+    vi.useFakeTimers();
     renderSuccess();
-    const fullNsec = /nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0/;
-    // Before any click the full nsec must NOT be visible anywhere.
-    expect(screen.queryByText(fullNsec)).not.toBeInTheDocument();
-    // First click: the revealed panel now shows the full nsec.
-    fireEvent.click(screen.getByText("Reveal"));
-    expect(screen.getByText(fullNsec)).toBeInTheDocument();
-    // Second click: toggles back to masked.
-    fireEvent.click(screen.getByText("Reveal"));
-    expect(screen.queryByText(fullNsec)).not.toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(mockApp.state.expireRecoveredNsec).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith("/dashboard/test-profile-id", { replace: true });
   });
 
-  // VAL-REC-002 regression: even when the demo scenario attempts to preset
-  // `revealed: true`, the component must still render masked by default so
-  // that the Reveal click has observable effect for validators.
-  it("ignores demoUi.recover.revealed preset and starts masked", () => {
-    render(
-      <MemoryRouter
-        initialEntries={[
-          {
-            pathname: "/recover/test-profile-id/success",
-            state: { demoUi: { recover: { variant: "success", revealed: true } } },
-          },
-        ]}
-      >
-        <Routes>
-          <Route path="/recover/:profileId/success" element={<RecoverSuccessScreen />} />
-        </Routes>
-      </MemoryRouter>
-    );
-    expect(
-      screen.queryByText(/nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0/)
-    ).not.toBeInTheDocument();
+  it("clears recovery state when returning to the dashboard", () => {
+    renderSuccess();
+    fireEvent.click(screen.getByText("Back to Signer"));
+    expect(mockApp.state.clearRecoverSession).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith("/dashboard/test-profile-id");
+  });
+
+  it("keeps demo-only fake nsec behavior behind demo state", () => {
+    // The fake recovered key is a demo-gallery affordance; product routes must
+    // continue reading recovered keys only from the AppState recovery session.
+    renderSuccess({ demoUi: { recover: { variant: "success", revealed: true } } });
+    expect(screen.queryByText(/nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Reveal"));
+    expect(screen.getByText(/nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0/)).toBeInTheDocument();
   });
 });

@@ -7,6 +7,14 @@ import { PAPER_MASKED_PACKAGE } from "../demo/fixtures";
 import { useDemoUi } from "../demo/demoUi";
 import { shortHex } from "../lib/bifrost/format";
 
+async function copySecret(value: string) {
+  try {
+    await navigator.clipboard?.writeText(value);
+  } catch {
+    // Clipboard availability varies in tests and non-secure preview contexts.
+  }
+}
+
 export function DistributeSharesScreen() {
   const navigate = useNavigate();
   const { createSession, updatePackageState } = useAppState();
@@ -15,6 +23,10 @@ export function DistributeSharesScreen() {
   if (!createSession?.keyset || !createSession.localShare || !createSession.createdProfileId) {
     return <Navigate to="/create" replace />;
   }
+
+  const completionReady = createSession.onboardingPackages.every(
+    (pkg) => (pkg.packageCopied || pkg.copied || pkg.qrShown) && pkg.passwordCopied
+  );
 
   return (
     <AppShell headerMeta={createSession.draft.groupName} mainVariant="flow">
@@ -41,7 +53,8 @@ export function DistributeSharesScreen() {
 
         <div className="package-stack">
           {createSession.onboardingPackages.map((pkg) => {
-            const distributed = pkg.copied || pkg.qrShown;
+            const packageHandedOff = pkg.packageCopied || pkg.copied || pkg.qrShown;
+            const distributed = packageHandedOff && pkg.passwordCopied;
             const locked = demoUi.shared?.lockedPackageIndexes?.includes(pkg.idx) ?? false;
             return (
               <div className={`package-card${locked ? " locked" : ""}`} key={pkg.idx}>
@@ -73,10 +86,26 @@ export function DistributeSharesScreen() {
                     variant="chip"
                     size="sm"
                     disabled={locked}
-                    onClick={() => updatePackageState(pkg.idx, { copied: true })}
+                    onClick={() => {
+                      void copySecret(pkg.packageText);
+                      updatePackageState(pkg.idx, { packageCopied: true, copied: true });
+                    }}
                   >
                     <Copy size={13} />
-                    Copy
+                    Copy Package
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="chip"
+                    size="sm"
+                    disabled={locked}
+                    onClick={() => {
+                      void copySecret(pkg.password);
+                      updatePackageState(pkg.idx, { passwordCopied: true });
+                    }}
+                  >
+                    <Copy size={13} />
+                    Copy Password
                   </Button>
                   <QrButton value={pkg.packageText} disabled={locked} onShown={() => updatePackageState(pkg.idx, { qrShown: true })} />
                 </div>
@@ -85,7 +114,7 @@ export function DistributeSharesScreen() {
           })}
         </div>
 
-        <Button type="button" size="full" onClick={() => navigate("/create/complete")}>
+        <Button type="button" size="full" disabled={!completionReady} onClick={() => navigate("/create/complete")}>
           Continue to Completion
         </Button>
       </section>

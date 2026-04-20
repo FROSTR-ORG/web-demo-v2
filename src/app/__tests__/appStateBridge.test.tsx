@@ -72,11 +72,18 @@ vi.mock("../../lib/bifrost/packageService", () => ({
     device: { share_secret: "0".repeat(64) }
   })),
   createKeysetBundle: vi.fn(),
+  createKeysetBundleFromNsec: vi.fn(),
+  generateNsec: vi.fn(),
   createProfilePackagePair: vi.fn(),
+  decodeBfonboardPackage: vi.fn(),
+  decodeBfsharePackage: vi.fn(),
   deriveProfileIdFromShareSecret: vi.fn(),
   encodeOnboardPackage: vi.fn(),
   onboardPayloadForRemoteShare: vi.fn(),
-  profilePayloadForShare: vi.fn()
+  profilePayloadForShare: vi.fn(),
+  recoverNsecFromShares: vi.fn(),
+  resolveShareIndex: vi.fn(async () => 0),
+  rotateKeysetBundle: vi.fn()
 }));
 
 vi.mock("../../lib/bifrost/format", () => ({
@@ -118,6 +125,10 @@ function makeSnapshot(overrides: Partial<AppStateBridgeSnapshot> = {}): AppState
     runtimeStatus: null,
     signerPaused: false,
     createSession: null,
+    importSession: null,
+    onboardSession: null,
+    rotateKeysetSession: null,
+    recoverSession: null,
     ...overrides
   };
 }
@@ -194,7 +205,11 @@ describe("appStateBridge helpers", () => {
       activeProfile: makeProfile(),
       runtimeStatus: null,
       signerPaused: true,
-      createSession: null,
+      createSession: { keyset: { shares: [{ seckey: "1".repeat(64) }] } },
+      importSession: { payload: { device: { share_secret: "2".repeat(64) } } },
+      onboardSession: { payload: { share_secret: "3".repeat(64) }, password: "super-secret" },
+      rotateKeysetSession: { sourceShares: [{ seckey: "4".repeat(64) }] },
+      recoverSession: { recovered: { nsec: "nsec1rawsecret" } },
       reloadProfiles: vi.fn(),
       extraThing: "ignored"
     } as unknown as AppStateValue;
@@ -204,11 +219,23 @@ describe("appStateBridge helpers", () => {
     expect(Object.keys(snapshot).sort()).toEqual([
       "activeProfile",
       "createSession",
+      "importSession",
+      "onboardSession",
       "profiles",
+      "recoverSession",
+      "rotateKeysetSession",
       "runtimeStatus",
       "signerPaused"
     ]);
     expect(snapshot.signerPaused).toBe(true);
+    expect(snapshot.createSession).toBeNull();
+    expect(snapshot.importSession).toBeNull();
+    expect(snapshot.onboardSession).toBeNull();
+    expect(snapshot.rotateKeysetSession).toBeNull();
+    expect(snapshot.recoverSession).toBeNull();
+    expect(JSON.stringify(snapshot)).not.toContain("super-secret");
+    expect(JSON.stringify(snapshot)).not.toContain("nsec1rawsecret");
+    expect(JSON.stringify(snapshot)).not.toContain("11111111");
   });
 });
 
@@ -338,11 +365,34 @@ describe("MockAppStateProvider bridge arming", () => {
     runtimeStatus: null,
     signerPaused: false,
     createSession: null,
+    importSession: null,
+    onboardSession: null,
+    rotateKeysetSession: null,
+    recoverSession: null,
     reloadProfiles: async () => undefined,
     createKeyset: async () => undefined,
     createProfile: async () => "prof_mock",
-    updatePackageState: () => undefined,
-    finishDistribution: async () => "prof_mock",
+	    updatePackageState: () => undefined,
+	    finishDistribution: async () => "prof_mock",
+	    clearCreateSession: () => undefined,
+	    beginImport: () => undefined,
+	    decryptImportBackup: async () => undefined,
+		    saveImportedProfile: async () => "prof_mock",
+		    clearImportSession: () => undefined,
+		    decodeOnboardPackage: async () => undefined,
+		    startOnboardHandshake: async () => undefined,
+		    saveOnboardedProfile: async () => "prof_mock",
+		    clearOnboardSession: () => undefined,
+	    validateRotateKeysetSources: async () => undefined,
+	    generateRotatedKeyset: async () => undefined,
+	    createRotatedProfile: async () => "prof_mock",
+	    updateRotatePackageState: () => undefined,
+	    finishRotateDistribution: async () => "prof_mock",
+	    clearRotateKeysetSession: () => undefined,
+	    validateRecoverSources: async () => undefined,
+	    recoverNsec: async () => ({ nsec: "nsec1mock", signing_key_hex: "0".repeat(64) }),
+	    clearRecoverSession: () => undefined,
+	    expireRecoveredNsec: () => undefined,
     unlockProfile: async () => undefined,
     lockProfile: () => undefined,
     clearCredentials: async () => undefined,

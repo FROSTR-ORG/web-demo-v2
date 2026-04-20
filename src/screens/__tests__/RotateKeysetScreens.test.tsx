@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   RotateKeysetFormScreen,
@@ -17,7 +17,28 @@ import {
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
-  activeProfile: null as { id: string } | null
+  activeProfile: null as { id: string } | null,
+  profiles: [] as Array<{
+    id: string;
+    label: string;
+    deviceName: string;
+    groupPublicKey: string;
+    relays: string[];
+    threshold: number;
+    memberCount: number;
+  }>,
+  rotateKeysetSession: null as Record<string, unknown> | null,
+  validateRotateKeysetSources: vi.fn().mockResolvedValue(undefined),
+  generateRotatedKeyset: vi.fn().mockResolvedValue(undefined),
+  createRotatedProfile: vi.fn().mockResolvedValue("test-profile-123"),
+  updateRotatePackageState: vi.fn(),
+  finishRotateDistribution: vi.fn().mockResolvedValue("test-profile-123"),
+  clearRotateKeysetSession: vi.fn(),
+  demoUi: {
+    rotateKeyset: { passwordPreset: "rotate-pass" },
+    progress: { frozen: true },
+    shared: { completionPreset: true }
+  } as Record<string, unknown>
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -30,8 +51,20 @@ vi.mock("react-router-dom", async () => {
 
 vi.mock("../../app/AppState", () => ({
   useAppState: () => ({
-    activeProfile: mocks.activeProfile
+    activeProfile: mocks.activeProfile,
+    profiles: mocks.profiles,
+    rotateKeysetSession: mocks.rotateKeysetSession,
+    validateRotateKeysetSources: mocks.validateRotateKeysetSources,
+    generateRotatedKeyset: mocks.generateRotatedKeyset,
+    createRotatedProfile: mocks.createRotatedProfile,
+    updateRotatePackageState: mocks.updateRotatePackageState,
+    finishRotateDistribution: mocks.finishRotateDistribution,
+    clearRotateKeysetSession: mocks.clearRotateKeysetSession
   })
+}));
+
+vi.mock("../../demo/demoUi", () => ({
+  useDemoUi: () => mocks.demoUi
 }));
 
 afterEach(() => {
@@ -41,6 +74,23 @@ afterEach(() => {
 beforeEach(() => {
   mocks.navigate.mockClear();
   mocks.activeProfile = null;
+  mocks.profiles = [];
+  mocks.rotateKeysetSession = null;
+  mocks.validateRotateKeysetSources.mockClear();
+  mocks.validateRotateKeysetSources.mockResolvedValue(undefined);
+  mocks.generateRotatedKeyset.mockClear();
+  mocks.generateRotatedKeyset.mockResolvedValue(undefined);
+  mocks.createRotatedProfile.mockClear();
+  mocks.createRotatedProfile.mockResolvedValue("test-profile-123");
+  mocks.updateRotatePackageState.mockClear();
+  mocks.finishRotateDistribution.mockClear();
+  mocks.finishRotateDistribution.mockResolvedValue("test-profile-123");
+  mocks.clearRotateKeysetSession.mockClear();
+  mocks.demoUi = {
+    rotateKeyset: { passwordPreset: "rotate-pass" },
+    progress: { frozen: true },
+    shared: { completionPreset: true }
+  };
 });
 
 /* ==========================================================
@@ -75,17 +125,32 @@ describe("RotateKeysetFormScreen", () => {
     expect(stepperLabels.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("renders source share #1 with validated badge (default mock)", () => {
+  it("renders source share #1 as password-required until the saved profile decrypts", () => {
     render(
       <MemoryRouter>
         <RotateKeysetFormScreen />
       </MemoryRouter>
     );
-    expect(screen.getByText("Validated")).toBeInTheDocument();
+    expect(screen.getByText("Password required")).toBeInTheDocument();
+    expect(screen.queryByText("Validated")).not.toBeInTheDocument();
     /* "My Signing Key" appears in both header-meta and source share card */
     expect(screen.getAllByText("My Signing Key").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("02a3f8...8f2c")).toBeInTheDocument();
-    expect(screen.getByText("Belongs to current group")).toBeInTheDocument();
+    expect(screen.getAllByText("Pending password").length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText("Belongs to current group")).not.toBeInTheDocument();
+  });
+
+  it("returns to Welcome with a safe notice when no saved profile id is available in product mode", () => {
+    mocks.demoUi = {};
+    render(
+      <MemoryRouter initialEntries={["/rotate-keyset"]}>
+        <Routes>
+          <Route path="/" element={<div>Welcome fallback</div>} />
+          <Route path="/rotate-keyset" element={<RotateKeysetFormScreen />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(mocks.clearRotateKeysetSession).toHaveBeenCalled();
+    expect(screen.getByText("Welcome fallback")).toBeInTheDocument();
   });
 
   it("reads location state profile and shows its keyset name", () => {
@@ -94,10 +159,13 @@ describe("RotateKeysetFormScreen", () => {
       label: "Work Key",
       deviceName: "Work Laptop",
       groupPublicKey: "03b7d2e4f1a8c9054f6a2e83d7b1094c5e8f3a6d2b7e4c19085f6d3a2b8ea91e",
-      relays: ["wss://relay.primal.net", "wss://relay.damus.io"]
+      relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
+      threshold: 2,
+      memberCount: 3
     };
+    mocks.profiles = [profile];
     render(
-      <MemoryRouter initialEntries={[{ pathname: "/rotate-keyset", state: { profile } }]}>
+      <MemoryRouter initialEntries={[{ pathname: "/rotate-keyset", state: { profileId: "prof_work" } }]}>
         <RotateKeysetFormScreen />
       </MemoryRouter>
     );
@@ -105,7 +173,7 @@ describe("RotateKeysetFormScreen", () => {
     expect(screen.getAllByText("Work Key").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("Work Laptop")).toBeInTheDocument();
     expect(screen.getByText("prof_work")).toBeInTheDocument();
-    expect(screen.getByText("3 configured")).toBeInTheDocument();
+    expect(screen.getByText("2 configured")).toBeInTheDocument();
   });
 
   it("renders source share #2 with input areas", () => {
@@ -135,17 +203,30 @@ describe("RotateKeysetFormScreen", () => {
       </MemoryRouter>
     );
     fireEvent.click(screen.getByText("Back"));
+    expect(mocks.clearRotateKeysetSession).toHaveBeenCalled();
     expect(mocks.navigate).toHaveBeenCalledWith("/");
   });
 
-  it("Validate & Continue navigates to /rotate-keyset/review", () => {
+  it("Validate & Continue validates real source inputs and navigates to /rotate-keyset/review", async () => {
     render(
       <MemoryRouter>
         <RotateKeysetFormScreen />
       </MemoryRouter>
     );
+    fireEvent.change(screen.getByPlaceholderText("Enter saved profile password"), { target: { value: "profile-pass" } });
+    fireEvent.change(screen.getByPlaceholderText("Paste bfshare from another device or backup..."), { target: { value: "bfshare1abc123" } });
+    fireEvent.change(screen.getByPlaceholderText("Enter password to decrypt"), { target: { value: "share-pass" } });
     fireEvent.click(screen.getByText(/Validate & Continue/));
-    expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/review");
+    await waitFor(() => {
+      expect(mocks.validateRotateKeysetSources).toHaveBeenCalledWith({
+        profileId: "prof_8f2c4a",
+        profilePassword: "profile-pass",
+        sourcePackages: [{ packageText: "bfshare1abc123", password: "share-pass" }],
+        threshold: 2,
+        count: 3
+      });
+      expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/review");
+    });
   });
 
   /* VAL-RTK-001: Validate & Continue CTA shows disabled visual when only 1 of
@@ -167,6 +248,19 @@ describe("RotateKeysetFormScreen", () => {
    ========================================================== */
 
 describe("ReviewGenerateScreen", () => {
+  it("guards product review without a validated rotate session", () => {
+    mocks.demoUi = {};
+    render(
+      <MemoryRouter initialEntries={["/rotate-keyset/review"]}>
+        <Routes>
+          <Route path="/rotate-keyset" element={<div>Rotate intake fallback</div>} />
+          <Route path="/rotate-keyset/review" element={<ReviewGenerateScreen />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(screen.getByText("Rotate intake fallback")).toBeInTheDocument();
+  });
+
   it("renders heading and key elements", () => {
     render(
       <MemoryRouter>
@@ -554,6 +648,53 @@ describe("RotateCreateProfileScreen", () => {
    ========================================================== */
 
 describe("RotateDistributeSharesScreen", () => {
+  it("guards product distribution until the rotated profile has been created", () => {
+    mocks.demoUi = {};
+    mocks.rotateKeysetSession = {
+      phase: "rotated",
+      sourceProfile: { id: "prof_work", label: "Work Key" },
+      createdProfileId: undefined,
+      onboardingPackages: []
+    };
+    render(
+      <MemoryRouter initialEntries={["/rotate-keyset/distribute"]}>
+        <Routes>
+          <Route path="/rotate-keyset/profile" element={<div>Create profile fallback</div>} />
+          <Route path="/rotate-keyset/distribute" element={<RotateDistributeSharesScreen />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(screen.getByText("Create profile fallback")).toBeInTheDocument();
+  });
+
+  it("keeps product completion disabled until package and password handoff are both accounted for", () => {
+    mocks.demoUi = {};
+    mocks.rotateKeysetSession = {
+      phase: "profile_created",
+      sourceProfile: { id: "prof_work", label: "Work Key" },
+      localShare: { idx: 0 },
+      createdProfileId: "prof_rotated",
+      onboardingPackages: [
+        {
+          idx: 1,
+          memberPubkey: "member",
+          packageText: "bfonboard1abc",
+          password: "distribution-password",
+          packageCopied: true,
+          copied: true,
+          passwordCopied: false,
+          qrShown: false
+        }
+      ]
+    };
+    render(
+      <MemoryRouter>
+        <RotateDistributeSharesScreen />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole("button", { name: "Continue to Completion" })).toBeDisabled();
+  });
+
   it("renders Distribute Shares heading and stepper with Rotate Keyset label", () => {
     render(
       <MemoryRouter>
@@ -620,7 +761,7 @@ describe("RotateDistributeSharesScreen", () => {
     expect(lockedCard).toBeTruthy();
     /* Disabled Copy + QR buttons inside the locked card */
     const disabled = lockedCard!.querySelectorAll("button[disabled]");
-    expect(disabled.length).toBe(2);
+    expect(disabled.length).toBe(3);
   });
 
   it("Share 2 card renders masked •••••••• password with Copy + QR enabled", () => {
