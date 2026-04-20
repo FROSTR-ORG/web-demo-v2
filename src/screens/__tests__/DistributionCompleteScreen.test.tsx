@@ -1,4 +1,10 @@
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  cleanup,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { DistributionCompleteScreen } from "../DistributionCompleteScreen";
@@ -15,40 +21,49 @@ const mocks = vi.hoisted(() => ({
     createdProfileId?: string;
     onboardingPackages: { idx: number; copied: boolean; qrShown: boolean }[];
   } | null,
-  demoUi: {} as Record<string, unknown>
+  demoUi: {} as Record<string, unknown>,
 }));
 
 vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  const actual =
+    await vi.importActual<typeof import("react-router-dom")>(
+      "react-router-dom",
+    );
   return {
     ...actual,
-    useNavigate: () => mocks.navigate
+    useNavigate: () => mocks.navigate,
   };
 });
 
 vi.mock("../../app/AppState", async () => {
-  const actual = await vi.importActual<typeof import("../../app/AppState")>("../../app/AppState");
+  const actual =
+    await vi.importActual<typeof import("../../app/AppState")>(
+      "../../app/AppState",
+    );
   return {
     ...actual,
     useAppState: () => ({
-	      createSession: mocks.createSession,
-	      finishDistribution: mocks.finishDistribution,
-	      clearCreateSession: mocks.clearCreateSession
-	    })
+      createSession: mocks.createSession,
+      finishDistribution: mocks.finishDistribution,
+      clearCreateSession: mocks.clearCreateSession,
+    }),
   };
 });
 
 vi.mock("../../demo/demoUi", () => ({
-  useDemoUi: () => mocks.demoUi
+  useDemoUi: () => mocks.demoUi,
 }));
 
 function renderScreen() {
   return render(
     <MemoryRouter initialEntries={["/create/complete"]}>
       <Routes>
-        <Route path="/create/complete" element={<DistributionCompleteScreen />} />
+        <Route
+          path="/create/complete"
+          element={<DistributionCompleteScreen />}
+        />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
@@ -62,8 +77,8 @@ beforeEach(() => {
     createdProfileId: DEMO_PROFILE_ID,
     onboardingPackages: [
       { idx: 1, copied: true, qrShown: false },
-      { idx: 2, copied: false, qrShown: true }
-    ]
+      { idx: 2, copied: false, qrShown: true },
+    ],
   };
   mocks.demoUi = { shared: { completionPreset: true } };
 });
@@ -73,28 +88,43 @@ afterEach(() => cleanup());
 describe("DistributionCompleteScreen finish handler — VAL-SHR-011", () => {
   it("navigates to /dashboard/{profileId} returned from finishDistribution", async () => {
     renderScreen();
-    fireEvent.click(screen.getByRole("button", { name: /Finish Distribution/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Finish Distribution/ }),
+    );
     await waitFor(() => {
       expect(mocks.finishDistribution).toHaveBeenCalled();
-      expect(mocks.navigate).toHaveBeenCalledWith(`/dashboard/${DEMO_PROFILE_ID}`);
+      expect(mocks.navigate).toHaveBeenCalledWith(
+        `/dashboard/${DEMO_PROFILE_ID}`,
+      );
+      expect(mocks.clearCreateSession).toHaveBeenCalled();
     });
   });
 
   it("falls back to createSession.createdProfileId when finishDistribution returns an empty value", async () => {
     mocks.finishDistribution.mockResolvedValue("" as unknown as string);
     renderScreen();
-    fireEvent.click(screen.getByRole("button", { name: /Finish Distribution/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Finish Distribution/ }),
+    );
     await waitFor(() => {
-      expect(mocks.navigate).toHaveBeenCalledWith(`/dashboard/${DEMO_PROFILE_ID}`);
+      expect(mocks.navigate).toHaveBeenCalledWith(
+        `/dashboard/${DEMO_PROFILE_ID}`,
+      );
+      expect(mocks.clearCreateSession).toHaveBeenCalled();
     });
   });
 
   it("still navigates to /dashboard/{fallbackId} when finishDistribution throws", async () => {
     mocks.finishDistribution.mockRejectedValue(new Error("boom"));
     renderScreen();
-    fireEvent.click(screen.getByRole("button", { name: /Finish Distribution/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Finish Distribution/ }),
+    );
     await waitFor(() => {
-      expect(mocks.navigate).toHaveBeenCalledWith(`/dashboard/${DEMO_PROFILE_ID}`);
+      expect(mocks.navigate).toHaveBeenCalledWith(
+        `/dashboard/${DEMO_PROFILE_ID}`,
+      );
+      expect(mocks.clearCreateSession).toHaveBeenCalled();
     });
   });
 
@@ -104,7 +134,9 @@ describe("DistributionCompleteScreen finish handler — VAL-SHR-011", () => {
     // With no createSession the screen redirects to "/" via <Navigate/>, so the
     // Finish Distribution button is not rendered. Ensure no stray navigation
     // to `/dashboard/` occurs in that edge-case.
-    expect(screen.queryByRole("button", { name: /Finish Distribution/ })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Finish Distribution/ }),
+    ).toBeNull();
     expect(mocks.navigate).not.toHaveBeenCalledWith("/dashboard/");
   });
 });

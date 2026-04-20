@@ -11,10 +11,13 @@ import {
   encodeBfsharePackage,
   generateNsec,
   profilePayloadForShare,
-  recoverNsecFromShares
+  recoverNsecFromShares,
 } from "../../lib/bifrost/packageService";
 import { packagePasswordForShare } from "../../lib/bifrost/format";
-import type { BfProfilePayload, StoredProfileRecord } from "../../lib/bifrost/types";
+import type {
+  BfProfilePayload,
+  StoredProfileRecord,
+} from "../../lib/bifrost/types";
 import { SetupFlowError } from "../AppState";
 
 const storage = new Map<string, unknown>();
@@ -26,7 +29,7 @@ vi.mock("idb-keyval", () => ({
   }),
   del: vi.fn(async (key: string) => {
     storage.delete(key);
-  })
+  }),
 }));
 
 const PROFILE_INDEX_KEY = "igloo.web-demo-v2.profile-index";
@@ -40,11 +43,13 @@ function Capture({ onState }: { onState: (state: AppStateValue) => void }) {
   return null;
 }
 
-async function makeProfilePackage(options: { threshold?: number; count?: number; groupName?: string } = {}) {
+async function makeProfilePackage(
+  options: { threshold?: number; count?: number; groupName?: string } = {},
+) {
   const keyset = await createKeysetBundle({
     groupName: options.groupName ?? "Flow Key",
     threshold: options.threshold ?? 2,
-    count: options.count ?? 3
+    count: options.count ?? 3,
   });
   const localShare = keyset.shares[0];
   const profileId = await deriveProfileIdFromShareSecret(localShare.seckey);
@@ -53,7 +58,7 @@ async function makeProfilePackage(options: { threshold?: number; count?: number;
     deviceName: "Flow Device",
     share: localShare,
     group: keyset.group,
-    relays: ["wss://relay.example.test"]
+    relays: ["wss://relay.example.test"],
   });
   const pair = await createProfilePackagePair(payload, "backup-password");
   return { keyset, localShare, profileId, payload, pair };
@@ -64,7 +69,7 @@ async function renderProvider() {
   render(
     <AppStateProvider>
       <Capture onState={(state) => (latest = state)} />
-    </AppStateProvider>
+    </AppStateProvider>,
   );
   await waitFor(() => expect(latest).toBeTruthy());
   return () => latest;
@@ -89,18 +94,24 @@ describe("AppState setup flows", () => {
         groupName: "Generated Create Key",
         threshold: 2,
         count: 3,
-        generatedNsec: generated.nsec
+        generatedNsec: generated.nsec,
       });
     });
-    await waitFor(() => expect(getState().createSession?.keyset?.group.group_name).toBe("Generated Create Key"));
+    await waitFor(() =>
+      expect(getState().createSession?.keyset?.group.group_name).toBe(
+        "Generated Create Key",
+      ),
+    );
 
     const session = getState().createSession!;
     expect(JSON.stringify(session.draft)).not.toContain(generated.nsec);
-    expect(JSON.stringify(Array.from(storage.entries()))).not.toContain(generated.nsec);
+    expect(JSON.stringify(Array.from(storage.entries()))).not.toContain(
+      generated.nsec,
+    );
 
     const recovered = await recoverNsecFromShares({
       group: session.keyset!.group,
-      shares: session.keyset!.shares.slice(0, session.keyset!.group.threshold)
+      shares: session.keyset!.shares.slice(0, session.keyset!.group.threshold),
     });
     expect(recovered.nsec).toBe(generated.nsec);
 
@@ -114,9 +125,17 @@ describe("AppState setup flows", () => {
     const getState = await renderProvider();
 
     await act(async () => {
-      await getState().createKeyset({ groupName: "Create Flow Key", threshold: 2, count: 2 });
+      await getState().createKeyset({
+        groupName: "Create Flow Key",
+        threshold: 2,
+        count: 2,
+      });
     });
-    await waitFor(() => expect(getState().createSession?.keyset?.group.group_name).toBe("Create Flow Key"));
+    await waitFor(() =>
+      expect(getState().createSession?.keyset?.group.group_name).toBe(
+        "Create Flow Key",
+      ),
+    );
 
     await act(async () => {
       await getState().createProfile({
@@ -125,22 +144,34 @@ describe("AppState setup flows", () => {
         confirmPassword: "local-password",
         distributionPassword: "remote-password",
         confirmDistributionPassword: "remote-password",
-        relays: ["wss://relay.example.test"]
+        relays: ["wss://relay.example.test"],
       });
     });
 
-    await waitFor(() => expect(getState().createSession?.onboardingPackages).toHaveLength(1));
+    await waitFor(() =>
+      expect(getState().createSession?.onboardingPackages).toHaveLength(1),
+    );
     const session = getState().createSession!;
     const remotePackage = session.onboardingPackages[0];
-    await expect(decodeBfonboardPackage(remotePackage.packageText, "remote-password")).resolves.toMatchObject({
-      relays: ["wss://relay.example.test"]
+    await expect(
+      decodeBfonboardPackage(remotePackage.packageText, "remote-password"),
+    ).resolves.toMatchObject({
+      relays: ["wss://relay.example.test"],
     });
     await expect(
-      decodeBfonboardPackage(remotePackage.packageText, packagePasswordForShare("Create Flow Key", remotePackage.idx))
+      decodeBfonboardPackage(
+        remotePackage.packageText,
+        packagePasswordForShare("Create Flow Key", remotePackage.idx),
+      ),
     ).rejects.toThrow();
 
-    const record = storage.get(`${PROFILE_RECORD_PREFIX}${session.createdProfileId}`) as StoredProfileRecord;
-    const decoded = await decodeProfilePackage(record.encryptedProfilePackage, "local-password");
+    const record = storage.get(
+      `${PROFILE_RECORD_PREFIX}${session.createdProfileId}`,
+    ) as StoredProfileRecord;
+    const decoded = await decodeProfilePackage(
+      record.encryptedProfilePackage,
+      "local-password",
+    );
     expect(decoded.device.manual_peer_policy_overrides).toHaveLength(1);
     for (const override of decoded.device.manual_peer_policy_overrides) {
       expect(override.policy.request).toEqual({
@@ -148,14 +179,14 @@ describe("AppState setup flows", () => {
         ping: "allow",
         onboard: "allow",
         sign: "allow",
-        ecdh: "allow"
+        ecdh: "allow",
       });
       expect(override.policy.respond).toEqual({
         echo: "allow",
         ping: "allow",
         onboard: "allow",
         sign: "allow",
-        ecdh: "allow"
+        ecdh: "allow",
       });
     }
     expect(JSON.stringify(record)).not.toMatch(/share_secret|seckey/);
@@ -174,32 +205,47 @@ describe("AppState setup flows", () => {
       getState().beginImport(generated.pair.profile_string);
     });
     await act(async () => {
-      await getState().decryptImportBackup(generated.pair.profile_string, "backup-password");
+      await getState().decryptImportBackup(
+        generated.pair.profile_string,
+        "backup-password",
+      );
     });
-    await waitFor(() => expect(getState().importSession?.payload?.profile_id).toBe(generated.profileId));
+    await waitFor(() =>
+      expect(getState().importSession?.payload?.profile_id).toBe(
+        generated.profileId,
+      ),
+    );
 
     let savedProfileId = "";
     await act(async () => {
       savedProfileId = await getState().saveImportedProfile({
         password: "local-password",
-        confirmPassword: "local-password"
+        confirmPassword: "local-password",
       });
     });
 
     expect(savedProfileId).toBe(generated.profileId);
     const ids = storage.get(PROFILE_INDEX_KEY) as string[];
     expect(ids).toEqual([generated.profileId]);
-    const record = storage.get(`${PROFILE_RECORD_PREFIX}${generated.profileId}`) as StoredProfileRecord;
+    const record = storage.get(
+      `${PROFILE_RECORD_PREFIX}${generated.profileId}`,
+    ) as StoredProfileRecord;
     expect(record.encryptedProfilePackage.startsWith("bfprofile1")).toBe(true);
     expect(JSON.stringify(record.summary)).not.toMatch(/share_secret|seckey/);
 
     cleanup();
     getState = await renderProvider();
-    await waitFor(() => expect(getState().profiles.map((profile) => profile.id)).toContain(generated.profileId));
+    await waitFor(() =>
+      expect(getState().profiles.map((profile) => profile.id)).toContain(
+        generated.profileId,
+      ),
+    );
     await act(async () => {
       await getState().unlockProfile(generated.profileId, "local-password");
     });
-    await waitFor(() => expect(getState().activeProfile?.id).toBe(generated.profileId));
+    await waitFor(() =>
+      expect(getState().activeProfile?.id).toBe(generated.profileId),
+    );
   }, 45_000);
 
   it("requires explicit confirmation before replacing an imported profile conflict", async () => {
@@ -210,12 +256,15 @@ describe("AppState setup flows", () => {
       getState().beginImport(generated.pair.profile_string);
     });
     await act(async () => {
-      await getState().decryptImportBackup(generated.pair.profile_string, "backup-password");
+      await getState().decryptImportBackup(
+        generated.pair.profile_string,
+        "backup-password",
+      );
     });
     await act(async () => {
       await getState().saveImportedProfile({
         password: "local-password",
-        confirmPassword: "local-password"
+        confirmPassword: "local-password",
       });
     });
     act(() => {
@@ -223,24 +272,31 @@ describe("AppState setup flows", () => {
       getState().beginImport(generated.pair.profile_string);
     });
     await act(async () => {
-      await getState().decryptImportBackup(generated.pair.profile_string, "backup-password");
+      await getState().decryptImportBackup(
+        generated.pair.profile_string,
+        "backup-password",
+      );
     });
-    await waitFor(() => expect(getState().importSession?.conflictProfile?.id).toBe(generated.profileId));
+    await waitFor(() =>
+      expect(getState().importSession?.conflictProfile?.id).toBe(
+        generated.profileId,
+      ),
+    );
 
     await expect(
       getState().saveImportedProfile({
         password: "replacement-password",
-        confirmPassword: "replacement-password"
-      })
+        confirmPassword: "replacement-password",
+      }),
     ).rejects.toMatchObject({
-      code: "profile_conflict"
+      code: "profile_conflict",
     });
 
     await act(async () => {
       await getState().saveImportedProfile({
         password: "replacement-password",
         confirmPassword: "replacement-password",
-        replaceExisting: true
+        replaceExisting: true,
       });
     });
 
@@ -260,54 +316,69 @@ describe("AppState setup flows", () => {
       getState().beginImport(generated.pair.profile_string);
     });
     await act(async () => {
-      await getState().decryptImportBackup(generated.pair.profile_string, "backup-password");
+      await getState().decryptImportBackup(
+        generated.pair.profile_string,
+        "backup-password",
+      );
     });
     await act(async () => {
       await getState().saveImportedProfile({
         password: "local-password",
-        confirmPassword: "local-password"
+        confirmPassword: "local-password",
       });
     });
 
     const externalSharePackage = await encodeBfsharePackage(
       {
         share_secret: generated.keyset.shares[1].seckey,
-        relays: ["wss://relay.example.test"]
+        relays: ["wss://relay.example.test"],
       },
-      "source-password"
+      "source-password",
     );
 
     await expect(
       getState().validateRecoverSources({
         profileId: generated.profileId,
         profilePassword: "wrong-password",
-        sourcePackages: [{ packageText: externalSharePackage, password: "source-password" }]
-      })
+        sourcePackages: [
+          { packageText: externalSharePackage, password: "source-password" },
+        ],
+      }),
     ).rejects.toMatchObject({
       code: "wrong_password",
-      details: { source: "saved_profile" }
+      details: { source: "saved_profile" },
     });
 
     await act(async () => {
       await getState().validateRecoverSources({
         profileId: generated.profileId,
         profilePassword: "local-password",
-        sourcePackages: [{ packageText: externalSharePackage, password: "source-password" }]
+        sourcePackages: [
+          { packageText: externalSharePackage, password: "source-password" },
+        ],
       });
     });
-    await waitFor(() => expect(getState().recoverSession?.sources).toHaveLength(2));
+    await waitFor(() =>
+      expect(getState().recoverSession?.sources).toHaveLength(2),
+    );
 
     let recoveredNsec = "";
     await act(async () => {
       recoveredNsec = (await getState().recoverNsec()).nsec;
     });
     expect(recoveredNsec.startsWith("nsec1")).toBe(true);
-    expect(getState().recoverSession?.recovered?.signing_key_hex).toHaveLength(64);
+    expect(getState().recoverSession?.recovered?.signing_key_hex).toHaveLength(
+      64,
+    );
     expect(getState().recoverSession?.expiresAt).toBeGreaterThan(Date.now());
 
-    const record = storage.get(`${PROFILE_RECORD_PREFIX}${generated.profileId}`) as StoredProfileRecord;
+    const record = storage.get(
+      `${PROFILE_RECORD_PREFIX}${generated.profileId}`,
+    ) as StoredProfileRecord;
     expect(JSON.stringify(record)).not.toContain(recoveredNsec);
-    expect(JSON.stringify(record.summary)).not.toMatch(/share_secret|seckey|nsec/);
+    expect(JSON.stringify(record.summary)).not.toMatch(
+      /share_secret|seckey|nsec/,
+    );
 
     act(() => {
       getState().expireRecoveredNsec();
@@ -324,28 +395,31 @@ describe("AppState setup flows", () => {
       getState().beginImport(generated.pair.profile_string);
     });
     await act(async () => {
-      await getState().decryptImportBackup(generated.pair.profile_string, "backup-password");
+      await getState().decryptImportBackup(
+        generated.pair.profile_string,
+        "backup-password",
+      );
     });
     await act(async () => {
       await getState().saveImportedProfile({
         password: "local-password",
-        confirmPassword: "local-password"
+        confirmPassword: "local-password",
       });
     });
 
     const firstExternal = await encodeBfsharePackage(
       {
         share_secret: generated.keyset.shares[1].seckey,
-        relays: ["wss://relay.example.test"]
+        relays: ["wss://relay.example.test"],
       },
-      "first-source-password"
+      "first-source-password",
     );
     const secondExternal = await encodeBfsharePackage(
       {
         share_secret: generated.keyset.shares[2].seckey,
-        relays: ["wss://relay.example.test"]
+        relays: ["wss://relay.example.test"],
       },
-      "second-source-password"
+      "second-source-password",
     );
 
     await expect(
@@ -354,19 +428,19 @@ describe("AppState setup flows", () => {
         profilePassword: "local-password",
         sourcePackages: [
           { packageText: firstExternal, password: "first-source-password" },
-          { packageText: firstExternal, password: "first-source-password" }
-        ]
-      })
+          { packageText: firstExternal, password: "first-source-password" },
+        ],
+      }),
     ).rejects.toMatchObject({
-      code: "duplicate_share"
+      code: "duplicate_share",
     });
 
     const mismatchedExternal = await encodeBfsharePackage(
       {
         share_secret: other.keyset.shares[1].seckey,
-        relays: ["wss://relay.example.test"]
+        relays: ["wss://relay.example.test"],
       },
-      "mismatch-password"
+      "mismatch-password",
     );
     await expect(
       getState().validateRecoverSources({
@@ -374,11 +448,11 @@ describe("AppState setup flows", () => {
         profilePassword: "local-password",
         sourcePackages: [
           { packageText: firstExternal, password: "first-source-password" },
-          { packageText: mismatchedExternal, password: "mismatch-password" }
-        ]
-      })
+          { packageText: mismatchedExternal, password: "mismatch-password" },
+        ],
+      }),
     ).rejects.toMatchObject({
-      code: "group_mismatch"
+      code: "group_mismatch",
     });
 
     await act(async () => {
@@ -387,11 +461,13 @@ describe("AppState setup flows", () => {
         profilePassword: "local-password",
         sourcePackages: [
           { packageText: firstExternal, password: "first-source-password" },
-          { packageText: secondExternal, password: "second-source-password" }
-        ]
+          { packageText: secondExternal, password: "second-source-password" },
+        ],
       });
     });
-    await waitFor(() => expect(getState().recoverSession?.externalShares).toHaveLength(2));
+    await waitFor(() =>
+      expect(getState().recoverSession?.externalShares).toHaveLength(2),
+    );
 
     let recoveredNsec = "";
     await act(async () => {
@@ -413,29 +489,36 @@ describe("AppState setup flows", () => {
       getState().beginImport(generated.pair.profile_string);
     });
     await act(async () => {
-      await getState().decryptImportBackup(generated.pair.profile_string, "backup-password");
+      await getState().decryptImportBackup(
+        generated.pair.profile_string,
+        "backup-password",
+      );
     });
-    await waitFor(() => expect(getState().importSession?.payload?.profile_id).toBe(generated.profileId));
+    await waitFor(() =>
+      expect(getState().importSession?.payload?.profile_id).toBe(
+        generated.profileId,
+      ),
+    );
     await act(async () => {
       await getState().saveImportedProfile({
         password: "local-password",
-        confirmPassword: "local-password"
+        confirmPassword: "local-password",
       });
     });
 
     const externalSharePackage = await encodeBfsharePackage(
       {
         share_secret: generated.keyset.shares[1].seckey,
-        relays: ["wss://relay.example.test"]
+        relays: ["wss://relay.example.test"],
       },
-      "source-password"
+      "source-password",
     );
     const secondExternalSharePackage = await encodeBfsharePackage(
       {
         share_secret: generated.keyset.shares[2].seckey,
-        relays: ["wss://relay.example.test"]
+        relays: ["wss://relay.example.test"],
       },
-      "second-source-password"
+      "second-source-password",
     );
 
     await act(async () => {
@@ -444,18 +527,27 @@ describe("AppState setup flows", () => {
         profilePassword: "local-password",
         sourcePackages: [
           { packageText: externalSharePackage, password: "source-password" },
-          { packageText: secondExternalSharePackage, password: "second-source-password" }
+          {
+            packageText: secondExternalSharePackage,
+            password: "second-source-password",
+          },
         ],
         threshold: 3,
-        count: 5
+        count: 5,
       });
     });
-    await waitFor(() => expect(getState().rotateKeysetSession?.sourceShares).toHaveLength(3));
+    await waitFor(() =>
+      expect(getState().rotateKeysetSession?.sourceShares).toHaveLength(3),
+    );
 
     await act(async () => {
       await getState().generateRotatedKeyset("dist-password");
     });
-    await waitFor(() => expect(getState().rotateKeysetSession?.rotated?.next.group.group_pk).toBe(generated.keyset.group.group_pk));
+    await waitFor(() =>
+      expect(getState().rotateKeysetSession?.rotated?.next.group.group_pk).toBe(
+        generated.keyset.group.group_pk,
+      ),
+    );
 
     let rotatedProfileId = "";
     await act(async () => {
@@ -463,38 +555,56 @@ describe("AppState setup flows", () => {
         deviceName: "Rotated Device",
         password: "rotated-password",
         confirmPassword: "rotated-password",
-        relays: ["wss://relay.example.test"]
+        relays: ["wss://relay.example.test"],
       });
     });
 
     expect(rotatedProfileId).not.toBe(generated.profileId);
-    expect(storage.get(`${PROFILE_RECORD_PREFIX}${generated.profileId}`)).toBeUndefined();
+    expect(
+      storage.get(`${PROFILE_RECORD_PREFIX}${generated.profileId}`),
+    ).toBeUndefined();
     const ids = storage.get(PROFILE_INDEX_KEY) as string[];
     expect(ids).toEqual([rotatedProfileId]);
-    const record = storage.get(`${PROFILE_RECORD_PREFIX}${rotatedProfileId}`) as StoredProfileRecord;
+    const record = storage.get(
+      `${PROFILE_RECORD_PREFIX}${rotatedProfileId}`,
+    ) as StoredProfileRecord;
     expect(record.summary.groupPublicKey).toBe(generated.keyset.group.group_pk);
     expect(JSON.stringify(record.summary)).not.toMatch(/share_secret|seckey/);
-    const decodedRotated = await decodeProfilePackage(record.encryptedProfilePackage, "rotated-password");
+    const decodedRotated = await decodeProfilePackage(
+      record.encryptedProfilePackage,
+      "rotated-password",
+    );
     expect(decodedRotated.device.manual_peer_policy_overrides).toHaveLength(4);
 
-    const rotatedPackage = getState().rotateKeysetSession!.onboardingPackages[0];
-    await expect(decodeBfonboardPackage(rotatedPackage.packageText, "dist-password")).resolves.toMatchObject({
-      relays: ["wss://relay.example.test"]
+    const rotatedPackage =
+      getState().rotateKeysetSession!.onboardingPackages[0];
+    await expect(
+      decodeBfonboardPackage(rotatedPackage.packageText, "dist-password"),
+    ).resolves.toMatchObject({
+      relays: ["wss://relay.example.test"],
     });
     await expect(
-      decodeBfonboardPackage(rotatedPackage.packageText, packagePasswordForShare("Flow Key", rotatedPackage.idx))
+      decodeBfonboardPackage(
+        rotatedPackage.packageText,
+        packagePasswordForShare("Flow Key", rotatedPackage.idx),
+      ),
     ).rejects.toThrow();
 
     act(() => {
       for (const pkg of getState().rotateKeysetSession!.onboardingPackages) {
-        getState().updateRotatePackageState(pkg.idx, { packageCopied: true, passwordCopied: true });
+        getState().updateRotatePackageState(pkg.idx, {
+          packageCopied: true,
+          passwordCopied: true,
+        });
       }
     });
-    await waitFor(() => expect(getState().rotateKeysetSession?.phase).toBe("distribution_ready"));
+    await waitFor(() =>
+      expect(getState().rotateKeysetSession?.phase).toBe("distribution_ready"),
+    );
 
-	    await act(async () => {
-	      await getState().finishRotateDistribution();
-	    });
+    await act(async () => {
+      await getState().finishRotateDistribution();
+    });
     await waitFor(() => expect(getState().rotateKeysetSession).toBeNull());
   }, 45_000);
 
@@ -507,21 +617,24 @@ describe("AppState setup flows", () => {
       getState().beginImport(generated.pair.profile_string);
     });
     await act(async () => {
-      await getState().decryptImportBackup(generated.pair.profile_string, "backup-password");
+      await getState().decryptImportBackup(
+        generated.pair.profile_string,
+        "backup-password",
+      );
     });
     await act(async () => {
       await getState().saveImportedProfile({
         password: "local-password",
-        confirmPassword: "local-password"
+        confirmPassword: "local-password",
       });
     });
 
     const duplicatePackage = await encodeBfsharePackage(
       {
         share_secret: generated.keyset.shares[1].seckey,
-        relays: ["wss://relay.example.test"]
+        relays: ["wss://relay.example.test"],
       },
-      "source-password"
+      "source-password",
     );
     await expect(
       getState().validateRotateKeysetSources({
@@ -529,43 +642,47 @@ describe("AppState setup flows", () => {
         profilePassword: "local-password",
         sourcePackages: [
           { packageText: duplicatePackage, password: "source-password" },
-          { packageText: duplicatePackage, password: "source-password" }
+          { packageText: duplicatePackage, password: "source-password" },
         ],
         threshold: 2,
-        count: 3
-      })
+        count: 3,
+      }),
     ).rejects.toMatchObject({
       code: "duplicate_share",
-      details: { sourceIndex: 3, shareIndex: generated.keyset.shares[1].idx }
+      details: { sourceIndex: 3, shareIndex: generated.keyset.shares[1].idx },
     });
 
     const mismatchedPackage = await encodeBfsharePackage(
       {
         share_secret: other.keyset.shares[1].seckey,
-        relays: ["wss://relay.example.test"]
+        relays: ["wss://relay.example.test"],
       },
-      "source-password"
+      "source-password",
     );
     await expect(
       getState().validateRotateKeysetSources({
         profileId: generated.profileId,
         profilePassword: "local-password",
-        sourcePackages: [{ packageText: mismatchedPackage, password: "source-password" }],
+        sourcePackages: [
+          { packageText: mismatchedPackage, password: "source-password" },
+        ],
         threshold: 2,
-        count: 3
-      })
-    ).rejects.toBeInstanceOf(SetupFlowError);
+        count: 3,
+      }),
+    ).rejects.toMatchObject({ code: "group_mismatch" });
     await expect(
       getState().validateRotateKeysetSources({
         profileId: generated.profileId,
         profilePassword: "wrong-password",
-        sourcePackages: [{ packageText: duplicatePackage, password: "source-password" }],
+        sourcePackages: [
+          { packageText: duplicatePackage, password: "source-password" },
+        ],
         threshold: 2,
-        count: 3
-      })
+        count: 3,
+      }),
     ).rejects.toMatchObject({
       code: "wrong_password",
-      details: { source: "saved_profile" }
+      details: { source: "saved_profile" },
     });
   }, 45_000);
 });

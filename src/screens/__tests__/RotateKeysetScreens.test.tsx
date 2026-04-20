@@ -1,4 +1,10 @@
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  cleanup,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
@@ -10,8 +16,14 @@ import {
   RotateGenerationFailedScreen,
   RotateCreateProfileScreen,
   RotateDistributeSharesScreen,
-  RotateDistributionCompleteScreen
+  RotateDistributionCompleteScreen,
 } from "../RotateKeysetScreens";
+import {
+  formatMismatchGroup,
+  generationFailurePhases,
+  mismatchLabel,
+  mismatchValue,
+} from "../RotateKeysetScreen/ErrorScreens";
 
 /* ---------- Mocks ---------- */
 
@@ -37,15 +49,15 @@ const mocks = vi.hoisted(() => ({
   demoUi: {
     rotateKeyset: { passwordPreset: "rotate-pass" },
     progress: { frozen: true },
-    shared: { completionPreset: true }
-  } as Record<string, unknown>
+    shared: { completionPreset: true },
+  } as Record<string, unknown>,
 }));
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual("react-router-dom");
   return {
     ...actual,
-    useNavigate: () => mocks.navigate
+    useNavigate: () => mocks.navigate,
   };
 });
 
@@ -59,12 +71,12 @@ vi.mock("../../app/AppState", () => ({
     createRotatedProfile: mocks.createRotatedProfile,
     updateRotatePackageState: mocks.updateRotatePackageState,
     finishRotateDistribution: mocks.finishRotateDistribution,
-    clearRotateKeysetSession: mocks.clearRotateKeysetSession
-  })
+    clearRotateKeysetSession: mocks.clearRotateKeysetSession,
+  }),
 }));
 
 vi.mock("../../demo/demoUi", () => ({
-  useDemoUi: () => mocks.demoUi
+  useDemoUi: () => mocks.demoUi,
 }));
 
 afterEach(() => {
@@ -86,10 +98,14 @@ beforeEach(() => {
   mocks.finishRotateDistribution.mockClear();
   mocks.finishRotateDistribution.mockResolvedValue("test-profile-123");
   mocks.clearRotateKeysetSession.mockClear();
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: vi.fn(() => Promise.resolve()) },
+  });
   mocks.demoUi = {
     rotateKeyset: { passwordPreset: "rotate-pass" },
     progress: { frozen: true },
-    shared: { completionPreset: true }
+    shared: { completionPreset: true },
   };
 });
 
@@ -102,9 +118,11 @@ describe("RotateKeysetFormScreen", () => {
     render(
       <MemoryRouter>
         <RotateKeysetFormScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: "Rotate Keyset" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Rotate Keyset" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Source Share #1")).toBeInTheDocument();
     expect(screen.getByText("Source Share #2")).toBeInTheDocument();
     expect(screen.getByText("Shares Collected")).toBeInTheDocument();
@@ -117,7 +135,7 @@ describe("RotateKeysetFormScreen", () => {
     render(
       <MemoryRouter>
         <RotateKeysetFormScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     /* Step 1 of stepper should be "Rotate Keyset" */
     const stepperLabels = screen.getAllByText("Rotate Keyset");
@@ -129,14 +147,20 @@ describe("RotateKeysetFormScreen", () => {
     render(
       <MemoryRouter>
         <RotateKeysetFormScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Password required")).toBeInTheDocument();
     expect(screen.queryByText("Validated")).not.toBeInTheDocument();
     /* "My Signing Key" appears in both header-meta and source share card */
-    expect(screen.getAllByText("My Signing Key").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText("Pending password").length).toBeGreaterThanOrEqual(2);
-    expect(screen.queryByText("Belongs to current group")).not.toBeInTheDocument();
+    expect(screen.getAllByText("My Signing Key").length).toBeGreaterThanOrEqual(
+      2,
+    );
+    expect(
+      screen.getAllByText("Pending password").length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(
+      screen.queryByText("Belongs to current group"),
+    ).not.toBeInTheDocument();
   });
 
   it("returns to Welcome with a safe notice when no saved profile id is available in product mode", () => {
@@ -147,7 +171,7 @@ describe("RotateKeysetFormScreen", () => {
           <Route path="/" element={<div>Welcome fallback</div>} />
           <Route path="/rotate-keyset" element={<RotateKeysetFormScreen />} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(mocks.clearRotateKeysetSession).toHaveBeenCalled();
     expect(screen.getByText("Welcome fallback")).toBeInTheDocument();
@@ -158,16 +182,21 @@ describe("RotateKeysetFormScreen", () => {
       id: "prof_work",
       label: "Work Key",
       deviceName: "Work Laptop",
-      groupPublicKey: "03b7d2e4f1a8c9054f6a2e83d7b1094c5e8f3a6d2b7e4c19085f6d3a2b8ea91e",
+      groupPublicKey:
+        "03b7d2e4f1a8c9054f6a2e83d7b1094c5e8f3a6d2b7e4c19085f6d3a2b8ea91e",
       relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
       threshold: 2,
-      memberCount: 3
+      memberCount: 3,
     };
     mocks.profiles = [profile];
     render(
-      <MemoryRouter initialEntries={[{ pathname: "/rotate-keyset", state: { profileId: "prof_work" } }]}>
+      <MemoryRouter
+        initialEntries={[
+          { pathname: "/rotate-keyset", state: { profileId: "prof_work" } },
+        ]}
+      >
         <RotateKeysetFormScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     /* Source share card should show the passed profile name */
     expect(screen.getAllByText("Work Key").length).toBeGreaterThanOrEqual(2);
@@ -180,10 +209,16 @@ describe("RotateKeysetFormScreen", () => {
     render(
       <MemoryRouter>
         <RotateKeysetFormScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByPlaceholderText("Paste bfshare from another device or backup...")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Enter password to decrypt")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(
+        "Paste bfshare from another device or backup...",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Enter password to decrypt"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Waiting for input")).toBeInTheDocument();
   });
 
@@ -191,16 +226,18 @@ describe("RotateKeysetFormScreen", () => {
     render(
       <MemoryRouter>
         <RotateKeysetFormScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByText("All shares change, group key stays the same")).toBeInTheDocument();
+    expect(
+      screen.getByText("All shares change, group key stays the same"),
+    ).toBeInTheDocument();
   });
 
   it("back link navigates to /", () => {
     render(
       <MemoryRouter>
         <RotateKeysetFormScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Back"));
     expect(mocks.clearRotateKeysetSession).toHaveBeenCalled();
@@ -211,19 +248,31 @@ describe("RotateKeysetFormScreen", () => {
     render(
       <MemoryRouter>
         <RotateKeysetFormScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    fireEvent.change(screen.getByPlaceholderText("Enter saved profile password"), { target: { value: "profile-pass" } });
-    fireEvent.change(screen.getByPlaceholderText("Paste bfshare from another device or backup..."), { target: { value: "bfshare1abc123" } });
-    fireEvent.change(screen.getByPlaceholderText("Enter password to decrypt"), { target: { value: "share-pass" } });
+    fireEvent.change(
+      screen.getByPlaceholderText("Enter saved profile password"),
+      { target: { value: "profile-pass" } },
+    );
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "Paste bfshare from another device or backup...",
+      ),
+      { target: { value: "bfshare1abc123" } },
+    );
+    fireEvent.change(screen.getByPlaceholderText("Enter password to decrypt"), {
+      target: { value: "share-pass" },
+    });
     fireEvent.click(screen.getByText(/Validate & Continue/));
     await waitFor(() => {
       expect(mocks.validateRotateKeysetSources).toHaveBeenCalledWith({
-        profileId: "prof_8f2c4a",
+        profileId: expect.stringMatching(/^prof_/),
         profilePassword: "profile-pass",
-        sourcePackages: [{ packageText: "bfshare1abc123", password: "share-pass" }],
+        sourcePackages: [
+          { packageText: "bfshare1abc123", password: "share-pass" },
+        ],
         threshold: 2,
-        count: 3
+        count: 3,
       });
       expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/review");
     });
@@ -235,7 +284,7 @@ describe("RotateKeysetFormScreen", () => {
     render(
       <MemoryRouter>
         <RotateKeysetFormScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const button = screen.getByText(/Validate & Continue/).closest("button")!;
     expect(button.getAttribute("aria-disabled")).toBe("true");
@@ -253,10 +302,16 @@ describe("ReviewGenerateScreen", () => {
     render(
       <MemoryRouter initialEntries={["/rotate-keyset/review"]}>
         <Routes>
-          <Route path="/rotate-keyset" element={<div>Rotate intake fallback</div>} />
-          <Route path="/rotate-keyset/review" element={<ReviewGenerateScreen />} />
+          <Route
+            path="/rotate-keyset"
+            element={<div>Rotate intake fallback</div>}
+          />
+          <Route
+            path="/rotate-keyset/review"
+            element={<ReviewGenerateScreen />}
+          />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Rotate intake fallback")).toBeInTheDocument();
   });
@@ -265,10 +320,12 @@ describe("ReviewGenerateScreen", () => {
     render(
       <MemoryRouter>
         <ReviewGenerateScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Review & Generate")).toBeInTheDocument();
-    expect(screen.getByText("Before generating fresh shares")).toBeInTheDocument();
+    expect(
+      screen.getByText("Before generating fresh shares"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Distribution Password")).toBeInTheDocument();
     expect(screen.getByText(/Rotate & Generate Keyset/)).toBeInTheDocument();
   });
@@ -277,7 +334,7 @@ describe("ReviewGenerateScreen", () => {
     render(
       <MemoryRouter>
         <ReviewGenerateScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Rotate Keyset")).toBeInTheDocument();
   });
@@ -286,17 +343,21 @@ describe("ReviewGenerateScreen", () => {
     render(
       <MemoryRouter>
         <ReviewGenerateScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByText("Before generating fresh shares")).toBeInTheDocument();
-    expect(screen.getByText(/reconstruct the existing signing key/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Before generating fresh shares"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/reconstruct the existing signing key/),
+    ).toBeInTheDocument();
   });
 
   it("renders distribution password inputs", () => {
     render(
       <MemoryRouter>
         <ReviewGenerateScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(screen.getByLabelText("Confirm Password")).toBeInTheDocument();
@@ -306,7 +367,7 @@ describe("ReviewGenerateScreen", () => {
     render(
       <MemoryRouter>
         <ReviewGenerateScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Back"));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset");
@@ -316,7 +377,7 @@ describe("ReviewGenerateScreen", () => {
     render(
       <MemoryRouter>
         <ReviewGenerateScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText(/Rotate & Generate Keyset/));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/progress");
@@ -328,9 +389,11 @@ describe("ReviewGenerateScreen", () => {
     render(
       <MemoryRouter>
         <ReviewGenerateScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    const button = screen.getByText(/Rotate & Generate Keyset/).closest("button")!;
+    const button = screen
+      .getByText(/Rotate & Generate Keyset/)
+      .closest("button")!;
     expect(button.className).toContain("rotate-generate-btn");
     expect(button.className).toContain("button-full");
   });
@@ -345,9 +408,11 @@ describe("RotateGenerationProgressScreen", () => {
     render(
       <MemoryRouter>
         <RotateGenerationProgressScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: "Generation Progress" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Generation Progress" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Process Source Shares")).toBeInTheDocument();
     expect(screen.getByText("Recover Existing Key")).toBeInTheDocument();
     expect(screen.getByText("Generate Fresh Shares")).toBeInTheDocument();
@@ -358,7 +423,7 @@ describe("RotateGenerationProgressScreen", () => {
     render(
       <MemoryRouter>
         <RotateGenerationProgressScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Rotate Keyset")).toBeInTheDocument();
   });
@@ -367,7 +432,7 @@ describe("RotateGenerationProgressScreen", () => {
     render(
       <MemoryRouter>
         <RotateGenerationProgressScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText(/of 4 phases/)).toBeInTheDocument();
     expect(screen.getByText("Overall Progress")).toBeInTheDocument();
@@ -377,7 +442,7 @@ describe("RotateGenerationProgressScreen", () => {
     render(
       <MemoryRouter>
         <RotateGenerationProgressScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Back"));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/review");
@@ -389,10 +454,14 @@ describe("RotateGenerationProgressScreen", () => {
     const { container } = render(
       <MemoryRouter>
         <RotateGenerationProgressScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(container.querySelector(".generation-phase-dot.active")).toBeTruthy();
-    expect(container.querySelector(".generation-phase-dot.pending")).toBeTruthy();
+    expect(
+      container.querySelector(".generation-phase-dot.active"),
+    ).toBeTruthy();
+    expect(
+      container.querySelector(".generation-phase-dot.pending"),
+    ).toBeTruthy();
   });
 });
 
@@ -405,9 +474,11 @@ describe("RotateWrongPasswordScreen", () => {
     render(
       <MemoryRouter>
         <RotateWrongPasswordScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: "Source Share Error" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Source Share Error" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Source Share #2")).toBeInTheDocument();
     expect(screen.getByText("Failed")).toBeInTheDocument();
   });
@@ -416,7 +487,7 @@ describe("RotateWrongPasswordScreen", () => {
     render(
       <MemoryRouter>
         <RotateWrongPasswordScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText(/Wrong password/)).toBeInTheDocument();
     expect(screen.getByText(/No encrypted backup found/)).toBeInTheDocument();
@@ -426,7 +497,7 @@ describe("RotateWrongPasswordScreen", () => {
     render(
       <MemoryRouter>
         <RotateWrongPasswordScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("bfshare1qvz8k2afcqqszq...")).toBeInTheDocument();
     expect(screen.getByText("••••••••")).toBeInTheDocument();
@@ -436,7 +507,7 @@ describe("RotateWrongPasswordScreen", () => {
     render(
       <MemoryRouter>
         <RotateWrongPasswordScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Retry"));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset");
@@ -446,7 +517,7 @@ describe("RotateWrongPasswordScreen", () => {
     render(
       <MemoryRouter>
         <RotateWrongPasswordScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Back"));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset");
@@ -462,17 +533,21 @@ describe("RotateGroupMismatchScreen", () => {
     render(
       <MemoryRouter>
         <RotateGroupMismatchScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: "Source Group Mismatch" })).toBeInTheDocument();
-    expect(screen.getByText("Sources belong to different groups")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Source Group Mismatch" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Sources belong to different groups"),
+    ).toBeInTheDocument();
   });
 
   it("renders contrasting group keys (blue + red)", () => {
     render(
       <MemoryRouter>
         <RotateGroupMismatchScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("npub1qe3...7kkm")).toBeInTheDocument();
     expect(screen.getByText("npub1x7f...2mnp")).toBeInTheDocument();
@@ -480,11 +555,19 @@ describe("RotateGroupMismatchScreen", () => {
     expect(screen.getByText("Share #2 Group")).toBeInTheDocument();
   });
 
+  it("formats live mismatch details without relying on static paper placeholders", () => {
+    expect(formatMismatchGroup("npub1livecurrentgroupabcdef123456")).toBe(
+      "npub1livec...3456",
+    );
+    expect(mismatchLabel({ sourceIndex: 3, shareIndex: 8 })).toBe("Share #3");
+    expect(mismatchValue({ shareIndex: 8 })).toBe("Index 8");
+  });
+
   it("Back to Source Intake navigates to /rotate-keyset", () => {
     render(
       <MemoryRouter>
         <RotateGroupMismatchScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Back to Source Intake"));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset");
@@ -496,7 +579,7 @@ describe("RotateGroupMismatchScreen", () => {
     const { container } = render(
       <MemoryRouter>
         <RotateGroupMismatchScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(container.querySelector(".back-link")).toBeNull();
     expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
@@ -512,9 +595,11 @@ describe("RotateGenerationFailedScreen", () => {
     render(
       <MemoryRouter>
         <RotateGenerationFailedScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: "Generation Failed" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Generation Failed" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Reconstruct signing key")).toBeInTheDocument();
     expect(screen.getByText("Failed")).toBeInTheDocument();
   });
@@ -523,18 +608,35 @@ describe("RotateGenerationFailedScreen", () => {
     render(
       <MemoryRouter>
         <RotateGenerationFailedScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Decrypt sources")).toBeInTheDocument();
     expect(screen.getByText("Recover current profiles")).toBeInTheDocument();
-    expect(screen.getByText("Verify same group config + group public key")).toBeInTheDocument();
+    expect(
+      screen.getByText("Verify same group config + group public key"),
+    ).toBeInTheDocument();
+  });
+
+  it("derives generation failure phases from live failure details", () => {
+    expect(
+      generationFailurePhases("Verify same group config + group public key").at(
+        -1,
+      ),
+    ).toEqual({
+      label: "Verify same group config + group public key",
+      state: "failed",
+    });
+    expect(generationFailurePhases("Unknown phase").at(-1)).toEqual({
+      label: "Reconstruct signing key",
+      state: "failed",
+    });
   });
 
   it("renders green safety banner", () => {
     render(
       <MemoryRouter>
         <RotateGenerationFailedScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     /* Text appears in both page copy and safety banner; verify at least the banner exists */
     const matches = screen.getAllByText(/No shares were modified/);
@@ -542,14 +644,16 @@ describe("RotateGenerationFailedScreen", () => {
     /* The safety banner has a distinct class */
     const banner = document.querySelector(".rotate-safety-banner");
     expect(banner).toBeTruthy();
-    expect(banner!.textContent).toContain("Your current configuration is intact");
+    expect(banner!.textContent).toContain(
+      "Your current configuration is intact",
+    );
   });
 
   it("Retry Generation button navigates to /rotate-keyset/review", () => {
     render(
       <MemoryRouter>
         <RotateGenerationFailedScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Retry Generation"));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/review");
@@ -559,7 +663,7 @@ describe("RotateGenerationFailedScreen", () => {
     render(
       <MemoryRouter>
         <RotateGenerationFailedScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Back"));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset");
@@ -575,9 +679,11 @@ describe("RotateCreateProfileScreen", () => {
     render(
       <MemoryRouter>
         <RotateCreateProfileScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: "Create Profile" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Create Profile" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Rotate Keyset")).toBeInTheDocument();
   });
 
@@ -585,13 +691,17 @@ describe("RotateCreateProfileScreen", () => {
     render(
       <MemoryRouter>
         <RotateCreateProfileScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     /* "Profile Name" appears as both section header and input label — verify at least one */
-    expect(screen.getAllByText("Profile Name").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Profile Name").length).toBeGreaterThanOrEqual(
+      1,
+    );
     expect(screen.getByText("Assigned Local Share")).toBeInTheDocument();
     /* "Profile Password" appears as section header */
-    expect(screen.getAllByText("Profile Password").length).toBeGreaterThanOrEqual(1);
+    expect(
+      screen.getAllByText("Profile Password").length,
+    ).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Relays")).toBeInTheDocument();
     expect(screen.getByText("Peer Permissions")).toBeInTheDocument();
   });
@@ -600,7 +710,7 @@ describe("RotateCreateProfileScreen", () => {
     render(
       <MemoryRouter>
         <RotateCreateProfileScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Continue to Distribute Shares"));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/distribute");
@@ -610,7 +720,7 @@ describe("RotateCreateProfileScreen", () => {
     render(
       <MemoryRouter>
         <RotateCreateProfileScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Back"));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/progress");
@@ -622,7 +732,7 @@ describe("RotateCreateProfileScreen", () => {
     render(
       <MemoryRouter>
         <RotateCreateProfileScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("wss://relay.primal.net")).toBeInTheDocument();
     expect(screen.getByText("wss://relay.example.com")).toBeInTheDocument();
@@ -634,7 +744,7 @@ describe("RotateCreateProfileScreen", () => {
     render(
       <MemoryRouter>
         <RotateCreateProfileScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Assigned Local Share")).toBeInTheDocument();
     expect(screen.getByText("Share #0, Encrypted")).toBeInTheDocument();
@@ -654,15 +764,21 @@ describe("RotateDistributeSharesScreen", () => {
       phase: "rotated",
       sourceProfile: { id: "prof_work", label: "Work Key" },
       createdProfileId: undefined,
-      onboardingPackages: []
+      onboardingPackages: [],
     };
     render(
       <MemoryRouter initialEntries={["/rotate-keyset/distribute"]}>
         <Routes>
-          <Route path="/rotate-keyset/profile" element={<div>Create profile fallback</div>} />
-          <Route path="/rotate-keyset/distribute" element={<RotateDistributeSharesScreen />} />
+          <Route
+            path="/rotate-keyset/profile"
+            element={<div>Create profile fallback</div>}
+          />
+          <Route
+            path="/rotate-keyset/distribute"
+            element={<RotateDistributeSharesScreen />}
+          />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Create profile fallback")).toBeInTheDocument();
   });
@@ -683,25 +799,29 @@ describe("RotateDistributeSharesScreen", () => {
           packageCopied: true,
           copied: true,
           passwordCopied: false,
-          qrShown: false
-        }
-      ]
+          qrShown: false,
+        },
+      ],
     };
     render(
       <MemoryRouter>
         <RotateDistributeSharesScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByRole("button", { name: "Continue to Completion" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Continue to Completion" }),
+    ).toBeDisabled();
   });
 
   it("renders Distribute Shares heading and stepper with Rotate Keyset label", () => {
     render(
       <MemoryRouter>
         <RotateDistributeSharesScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: "Distribute Shares" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Distribute Shares" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Rotate Keyset")).toBeInTheDocument();
   });
 
@@ -709,20 +829,31 @@ describe("RotateDistributeSharesScreen", () => {
     render(
       <MemoryRouter>
         <RotateDistributeSharesScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Saved to Igloo Web")).toBeInTheDocument();
     expect(screen.getByText("Share 2")).toBeInTheDocument();
     expect(screen.getByText("Share 3")).toBeInTheDocument();
   });
 
-  it("Continue button navigates to /rotate-keyset/complete", () => {
+  it("Continue button navigates to /rotate-keyset/complete after demo handoff is accounted for", async () => {
     render(
       <MemoryRouter>
         <RotateDistributeSharesScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    fireEvent.click(screen.getByText("Continue to Completion"));
+    const continueButton = screen.getByRole("button", {
+      name: "Continue to Completion",
+    });
+    expect(continueButton).toBeDisabled();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Copy Package/ })[0]);
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Copy Password/ })[0],
+    );
+
+    await waitFor(() => expect(continueButton).not.toBeDisabled());
+    fireEvent.click(continueButton);
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/complete");
   });
 
@@ -730,7 +861,7 @@ describe("RotateDistributeSharesScreen", () => {
     render(
       <MemoryRouter>
         <RotateDistributeSharesScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Back"));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/profile");
@@ -742,7 +873,7 @@ describe("RotateDistributeSharesScreen", () => {
     render(
       <MemoryRouter>
         <RotateDistributeSharesScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText(/fresh share/)).toBeInTheDocument();
   });
@@ -754,7 +885,7 @@ describe("RotateDistributeSharesScreen", () => {
     const { container } = render(
       <MemoryRouter>
         <RotateDistributeSharesScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Enter password to unlock")).toBeInTheDocument();
     const lockedCard = container.querySelector(".package-card.locked");
@@ -768,7 +899,7 @@ describe("RotateDistributeSharesScreen", () => {
     const { container } = render(
       <MemoryRouter>
         <RotateDistributeSharesScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     /* There are two non-locked cards: local "Saved" card and Share 2 */
     const cards = container.querySelectorAll(".package-card");
@@ -785,7 +916,7 @@ describe("RotateDistributeSharesScreen", () => {
     render(
       <MemoryRouter>
         <RotateDistributeSharesScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     /* Paper masked placeholder is used for both non-local remote packages */
     const masked = screen.getAllByText(/bfonboard1•+/);
@@ -802,9 +933,11 @@ describe("RotateDistributionCompleteScreen", () => {
     render(
       <MemoryRouter>
         <RotateDistributionCompleteScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: "Distribution Completion" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Distribution Completion" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Rotate Keyset")).toBeInTheDocument();
   });
 
@@ -812,7 +945,7 @@ describe("RotateDistributionCompleteScreen", () => {
     render(
       <MemoryRouter>
         <RotateDistributionCompleteScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Distribution Status")).toBeInTheDocument();
     expect(screen.getByText("All packages distributed")).toBeInTheDocument();
@@ -823,7 +956,7 @@ describe("RotateDistributionCompleteScreen", () => {
     render(
       <MemoryRouter>
         <RotateDistributionCompleteScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Finish Distribution"));
     expect(mocks.navigate).toHaveBeenCalledWith("/dashboard/test-profile-123");
@@ -834,7 +967,7 @@ describe("RotateDistributionCompleteScreen", () => {
     render(
       <MemoryRouter>
         <RotateDistributionCompleteScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Finish Distribution"));
     expect(mocks.navigate).toHaveBeenCalledWith("/");
@@ -844,7 +977,7 @@ describe("RotateDistributionCompleteScreen", () => {
     render(
       <MemoryRouter>
         <RotateDistributionCompleteScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Back"));
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/distribute");
@@ -857,7 +990,7 @@ describe("RotateDistributionCompleteScreen", () => {
     render(
       <MemoryRouter>
         <RotateDistributionCompleteScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Member #1 — Igloo Mobile")).toBeInTheDocument();
     expect(screen.getByText("Member #2 — Igloo Desktop")).toBeInTheDocument();
@@ -873,8 +1006,12 @@ describe("RotateDistributionCompleteScreen", () => {
     render(
       <MemoryRouter>
         <RotateDistributionCompleteScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByText(/2 of 2 remote bfonboard packages have been accounted for/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /2 of 2 remote bfonboard packages have been accounted for/,
+      ),
+    ).toBeInTheDocument();
   });
 });

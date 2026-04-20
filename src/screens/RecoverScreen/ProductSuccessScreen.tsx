@@ -14,11 +14,22 @@ import { maskNsec, shortPubkey } from "./recoverUtils";
 export function ProductRecoverSuccessScreen() {
   const { profileId } = useParams();
   const navigate = useNavigate();
-  const { activeProfile, recoverSession, clearRecoverSession, expireRecoveredNsec } = useAppState();
+  const {
+    activeProfile,
+    recoverSession,
+    clearRecoverSession,
+    expireRecoveredNsec,
+  } = useAppState();
   const [copied, setCopied] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [exiting, setExiting] = useState(false);
-  const session = profileId && recoverSession?.sourceProfile.id === profileId && recoverSession.recovered ? recoverSession : null;
+  const [now, setNow] = useState(() => Date.now());
+  const session =
+    profileId &&
+    recoverSession?.sourceProfile.id === profileId &&
+    recoverSession.recovered
+      ? recoverSession
+      : null;
   const recovered = session?.recovered;
   const expiresAt = session?.expiresAt;
 
@@ -32,6 +43,13 @@ export function ProductRecoverSuccessScreen() {
     }, delay);
     return () => window.clearTimeout(timer);
   }, [expireRecoveredNsec, expiresAt, navigate, profileId]);
+
+  useEffect(() => {
+    if (!expiresAt || !profileId) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [expiresAt, profileId]);
 
   if (!profileId || !activeProfile || activeProfile.id !== profileId) {
     return <Navigate to="/" replace />;
@@ -49,9 +67,14 @@ export function ProductRecoverSuccessScreen() {
   const threshold = activeProfile.threshold;
   const totalShares = activeProfile.memberCount;
   const sources = session.sources;
-  const secondsRemaining = expiresAt ? Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)) : 60;
+  const secondsRemaining = expiresAt
+    ? Math.max(0, Math.ceil((expiresAt - now) / 1000))
+    : 60;
 
   async function handleCopy() {
+    if (!revealed) {
+      return;
+    }
     try {
       await navigator.clipboard?.writeText(recoveredNsec);
     } catch {
@@ -74,7 +97,10 @@ export function ProductRecoverSuccessScreen() {
   }
 
   return (
-    <AppShell mainVariant="flow" headerMeta={<RecoverHeader keysetName={activeProfile.groupName} />}>
+    <AppShell
+      mainVariant="flow"
+      headerMeta={<RecoverHeader keysetName={activeProfile.groupName} />}
+    >
       <div className="screen-column">
         <button type="button" className="back-link" onClick={handleBack}>
           <ChevronLeft size={14} />
@@ -84,7 +110,8 @@ export function ProductRecoverSuccessScreen() {
         <div className="screen-heading">
           <h1 className="page-title">Recover NSEC</h1>
           <p className="page-copy">
-            Recovering your nsec requires {threshold} of your {totalShares} shares.
+            Recovering your nsec requires {threshold} of your {totalShares}{" "}
+            shares.
           </p>
         </div>
 
@@ -95,7 +122,9 @@ export function ProductRecoverSuccessScreen() {
             mono={index !== 0}
             key={`${source.idx}-${index}`}
           >
-            <LoadedShareDisplay>{shortPubkey(source.memberPubkey)}</LoadedShareDisplay>
+            <LoadedShareDisplay>
+              {shortPubkey(source.memberPubkey)}
+            </LoadedShareDisplay>
           </ShareBlock>
         ))}
 
@@ -107,24 +136,43 @@ export function ProductRecoverSuccessScreen() {
 
         <RecoveryWarning secondsRemaining={secondsRemaining} />
 
-        <RecoveredNsecBlock label="Recovered NSEC:" valueClassName="recover-nsec-masked">
+        <RecoveredNsecBlock
+          label="Recovered NSEC:"
+          valueClassName="recover-nsec-masked"
+        >
           {maskNsec(recoveredNsec)}
         </RecoveredNsecBlock>
 
-        <RecoveredNsecBlock label="Recovered NSEC (revealed):" valueClassName="recover-nsec-revealed">
+        <RecoveredNsecBlock
+          label="Recovered NSEC (revealed):"
+          valueClassName="recover-nsec-revealed"
+        >
           {revealed ? recoveredNsec : maskNsec(recoveredNsec)}
         </RecoveredNsecBlock>
 
         <div className="recover-actions">
-          <button type="button" className="recover-btn-copy" onClick={handleCopy}>
+          <button
+            type="button"
+            className="recover-btn-copy"
+            onClick={handleCopy}
+            disabled={!revealed}
+          >
             <Copy size={14} />
             Copy to Clipboard
           </button>
-          <button type="button" className="recover-btn-reveal" onClick={() => setRevealed((prev) => !prev)}>
+          <button
+            type="button"
+            className="recover-btn-reveal"
+            onClick={() => setRevealed((prev) => !prev)}
+          >
             <Eye size={14} />
-            Reveal
+            {revealed ? "Hide" : "Reveal"}
           </button>
-          <button type="button" className="recover-btn-clear" onClick={handleClear}>
+          <button
+            type="button"
+            className="recover-btn-clear"
+            onClick={handleClear}
+          >
             Clear
           </button>
           {copied ? (

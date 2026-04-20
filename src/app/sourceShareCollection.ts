@@ -2,14 +2,14 @@ import { memberForShare, memberPubkeyXOnly } from "../lib/bifrost/format";
 import {
   decodeBfsharePackage,
   decodeProfilePackage,
-  resolveShareIndex
+  resolveShareIndex,
 } from "../lib/bifrost/packageService";
 import type {
   BfProfilePayload,
   BfSharePayload,
   GroupPackageWire,
   SharePackageWire,
-  StoredProfileRecord
+  StoredProfileRecord,
 } from "../lib/bifrost/types";
 import { getProfile } from "../lib/storage/profileStore";
 import type { RecoverSourceSummary } from "./AppStateTypes";
@@ -37,19 +37,34 @@ export async function loadSavedProfileSource(input: {
 
   let sourcePayload: BfProfilePayload;
   try {
-    sourcePayload = await decodeProfilePackage(record.encryptedProfilePackage, input.profilePassword);
+    sourcePayload = await decodeProfilePackage(
+      record.encryptedProfilePackage,
+      input.profilePassword,
+    );
   } catch (error) {
     throw setupErrorFromPackage(error, {
       code: "wrong_password",
       message: "The profile password could not decrypt Source Share #1.",
-      details: { source: "saved_profile" }
+      details: { source: "saved_profile" },
     });
   }
 
-  const localIdx = await resolveShareIndex(sourcePayload.group_package, sourcePayload.device.share_secret);
+  let localIdx: number;
+  try {
+    localIdx = await resolveShareIndex(
+      sourcePayload.group_package,
+      sourcePayload.device.share_secret,
+    );
+  } catch (error) {
+    throw setupErrorFromPackage(error, {
+      code: "invalid_package",
+      message: "Saved profile data could not resolve Source Share #1.",
+      details: { source: "saved_profile" },
+    });
+  }
   const localShare: SharePackageWire = {
     idx: localIdx,
-    seckey: sourcePayload.device.share_secret
+    seckey: sourcePayload.device.share_secret,
   };
   return { record, sourcePayload, localIdx, localShare };
 }
@@ -71,14 +86,14 @@ export async function decodeExternalBfshareSources(input: {
       throw new SetupFlowError(
         "invalid_package",
         `Source Share #${displayIndex} bfshare package is required.`,
-        { source: "bfshare", sourceIndex: displayIndex }
+        { source: "bfshare", sourceIndex: displayIndex },
       );
     }
     if (!packageText.startsWith("bfshare1")) {
       throw new SetupFlowError(
         "invalid_package",
         `Source Share #${displayIndex} must be a bfshare package.`,
-        { source: "bfshare", sourceIndex: displayIndex }
+        { source: "bfshare", sourceIndex: displayIndex },
       );
     }
 
@@ -89,7 +104,7 @@ export async function decodeExternalBfshareSources(input: {
       throw setupErrorFromPackage(error, {
         code: "wrong_password",
         message: "Unable to decrypt this bfshare source package.",
-        details: { source: "bfshare", sourceIndex: displayIndex }
+        details: { source: "bfshare", sourceIndex: displayIndex },
       });
     }
 
@@ -97,17 +112,22 @@ export async function decodeExternalBfshareSources(input: {
     try {
       idx = await resolveShareIndex(input.group, decoded.share_secret);
     } catch (error) {
-      throw new SetupFlowError(
-        "group_mismatch",
-        error instanceof Error ? error.message : "This bfshare source package does not belong to the selected group.",
-        { source: "bfshare", sourceIndex: displayIndex, groupPublicKey: input.group.group_pk }
-      );
+      throw setupErrorFromPackage(error, {
+        code: "group_mismatch",
+        message:
+          "This bfshare source package does not belong to the selected group.",
+        details: {
+          source: "bfshare",
+          sourceIndex: displayIndex,
+          groupPublicKey: input.group.group_pk,
+        },
+      });
     }
     if (input.seenShareIndexes.has(idx)) {
       throw new SetupFlowError(
         "duplicate_share",
         "This source share has already been collected.",
-        { source: "bfshare", sourceIndex: displayIndex, shareIndex: idx }
+        { source: "bfshare", sourceIndex: displayIndex, shareIndex: idx },
       );
     }
 
@@ -116,8 +136,10 @@ export async function decodeExternalBfshareSources(input: {
     shares.push(externalShare);
     sources.push({
       idx,
-      memberPubkey: memberPubkeyXOnly(memberForShare(input.group, externalShare)),
-      relays: decoded.relays
+      memberPubkey: memberPubkeyXOnly(
+        memberForShare(input.group, externalShare),
+      ),
+      relays: decoded.relays,
     });
   }
 

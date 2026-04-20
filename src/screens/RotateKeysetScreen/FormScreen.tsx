@@ -20,7 +20,9 @@ export function RotateKeysetFormScreen() {
   const [profilePassword, setProfilePassword] = useState("");
   const [threshold, setThreshold] = useState(2);
   const [totalShares, setTotalShares] = useState(3);
-  const [sources, setSources] = useState<RotateSourceInput[]>([{ packageText: "", password: "" }]);
+  const [sources, setSources] = useState<RotateSourceInput[]>([
+    { packageText: "", password: "" },
+  ]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const previousProfileIdRef = useRef<string | undefined>(undefined);
@@ -28,46 +30,76 @@ export function RotateKeysetFormScreen() {
   /* Read profile data from location state (passed by WelcomeScreen Rotate button) */
   const locationState = location.state as { profileId?: string } | null;
   const existingRotateSession = appState.rotateKeysetSession;
-  const selectedProfileId = locationState?.profileId ?? existingRotateSession?.sourceProfile.id;
+  const selectedProfileId =
+    locationState?.profileId ?? existingRotateSession?.sourceProfile.id;
   const selectedProfile =
     profiles.find((profile) => profile.id === selectedProfileId) ??
-    (existingRotateSession && existingRotateSession.sourceProfile.id === selectedProfileId ? existingRotateSession.sourceProfile : undefined);
+    (existingRotateSession &&
+    existingRotateSession.sourceProfile.id === selectedProfileId
+      ? existingRotateSession.sourceProfile
+      : undefined);
   const demoMode = Boolean(demoUi.rotateKeyset || demoUi.progress);
   const locationProfile = selectedProfile;
   const sourceProfileValidated = Boolean(
     existingRotateSession?.sourcePayload &&
-      existingRotateSession.sourceProfile.id === locationProfile?.id
+    existingRotateSession.sourceProfile.id === locationProfile?.id,
   );
-  const validatedLocalShare = sourceProfileValidated ? existingRotateSession?.sourceShares[0] : undefined;
+  const validatedLocalShare = sourceProfileValidated
+    ? existingRotateSession?.sourceShares[0]
+    : undefined;
   const sourceShare = {
     label: locationProfile?.label ?? MOCK_SOURCE_SHARE_1.label,
     deviceName: locationProfile?.deviceName ?? MOCK_SOURCE_SHARE_1.deviceName,
-    sharePubkey: sourceProfileValidated ? `Share #${validatedLocalShare?.idx ?? locationProfile?.localShareIdx ?? 0}` : "Pending password",
-    sharePubkeyDisplay: sourceProfileValidated ? `Share #${validatedLocalShare?.idx ?? locationProfile?.localShareIdx ?? 0}` : "Pending password",
+    sharePubkey: sourceProfileValidated
+      ? `Share #${validatedLocalShare?.idx ?? locationProfile?.localShareIdx ?? 0}`
+      : "Pending password",
+    sharePubkeyDisplay: sourceProfileValidated
+      ? `Share #${validatedLocalShare?.idx ?? locationProfile?.localShareIdx ?? 0}`
+      : "Pending password",
     profileId: locationProfile?.id ?? MOCK_SOURCE_SHARE_1.profileId,
     relays: locationProfile?.relays?.length ?? MOCK_SOURCE_SHARE_1.relays,
     threshold: locationProfile?.threshold ?? 2,
-    memberCount: locationProfile?.memberCount ?? 3
+    memberCount: locationProfile?.memberCount ?? 3,
   };
   const requiredExternalSources = Math.max(1, sourceShare.threshold - 1);
-  const routeState = selectedProfile ? { profileId: selectedProfile.id } : undefined;
-  const filledSources = sources.filter((source) => source.packageText.trim() && source.password.trim()).length;
+  const routeState = selectedProfile
+    ? { profileId: selectedProfile.id }
+    : undefined;
+  const filledSources = sources.filter(
+    (source) => source.packageText.trim() && source.password.trim(),
+  ).length;
   const canValidate = Boolean(
     sourceShare.profileId &&
-    profilePassword.trim() &&
+    (sourceProfileValidated || profilePassword.trim()) &&
     sources.length >= requiredExternalSources &&
-    sources.every((source) => source.packageText.trim() && source.password.trim())
+    sources.every(
+      (source) => source.packageText.trim() && source.password.trim(),
+    ),
   );
 
   useEffect(() => {
-    if (previousProfileIdRef.current && previousProfileIdRef.current !== sourceShare.profileId) {
+    if (
+      previousProfileIdRef.current &&
+      previousProfileIdRef.current !== sourceShare.profileId
+    ) {
       clearRotateKeysetSession();
     }
     previousProfileIdRef.current = sourceShare.profileId;
     setThreshold(sourceShare.threshold);
     setTotalShares(Math.max(sourceShare.memberCount, sourceShare.threshold, 2));
-    setSources((current) => Array.from({ length: requiredExternalSources }, (_, index) => current[index] ?? { packageText: "", password: "" }));
-  }, [clearRotateKeysetSession, sourceShare.profileId, sourceShare.threshold, sourceShare.memberCount, requiredExternalSources]);
+    setSources((current) =>
+      Array.from(
+        { length: requiredExternalSources },
+        (_, index) => current[index] ?? { packageText: "", password: "" },
+      ),
+    );
+  }, [
+    clearRotateKeysetSession,
+    sourceShare.profileId,
+    sourceShare.threshold,
+    sourceShare.memberCount,
+    requiredExternalSources,
+  ]);
 
   useEffect(() => {
     if (!selectedProfile && !demoMode) {
@@ -83,8 +115,7 @@ export function RotateKeysetFormScreen() {
         state={{
           setupNotice: {
             code: "rotate_selection_missing",
-            message: "Choose a saved profile before rotating its keyset."
-          }
+          },
         }}
       />
     );
@@ -101,7 +132,11 @@ export function RotateKeysetFormScreen() {
 
   function updateSource(index: number, patch: Partial<RotateSourceInput>) {
     clearValidatedRotateSession();
-    setSources((current) => current.map((source, idx) => (idx === index ? { ...source, ...patch } : source)));
+    setSources((current) =>
+      current.map((source, idx) =>
+        idx === index ? { ...source, ...patch } : source,
+      ),
+    );
   }
 
   async function handleValidate() {
@@ -110,7 +145,9 @@ export function RotateKeysetFormScreen() {
       return;
     }
     if (!canValidate) {
-      setError(`Enter the saved profile password and ${requiredExternalSources} bfshare source package${requiredExternalSources === 1 ? "" : "s"} before continuing.`);
+      setError(
+        `Enter the saved profile password and ${requiredExternalSources} bfshare source package${requiredExternalSources === 1 ? "" : "s"} before continuing.`,
+      );
       return;
     }
     setBusy(true);
@@ -121,21 +158,37 @@ export function RotateKeysetFormScreen() {
         profilePassword,
         sourcePackages: sources,
         threshold,
-        count: totalShares
+        count: totalShares,
       });
       navigateWithRotateState(navigate, "/rotate-keyset/review", routeState);
     } catch (err) {
       if (err instanceof SetupFlowError) {
         if (err.code === "group_mismatch" || err.code === "duplicate_share") {
-          navigate("/rotate-keyset/error-mismatch", { state: { ...routeState, errorMessage: err.message, details: err.details } });
+          navigate("/rotate-keyset/error-mismatch", {
+            state: {
+              ...routeState,
+              errorMessage: err.message,
+              details: detailsWithSourcePackage(err.details, sources),
+            },
+          });
           return;
         }
         if (err.code === "wrong_password" || err.code === "invalid_package") {
-          navigate("/rotate-keyset/error-password", { state: { ...routeState, errorMessage: err.message, details: err.details } });
+          navigate("/rotate-keyset/error-password", {
+            state: {
+              ...routeState,
+              errorMessage: err.message,
+              details: detailsWithSourcePackage(err.details, sources),
+            },
+          });
           return;
         }
       }
-      setError(err instanceof Error ? err.message : "Unable to validate source shares.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to validate source shares.",
+      );
     } finally {
       setBusy(false);
     }
@@ -145,17 +198,21 @@ export function RotateKeysetFormScreen() {
     <AppShell headerMeta={sourceShare.label} mainVariant="flow">
       <div className="screen-column">
         <Stepper current={1} variant="rotate-keyset" />
-        <BackLink onClick={() => {
-          clearRotateKeysetSession();
-          navigate("/");
-        }} />
+        <BackLink
+          onClick={() => {
+            clearRotateKeysetSession();
+            navigate("/");
+          }}
+        />
         <PageHeading
           title="Rotate Keyset"
           copy="This keyset rotation started from the selected saved profile, which already counts as Source Share #1. Add the remaining threshold bfshare packages to refresh device shares for the same group public key, then continue into shared profile creation and share distribution."
         />
 
         {/* ---- Source Share #1 ---- */}
-        <div className={`source-share-card${sourceProfileValidated ? " validated" : ""}`}>
+        <div
+          className={`source-share-card${sourceProfileValidated ? " validated" : ""}`}
+        >
           <div className="source-share-header">
             <span className="source-share-title">Source Share #1</span>
             {sourceProfileValidated ? (
@@ -169,7 +226,9 @@ export function RotateKeysetFormScreen() {
           </div>
           <div className="source-share-field">
             <span className="source-share-field-label">Saved Profile</span>
-            <div className="source-share-value validated">{sourceShare.label}</div>
+            <div className="source-share-value validated">
+              {sourceShare.label}
+            </div>
           </div>
           <div className="source-share-field">
             <span className="source-share-field-label">Profile Password</span>
@@ -187,19 +246,27 @@ export function RotateKeysetFormScreen() {
           <div className="source-share-details">
             <div className="source-share-detail-row">
               <span className="source-share-detail-key">Device Name</span>
-              <span className="source-share-detail-val">{sourceShare.deviceName}</span>
+              <span className="source-share-detail-val">
+                {sourceShare.deviceName}
+              </span>
             </div>
             <div className="source-share-detail-row">
               <span className="source-share-detail-key">Share Public Key</span>
-              <span className="source-share-detail-val">{sourceShare.sharePubkeyDisplay}</span>
+              <span className="source-share-detail-val">
+                {sourceShare.sharePubkeyDisplay}
+              </span>
             </div>
             <div className="source-share-detail-row">
               <span className="source-share-detail-key">Profile ID</span>
-              <span className="source-share-detail-val">{sourceShare.profileId}</span>
+              <span className="source-share-detail-val">
+                {sourceShare.profileId}
+              </span>
             </div>
             <div className="source-share-detail-row">
-            <span className="source-share-detail-key">Relays</span>
-            <span className="source-share-detail-val">{sourceShare.relays} configured</span>
+              <span className="source-share-detail-key">Relays</span>
+              <span className="source-share-detail-val">
+                {sourceShare.relays} configured
+              </span>
             </div>
             <div className="source-share-detail-row last">
               <span className="source-share-detail-key">Group Match</span>
@@ -209,7 +276,9 @@ export function RotateKeysetFormScreen() {
                   Belongs to current group
                 </span>
               ) : (
-                <span className="source-share-detail-val">Pending password</span>
+                <span className="source-share-detail-val">
+                  Pending password
+                </span>
               )}
             </div>
           </div>
@@ -218,8 +287,14 @@ export function RotateKeysetFormScreen() {
         {sources.map((source, index) => (
           <div className="source-share-card" key={index}>
             <div className="source-share-header">
-              <span className="source-share-title">Source Share #{index + 2}</span>
-              <span className="source-share-status">{source.packageText && source.password ? "Ready to validate" : "Waiting for input"}</span>
+              <span className="source-share-title">
+                Source Share #{index + 2}
+              </span>
+              <span className="source-share-status">
+                {source.packageText && source.password
+                  ? "Ready to validate"
+                  : "Waiting for input"}
+              </span>
             </div>
             <div className="source-share-field">
               <span className="source-share-field-label">bfshare Package</span>
@@ -227,7 +302,9 @@ export function RotateKeysetFormScreen() {
                 className="source-share-textarea"
                 placeholder="Paste bfshare from another device or backup..."
                 value={source.packageText}
-                onChange={(e) => updateSource(index, { packageText: e.target.value })}
+                onChange={(e) =>
+                  updateSource(index, { packageText: e.target.value })
+                }
                 rows={2}
               />
             </div>
@@ -238,7 +315,9 @@ export function RotateKeysetFormScreen() {
                 className="input"
                 placeholder="Enter password to decrypt"
                 value={source.password}
-                onChange={(e) => updateSource(index, { password: e.target.value })}
+                onChange={(e) =>
+                  updateSource(index, { password: e.target.value })
+                }
               />
             </div>
           </div>
@@ -248,15 +327,24 @@ export function RotateKeysetFormScreen() {
         <div className="shares-collected">
           <div className="shares-collected-header">
             <span className="shares-collected-label">Shares Collected</span>
-            <span className="shares-collected-count">{Math.min(sourceShare.threshold, 1 + filledSources)} of {sourceShare.threshold} required</span>
+            <span className="shares-collected-count">
+              {Math.min(sourceShare.threshold, 1 + filledSources)} of{" "}
+              {sourceShare.threshold} required
+            </span>
           </div>
           <div className="progress-bar-track">
-            <div className="progress-bar-fill" style={{ width: `${Math.min(100, ((1 + filledSources) / sourceShare.threshold) * 100)}%` }} />
+            <div
+              className="progress-bar-fill"
+              style={{
+                width: `${Math.min(100, ((1 + filledSources) / sourceShare.threshold) * 100)}%`,
+              }}
+            />
           </div>
         </div>
 
         <p className="rotate-help-text">
-          Old devices do not need to be online. Only threshold bfshare packages and their passwords are required.
+          Old devices do not need to be online. Only threshold bfshare packages
+          and their passwords are required.
         </p>
 
         {/* ---- Separator ---- */}
@@ -290,7 +378,8 @@ export function RotateKeysetFormScreen() {
             />
           </div>
           <span className="help">
-            Any {threshold} of {totalShares} shares can sign — min threshold is 2, min shares is 2
+            Any {threshold} of {totalShares} shares can sign — min threshold is
+            2, min shares is 2
           </span>
         </div>
 
@@ -303,7 +392,9 @@ export function RotateKeysetFormScreen() {
           type="button"
           size="full"
           aria-disabled={!canValidate}
-          className={!canValidate ? "button-disabled-visual bg-[#2563EB40]" : undefined}
+          className={
+            !canValidate ? "button-disabled-visual bg-[#2563EB40]" : undefined
+          }
           disabled={busy || !canValidate}
           onClick={() => void handleValidate()}
         >
@@ -316,13 +407,38 @@ export function RotateKeysetFormScreen() {
             <Info size={14} />
           </span>
           <div className="info-callout-body">
-            <span className="info-callout-title">All shares change, group key stays the same</span>
+            <span className="info-callout-title">
+              All shares change, group key stays the same
+            </span>
             <p className="info-callout-copy">
-              Rotation replaces all device shares for the same group public key. Next, create this device's local profile by setting its name, password, relays, and peer permissions before adoption.
+              Rotation replaces all device shares for the same group public key.
+              Next, create this device's local profile by setting its name,
+              password, relays, and peer permissions before adoption.
             </p>
           </div>
         </div>
       </div>
     </AppShell>
   );
+}
+
+function detailsWithSourcePackage(
+  details: Record<string, unknown> | undefined,
+  sources: RotateSourceInput[],
+): Record<string, unknown> | undefined {
+  const sourceIndex =
+    typeof details?.sourceIndex === "number" ? details.sourceIndex : undefined;
+  if (sourceIndex === undefined) {
+    return details;
+  }
+  const source = sources[sourceIndex - 2];
+  const packageText = source?.packageText.trim();
+  if (!packageText) {
+    return details;
+  }
+  return {
+    ...details,
+    packagePrefix:
+      packageText.length > 24 ? `${packageText.slice(0, 24)}...` : packageText,
+  };
 }

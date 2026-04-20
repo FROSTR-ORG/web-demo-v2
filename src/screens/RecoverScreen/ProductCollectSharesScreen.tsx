@@ -13,11 +13,22 @@ import type { SourceInput } from "./types";
 export function ProductCollectSharesScreen() {
   const { profileId } = useParams();
   const navigate = useNavigate();
-  const { activeProfile, recoverSession, validateRecoverSources, recoverNsec, clearRecoverSession } = useAppState();
-  const externalCount = activeProfile ? Math.max(0, activeProfile.threshold - 1) : 0;
+  const {
+    activeProfile,
+    recoverSession,
+    validateRecoverSources,
+    recoverNsec,
+    clearRecoverSession,
+  } = useAppState();
+  const externalCount = activeProfile
+    ? Math.max(0, activeProfile.threshold - 1)
+    : 0;
   const [profilePassword, setProfilePassword] = useState("");
-  const [sourceInputs, setSourceInputs] = useState<SourceInput[]>(
-    () => Array.from({ length: externalCount }, () => ({ packageText: "", password: "" }))
+  const [sourceInputs, setSourceInputs] = useState<SourceInput[]>(() =>
+    Array.from({ length: externalCount }, () => ({
+      packageText: "",
+      password: "",
+    })),
   );
   const [error, setError] = useState<string | null>(null);
   const [validating, setValidating] = useState(false);
@@ -25,13 +36,20 @@ export function ProductCollectSharesScreen() {
 
   useEffect(() => {
     setSourceInputs((current) =>
-      Array.from({ length: externalCount }, (_, index) => current[index] ?? { packageText: "", password: "" })
+      Array.from(
+        { length: externalCount },
+        (_, index) => current[index] ?? { packageText: "", password: "" },
+      ),
     );
   }, [externalCount]);
 
   const canValidate =
     profilePassword.trim().length > 0 &&
-    sourceInputs.every((source) => source.packageText.trim().length > 0 && source.password.length > 0);
+    sourceInputs.length === externalCount &&
+    sourceInputs.every(
+      (source) =>
+        source.packageText.trim().length > 0 && source.password.length > 0,
+    );
 
   if (!profileId || !activeProfile || activeProfile.id !== profileId) {
     return <Navigate to="/" replace />;
@@ -39,12 +57,20 @@ export function ProductCollectSharesScreen() {
   const currentProfileId = profileId;
   const threshold = activeProfile.threshold;
   const totalShares = activeProfile.memberCount;
-  const validated = isValidatedSession(recoverSession, currentProfileId, threshold);
+  const validated = isValidatedSession(
+    recoverSession,
+    currentProfileId,
+    threshold,
+  );
 
   function updateSource(index: number, patch: Partial<SourceInput>) {
     clearRecoverSession();
     setError(null);
-    setSourceInputs((current) => current.map((source, sourceIndex) => (sourceIndex === index ? { ...source, ...patch } : source)));
+    setSourceInputs((current) =>
+      current.map((source, sourceIndex) =>
+        sourceIndex === index ? { ...source, ...patch } : source,
+      ),
+    );
   }
 
   async function handleValidate() {
@@ -55,7 +81,7 @@ export function ProductCollectSharesScreen() {
       await validateRecoverSources({
         profileId: currentProfileId,
         profilePassword,
-        sourcePackages: sourceInputs
+        sourcePackages: sourceInputs,
       });
     } catch (caught) {
       setError(errorMessage(caught));
@@ -84,7 +110,10 @@ export function ProductCollectSharesScreen() {
   }
 
   return (
-    <AppShell mainVariant="flow" headerMeta={<RecoverHeader keysetName={activeProfile.groupName} />}>
+    <AppShell
+      mainVariant="flow"
+      headerMeta={<RecoverHeader keysetName={activeProfile.groupName} />}
+    >
       <div className="screen-column">
         <button type="button" className="back-link" onClick={handleBack}>
           <ChevronLeft size={14} />
@@ -94,13 +123,16 @@ export function ProductCollectSharesScreen() {
         <div className="screen-heading">
           <h1 className="page-title">Recover NSEC</h1>
           <p className="page-copy">
-            Recovering your nsec requires {threshold} of your {totalShares} shares.
+            Recovering your nsec requires {threshold} of your {totalShares}{" "}
+            shares.
           </p>
         </div>
 
         <ShareBlock label="Source Share #1 — This Browser" loaded={validated}>
           <input
-            className={validated ? "recover-share-input loaded" : "recover-share-input"}
+            className={
+              validated ? "recover-share-input loaded" : "recover-share-input"
+            }
             type="password"
             placeholder="Saved profile password"
             aria-label="Saved profile password"
@@ -112,40 +144,77 @@ export function ProductCollectSharesScreen() {
             }}
           />
           {validated && recoverSession.sources[0] ? (
-            <LoadedShareDisplay>{shortPubkey(recoverSession.sources[0].memberPubkey)}</LoadedShareDisplay>
+            <LoadedShareDisplay>
+              {shortPubkey(recoverSession.sources[0].memberPubkey)}
+            </LoadedShareDisplay>
           ) : null}
         </ShareBlock>
 
         {sourceInputs.map((source, index) => {
           const sourceNumber = index + 2;
-          const loadedSource = validated ? recoverSession.sources[index + 1] : null;
+          const loadedSource = validated
+            ? recoverSession.sources[index + 1]
+            : null;
           return (
-            <ShareBlock label={`Source Share #${sourceNumber} — bfshare`} loaded={Boolean(loadedSource)} mono key={sourceNumber}>
+            <ShareBlock
+              label={`Source Share #${sourceNumber} — bfshare`}
+              loaded={Boolean(loadedSource)}
+              mono
+              key={sourceNumber}
+            >
               <textarea
-                className={loadedSource ? "recover-share-input loaded" : "recover-share-input"}
+                className={
+                  loadedSource
+                    ? "recover-share-input loaded"
+                    : "recover-share-input"
+                }
                 placeholder="Paste bfshare package..."
                 aria-label={`Source Share #${sourceNumber} bfshare package`}
                 value={source.packageText}
-                onChange={(event) => updateSource(index, { packageText: event.target.value })}
+                onChange={(event) =>
+                  updateSource(index, { packageText: event.target.value })
+                }
                 rows={4}
               />
               <input
-                className={loadedSource ? "recover-share-input loaded" : "recover-share-input"}
+                className={
+                  loadedSource
+                    ? "recover-share-input loaded"
+                    : "recover-share-input"
+                }
                 type="password"
                 placeholder="Package password"
                 aria-label={`Source Share #${sourceNumber} package password`}
                 value={source.password}
-                onChange={(event) => updateSource(index, { password: event.target.value })}
+                onChange={(event) =>
+                  updateSource(index, { password: event.target.value })
+                }
               />
-              {loadedSource ? <LoadedShareDisplay>{shortPubkey(loadedSource.memberPubkey)}</LoadedShareDisplay> : null}
+              {loadedSource ? (
+                <LoadedShareDisplay>
+                  {shortPubkey(loadedSource.memberPubkey)}
+                </LoadedShareDisplay>
+              ) : null}
             </ShareBlock>
           );
         })}
 
-        <Button type="button" variant="secondary" size="full" disabled={!canValidate || validating} onClick={handleValidate}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="full"
+          disabled={!canValidate || validating}
+          onClick={handleValidate}
+        >
           {validating ? "Validating Sources..." : "Validate Sources"}
         </Button>
-        <Button type="button" variant="primary" size="full" disabled={!validated || recovering} onClick={handleRecover}>
+        <Button
+          type="button"
+          variant="primary"
+          size="full"
+          disabled={!validated || recovering}
+          onClick={handleRecover}
+        >
           {recovering ? "Recovering NSEC..." : "Recover NSEC"}
         </Button>
 

@@ -4,35 +4,37 @@ export type Hex = string;
 
 export const MemberPackageWireSchema = z.object({
   idx: z.number().int().nonnegative(),
-  pubkey: z.string()
+  pubkey: z.string(),
 });
 
 export const GroupPackageWireSchema = z.object({
   group_name: z.string().min(1),
   group_pk: z.string(),
   threshold: z.number().int().positive(),
-  members: z.array(MemberPackageWireSchema).min(1)
+  members: z.array(MemberPackageWireSchema).min(1),
 });
 
 export const SharePackageWireSchema = z.object({
   idx: z.number().int().nonnegative(),
-  seckey: z.string().length(64)
+  seckey: z.string().length(64),
 });
 
 export const DerivedPublicNonceWireSchema = z.object({
   binder_pn: z.string(),
   hidden_pn: z.string(),
-  code: z.string()
+  code: z.string(),
 });
 
 export type MemberPackageWire = z.infer<typeof MemberPackageWireSchema>;
 export type GroupPackageWire = z.infer<typeof GroupPackageWireSchema>;
 export type SharePackageWire = z.infer<typeof SharePackageWireSchema>;
-export type DerivedPublicNonceWire = z.infer<typeof DerivedPublicNonceWireSchema>;
+export type DerivedPublicNonceWire = z.infer<
+  typeof DerivedPublicNonceWireSchema
+>;
 
 export const KeysetBundleSchema = z.object({
   group: GroupPackageWireSchema,
-  shares: z.array(SharePackageWireSchema).min(1)
+  shares: z.array(SharePackageWireSchema).min(1),
 });
 
 export type KeysetBundle = z.infer<typeof KeysetBundleSchema>;
@@ -44,51 +46,72 @@ export const BfMethodPolicyOverrideSchema = z.object({
   ping: BfPolicyOverrideValueSchema,
   onboard: BfPolicyOverrideValueSchema,
   sign: BfPolicyOverrideValueSchema,
-  ecdh: BfPolicyOverrideValueSchema
+  ecdh: BfPolicyOverrideValueSchema,
 });
 
 export const BfPeerPolicyOverrideSchema = z.object({
   request: BfMethodPolicyOverrideSchema,
-  respond: BfMethodPolicyOverrideSchema
+  respond: BfMethodPolicyOverrideSchema,
 });
 
 export const BfManualPeerPolicyOverrideSchema = z.object({
   pubkey: z.string().min(1),
-  policy: BfPeerPolicyOverrideSchema
+  policy: BfPeerPolicyOverrideSchema,
 });
 
-export const BfProfilePayloadSchema = z.object({
-  profile_id: z.string().min(1),
-  version: z.number().int().positive(),
-  device: z.object({
-    name: z.string().min(1),
-    share_secret: z.string().length(64),
-    manual_peer_policy_overrides: z.array(BfManualPeerPolicyOverrideSchema).default([]),
-    relays: z.array(z.string().min(1))
-  }),
-  group_package: GroupPackageWireSchema
+const BfProfileDevicePayloadSchema = z.object({
+  name: z.string().nullable().optional(),
+  share_secret: z.string().optional(),
+  manual_peer_policy_overrides: z
+    .array(BfManualPeerPolicyOverrideSchema)
+    .optional(),
+  relays: z.array(z.string().min(1)).optional(),
 });
+
+export const BfProfilePayloadSchema = z
+  .object({
+    profile_id: z.string().nullable().optional(),
+    version: z.number().int().nonnegative().optional(),
+    device: BfProfileDevicePayloadSchema,
+    group_package: GroupPackageWireSchema,
+  })
+  .transform((payload) => ({
+    profile_id: payload.profile_id ?? "",
+    version: payload.version ?? 1,
+    device: {
+      name: payload.device.name ?? "",
+      share_secret: payload.device.share_secret ?? "",
+      manual_peer_policy_overrides:
+        payload.device.manual_peer_policy_overrides ?? [],
+      relays: payload.device.relays ?? [],
+    },
+    group_package: payload.group_package,
+  }));
 
 export const BfOnboardPayloadSchema = z.object({
   share_secret: z.string().length(64),
   relays: z.array(z.string().min(1)),
-  peer_pk: z.string().min(1)
+  peer_pk: z.string().min(1),
 });
 
 export const BfSharePayloadSchema = z.object({
   share_secret: z.string().length(64),
-  relays: z.array(z.string().min(1))
+  relays: z.array(z.string().min(1)),
 });
 
 export const ProfilePackagePairSchema = z.object({
   profile_string: z.string().startsWith("bfprofile1"),
-  share_string: z.string().startsWith("bfshare1")
+  share_string: z.string().startsWith("bfshare1"),
 });
 
 export type BfPolicyOverrideValue = z.infer<typeof BfPolicyOverrideValueSchema>;
-export type BfMethodPolicyOverride = z.infer<typeof BfMethodPolicyOverrideSchema>;
+export type BfMethodPolicyOverride = z.infer<
+  typeof BfMethodPolicyOverrideSchema
+>;
 export type BfPeerPolicyOverride = z.infer<typeof BfPeerPolicyOverrideSchema>;
-export type BfManualPeerPolicyOverride = z.infer<typeof BfManualPeerPolicyOverrideSchema>;
+export type BfManualPeerPolicyOverride = z.infer<
+  typeof BfManualPeerPolicyOverrideSchema
+>;
 export type BfProfilePayload = z.infer<typeof BfProfilePayloadSchema>;
 export type BfOnboardPayload = z.infer<typeof BfOnboardPayloadSchema>;
 export type BfSharePayload = z.infer<typeof BfSharePayloadSchema>;
@@ -102,12 +125,12 @@ export interface RotateKeysetBundleResult {
 
 export const RecoveredNsecResultSchema = z.object({
   nsec: z.string().startsWith("nsec1"),
-  signing_key_hex: z.string().length(64)
+  signing_key_hex: z.string().length(64),
 });
 
 export const GeneratedNsecResultSchema = z.object({
   nsec: z.string().startsWith("nsec1"),
-  signing_key_hex: z.string().length(64)
+  signing_key_hex: z.string().length(64),
 });
 
 export type RecoveredNsecResult = z.infer<typeof RecoveredNsecResultSchema>;
@@ -120,18 +143,18 @@ export const BifrostPackageErrorCodeSchema = z.enum([
   "unsupported_package",
   "invalid_payload",
   "verification_failed",
-  "crypto_failed"
+  "crypto_failed",
 ]);
 
 export const BifrostPackageErrorResultSchema = z.object({
   code: BifrostPackageErrorCodeSchema,
-  message: z.string()
+  message: z.string(),
 });
 
 export const StructuredBridgeResultSchema = z.object({
   ok: z.boolean(),
   value: z.unknown().optional().nullable(),
-  error: BifrostPackageErrorResultSchema.optional().nullable()
+  error: BifrostPackageErrorResultSchema.optional().nullable(),
 });
 
 export const OnboardingRequestBundleSchema = z.object({
@@ -139,17 +162,23 @@ export const OnboardingRequestBundleSchema = z.object({
   local_pubkey32: z.string().length(64),
   request_nonces: z.array(DerivedPublicNonceWireSchema),
   bootstrap_state_hex: z.string().min(1),
-  event_json: z.string().min(1)
+  event_json: z.string().min(1),
 });
 
 export const OnboardingResponseSchema = z.object({
   group: GroupPackageWireSchema,
-  nonces: z.array(DerivedPublicNonceWireSchema)
+  nonces: z.array(DerivedPublicNonceWireSchema),
 });
 
-export type BifrostPackageErrorCode = z.infer<typeof BifrostPackageErrorCodeSchema>;
-export type BifrostPackageErrorResult = z.infer<typeof BifrostPackageErrorResultSchema>;
-export type OnboardingRequestBundle = z.infer<typeof OnboardingRequestBundleSchema>;
+export type BifrostPackageErrorCode = z.infer<
+  typeof BifrostPackageErrorCodeSchema
+>;
+export type BifrostPackageErrorResult = z.infer<
+  typeof BifrostPackageErrorResultSchema
+>;
+export type OnboardingRequestBundle = z.infer<
+  typeof OnboardingRequestBundleSchema
+>;
 export type OnboardingResponse = z.infer<typeof OnboardingResponseSchema>;
 
 export interface RuntimeConfigInput {
@@ -297,7 +326,14 @@ export type CompletedOperation =
   | { Sign: { request_id: string; signatures_hex64: string[] } }
   | { Ecdh: { request_id: string; shared_secret_hex32: string } }
   | { Ping: { request_id: string; peer: string } }
-  | { Onboard: { request_id: string; group_member_count: number; group: GroupPackageWire; nonces: DerivedPublicNonceWire[] } };
+  | {
+      Onboard: {
+        request_id: string;
+        group_member_count: number;
+        group: GroupPackageWire;
+        nonces: DerivedPublicNonceWire[];
+      };
+    };
 
 export interface OperationFailure {
   request_id: string;

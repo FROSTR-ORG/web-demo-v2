@@ -10,7 +10,7 @@ import { useDemoUi } from "../demo/demoUi";
 
 function OnboardLabelWithHelp({
   htmlFor,
-  children
+  children,
 }: {
   htmlFor?: string;
   children: React.ReactNode;
@@ -24,7 +24,11 @@ function OnboardLabelWithHelp({
       ) : (
         <span className="label">{children}</span>
       )}
-      <HelpCircle className="import-label-help-icon" size={14} aria-hidden="true" />
+      <HelpCircle
+        className="import-label-help-icon"
+        size={14}
+        aria-hidden="true"
+      />
     </span>
   );
 }
@@ -36,24 +40,27 @@ const MOCK_REVIEW_DATA = {
   threshold: "2 of 3",
   shareKey: "#1 (Index 1)",
   relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
-  peerPolicies: "3 total"
+  peerPolicies: "3 total",
 };
 
 /* ---------- Validation helpers ---------- */
 
-function validatePackageString(value: string): { valid: boolean; message: string } {
+function validatePackageString(value: string): {
+  valid: boolean;
+  message: string;
+} {
   if (!value.trim()) {
     return { valid: false, message: "" };
   }
   if (value.trim().startsWith("bfonboard1")) {
     return {
       valid: true,
-      message: "Valid bfonboard package format."
+      message: "Valid bfonboard package format.",
     };
   }
   return {
     valid: false,
-    message: "Invalid package — String must begin with bfonboard1 prefix."
+    message: "Invalid package — String must begin with bfonboard1 prefix.",
   };
 }
 
@@ -65,8 +72,12 @@ export function EnterPackageScreen() {
   const navigate = useNavigate();
   const { decodeOnboardPackage, clearOnboardSession } = useAppState();
   const demoUi = useDemoUi();
-  const [packageString, setPackageString] = useState(demoUi.onboard?.packagePreset ?? "");
-  const [password, setPassword] = useState(demoUi.onboard?.passwordPreset ?? "");
+  const [packageString, setPackageString] = useState(
+    demoUi.onboard?.packagePreset ?? "",
+  );
+  const [password, setPassword] = useState(
+    demoUi.onboard?.passwordPreset ?? "",
+  );
   const [error, setError] = useState("");
   const validation = validatePackageString(packageString);
   /*
@@ -85,28 +96,42 @@ export function EnterPackageScreen() {
       await decodeOnboardPackage(packageString, password);
       navigate(
         "/onboard/handshake",
-        demoUi.onboard?.packagePreset ? { state: { packageString: packageString.trim() } } : undefined
+        demoUi.onboard?.packagePreset
+          ? { state: { packageString: packageString.trim() } }
+          : undefined,
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to decrypt this onboarding package.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to decrypt this onboarding package.",
+      );
     }
   }
 
   return (
     <AppShell mainVariant="flow">
       <div className="screen-column">
-        <BackLink onClick={() => {
-          clearOnboardSession();
-          navigate("/");
-        }} label="Back to Welcome" />
+        <BackLink
+          onClick={() => {
+            clearOnboardSession();
+            navigate("/");
+          }}
+          label="Back to Welcome"
+        />
         <PageHeading
           title="Enter Onboarding Package"
           copy="Enter the onboarding package from a source device to receive this device's share."
         />
 
         <div className="field">
-          <OnboardLabelWithHelp htmlFor="onboard-package-input">Onboarding Package</OnboardLabelWithHelp>
-          <p className="help">Paste a bfonboard1... package from the source device or scan its QR code.</p>
+          <OnboardLabelWithHelp htmlFor="onboard-package-input">
+            Onboarding Package
+          </OnboardLabelWithHelp>
+          <p className="help">
+            Paste a bfonboard1... package from the source device or scan its QR
+            code.
+          </p>
           <textarea
             id="onboard-package-input"
             className="input import-textarea"
@@ -115,12 +140,21 @@ export function EnterPackageScreen() {
             onChange={(e) => setPackageString(e.target.value)}
             rows={3}
           />
-          <button type="button" className="button button-chip button-sm onboard-scan-btn">
+          <button
+            type="button"
+            className="button button-chip button-sm onboard-scan-btn"
+          >
             <QrCode size={14} />
             Scan QR
           </button>
           {validation.message && (
-            <span className={validation.valid ? "import-validation-ok" : "import-validation-error"}>
+            <span
+              className={
+                validation.valid
+                  ? "import-validation-ok"
+                  : "import-validation-error"
+              }
+            >
               {validation.message}
             </span>
           )}
@@ -170,7 +204,8 @@ function isAbortError(error: unknown): boolean {
 export function HandshakeScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { onboardSession, clearOnboardSession, startOnboardHandshake } = useAppState();
+  const { onboardSession, clearOnboardSession, startOnboardHandshake } =
+    useAppState();
   const demoUi = useDemoUi();
   const state = location.state as { packageString?: string } | null;
   const demoHandshake = Boolean(demoUi.onboard?.packagePreset);
@@ -185,15 +220,19 @@ export function HandshakeScreen() {
 
   return (
     <HandshakeContent
-      packageString={onboardSession?.packageString ?? (demoHandshake ? state?.packageString : undefined) ?? ""}
+      packageString={
+        onboardSession?.packageString ??
+        (demoHandshake ? state?.packageString : undefined) ??
+        ""
+      }
       relays={onboardSession?.payload.relays}
-	      peerPk={onboardSession?.payload.peer_pk}
-	      deferredLiveHandshake={Boolean(onboardSession)}
-	      sessionPhase={onboardSession?.phase}
-	      startOnboardHandshake={startOnboardHandshake}
-	      clearOnboardSession={clearOnboardSession}
-	      navigate={navigate}
-	    />
+      peerPk={onboardSession?.payload.peer_pk}
+      deferredLiveHandshake={Boolean(onboardSession)}
+      sessionPhase={onboardSession?.phase}
+      startOnboardHandshake={startOnboardHandshake}
+      clearOnboardSession={clearOnboardSession}
+      navigate={navigate}
+    />
   );
 }
 
@@ -205,7 +244,7 @@ function HandshakeContent({
   sessionPhase,
   startOnboardHandshake,
   clearOnboardSession,
-  navigate
+  navigate,
 }: {
   packageString: string;
   relays?: string[];
@@ -218,13 +257,17 @@ function HandshakeContent({
 }) {
   const demoUi = useDemoUi();
   const startHandshakeRef = useRef(startOnboardHandshake);
-  const relayDetail = relays?.length ? relays.join(", ") : "wss://relay.primal.net, wss://relay.damus.io";
-  const peerDetail = peerPk ? `${peerPk.slice(0, 10)}...${peerPk.slice(-4)}` : "02a3f8c2d1...8f2c";
+  const relayDetail = relays?.length
+    ? relays.join(", ")
+    : "wss://relay.primal.net, wss://relay.damus.io";
+  const peerDetail = peerPk
+    ? `${peerPk.slice(0, 10)}...${peerPk.slice(-4)}`
+    : "02a3f8c2d1...8f2c";
   const [steps, setSteps] = useState<TimelineStep[]>([
     { label: "Connected to relays", detail: relayDetail, state: "done" },
     { label: "Found source device", detail: peerDetail, state: "done" },
     { label: "Receiving keyset data", state: "active" },
-    { label: "Saving to device", state: "pending" }
+    { label: "Saving to device", state: "pending" },
   ]);
 
   const advanceHandshake = useCallback(() => {
@@ -245,12 +288,16 @@ function HandshakeContent({
   }, [startOnboardHandshake]);
 
   useEffect(() => {
-    if (!deferredLiveHandshake || (sessionPhase !== "decoded" && sessionPhase !== "failed")) {
+    if (
+      !deferredLiveHandshake ||
+      (sessionPhase !== "decoded" && sessionPhase !== "failed")
+    ) {
       return;
     }
     let cancelled = false;
     let settled = false;
-    startHandshakeRef.current()
+    startHandshakeRef
+      .current()
       .then(() => {
         settled = true;
         if (!cancelled) {
@@ -272,6 +319,9 @@ function HandshakeContent({
         clearOnboardSession();
       }
     };
+    // sessionPhase intentionally omitted: this mount owns one live handshake; phase
+    // transitions after start are observed through the promise instead of rerunning.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clearOnboardSession, deferredLiveHandshake, navigate]);
 
   /* Auto-advance visible handshake steps while the real handshake is pending. */
@@ -288,7 +338,10 @@ function HandshakeContent({
         return;
       }
       const timer = window.setTimeout(() => {
-        navigate("/onboard/complete", { replace: true, state: { fromHandshake: true } });
+        navigate("/onboard/complete", {
+          replace: true,
+          state: { fromHandshake: true },
+        });
       }, 500);
       return () => window.clearTimeout(timer);
     }
@@ -297,7 +350,13 @@ function HandshakeContent({
       const timer = window.setTimeout(advanceHandshake, 1500);
       return () => window.clearTimeout(timer);
     }
-  }, [steps, navigate, advanceHandshake, demoUi.progress?.frozen, deferredLiveHandshake]);
+  }, [
+    steps,
+    navigate,
+    advanceHandshake,
+    demoUi.progress?.frozen,
+    deferredLiveHandshake,
+  ]);
 
   const truncatedPackage = demoUi.onboard?.packagePreset
     ? "bfonboard1•••"
@@ -312,7 +371,8 @@ function HandshakeContent({
         <div className="screen-heading">
           <h1 className="page-title">Onboarding...</h1>
           <p className="page-copy">
-            Connecting to your source device to receive group configuration and share data.
+            Connecting to your source device to receive group configuration and
+            share data.
           </p>
         </div>
 
@@ -322,7 +382,9 @@ function HandshakeContent({
             <div key={step.label} className="onboard-timeline-step">
               <div className="onboard-timeline-indicator">
                 <TimelineDot state={step.state} />
-                {i < steps.length - 1 && <div className="onboard-timeline-line" />}
+                {i < steps.length - 1 && (
+                  <div className="onboard-timeline-line" />
+                )}
               </div>
               <div className="onboard-timeline-content">
                 <span className={`onboard-step-label ${step.state}`}>
@@ -338,19 +400,25 @@ function HandshakeContent({
 
         {/* Summary bar */}
         <div className="onboard-summary-bar">
-          <span className="onboard-summary-package">Onboarding package: {truncatedPackage}</span>
+          <span className="onboard-summary-package">
+            Onboarding package: {truncatedPackage}
+          </span>
           <span className="onboard-summary-sep">·</span>
           <span className="onboard-summary-share">Share #1</span>
         </div>
 
         {/* Cancel button */}
-        <Button type="button" variant="ghost" size="full" onClick={() => {
-          clearOnboardSession();
-          navigate("/onboard");
-        }}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="full"
+          onClick={() => {
+            clearOnboardSession();
+            navigate("/onboard");
+          }}
+        >
           Cancel Onboarding
         </Button>
-
       </div>
     </AppShell>
   );
@@ -382,8 +450,11 @@ export function OnboardingFailedScreen() {
   const navigate = useNavigate();
   const { onboardSession, clearOnboardSession } = useAppState();
   const demoUi = useDemoUi();
-  const productError = onboardSession?.phase === "failed" ? onboardSession.error : null;
-  const rejected = demoUi.onboard?.failedVariant === "rejected" || productError?.code === "onboard_rejected";
+  const productError =
+    onboardSession?.phase === "failed" ? onboardSession.error : null;
+  const rejected =
+    demoUi.onboard?.failedVariant === "rejected" ||
+    productError?.code === "onboard_rejected";
   const title =
     productError?.code === "relay_unreachable"
       ? "Relays Unreachable"
@@ -413,10 +484,12 @@ export function OnboardingFailedScreen() {
   return (
     <AppShell mainVariant="flow">
       <div className="screen-column">
-        <BackLink onClick={() => {
-          clearOnboardSession();
-          navigate("/onboard");
-        }} />
+        <BackLink
+          onClick={() => {
+            clearOnboardSession();
+            navigate("/onboard");
+          }}
+        />
         <div className="screen-heading">
           <h1 className="page-title">Onboarding Failed</h1>
         </div>
@@ -427,32 +500,37 @@ export function OnboardingFailedScreen() {
           </div>
           <div className="onboard-error-body">
             <div className="onboard-error-title">{title}</div>
-            <div className="onboard-error-description">
-              {description}
-            </div>
+            <div className="onboard-error-description">{description}</div>
           </div>
         </div>
 
         <div className="inline-actions">
-	          <Button
-	            type="button"
-	            onClick={() => {
-              if (onboardSession?.phase === "decoded" || onboardSession?.phase === "failed") {
+          <Button
+            type="button"
+            onClick={() => {
+              if (
+                onboardSession?.phase === "decoded" ||
+                onboardSession?.phase === "failed"
+              ) {
                 navigate("/onboard/handshake");
                 return;
               }
-	              clearOnboardSession();
-	              navigate("/onboard");
-	            }}
-	          >
-	            Retry
-	          </Button>
-	          <Button type="button" variant="ghost" onClick={() => {
-	            clearOnboardSession();
-	            navigate("/onboard");
-	          }}>
-	            Back to Onboarding
-	          </Button>
+              clearOnboardSession();
+              navigate("/onboard");
+            }}
+          >
+            Retry
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              clearOnboardSession();
+              navigate("/onboard");
+            }}
+          >
+            Back to Onboarding
+          </Button>
         </div>
       </div>
     </AppShell>
@@ -468,7 +546,8 @@ export function OnboardingCompleteScreen() {
   const { onboardSession } = useAppState();
   const demoUi = useDemoUi();
   const state = location.state as { fromHandshake?: boolean } | null;
-  const readyProductSession = onboardSession?.phase === "ready_to_save" ? onboardSession : null;
+  const readyProductSession =
+    onboardSession?.phase === "ready_to_save" ? onboardSession : null;
 
   if (readyProductSession) {
     return <OnboardingCompleteContent productSession={readyProductSession} />;
@@ -482,40 +561,49 @@ export function OnboardingCompleteScreen() {
 }
 
 function OnboardingCompleteContent({
-  productSession
+  productSession,
 }: {
-  productSession?: NonNullable<ReturnType<typeof useAppState>["onboardSession"]>;
+  productSession?: NonNullable<
+    ReturnType<typeof useAppState>["onboardSession"]
+  >;
 }) {
   const navigate = useNavigate();
   const { createKeyset, createProfile, saveOnboardedProfile } = useAppState();
   const demoUi = useDemoUi();
-  const presetPassword = productSession ? "" : (demoUi.onboard?.passwordPreset ?? "");
+  const presetPassword = productSession
+    ? ""
+    : (demoUi.onboard?.passwordPreset ?? "");
   const [profilePassword, setProfilePassword] = useState(presetPassword);
   const [confirmPassword, setConfirmPassword] = useState(presetPassword);
   const [saving, setSaving] = useState(false);
 
-  const passwordsMatch = profilePassword.length > 0 && profilePassword === confirmPassword;
-  const reviewData = productSession?.response && productSession.localShareIdx !== undefined
-    ? {
-        groupName: productSession.response.group.group_name,
-        threshold: `${productSession.response.group.threshold} of ${productSession.response.group.members.length}`,
-        shareKey: `#${productSession.localShareIdx} (Index ${productSession.localShareIdx})`,
-        relays: productSession.payload.relays,
-        peerPolicies: `${Math.max(0, productSession.response.group.members.length - 1)} peers`
-      }
-    : MOCK_REVIEW_DATA;
+  const passwordsMatch =
+    profilePassword.length > 0 && profilePassword === confirmPassword;
+  const reviewData =
+    productSession?.response && productSession.localShareIdx !== undefined
+      ? {
+          groupName: productSession.response.group.group_name,
+          threshold: `${productSession.response.group.threshold} of ${productSession.response.group.members.length}`,
+          shareKey: `#${productSession.localShareIdx} (Index ${productSession.localShareIdx})`,
+          relays: productSession.payload.relays,
+          peerPolicies: `${Math.max(0, productSession.response.group.members.length - 1)} peers`,
+        }
+      : MOCK_REVIEW_DATA;
 
   async function handleSave() {
     if (saving) return;
     setSaving(true);
     try {
       const profileId = productSession
-        ? await saveOnboardedProfile({ password: profilePassword, confirmPassword })
+        ? await saveOnboardedProfile({
+            password: profilePassword,
+            confirmPassword,
+          })
         : await (async () => {
             await createKeyset({
               groupName: MOCK_REVIEW_DATA.groupName,
               threshold: 2,
-              count: 3
+              count: 3,
             });
             return createProfile({
               deviceName: "Igloo Web",
@@ -523,7 +611,7 @@ function OnboardingCompleteContent({
               confirmPassword,
               distributionPassword: profilePassword,
               confirmDistributionPassword: profilePassword,
-              relays: MOCK_REVIEW_DATA.relays
+              relays: MOCK_REVIEW_DATA.relays,
             });
           })();
       navigate(`/dashboard/${profileId}`);
@@ -546,7 +634,9 @@ function OnboardingCompleteContent({
         </div>
 
         <p className="page-copy">
-          You've successfully applied the onboarding package. Review your configuration and set or confirm a local password before launching the signer.
+          You've successfully applied the onboarding package. Review your
+          configuration and set or confirm a local password before launching the
+          signer.
         </p>
 
         {/* Group Profile card */}
@@ -571,11 +661,15 @@ function OnboardingCompleteContent({
           </div>
           <div className="import-review-row">
             <span className="import-review-label">Relays</span>
-            <span className="import-review-value">{reviewData.relays.length} connected</span>
+            <span className="import-review-value">
+              {reviewData.relays.length} connected
+            </span>
           </div>
           <div className="import-review-row">
             <span className="import-review-label">Peer Policies</span>
-            <span className="import-review-value">{reviewData.peerPolicies}</span>
+            <span className="import-review-value">
+              {reviewData.peerPolicies}
+            </span>
           </div>
         </div>
 
@@ -586,10 +680,15 @@ function OnboardingCompleteContent({
           <div className="import-password-header">
             <span className="import-label-row import-password-title-row">
               <span className="section-title">Profile Password</span>
-              <HelpCircle className="import-label-help-icon" size={14} aria-hidden="true" />
+              <HelpCircle
+                className="import-label-help-icon"
+                size={14}
+                aria-hidden="true"
+              />
             </span>
             <p className="help">
-              This password encrypts your profile on this device. You'll need it each time you unlock it.
+              This password encrypts your profile on this device. You'll need it
+              each time you unlock it.
             </p>
           </div>
           <div className="field-row">

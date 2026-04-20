@@ -9,7 +9,7 @@ import type {
   RuntimeSnapshotInput,
   RuntimeStatusSummary,
   SharePackageWire,
-  StoredProfileSummary
+  StoredProfileSummary,
 } from "../lib/bifrost/types";
 
 export interface CreateDraft {
@@ -34,7 +34,10 @@ export interface CreateProfileDraft extends ProfileDraft {
   confirmDistributionPassword: string;
 }
 
-export type ImportProfileDraft = Pick<ProfileDraft, "password" | "confirmPassword"> & {
+export type ImportProfileDraft = Pick<
+  ProfileDraft,
+  "password" | "confirmPassword"
+> & {
   replaceExisting?: boolean;
 };
 
@@ -74,7 +77,11 @@ export interface OnboardSession {
 }
 
 export interface RotateKeysetSession {
-  phase: "sources_validated" | "rotated" | "profile_created" | "distribution_ready";
+  phase:
+    | "sources_validated"
+    | "rotated"
+    | "profile_created"
+    | "distribution_ready";
   sourceProfile: StoredProfileSummary;
   sourcePayload?: BfProfilePayload;
   sourceShares: SharePackageWire[];
@@ -103,6 +110,13 @@ export interface RecoverSession {
   expiresAt?: number;
 }
 
+export type OnboardingPackageStatePatch = Partial<
+  Pick<
+    OnboardingPackageView,
+    "packageCopied" | "passwordCopied" | "qrShown" | "copied"
+  >
+>;
+
 export class SetupFlowError extends Error {
   constructor(
     public readonly code:
@@ -120,7 +134,7 @@ export class SetupFlowError extends Error {
       | "onboard_rejected"
       | "invalid_onboard_response",
     message: string,
-    public readonly details?: Record<string, unknown>
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "SetupFlowError";
@@ -140,16 +154,24 @@ export interface AppStateValue {
   reloadProfiles: () => Promise<void>;
   createKeyset: (draft: CreateKeysetDraft) => Promise<void>;
   createProfile: (draft: CreateProfileDraft) => Promise<string>;
-  updatePackageState: (idx: number, patch: Partial<Pick<OnboardingPackageView, "packageCopied" | "passwordCopied" | "qrShown" | "copied">>) => void;
+  updatePackageState: (idx: number, patch: OnboardingPackageStatePatch) => void;
   finishDistribution: () => Promise<string>;
   clearCreateSession: () => void;
   beginImport: (backupString: string) => void;
-  decryptImportBackup: (backupString: string, password: string) => Promise<void>;
+  decryptImportBackup: (
+    backupString: string,
+    password: string,
+  ) => Promise<void>;
   saveImportedProfile: (draft: ImportProfileDraft) => Promise<string>;
   clearImportSession: () => void;
-  decodeOnboardPackage: (packageString: string, password: string) => Promise<void>;
+  decodeOnboardPackage: (
+    packageString: string,
+    password: string,
+  ) => Promise<void>;
   startOnboardHandshake: () => Promise<void>;
-  saveOnboardedProfile: (draft: Pick<ProfileDraft, "password" | "confirmPassword">) => Promise<string>;
+  saveOnboardedProfile: (
+    draft: Pick<ProfileDraft, "password" | "confirmPassword">,
+  ) => Promise<string>;
   clearOnboardSession: () => void;
   validateRotateKeysetSources: (input: {
     profileId: string;
@@ -160,7 +182,10 @@ export interface AppStateValue {
   }) => Promise<void>;
   generateRotatedKeyset: (distributionPassword: string) => Promise<void>;
   createRotatedProfile: (draft: ProfileDraft) => Promise<string>;
-  updateRotatePackageState: (idx: number, patch: Partial<Pick<OnboardingPackageView, "packageCopied" | "passwordCopied" | "qrShown" | "copied">>) => void;
+  updateRotatePackageState: (
+    idx: number,
+    patch: OnboardingPackageStatePatch,
+  ) => void;
   finishRotateDistribution: () => Promise<string>;
   clearRotateKeysetSession: () => void;
   validateRecoverSources: (input: {

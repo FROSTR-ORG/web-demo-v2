@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { memberForShare, memberPubkeyXOnly } from "../lib/bifrost/format";
 import {
   BifrostPackageError,
@@ -15,37 +22,48 @@ import {
   profilePayloadForShare,
   recoverNsecFromShares,
   resolveShareIndex,
-  rotateKeysetBundle
+  rotateKeysetBundle,
 } from "../lib/bifrost/packageService";
 import { RuntimeClient } from "../lib/bifrost/runtimeClient";
 import type {
   BfProfilePayload,
-  OnboardingPackageView,
   RuntimeSnapshotInput,
   RuntimeStatusSummary,
-  StoredProfileSummary
+  StoredProfileSummary,
 } from "../lib/bifrost/types";
-import { OnboardingRelayError, runOnboardingRelayHandshake } from "../lib/relay/browserRelayClient";
+import {
+  OnboardingRelayError,
+  runOnboardingRelayHandshake,
+} from "../lib/relay/browserRelayClient";
 import { LocalRuntimeSimulator } from "../lib/relay/localSimulator";
-import { getProfile, listProfiles, removeProfile, saveProfile, touchProfile } from "../lib/storage/profileStore";
+import {
+  getProfile,
+  listProfiles,
+  removeProfile,
+  saveProfile,
+  touchProfile,
+} from "../lib/storage/profileStore";
 import { BRIDGE_EVENT, consumeBridgeSnapshot } from "./appStateBridge";
 import { AppStateContext } from "./AppStateContext";
 import {
   allPackagesDistributed,
   buildRemoteOnboardingPackages,
-  normalizePackageStatePatch
+  normalizePackageStatePatch,
 } from "./distributionPackages";
 import {
   buildStoredProfileRecord,
   createRuntimeFromProfilePayload,
-  createRuntimeFromSnapshot
+  createRuntimeFromSnapshot,
 } from "./profileRuntime";
-import { decodeExternalBfshareSources, loadSavedProfileSource } from "./sourceShareCollection";
+import {
+  decodeExternalBfshareSources,
+  loadSavedProfileSource,
+} from "./sourceShareCollection";
 import {
   isAbortError,
   makeAbortError,
   setupErrorFromOnboardingRelay,
-  setupErrorFromPackage
+  setupErrorFromPackage,
 } from "./setupFlowErrors";
 import { SetupFlowError } from "./AppStateTypes";
 import type {
@@ -56,27 +74,42 @@ import type {
   CreateSession,
   ImportProfileDraft,
   ImportSession,
+  OnboardingPackageStatePatch,
   OnboardSession,
   ProfileDraft,
   RecoverSession,
   RecoverSourceSummary,
-  RotateKeysetSession
+  RotateKeysetSession,
 } from "./AppStateTypes";
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [profiles, setProfiles] = useState<StoredProfileSummary[]>([]);
-  const [activeProfile, setActiveProfile] = useState<StoredProfileSummary | null>(null);
-  const [runtimeStatus, setRuntimeStatus] = useState<RuntimeStatusSummary | null>(null);
+  const [activeProfile, setActiveProfile] =
+    useState<StoredProfileSummary | null>(null);
+  const [runtimeStatus, setRuntimeStatus] =
+    useState<RuntimeStatusSummary | null>(null);
   const [signerPaused, setSignerPausedState] = useState(false);
-  const [createSession, setCreateSession] = useState<CreateSession | null>(null);
-  const [importSession, setImportSession] = useState<ImportSession | null>(null);
-  const [onboardSession, setOnboardSession] = useState<OnboardSession | null>(null);
-  const [rotateKeysetSession, setRotateKeysetSession] = useState<RotateKeysetSession | null>(null);
-  const [recoverSession, setRecoverSession] = useState<RecoverSession | null>(null);
+  const [createSession, setCreateSession] = useState<CreateSession | null>(
+    null,
+  );
+  const [importSession, setImportSession] = useState<ImportSession | null>(
+    null,
+  );
+  const [onboardSession, setOnboardSession] = useState<OnboardSession | null>(
+    null,
+  );
+  const [rotateKeysetSession, setRotateKeysetSession] =
+    useState<RotateKeysetSession | null>(null);
+  const [recoverSession, setRecoverSession] = useState<RecoverSession | null>(
+    null,
+  );
   const [bridgeHydrated, setBridgeHydrated] = useState(false);
   const runtimeRef = useRef<RuntimeClient | null>(null);
   const simulatorRef = useRef<LocalRuntimeSimulator | null>(null);
-  const onboardHandshakeRef = useRef<{ id: number; controller: AbortController } | null>(null);
+  const onboardHandshakeRef = useRef<{
+    id: number;
+    controller: AbortController;
+  } | null>(null);
   const onboardHandshakeSeq = useRef(0);
 
   const abortOnboardHandshake = useCallback(() => {
@@ -122,48 +155,62 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(BRIDGE_EVENT, onBridgeUpdate);
   }, [reloadProfiles]);
 
-  const setRuntime = useCallback((runtime: RuntimeClient, simulator?: LocalRuntimeSimulator) => {
-    runtimeRef.current = runtime;
-    simulatorRef.current = simulator ?? null;
-    setRuntimeStatus(runtime.runtimeStatus());
-    // A live RuntimeClient just came online in this SPA session — re-enable the
-    // runtime-polling interval by clearing the bridge-hydration flag. Without
-    // this reset, `bridgeHydrated` would stay `true` forever after any demo
-    // hand-off, permanently disabling the refresh loop even though a real
-    // runtime is now backing `runtimeRef`.
-    setBridgeHydrated(false);
-  }, []);
+  const setRuntime = useCallback(
+    (runtime: RuntimeClient, simulator?: LocalRuntimeSimulator) => {
+      if (simulatorRef.current && simulatorRef.current !== simulator) {
+        simulatorRef.current.stop();
+      }
+      runtimeRef.current = runtime;
+      simulatorRef.current = simulator ?? null;
+      setRuntimeStatus(runtime.runtimeStatus());
+      // A live RuntimeClient just came online in this SPA session — re-enable the
+      // runtime-polling interval by clearing the bridge-hydration flag. Without
+      // this reset, `bridgeHydrated` would stay `true` forever after any demo
+      // hand-off, permanently disabling the refresh loop even though a real
+      // runtime is now backing `runtimeRef`.
+      setBridgeHydrated(false);
+    },
+    [],
+  );
 
   const startRuntimeFromPayload = useCallback(
     async (payload: BfProfilePayload, localShareIdx: number) => {
       setRuntime(await createRuntimeFromProfilePayload(payload, localShareIdx));
     },
-    [setRuntime]
+    [setRuntime],
   );
 
   const startRuntimeFromSnapshot = useCallback(
     async (snapshot: RuntimeSnapshotInput) => {
       setRuntime(await createRuntimeFromSnapshot(snapshot));
     },
-    [setRuntime]
+    [setRuntime],
   );
 
   const savePayloadAsProfile = useCallback(
     async (
       payload: BfProfilePayload,
       password: string,
-      options: { replaceProfileId?: string; createdAt?: number; label?: string } = {}
+      options: {
+        replaceProfileId?: string;
+        createdAt?: number;
+        label?: string;
+      } = {},
     ) => {
       if (password.length < 8) {
         throw new Error("Profile password must be at least 8 characters.");
       }
-      const { record, normalizedPayload, localShareIdx } = await buildStoredProfileRecord(payload, password, {
-        createdAt: options.createdAt,
-        label: options.label
-      });
+      const { record, normalizedPayload, localShareIdx } =
+        await buildStoredProfileRecord(payload, password, {
+          createdAt: options.createdAt,
+          label: options.label,
+        });
 
       await saveProfile(record);
-      if (options.replaceProfileId && options.replaceProfileId !== record.summary.id) {
+      if (
+        options.replaceProfileId &&
+        options.replaceProfileId !== record.summary.id
+      ) {
         await removeProfile(options.replaceProfileId);
       }
       await startRuntimeFromPayload(normalizedPayload, localShareIdx);
@@ -172,7 +219,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       await reloadProfiles();
       return record.summary;
     },
-    [reloadProfiles, startRuntimeFromPayload]
+    [reloadProfiles, startRuntimeFromPayload],
   );
 
   const createKeyset = useCallback(async (draft: CreateKeysetDraft) => {
@@ -193,46 +240,51 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     const sessionDraft: CreateDraft = {
       groupName,
       threshold: draft.threshold,
-      count: draft.count
+      count: draft.count,
     };
     const keyset = draft.generatedNsec
-      ? await createKeysetBundleFromNsec({ ...sessionDraft, nsec: draft.generatedNsec })
+      ? await createKeysetBundleFromNsec({
+          ...sessionDraft,
+          nsec: draft.generatedNsec,
+        })
       : await createKeysetBundle(sessionDraft);
     const localShare = keyset.shares[0];
     setCreateSession({
       draft: sessionDraft,
       keyset,
       localShare,
-      onboardingPackages: []
+      onboardingPackages: [],
     });
   }, []);
 
-	  const createProfile = useCallback(
-	    async (draft: CreateProfileDraft) => {
-	      if (!createSession?.keyset || !createSession.localShare) {
-	        throw new Error("Create a keyset before creating a profile.");
-	      }
-	      const deviceName = draft.deviceName.trim();
-	      const relays = draft.relays.map((relay) => relay.trim()).filter(Boolean);
-	      const distributionPassword = draft.distributionPassword.trim();
-	      if (!deviceName) {
-	        throw new Error("Profile name is required.");
-	      }
+  const createProfile = useCallback(
+    async (draft: CreateProfileDraft) => {
+      if (!createSession?.keyset || !createSession.localShare) {
+        throw new Error("Create a keyset before creating a profile.");
+      }
+      const deviceName = draft.deviceName.trim();
+      const relays = draft.relays.map((relay) => relay.trim()).filter(Boolean);
+      const distributionPassword = draft.distributionPassword.trim();
+      if (!deviceName) {
+        throw new Error("Profile name is required.");
+      }
       if (draft.password.length < 8) {
         throw new Error("Profile password must be at least 8 characters.");
       }
-	      if (draft.password !== draft.confirmPassword) {
-	        throw new Error("Profile passwords do not match.");
-	      }
-	      if (distributionPassword.length < 8) {
-	        throw new Error("Remote package password must be at least 8 characters.");
-	      }
-	      if (distributionPassword !== draft.confirmDistributionPassword) {
-	        throw new Error("Remote package passwords do not match.");
-	      }
-	      if (relays.length === 0) {
-	        throw new Error("At least one relay is required.");
-	      }
+      if (draft.password !== draft.confirmPassword) {
+        throw new Error("Profile passwords do not match.");
+      }
+      if (distributionPassword.length < 8) {
+        throw new Error(
+          "Remote package password must be at least 8 characters.",
+        );
+      }
+      if (distributionPassword !== draft.confirmDistributionPassword) {
+        throw new Error("Remote package passwords do not match.");
+      }
+      if (relays.length === 0) {
+        throw new Error("At least one relay is required.");
+      }
 
       const { group } = createSession.keyset;
       const localShare = createSession.localShare;
@@ -240,186 +292,238 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const payload = profilePayloadForShare({
         profileId,
         deviceName,
-	        share: localShare,
-	        group,
-	        relays,
-	        manualPeerPolicyOverrides: defaultManualPeerPolicyOverrides(group, localShare.idx)
-	      });
-      const createdAt = Date.now();
-      const { record } = await buildStoredProfileRecord(payload, draft.password, {
-        createdAt,
-        lastUsedAt: createdAt,
-        label: createSession.draft.groupName
+        share: localShare,
+        group,
+        relays,
+        manualPeerPolicyOverrides: defaultManualPeerPolicyOverrides(
+          group,
+          localShare.idx,
+        ),
       });
+      const createdAt = Date.now();
+      const { record } = await buildStoredProfileRecord(
+        payload,
+        draft.password,
+        {
+          createdAt,
+          lastUsedAt: createdAt,
+          label: createSession.draft.groupName,
+        },
+      );
       await saveProfile(record);
 
-	      const remoteShares = createSession.keyset.shares.filter((share) => share.idx !== localShare.idx);
-	      const onboardingPackages = await buildRemoteOnboardingPackages({
-	        remoteShares,
-	        localShare,
-	        group,
-	        relays,
-	        password: distributionPassword
-	      });
+      const remoteShares = createSession.keyset.shares.filter(
+        (share) => share.idx !== localShare.idx,
+      );
+      const onboardingPackages = await buildRemoteOnboardingPackages({
+        remoteShares,
+        localShare,
+        group,
+        relays,
+        password: distributionPassword,
+      });
 
-      const runtime = await createRuntimeFromProfilePayload(payload, localShare.idx);
+      const runtime = await createRuntimeFromProfilePayload(
+        payload,
+        localShare.idx,
+      );
       const simulator = new LocalRuntimeSimulator(runtime);
       await simulator.attachVirtualPeers({ group, localShare, remoteShares });
       simulator.start();
       simulator.refreshAll();
+      setRuntime(runtime, simulator);
       setRuntimeStatus(simulator.pump(4));
-      runtimeRef.current = runtime;
-      simulatorRef.current = simulator;
-      // A real RuntimeClient is now backing runtimeRef — clear the
-      // bridge-hydration flag so the runtime-polling interval resumes (see
-      // `setRuntime` for the matching reset on the unlock path).
-      setBridgeHydrated(false);
       setActiveProfile(record.summary);
       setSignerPausedState(false);
       setCreateSession({
         ...createSession,
         createdProfileId: profileId,
-        onboardingPackages
+        onboardingPackages,
       });
       await reloadProfiles();
 
       return profileId;
     },
-    [createSession, reloadProfiles]
+    [createSession, reloadProfiles, setRuntime],
   );
 
-	  const updatePackageState = useCallback(
-	    (idx: number, patch: Partial<Pick<OnboardingPackageView, "packageCopied" | "passwordCopied" | "copied" | "qrShown">>) => {
-	      setCreateSession((session) => {
-	        if (!session) {
-	          return session;
-	        }
-	        const normalizedPatch = normalizePackageStatePatch(patch);
-	        return {
-	          ...session,
-	          onboardingPackages: session.onboardingPackages.map((entry) => (entry.idx === idx ? { ...entry, ...normalizedPatch } : entry))
-	        };
-	      });
-	    },
-	    []
-	  );
+  const updatePackageState = useCallback(
+    (idx: number, patch: OnboardingPackageStatePatch) => {
+      setCreateSession((session) => {
+        if (!session) {
+          return session;
+        }
+        const normalizedPatch = normalizePackageStatePatch(patch);
+        return {
+          ...session,
+          onboardingPackages: session.onboardingPackages.map((entry) =>
+            entry.idx === idx ? { ...entry, ...normalizedPatch } : entry,
+          ),
+        };
+      });
+    },
+    [],
+  );
 
-	  const finishDistribution = useCallback(async () => {
+  const finishDistribution = useCallback(async () => {
     if (!createSession?.createdProfileId) {
       throw new Error("No created profile is available.");
     }
-	    return createSession.createdProfileId;
-	  }, [createSession]);
+    return createSession.createdProfileId;
+  }, [createSession]);
 
-	  const clearCreateSession = useCallback(() => {
-	    setCreateSession(null);
-	  }, []);
+  const clearCreateSession = useCallback(() => {
+    setCreateSession(null);
+  }, []);
 
-	  const beginImport = useCallback((backupString: string) => {
-	    setImportSession({ backupString: backupString.trim() });
-	  }, []);
+  const beginImport = useCallback((backupString: string) => {
+    setImportSession({ backupString: backupString.trim() });
+  }, []);
 
-	  const decryptImportBackup = useCallback(async (backupString: string, password: string) => {
-	    const trimmed = backupString.trim();
-	    if (!trimmed) {
-	      throw new SetupFlowError("invalid_package", "Profile backup is required.");
-	    }
-	    if (!trimmed.startsWith("bfprofile1")) {
-	      throw new SetupFlowError("invalid_package", "Profile backup must start with bfprofile1.");
-	    }
-	    try {
-	      const payload = await decodeProfilePackage(trimmed, password);
-	      const localShareIdx = await resolveShareIndex(payload.group_package, payload.device.share_secret);
-	      const profileId = payload.profile_id || (await deriveProfileIdFromShareSecret(payload.device.share_secret));
-	      const conflictRecord = await getProfile(profileId);
-	      setImportSession({
-	        backupString: trimmed,
-	        payload: { ...payload, profile_id: profileId },
-	        localShareIdx,
-	        conflictProfile: conflictRecord?.summary
-	      });
-	    } catch (error) {
-	      if (error instanceof SetupFlowError) {
-	        throw error;
-	      }
-	      throw setupErrorFromPackage(error, {
-	        code: "wrong_password",
-	        message: "The backup password could not decrypt this profile."
-	      });
-	    }
-	  }, []);
+  const decryptImportBackup = useCallback(
+    async (backupString: string, password: string) => {
+      const trimmed = backupString.trim();
+      if (!trimmed) {
+        throw new SetupFlowError(
+          "invalid_package",
+          "Profile backup is required.",
+        );
+      }
+      if (!trimmed.startsWith("bfprofile1")) {
+        throw new SetupFlowError(
+          "invalid_package",
+          "Profile backup must start with bfprofile1.",
+        );
+      }
+      try {
+        const payload = await decodeProfilePackage(trimmed, password);
+        const localShareIdx = await resolveShareIndex(
+          payload.group_package,
+          payload.device.share_secret,
+        );
+        const profileId =
+          payload.profile_id ||
+          (await deriveProfileIdFromShareSecret(payload.device.share_secret));
+        const conflictRecord = await getProfile(profileId);
+        setImportSession({
+          backupString: trimmed,
+          payload: { ...payload, profile_id: profileId },
+          localShareIdx,
+          conflictProfile: conflictRecord?.summary,
+        });
+      } catch (error) {
+        if (error instanceof SetupFlowError) {
+          throw error;
+        }
+        throw setupErrorFromPackage(error, {
+          code: "wrong_password",
+          message: "The backup password could not decrypt this profile.",
+        });
+      }
+    },
+    [],
+  );
 
-	  const saveImportedProfile = useCallback(
-	    async (draft: ImportProfileDraft) => {
-	      if (!importSession?.payload) {
-	        throw new SetupFlowError("missing_session", "Decrypt a profile backup before saving it.");
-	      }
-	      if (draft.password !== draft.confirmPassword) {
-	        throw new Error("Profile passwords do not match.");
-	      }
-	      if (importSession.conflictProfile && !draft.replaceExisting) {
-	        throw new SetupFlowError(
-	          "profile_conflict",
-	          "A profile with this id already exists.",
-	          { profileId: importSession.conflictProfile.id, label: importSession.conflictProfile.label }
-	        );
-	      }
-	      const summary = await savePayloadAsProfile(importSession.payload, draft.password);
-	      return summary.id;
-	    },
-	    [importSession, savePayloadAsProfile]
-	  );
+  const saveImportedProfile = useCallback(
+    async (draft: ImportProfileDraft) => {
+      if (!importSession?.payload) {
+        throw new SetupFlowError(
+          "missing_session",
+          "Decrypt a profile backup before saving it.",
+        );
+      }
+      if (draft.password !== draft.confirmPassword) {
+        throw new Error("Profile passwords do not match.");
+      }
+      if (importSession.conflictProfile && !draft.replaceExisting) {
+        throw new SetupFlowError(
+          "profile_conflict",
+          "A profile with this id already exists.",
+          {
+            profileId: importSession.conflictProfile.id,
+            label: importSession.conflictProfile.label,
+          },
+        );
+      }
+      const summary = await savePayloadAsProfile(
+        importSession.payload,
+        draft.password,
+      );
+      return summary.id;
+    },
+    [importSession, savePayloadAsProfile],
+  );
 
-	  const clearImportSession = useCallback(() => {
-	    setImportSession(null);
-	  }, []);
+  const clearImportSession = useCallback(() => {
+    setImportSession(null);
+  }, []);
 
-		  const decodeOnboardPackage = useCallback(async (packageString: string, password: string) => {
-		    abortOnboardHandshake();
-		    const trimmed = packageString.trim();
-	    if (!trimmed) {
-	      throw new SetupFlowError("invalid_package", "Onboarding package is required.");
-	    }
-	    if (!trimmed.startsWith("bfonboard1")) {
-	      throw new SetupFlowError("invalid_package", "Onboarding package must start with bfonboard1.");
-	    }
-	    try {
-	      const payload = await decodeBfonboardPackage(trimmed, password);
-	      setOnboardSession({ phase: "decoded", packageString: trimmed, payload });
-    } catch (error) {
-      throw setupErrorFromPackage(error, {
-        code: "wrong_password",
-        message: "The package password could not decrypt this onboarding package."
-      });
-	    }
-		  }, [abortOnboardHandshake]);
+  const decodeOnboardPackage = useCallback(
+    async (packageString: string, password: string) => {
+      abortOnboardHandshake();
+      const trimmed = packageString.trim();
+      if (!trimmed) {
+        throw new SetupFlowError(
+          "invalid_package",
+          "Onboarding package is required.",
+        );
+      }
+      if (!trimmed.startsWith("bfonboard1")) {
+        throw new SetupFlowError(
+          "invalid_package",
+          "Onboarding package must start with bfonboard1.",
+        );
+      }
+      try {
+        const payload = await decodeBfonboardPackage(trimmed, password);
+        setOnboardSession({
+          phase: "decoded",
+          packageString: trimmed,
+          payload,
+        });
+      } catch (error) {
+        throw setupErrorFromPackage(error, {
+          code: "wrong_password",
+          message:
+            "The package password could not decrypt this onboarding package.",
+        });
+      }
+    },
+    [abortOnboardHandshake],
+  );
 
   const startOnboardHandshake = useCallback(async () => {
     if (!onboardSession?.payload) {
-      throw new SetupFlowError("missing_session", "Decode an onboarding package before starting the handshake.");
+      throw new SetupFlowError(
+        "missing_session",
+        "Decode an onboarding package before starting the handshake.",
+      );
     }
     const baseSession = onboardSession;
     abortOnboardHandshake();
     const attempt = {
       id: onboardHandshakeSeq.current + 1,
-      controller: new AbortController()
+      controller: new AbortController(),
     };
     onboardHandshakeSeq.current = attempt.id;
     onboardHandshakeRef.current = attempt;
     const eventKind = await defaultBifrostEventKind();
     try {
-      if (attempt.controller.signal.aborted || onboardHandshakeRef.current?.id !== attempt.id) {
+      if (
+        attempt.controller.signal.aborted ||
+        onboardHandshakeRef.current?.id !== attempt.id
+      ) {
         throw makeAbortError();
       }
       const requestBundle = await createOnboardingRequestBundle({
         shareSecret: baseSession.payload.share_secret,
         peerPubkey32Hex: baseSession.payload.peer_pk,
-        eventKind
+        eventKind,
       });
       setOnboardSession({
         ...baseSession,
         phase: "handshaking",
-        requestBundle
+        requestBundle,
       });
 
       const response = await runOnboardingRelayHandshake({
@@ -436,20 +540,28 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               shareSecret: baseSession.payload.share_secret,
               expectedPeerPubkey32Hex: baseSession.payload.peer_pk,
               expectedLocalPubkey32Hex: requestBundle.local_pubkey32,
-              requestId: requestBundle.request_id
+              requestId: requestBundle.request_id,
             });
           } catch (error) {
-            if (error instanceof BifrostPackageError && error.code === "verification_failed") {
+            if (
+              error instanceof BifrostPackageError &&
+              error.code === "verification_failed"
+            ) {
               throw new OnboardingRelayError("onboard_rejected", error.message);
             }
             throw new OnboardingRelayError(
               "invalid_onboard_response",
-              error instanceof Error ? error.message : "Invalid onboarding response."
+              error instanceof Error
+                ? error.message
+                : "Invalid onboarding response.",
             );
           }
-        }
+        },
       });
-      if (attempt.controller.signal.aborted || onboardHandshakeRef.current?.id !== attempt.id) {
+      if (
+        attempt.controller.signal.aborted ||
+        onboardHandshakeRef.current?.id !== attempt.id
+      ) {
         throw makeAbortError();
       }
       const runtimeSnapshot = await buildOnboardingRuntimeSnapshot({
@@ -457,7 +569,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         shareSecret: baseSession.payload.share_secret,
         peerPubkey32Hex: baseSession.payload.peer_pk,
         responseNonces: response.nonces,
-        bootstrapStateHex: requestBundle.bootstrap_state_hex
+        bootstrapStateHex: requestBundle.bootstrap_state_hex,
       });
       setOnboardSession({
         ...baseSession,
@@ -465,13 +577,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         requestBundle,
         response,
         runtimeSnapshot,
-        localShareIdx: runtimeSnapshot.bootstrap.share.idx
+        localShareIdx: runtimeSnapshot.bootstrap.share.idx,
       });
       if (onboardHandshakeRef.current?.id === attempt.id) {
         onboardHandshakeRef.current = null;
       }
     } catch (error) {
-      if (isAbortError(error) || onboardHandshakeRef.current?.id !== attempt.id) {
+      if (
+        isAbortError(error) ||
+        onboardHandshakeRef.current?.id !== attempt.id
+      ) {
         throw error;
       }
       if (onboardHandshakeRef.current?.id === attempt.id) {
@@ -484,8 +599,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         error: {
           code: setupError.code,
           message: setupError.message,
-          details: setupError.details
-        }
+          details: setupError.details,
+        },
       });
       throw setupError;
     }
@@ -498,7 +613,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         !onboardSession.response ||
         !onboardSession.runtimeSnapshot
       ) {
-        throw new SetupFlowError("missing_session", "Complete onboarding before saving this profile.");
+        throw new SetupFlowError(
+          "missing_session",
+          "Complete onboarding before saving this profile.",
+        );
       }
       if (draft.password.length < 8) {
         throw new Error("Profile password must be at least 8 characters.");
@@ -516,14 +634,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         share,
         group,
         relays: onboardSession.payload.relays,
-        manualPeerPolicyOverrides: defaultManualPeerPolicyOverrides(group, share.idx)
+        manualPeerPolicyOverrides: defaultManualPeerPolicyOverrides(
+          group,
+          share.idx,
+        ),
       });
       const createdAt = Date.now();
-      const { record } = await buildStoredProfileRecord(payload, draft.password, {
-        createdAt,
-        lastUsedAt: createdAt,
-        label: group.group_name
-      });
+      const { record } = await buildStoredProfileRecord(
+        payload,
+        draft.password,
+        {
+          createdAt,
+          lastUsedAt: createdAt,
+          label: group.group_name,
+        },
+      );
       await saveProfile(record);
       await startRuntimeFromSnapshot(onboardSession.runtimeSnapshot);
       setActiveProfile(record.summary);
@@ -532,13 +657,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       await reloadProfiles();
       return profileId;
     },
-    [onboardSession, reloadProfiles, startRuntimeFromSnapshot]
+    [onboardSession, reloadProfiles, startRuntimeFromSnapshot],
   );
 
-	  const clearOnboardSession = useCallback(() => {
-	    abortOnboardHandshake();
-	    setOnboardSession(null);
-	  }, [abortOnboardHandshake]);
+  const clearOnboardSession = useCallback(() => {
+    abortOnboardHandshake();
+    setOnboardSession(null);
+  }, [abortOnboardHandshake]);
 
   const validateRotateKeysetSources = useCallback(
     async (input: {
@@ -548,25 +673,33 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       threshold: number;
       count: number;
     }) => {
-      if (input.threshold < 2 || input.count < 2 || input.threshold > input.count) {
-	        throw new SetupFlowError("invalid_package", "New keyset configuration is invalid.");
-	      }
-      const { record, sourcePayload, localIdx, localShare } = await loadSavedProfileSource({
-        profileId: input.profileId,
-        profilePassword: input.profilePassword
-      });
+      if (
+        input.threshold < 2 ||
+        input.count < 2 ||
+        input.threshold > input.count
+      ) {
+        throw new SetupFlowError(
+          "invalid_package",
+          "New keyset configuration is invalid.",
+        );
+      }
+      const { record, sourcePayload, localIdx, localShare } =
+        await loadSavedProfileSource({
+          profileId: input.profileId,
+          profilePassword: input.profilePassword,
+        });
       const seen = new Set<number>([localIdx]);
       const external = await decodeExternalBfshareSources({
         group: sourcePayload.group_package,
         sourcePackages: input.sourcePackages,
-        seenShareIndexes: seen
+        seenShareIndexes: seen,
       });
       const shares = [localShare, ...external.shares];
 
       if (shares.length < sourcePayload.group_package.threshold) {
         throw new SetupFlowError(
           "insufficient_sources",
-          `Collect ${sourcePayload.group_package.threshold} source shares before continuing.`
+          `Collect ${sourcePayload.group_package.threshold} source shares before continuing.`,
         );
       }
 
@@ -577,147 +710,195 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         sourceShares: shares,
         threshold: input.threshold,
         count: input.count,
-        onboardingPackages: []
+        onboardingPackages: [],
       });
     },
-    []
+    [],
   );
 
   const generateRotatedKeyset = useCallback(
     async (distributionPassword: string) => {
-      if (!rotateKeysetSession?.sourcePayload || rotateKeysetSession.sourceShares.length === 0) {
-        throw new SetupFlowError("missing_session", "Validate source shares before rotating.");
+      if (
+        !rotateKeysetSession?.sourcePayload ||
+        rotateKeysetSession.sourceShares.length === 0
+      ) {
+        throw new SetupFlowError(
+          "missing_session",
+          "Validate source shares before rotating.",
+        );
       }
       if (distributionPassword.length < 8) {
         throw new Error("Distribution password must be at least 8 characters.");
       }
       try {
-	        const rotated = await rotateKeysetBundle({
-	          group: rotateKeysetSession.sourcePayload.group_package,
-	          shares: rotateKeysetSession.sourceShares,
-	          threshold: rotateKeysetSession.threshold,
-	          count: rotateKeysetSession.count
-	        });
-	        if (rotated.next.group.group_pk !== rotateKeysetSession.sourcePayload.group_package.group_pk) {
-	          throw new Error("Rotation changed the group public key.");
-	        }
-	        setRotateKeysetSession((session) =>
+        const rotated = await rotateKeysetBundle({
+          group: rotateKeysetSession.sourcePayload.group_package,
+          shares: rotateKeysetSession.sourceShares,
+          threshold: rotateKeysetSession.threshold,
+          count: rotateKeysetSession.count,
+        });
+        if (
+          rotated.next.group.group_pk !==
+          rotateKeysetSession.sourcePayload.group_package.group_pk
+        ) {
+          throw new SetupFlowError(
+            "generation_failed",
+            "Rotation changed the group public key.",
+            { failedPhase: "Verify same group config + group public key" },
+          );
+        }
+        setRotateKeysetSession((session) =>
           session
             ? {
-	                ...session,
-	                phase: "rotated",
-	                rotated,
-	                distributionPassword
+                ...session,
+                phase: "rotated",
+                rotated,
+                distributionPassword,
               }
-            : session
+            : session,
         );
       } catch (error) {
         throw new SetupFlowError(
           "generation_failed",
-          error instanceof Error ? error.message : "Unable to generate rotated shares."
+          error instanceof Error
+            ? error.message
+            : "Unable to generate rotated shares.",
+          error instanceof SetupFlowError
+            ? error.details
+            : { failedPhase: "Generate Fresh Shares" },
         );
       }
     },
-    [rotateKeysetSession]
+    [rotateKeysetSession],
   );
 
   const createRotatedProfile = useCallback(
     async (draft: ProfileDraft) => {
-      if (!rotateKeysetSession?.rotated || !rotateKeysetSession.sourcePayload || !rotateKeysetSession.distributionPassword) {
-        throw new SetupFlowError("missing_session", "Generate rotated shares before creating a profile.");
+      if (
+        !rotateKeysetSession?.rotated ||
+        !rotateKeysetSession.sourcePayload ||
+        !rotateKeysetSession.distributionPassword
+      ) {
+        throw new SetupFlowError(
+          "missing_session",
+          "Generate rotated shares before creating a profile.",
+        );
       }
       const deviceName = draft.deviceName.trim();
       const relays = draft.relays.map((relay) => relay.trim()).filter(Boolean);
-	      if (!deviceName) {
-	        throw new Error("Profile name is required.");
-	      }
-	      if (draft.password.length < 8) {
-	        throw new Error("Profile password must be at least 8 characters.");
-	      }
-	      if (draft.password !== draft.confirmPassword) {
-	        throw new Error("Profile passwords do not match.");
-	      }
-	      if (relays.length === 0) {
-	        throw new Error("At least one relay is required.");
-	      }
+      if (!deviceName) {
+        throw new Error("Profile name is required.");
+      }
+      if (draft.password.length < 8) {
+        throw new Error("Profile password must be at least 8 characters.");
+      }
+      if (draft.password !== draft.confirmPassword) {
+        throw new Error("Profile passwords do not match.");
+      }
+      if (relays.length === 0) {
+        throw new Error("At least one relay is required.");
+      }
 
       const previousLocalIdx = rotateKeysetSession.sourceShares[0]?.idx;
       const nextBundle = rotateKeysetSession.rotated.next;
-      const localShare = nextBundle.shares.find((share) => share.idx === previousLocalIdx) ?? nextBundle.shares[0];
+      const localShare =
+        nextBundle.shares.find((share) => share.idx === previousLocalIdx) ??
+        nextBundle.shares[0];
       if (!localShare) {
-        throw new SetupFlowError("generation_failed", "Rotation did not produce a local share.");
+        throw new SetupFlowError(
+          "generation_failed",
+          "Rotation did not produce a local share.",
+        );
       }
       const profileId = await deriveProfileIdFromShareSecret(localShare.seckey);
       const payload = profilePayloadForShare({
         profileId,
         deviceName,
-	        share: localShare,
-	        group: nextBundle.group,
-	        relays,
-	        manualPeerPolicyOverrides: defaultManualPeerPolicyOverrides(nextBundle.group, localShare.idx)
-	      });
+        share: localShare,
+        group: nextBundle.group,
+        relays,
+        manualPeerPolicyOverrides: defaultManualPeerPolicyOverrides(
+          nextBundle.group,
+          localShare.idx,
+        ),
+      });
       const summary = await savePayloadAsProfile(payload, draft.password, {
         replaceProfileId: rotateKeysetSession.sourceProfile.id,
         createdAt: rotateKeysetSession.sourceProfile.createdAt,
-        label: rotateKeysetSession.sourceProfile.label
+        label: rotateKeysetSession.sourceProfile.label,
       });
 
-      const remoteShares = nextBundle.shares.filter((share) => share.idx !== localShare.idx);
+      const remoteShares = nextBundle.shares.filter(
+        (share) => share.idx !== localShare.idx,
+      );
       const onboardingPackages = await buildRemoteOnboardingPackages({
         remoteShares,
         localShare,
         group: nextBundle.group,
         relays,
-        password: rotateKeysetSession.distributionPassword
+        password: rotateKeysetSession.distributionPassword,
       });
 
       setRotateKeysetSession((session) =>
         session
           ? {
-	              ...session,
-	              phase: "profile_created",
-	              localShare,
-	              onboardingPackages,
-	              createdProfileId: summary.id
+              ...session,
+              phase: "profile_created",
+              localShare,
+              onboardingPackages,
+              createdProfileId: summary.id,
             }
-          : session
+          : session,
       );
       return summary.id;
     },
-    [rotateKeysetSession, savePayloadAsProfile]
+    [rotateKeysetSession, savePayloadAsProfile],
   );
 
-	  const updateRotatePackageState = useCallback(
-	    (idx: number, patch: Partial<Pick<OnboardingPackageView, "packageCopied" | "passwordCopied" | "copied" | "qrShown">>) => {
-	      setRotateKeysetSession((session) => {
-	        if (!session) {
-	          return session;
-	        }
-	        const normalizedPatch = normalizePackageStatePatch(patch);
-		        const onboardingPackages = session.onboardingPackages.map((entry) => (entry.idx === idx ? { ...entry, ...normalizedPatch } : entry));
-		        const distributed = allPackagesDistributed(onboardingPackages);
-		        return {
-		          ...session,
-		          phase: distributed && session.createdProfileId ? "distribution_ready" : session.createdProfileId ? "profile_created" : session.phase,
-		          onboardingPackages
-		        };
-		      });
-	    },
-	    []
-	  );
+  const updateRotatePackageState = useCallback(
+    (idx: number, patch: OnboardingPackageStatePatch) => {
+      setRotateKeysetSession((session) => {
+        if (!session) {
+          return session;
+        }
+        const normalizedPatch = normalizePackageStatePatch(patch);
+        const onboardingPackages = session.onboardingPackages.map((entry) =>
+          entry.idx === idx ? { ...entry, ...normalizedPatch } : entry,
+        );
+        const distributed = allPackagesDistributed(onboardingPackages);
+        return {
+          ...session,
+          phase:
+            distributed && session.createdProfileId
+              ? "distribution_ready"
+              : session.createdProfileId
+                ? "profile_created"
+                : session.phase,
+          onboardingPackages,
+        };
+      });
+    },
+    [],
+  );
 
-	  const finishRotateDistribution = useCallback(async () => {
-	    if (!rotateKeysetSession?.createdProfileId || rotateKeysetSession.phase !== "distribution_ready") {
-	      throw new SetupFlowError("missing_session", "No rotated profile is available.");
-	    }
+  const finishRotateDistribution = useCallback(async () => {
+    if (
+      !rotateKeysetSession?.createdProfileId ||
+      rotateKeysetSession.phase !== "distribution_ready"
+    ) {
+      throw new SetupFlowError(
+        "missing_session",
+        "No rotated profile is available.",
+      );
+    }
     const profileId = rotateKeysetSession.createdProfileId;
-	    setRotateKeysetSession(null);
-	    return profileId;
-	  }, [rotateKeysetSession]);
+    setRotateKeysetSession(null);
+    return profileId;
+  }, [rotateKeysetSession]);
 
-	  const clearRotateKeysetSession = useCallback(() => {
-	    setRotateKeysetSession(null);
-	  }, []);
+  const clearRotateKeysetSession = useCallback(() => {
+    setRotateKeysetSession(null);
+  }, []);
 
   const validateRecoverSources = useCallback(
     async (input: {
@@ -725,39 +906,45 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       profilePassword: string;
       sourcePackages: Array<{ packageText: string; password: string }>;
     }) => {
-      const { record, sourcePayload, localIdx, localShare } = await loadSavedProfileSource({
-        profileId: input.profileId,
-        profilePassword: input.profilePassword
-      });
-      const requiredExternalSources = Math.max(0, sourcePayload.group_package.threshold - 1);
+      const { record, sourcePayload, localIdx, localShare } =
+        await loadSavedProfileSource({
+          profileId: input.profileId,
+          profilePassword: input.profilePassword,
+        });
+      const requiredExternalSources = Math.max(
+        0,
+        sourcePayload.group_package.threshold - 1,
+      );
       if (input.sourcePackages.length < requiredExternalSources) {
         throw new SetupFlowError(
           "insufficient_sources",
-          `Collect ${requiredExternalSources} external source packages before continuing.`
+          `Collect ${requiredExternalSources} external source packages before continuing.`,
         );
       }
 
       const seen = new Set<number>([localIdx]);
       const external = await decodeExternalBfshareSources({
         group: sourcePayload.group_package,
-        sourcePackages: input.sourcePackages.slice(0, requiredExternalSources),
-        seenShareIndexes: seen
+        sourcePackages: input.sourcePackages,
+        seenShareIndexes: seen,
       });
       const externalShares = external.shares;
       const sources: RecoverSourceSummary[] = [
         {
           idx: localIdx,
-          memberPubkey: memberPubkeyXOnly(memberForShare(sourcePayload.group_package, localShare)),
-          relays: sourcePayload.device.relays
+          memberPubkey: memberPubkeyXOnly(
+            memberForShare(sourcePayload.group_package, localShare),
+          ),
+          relays: sourcePayload.device.relays,
         },
-        ...external.sources
+        ...external.sources,
       ];
 
       const shares = [localShare, ...externalShares];
       if (shares.length < sourcePayload.group_package.threshold) {
         throw new SetupFlowError(
           "insufficient_sources",
-          `Collect ${sourcePayload.group_package.threshold} source shares before continuing.`
+          `Collect ${sourcePayload.group_package.threshold} source shares before continuing.`,
         );
       }
 
@@ -766,44 +953,52 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         sourcePayload,
         localShare,
         externalShares,
-        sources
+        sources,
       });
     },
-    []
+    [],
   );
 
   const recoverNsec = useCallback(async () => {
     if (!recoverSession?.sourcePayload || !recoverSession.localShare) {
-      throw new SetupFlowError("missing_session", "Validate recovery sources before recovering.");
+      throw new SetupFlowError(
+        "missing_session",
+        "Validate recovery sources before recovering.",
+      );
     }
 
-    const shares = [recoverSession.localShare, ...recoverSession.externalShares];
+    const shares = [
+      recoverSession.localShare,
+      ...recoverSession.externalShares,
+    ];
     if (shares.length < recoverSession.sourcePayload.group_package.threshold) {
       throw new SetupFlowError(
         "insufficient_sources",
-        `Collect ${recoverSession.sourcePayload.group_package.threshold} source shares before continuing.`
+        `Collect ${recoverSession.sourcePayload.group_package.threshold} source shares before continuing.`,
       );
     }
 
     try {
       const recovered = await recoverNsecFromShares({
         group: recoverSession.sourcePayload.group_package,
-        shares
+        shares,
       });
       setRecoverSession((session) =>
         session
           ? {
               ...session,
               recovered,
-              expiresAt: Date.now() + 60_000
+              expiresAt: Date.now() + 60_000,
             }
-          : session
+          : session,
       );
       return recovered;
     } catch (error) {
       throw new SetupFlowError(
         "recovery_failed",
-        error instanceof Error ? error.message : "Unable to recover the Nostr private key."
+        error instanceof Error
+          ? error.message
+          : "Unable to recover the Nostr private key.",
       );
     }
   }, [recoverSession]);
@@ -822,15 +1017,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (!record) {
         throw new Error("Profile was not found.");
       }
-      const payload = await decodeProfilePackage(record.encryptedProfilePackage, password);
-      const runtime = await createRuntimeFromProfilePayload(payload, record.summary.localShareIdx);
+      const payload = await decodeProfilePackage(
+        record.encryptedProfilePackage,
+        password,
+      );
+      const runtime = await createRuntimeFromProfilePayload(
+        payload,
+        record.summary.localShareIdx,
+      );
       await touchProfile(id);
       setRuntime(runtime);
       setActiveProfile({ ...record.summary, lastUsedAt: Date.now() });
       setSignerPausedState(false);
       await reloadProfiles();
     },
-    [reloadProfiles, setRuntime]
+    [reloadProfiles, setRuntime],
   );
 
   const lockProfile = useCallback(() => {
@@ -838,14 +1039,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     runtimeRef.current = null;
     simulatorRef.current?.stop();
     simulatorRef.current = null;
-	    setRuntimeStatus(null);
-	    setActiveProfile(null);
-	    setSignerPausedState(false);
-	    setCreateSession(null);
-	    setImportSession(null);
-	    setOnboardSession(null);
-	    setRotateKeysetSession(null);
-	    setRecoverSession(null);
+    setRuntimeStatus(null);
+    setActiveProfile(null);
+    setSignerPausedState(false);
+    setCreateSession(null);
+    setImportSession(null);
+    setOnboardSession(null);
+    setRotateKeysetSession(null);
+    setRecoverSession(null);
   }, [abortOnboardHandshake]);
 
   const clearCredentials = useCallback(async () => {
@@ -920,33 +1121,33 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       recoverSession,
       reloadProfiles,
       createKeyset,
-	      createProfile,
-	      updatePackageState,
-	      finishDistribution,
-	      clearCreateSession,
-	      beginImport,
-	      decryptImportBackup,
-	      saveImportedProfile,
-	      clearImportSession,
-	      decodeOnboardPackage,
-	      startOnboardHandshake,
-	      saveOnboardedProfile,
-	      clearOnboardSession,
-	      validateRotateKeysetSources,
-	      generateRotatedKeyset,
-	      createRotatedProfile,
-	      updateRotatePackageState,
-	      finishRotateDistribution,
-	      clearRotateKeysetSession,
-	      validateRecoverSources,
-	      recoverNsec,
-	      clearRecoverSession,
-	      expireRecoveredNsec,
-	      unlockProfile,
+      createProfile,
+      updatePackageState,
+      finishDistribution,
+      clearCreateSession,
+      beginImport,
+      decryptImportBackup,
+      saveImportedProfile,
+      clearImportSession,
+      decodeOnboardPackage,
+      startOnboardHandshake,
+      saveOnboardedProfile,
+      clearOnboardSession,
+      validateRotateKeysetSources,
+      generateRotatedKeyset,
+      createRotatedProfile,
+      updateRotatePackageState,
+      finishRotateDistribution,
+      clearRotateKeysetSession,
+      validateRecoverSources,
+      recoverNsec,
+      clearRecoverSession,
+      expireRecoveredNsec,
+      unlockProfile,
       lockProfile,
       clearCredentials,
       setSignerPaused,
-      refreshRuntime
+      refreshRuntime,
     }),
     [
       profiles,
@@ -960,35 +1161,39 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       recoverSession,
       reloadProfiles,
       createKeyset,
-	      createProfile,
-	      updatePackageState,
-	      finishDistribution,
-	      clearCreateSession,
-	      beginImport,
-	      decryptImportBackup,
+      createProfile,
+      updatePackageState,
+      finishDistribution,
+      clearCreateSession,
+      beginImport,
+      decryptImportBackup,
       saveImportedProfile,
       clearImportSession,
       decodeOnboardPackage,
       startOnboardHandshake,
       saveOnboardedProfile,
       clearOnboardSession,
-	      validateRotateKeysetSources,
-	      generateRotatedKeyset,
-	      createRotatedProfile,
-	      updateRotatePackageState,
-	      finishRotateDistribution,
-	      clearRotateKeysetSession,
-	      validateRecoverSources,
-	      recoverNsec,
-	      clearRecoverSession,
-	      expireRecoveredNsec,
-	      unlockProfile,
+      validateRotateKeysetSources,
+      generateRotatedKeyset,
+      createRotatedProfile,
+      updateRotatePackageState,
+      finishRotateDistribution,
+      clearRotateKeysetSession,
+      validateRecoverSources,
+      recoverNsec,
+      clearRecoverSession,
+      expireRecoveredNsec,
+      unlockProfile,
       lockProfile,
       clearCredentials,
       setSignerPaused,
-      refreshRuntime
-    ]
+      refreshRuntime,
+    ],
   );
 
-  return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
+  return (
+    <AppStateContext.Provider value={value}>
+      {children}
+    </AppStateContext.Provider>
+  );
 }

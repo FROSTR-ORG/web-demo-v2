@@ -13,7 +13,7 @@ import type { BfProfilePayload } from "../lib/bifrost/types";
 
 function ImportLabelWithHelp({
   htmlFor,
-  children
+  children,
 }: {
   htmlFor?: string;
   children: React.ReactNode;
@@ -27,7 +27,11 @@ function ImportLabelWithHelp({
       ) : (
         <span className="label">{children}</span>
       )}
-      <HelpCircle className="import-label-help-icon" size={14} aria-hidden="true" />
+      <HelpCircle
+        className="import-label-help-icon"
+        size={14}
+        aria-hidden="true"
+      />
     </span>
   );
 }
@@ -40,24 +44,27 @@ const MOCK_REVIEW_DATA = {
   shareKey: "#1 (Index 1)",
   relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
   peerPolicies: "3 configured",
-  backupCreated: "Mar 8, 2026"
+  backupCreated: "Mar 8, 2026",
 };
 
 /* ---------- Validation helpers ---------- */
 
-function validateBackupString(value: string): { valid: boolean; message: string } {
+function validateBackupString(value: string): {
+  valid: boolean;
+  message: string;
+} {
   if (!value.trim()) {
     return { valid: false, message: "" };
   }
   if (value.trim().startsWith("bfprofile1")) {
     return {
       valid: true,
-      message: "Valid backup format — decrypt to review profile details"
+      message: "Valid backup format — decrypt to review profile details",
     };
   }
   return {
     valid: false,
-    message: "Invalid backup — String must begin with bfprofile1 prefix."
+    message: "Invalid backup — String must begin with bfprofile1 prefix.",
   };
 }
 
@@ -70,7 +77,9 @@ export function LoadBackupScreen() {
   const { beginImport, clearImportSession } = useAppState();
   const demoUi = useDemoUi();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [backupString, setBackupString] = useState(demoUi.import?.backupPreset ?? "");
+  const [backupString, setBackupString] = useState(
+    demoUi.import?.backupPreset ?? "",
+  );
   const validation = validateBackupString(backupString);
 
   function handleContinue() {
@@ -82,18 +91,25 @@ export function LoadBackupScreen() {
   return (
     <AppShell mainVariant="flow">
       <div className="screen-column">
-        <BackLink onClick={() => {
-          clearImportSession();
-          navigate("/");
-        }} label="Back to Welcome" />
+        <BackLink
+          onClick={() => {
+            clearImportSession();
+            navigate("/");
+          }}
+          label="Back to Welcome"
+        />
         <PageHeading
           title="Load Backup"
           copy="Load a bfprofile1 device profile backup from text or file to continue."
         />
 
         <div className="field">
-          <ImportLabelWithHelp htmlFor="backup-input">Profile Backup</ImportLabelWithHelp>
-          <p className="help">Paste a bfprofile1... backup string or upload a backup file.</p>
+          <ImportLabelWithHelp htmlFor="backup-input">
+            Profile Backup
+          </ImportLabelWithHelp>
+          <p className="help">
+            Paste a bfprofile1... backup string or upload a backup file.
+          </p>
           <textarea
             id="backup-input"
             className="input import-textarea"
@@ -114,11 +130,21 @@ export function LoadBackupScreen() {
               event.currentTarget.value = "";
             }}
           />
-          <button type="button" className="button button-ghost button-md import-upload-btn" onClick={() => fileInputRef.current?.click()}>
+          <button
+            type="button"
+            className="button button-ghost button-md import-upload-btn"
+            onClick={() => fileInputRef.current?.click()}
+          >
             Upload Backup File
           </button>
           {validation.message && (
-            <span className={validation.valid ? "import-validation-ok" : "import-validation-error"}>
+            <span
+              className={
+                validation.valid
+                  ? "import-validation-ok"
+                  : "import-validation-error"
+              }
+            >
               {validation.message}
             </span>
           )}
@@ -145,9 +171,14 @@ export function LoadBackupScreen() {
 export function DecryptBackupScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { importSession, decryptImportBackup, clearImportSession } = useAppState();
+  const { importSession, decryptImportBackup, clearImportSession } =
+    useAppState();
   const demoUi = useDemoUi();
-  const backupString = importSession?.backupString ?? (location.state as { backupString?: string } | null)?.backupString ?? demoUi.import?.backupPreset ?? "";
+  const backupString =
+    importSession?.backupString ??
+    (location.state as { backupString?: string } | null)?.backupString ??
+    demoUi.import?.backupPreset ??
+    "";
   const [password, setPassword] = useState(demoUi.import?.passwordPreset ?? "");
   const [error, setError] = useState("");
 
@@ -166,18 +197,28 @@ export function DecryptBackupScreen() {
       await decryptImportBackup(backupString, password);
       navigate("/import/review");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to decrypt this backup.");
-      navigate("/import/error", { state: { errorCode: err instanceof Error && "code" in err ? err.code : undefined } });
+      setError(
+        err instanceof Error ? err.message : "Unable to decrypt this backup.",
+      );
+      navigate("/import/error", {
+        state: {
+          backupString,
+          errorCode:
+            err instanceof Error && "code" in err ? err.code : undefined,
+        },
+      });
     }
   }
 
   return (
     <AppShell mainVariant="flow">
       <div className="screen-column">
-        <BackLink onClick={() => {
-          clearImportSession();
-          navigate("/import");
-        }} />
+        <BackLink
+          onClick={() => {
+            clearImportSession();
+            navigate("/import");
+          }}
+        />
         <PageHeading
           title="Decrypt Backup"
           copy="Decrypt the loaded bfprofile1 backup using its backup password."
@@ -186,7 +227,9 @@ export function DecryptBackupScreen() {
         <div className="field">
           <ImportLabelWithHelp>Profile Backup</ImportLabelWithHelp>
           <div className="import-backup-display">
-            <span className="import-backup-text">{truncate(backupString, 60)}</span>
+            <span className="import-backup-text">
+              {truncate(backupString, 60)}
+            </span>
           </div>
           {validation.valid && (
             <span className="import-validation-ok">{validation.message}</span>
@@ -225,7 +268,8 @@ export function DecryptBackupScreen() {
 export function ReviewSaveScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { importSession, saveImportedProfile, clearImportSession } = useAppState();
+  const { importSession, saveImportedProfile, clearImportSession } =
+    useAppState();
   const demoUi = useDemoUi();
   const state = location.state as { backupString?: string } | null;
   const presetPassword = demoUi.import?.profilePasswordPreset ?? "";
@@ -243,24 +287,35 @@ export function ReviewSaveScreen() {
     return <Navigate to="/import" replace />;
   }
 
-  const passwordsMatch = profilePassword.length > 0 && profilePassword === confirmPassword;
+  const passwordsMatch =
+    profilePassword.length > 0 && profilePassword === confirmPassword;
   const conflictProfile = importSession?.conflictProfile;
   const reviewData = importSession?.payload
     ? reviewDataFromPayload(importSession.payload, importSession.localShareIdx)
     : MOCK_REVIEW_DATA;
-  const backupForRetry = importSession?.backupString ?? state?.backupString ?? demoUi.import?.backupPreset ?? DEMO_BFPROFILE;
+  const backupForRetry =
+    importSession?.backupString ??
+    state?.backupString ??
+    demoUi.import?.backupPreset ??
+    DEMO_BFPROFILE;
 
   async function handleImport() {
     if (saving || !passwordsMatch) return;
     setSaving(true);
     setError("");
     try {
-      const profileId = await saveImportedProfile({ password: profilePassword, confirmPassword, replaceExisting });
+      const profileId = await saveImportedProfile({
+        password: profilePassword,
+        confirmPassword,
+        replaceExisting,
+      });
       setHandoffStarted(true);
       navigate(`/dashboard/${profileId}`);
       window.setTimeout(clearImportSession, 0);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to import this profile.");
+      setError(
+        err instanceof Error ? err.message : "Unable to import this profile.",
+      );
       setSaving(false);
     }
   }
@@ -271,7 +326,9 @@ export function ReviewSaveScreen() {
         <BackLink
           onClick={() => {
             clearImportSession();
-            navigate("/import/decrypt", { state: { backupString: backupForRetry } });
+            navigate("/import/decrypt", {
+              state: { backupString: backupForRetry },
+            });
           }}
         />
         <PageHeading
@@ -309,14 +366,20 @@ export function ReviewSaveScreen() {
           </div>
           <div className="import-review-row">
             <span className="import-review-label">Peer Policies</span>
-            <span className="import-review-value">{reviewData.peerPolicies}</span>
+            <span className="import-review-value">
+              {reviewData.peerPolicies}
+            </span>
           </div>
         </div>
 
         {/* Metadata bar */}
         <div className="import-meta-bar">
-          <span className="import-meta-label">Import-specific meta stays outside the cards.</span>
-          <span className="import-meta-value">Backup Created · {reviewData.backupCreated}</span>
+          <span className="import-meta-label">
+            Import-specific meta stays outside the cards.
+          </span>
+          <span className="import-meta-value">
+            Backup Created · {reviewData.backupCreated}
+          </span>
         </div>
 
         {conflictProfile ? (
@@ -341,10 +404,15 @@ export function ReviewSaveScreen() {
           <div className="import-password-header">
             <span className="import-label-row import-password-title-row">
               <span className="section-title">Profile Password</span>
-              <HelpCircle className="import-label-help-icon" size={14} aria-hidden="true" />
+              <HelpCircle
+                className="import-label-help-icon"
+                size={14}
+                aria-hidden="true"
+              />
             </span>
             <p className="help">
-              This password encrypts your profile on this device. You'll need it each time you unlock it.
+              This password encrypts your profile on this device. You'll need it
+              each time you unlock it.
             </p>
           </div>
           <div className="field-row">
@@ -366,7 +434,12 @@ export function ReviewSaveScreen() {
         <Button
           type="button"
           size="full"
-          disabled={!passwordsMatch || saving || !importSession?.payload || Boolean(conflictProfile && !replaceExisting)}
+          disabled={
+            !passwordsMatch ||
+            saving ||
+            !importSession?.payload ||
+            Boolean(conflictProfile && !replaceExisting)
+          }
           onClick={handleImport}
         >
           {saving ? "Importing..." : "Import & Launch Signer"}
@@ -385,9 +458,15 @@ export function ImportErrorScreen() {
   const location = useLocation();
   const { importSession, clearImportSession } = useAppState();
   const demoUi = useDemoUi();
-  const state = location.state as { backupString?: string; errorCode?: string } | null;
-  const backupString = importSession?.backupString ?? state?.backupString ?? DEMO_BFPROFILE;
-  const corrupted = demoUi.import?.errorVariant === "corrupted" || state?.errorCode === "invalid_package";
+  const state = location.state as {
+    backupString?: string;
+    errorCode?: string;
+  } | null;
+  const backupString =
+    importSession?.backupString ?? state?.backupString ?? DEMO_BFPROFILE;
+  const corrupted =
+    demoUi.import?.errorVariant === "corrupted" ||
+    state?.errorCode === "invalid_package";
   /*
    * Paper's error variants use Tailwind-style arbitrary hex classes so the
    * fidelity validators can compare `className` tokens directly. We mirror
@@ -401,10 +480,12 @@ export function ImportErrorScreen() {
   return (
     <AppShell mainVariant="flow">
       <div className="screen-column">
-        <BackLink onClick={() => {
-          clearImportSession();
-          navigate("/import");
-        }} />
+        <BackLink
+          onClick={() => {
+            clearImportSession();
+            navigate("/import");
+          }}
+        />
         <PageHeading
           title="Import Error"
           copy="We couldn't import this profile backup. Resolve the issue below and try again."
@@ -415,7 +496,9 @@ export function ImportErrorScreen() {
             <AlertTriangle size={14} />
           </div>
           <div className="import-error-body">
-            <div className="import-error-title">{corrupted ? "Backup Corrupted" : "Incorrect Password"}</div>
+            <div className="import-error-title">
+              {corrupted ? "Backup Corrupted" : "Incorrect Password"}
+            </div>
             <div className="import-error-description">
               {corrupted
                 ? "The backup could not be parsed. It may be damaged or incomplete."
@@ -432,21 +515,33 @@ export function ImportErrorScreen() {
              * button. The amber wrong-password variant keeps Try Again as
              * primary and Back to Import as ghost (VAL-IMP-004).
              */
-            <Button type="button" onClick={() => {
-              clearImportSession();
-              navigate("/import");
-            }}>
+            <Button
+              type="button"
+              onClick={() => {
+                clearImportSession();
+                navigate("/import");
+              }}
+            >
               Back to Import
             </Button>
           ) : (
             <>
-              <Button type="button" onClick={() => navigate("/import/decrypt", { state: { backupString } })}>
+              <Button
+                type="button"
+                onClick={() =>
+                  navigate("/import/decrypt", { state: { backupString } })
+                }
+              >
                 Try Again
               </Button>
-              <Button type="button" variant="ghost" onClick={() => {
-                clearImportSession();
-                navigate("/import");
-              }}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  clearImportSession();
+                  navigate("/import");
+                }}
+              >
                 Back to Import
               </Button>
             </>
@@ -463,8 +558,14 @@ function truncate(str: string, len: number) {
   return str.length > len ? str.slice(0, len) + "..." : str;
 }
 
-function reviewDataFromPayload(payload: BfProfilePayload, localShareIdx?: number): typeof MOCK_REVIEW_DATA {
-  const shareLabel = localShareIdx === undefined ? "#? (Index ?)" : `#${localShareIdx} (Index ${localShareIdx})`;
+function reviewDataFromPayload(
+  payload: BfProfilePayload,
+  localShareIdx?: number,
+): typeof MOCK_REVIEW_DATA {
+  const shareLabel =
+    localShareIdx === undefined
+      ? "#? (Index ?)"
+      : `#${localShareIdx} (Index ${localShareIdx})`;
   const policyCount = payload.device.manual_peer_policy_overrides?.length ?? 0;
   return {
     groupName: payload.group_package.group_name,
@@ -472,6 +573,6 @@ function reviewDataFromPayload(payload: BfProfilePayload, localShareIdx?: number
     shareKey: shareLabel,
     relays: payload.device.relays,
     peerPolicies: `${policyCount} configured`,
-    backupCreated: "Unknown"
+    backupCreated: "Unknown",
   };
 }

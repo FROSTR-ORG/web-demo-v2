@@ -1,11 +1,17 @@
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  cleanup,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   LoadBackupScreen,
   DecryptBackupScreen,
   ReviewSaveScreen,
-  ImportErrorScreen
+  ImportErrorScreen,
 } from "../ImportScreens";
 
 const mocks = vi.hoisted(() => ({
@@ -22,26 +28,36 @@ const mocks = vi.hoisted(() => ({
   importSession: null as {
     backupString: string;
     localShareIdx?: number;
-	    payload?: {
-	      profile_id: string;
-	      version: number;
-	      device: { name: string; share_secret: string; manual_peer_policy_overrides: unknown[]; relays: string[] };
-	      group_package: { group_name: string; group_pk: string; threshold: number; members: { idx: number; pubkey: string }[] };
-	    };
-	    conflictProfile?: {
-	      id: string;
-	      label: string;
-	      deviceName: string;
-	      groupName: string;
-	      threshold: number;
-	      memberCount: number;
-	      localShareIdx: number;
-	      groupPublicKey: string;
-	      relays: string[];
-	      createdAt: number;
-	      lastUsedAt: number;
-	    };
-	  } | null
+    payload?: {
+      profile_id: string;
+      version: number;
+      device: {
+        name: string;
+        share_secret: string;
+        manual_peer_policy_overrides: unknown[];
+        relays: string[];
+      };
+      group_package: {
+        group_name: string;
+        group_pk: string;
+        threshold: number;
+        members: { idx: number; pubkey: string }[];
+      };
+    };
+    conflictProfile?: {
+      id: string;
+      label: string;
+      deviceName: string;
+      groupName: string;
+      threshold: number;
+      memberCount: number;
+      localShareIdx: number;
+      groupPublicKey: string;
+      relays: string[];
+      createdAt: number;
+      lastUsedAt: number;
+    };
+  } | null,
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -54,8 +70,8 @@ vi.mock("react-router-dom", async () => {
       search: "",
       hash: "",
       state: mocks.locationState,
-      key: "default"
-    })
+      key: "default",
+    }),
   };
 });
 
@@ -65,15 +81,15 @@ vi.mock("../../app/AppState", () => ({
     createKeyset: mocks.createKeyset,
     createProfile: mocks.createProfile,
     beginImport: mocks.beginImport,
-	      decryptImportBackup: mocks.decryptImportBackup,
-	      saveImportedProfile: mocks.saveImportedProfile,
-	      clearImportSession: mocks.clearImportSession,
-	      importSession: mocks.importSession
-  })
+    decryptImportBackup: mocks.decryptImportBackup,
+    saveImportedProfile: mocks.saveImportedProfile,
+    clearImportSession: mocks.clearImportSession,
+    importSession: mocks.importSession,
+  }),
 }));
 
 vi.mock("../../lib/storage/profileStore", () => ({
-  saveProfile: mocks.mockSaveProfile
+  saveProfile: mocks.mockSaveProfile,
 }));
 
 afterEach(() => {
@@ -107,7 +123,7 @@ function makeImportSession() {
         name: "Igloo Web",
         share_secret: "1".repeat(64),
         manual_peer_policy_overrides: [],
-        relays: ["wss://relay.primal.net", "wss://relay.damus.io"]
+        relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
       },
       group_package: {
         group_name: "My Signing Key",
@@ -116,10 +132,10 @@ function makeImportSession() {
         members: [
           { idx: 1, pubkey: "02" + "1".repeat(64) },
           { idx: 2, pubkey: "02" + "2".repeat(64) },
-          { idx: 3, pubkey: "02" + "3".repeat(64) }
-        ]
-      }
-    }
+          { idx: 3, pubkey: "02" + "3".repeat(64) },
+        ],
+      },
+    },
   };
 }
 
@@ -128,21 +144,27 @@ describe("LoadBackupScreen", () => {
     render(
       <MemoryRouter>
         <LoadBackupScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Load Backup")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("bfprofile1...")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Upload Backup File/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Continue/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Upload Backup File/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Continue/i }),
+    ).toBeInTheDocument();
     /* VAL-IMP-001: Load Backup uses 'Back to Welcome' label (not default 'Back'). */
-    expect(screen.getByRole("button", { name: "Back to Welcome" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Back to Welcome" }),
+    ).toBeInTheDocument();
   });
 
   it("Continue CTA is disabled until a valid bfprofile1 backup is entered (VAL-IMP-001)", () => {
     render(
       <MemoryRouter>
         <LoadBackupScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const continueBtn = screen.getByRole("button", { name: /Continue/i });
     expect(continueBtn).toBeDisabled();
@@ -156,12 +178,14 @@ describe("LoadBackupScreen", () => {
     render(
       <MemoryRouter>
         <LoadBackupScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const textarea = screen.getByPlaceholderText("bfprofile1...");
     fireEvent.change(textarea, { target: { value: "bfprofile1abc123" } });
     const validator = screen.getByText(/Valid backup/);
-    expect(validator.textContent).toBe("Valid backup format — decrypt to review profile details");
+    expect(validator.textContent).toBe(
+      "Valid backup format — decrypt to review profile details",
+    );
     expect(validator.textContent).not.toContain("2 of 3");
     expect(validator.textContent).not.toContain("(Index 1)");
     expect(validator.textContent).not.toContain("Share #");
@@ -172,7 +196,7 @@ describe("LoadBackupScreen", () => {
     render(
       <MemoryRouter>
         <LoadBackupScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const textarea = screen.getByPlaceholderText("bfprofile1...");
     fireEvent.change(textarea, { target: { value: "invalid-string" } });
@@ -186,12 +210,18 @@ describe("DecryptBackupScreen", () => {
     render(
       <MemoryRouter>
         <DecryptBackupScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: "Decrypt Backup" })).toBeInTheDocument();
-    expect(screen.getByText(/bfprofile1qvz8k2afcqqszq2v5v5hn/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Decrypt Backup" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/bfprofile1qvz8k2afcqqszq2v5v5hn/),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("Backup Password")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Decrypt Backup/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Decrypt Backup/i }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Back")).toBeInTheDocument();
   });
 
@@ -200,10 +230,12 @@ describe("DecryptBackupScreen", () => {
     render(
       <MemoryRouter>
         <DecryptBackupScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const validator = screen.getByText(/Valid backup/);
-    expect(validator.textContent).toBe("Valid backup format — decrypt to review profile details");
+    expect(validator.textContent).toBe(
+      "Valid backup format — decrypt to review profile details",
+    );
     expect(validator.textContent).not.toContain("2 of 3");
     expect(validator.textContent).not.toContain("(Index 1)");
     expect(validator.textContent).not.toContain("Share #");
@@ -215,7 +247,7 @@ describe("DecryptBackupScreen", () => {
     render(
       <MemoryRouter>
         <DecryptBackupScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const decryptBtn = screen.getByRole("button", { name: /Decrypt Backup/i });
     expect(decryptBtn).toBeDisabled();
@@ -230,7 +262,7 @@ describe("DecryptBackupScreen", () => {
     const { container } = render(
       <MemoryRouter>
         <DecryptBackupScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     /* When no backup state, the component renders nothing (Navigate redirects) */
     expect(container.textContent).toBe("");
@@ -238,17 +270,28 @@ describe("DecryptBackupScreen", () => {
 
   it("navigates to error with backup context when password is wrong", async () => {
     mocks.importSession = { backupString: "bfprofile1abc123" };
-    mocks.decryptImportBackup.mockRejectedValueOnce(new Error("Incorrect password"));
+    mocks.decryptImportBackup.mockRejectedValueOnce(
+      new Error("Incorrect password"),
+    );
     render(
       <MemoryRouter>
         <DecryptBackupScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const passwordInput = screen.getByLabelText("Backup Password");
     fireEvent.change(passwordInput, { target: { value: "wrong" } });
     fireEvent.click(screen.getByRole("button", { name: /Decrypt Backup/i }));
-    await waitFor(() => expect(mocks.decryptImportBackup).toHaveBeenCalledWith("bfprofile1abc123", "wrong"));
-    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith("/import/error", { state: { errorCode: undefined } }));
+    await waitFor(() =>
+      expect(mocks.decryptImportBackup).toHaveBeenCalledWith(
+        "bfprofile1abc123",
+        "wrong",
+      ),
+    );
+    await waitFor(() =>
+      expect(mocks.navigate).toHaveBeenCalledWith("/import/error", {
+        state: { backupString: "bfprofile1abc123", errorCode: undefined },
+      }),
+    );
   });
 });
 
@@ -259,7 +302,7 @@ describe("ReviewSaveScreen", () => {
     render(
       <MemoryRouter>
         <ReviewSaveScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Review & Save Profile")).toBeInTheDocument();
     expect(screen.getByText("Group Profile")).toBeInTheDocument();
@@ -268,7 +311,9 @@ describe("ReviewSaveScreen", () => {
     expect(screen.getByText("2 of 3")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(screen.getByLabelText("Confirm Password")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Import & Launch Signer/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Import & Launch Signer/i }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Back")).toBeInTheDocument();
   });
 
@@ -278,7 +323,7 @@ describe("ReviewSaveScreen", () => {
     render(
       <MemoryRouter>
         <ReviewSaveScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const titleRow = screen.getByText("Profile Password").parentElement;
     expect(titleRow).toHaveClass("import-label-row");
@@ -289,16 +334,21 @@ describe("ReviewSaveScreen", () => {
     mocks.importSession = makeImportSession();
     mocks.locationState = {
       backupString: "bfprofile1test",
-      demoUi: { import: { profilePasswordPreset: "hunter1234" } }
+      demoUi: { import: { profilePasswordPreset: "hunter1234" } },
     };
     render(
       <MemoryRouter>
         <ReviewSaveScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    fireEvent.click(screen.getByRole("button", { name: /Import & Launch Signer/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Import & Launch Signer/i }),
+    );
     await waitFor(() => expect(mocks.saveImportedProfile).toHaveBeenCalled());
-    const profileArg = mocks.saveImportedProfile.mock.calls[0][0] as { password: string; confirmPassword: string };
+    const profileArg = mocks.saveImportedProfile.mock.calls[0][0] as {
+      password: string;
+      confirmPassword: string;
+    };
     expect(profileArg.password).toBe("hunter1234");
     expect(profileArg.confirmPassword).toBe("hunter1234");
     await waitFor(() => expect(mocks.navigate).toHaveBeenCalled());
@@ -320,19 +370,21 @@ describe("ReviewSaveScreen", () => {
         groupPublicKey: "2".repeat(64),
         relays: ["wss://relay.primal.net"],
         createdAt: 1,
-        lastUsedAt: 1
-      }
+        lastUsedAt: 1,
+      },
     };
     mocks.locationState = {
       backupString: "bfprofile1test",
-      demoUi: { import: { profilePasswordPreset: "hunter1234" } }
+      demoUi: { import: { profilePasswordPreset: "hunter1234" } },
     };
     render(
       <MemoryRouter>
         <ReviewSaveScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    const save = screen.getByRole("button", { name: /Import & Launch Signer/i });
+    const save = screen.getByRole("button", {
+      name: /Import & Launch Signer/i,
+    });
     expect(screen.getByText("Existing profile found")).toBeInTheDocument();
     expect(save).toBeDisabled();
     fireEvent.click(screen.getByLabelText(/Replace Existing Signing Key/i));
@@ -344,7 +396,7 @@ describe("ReviewSaveScreen", () => {
     const { container } = render(
       <MemoryRouter>
         <ReviewSaveScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     /* When no state, the component renders nothing (Navigate redirects) */
     expect(container.textContent).toBe("");
@@ -355,7 +407,7 @@ describe("ReviewSaveScreen", () => {
     const { container } = render(
       <MemoryRouter>
         <ReviewSaveScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(container.textContent).toBe("");
   });
@@ -366,12 +418,14 @@ describe("ImportErrorScreen", () => {
     render(
       <MemoryRouter>
         <ImportErrorScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Import Error")).toBeInTheDocument();
     expect(screen.getByText("Incorrect Password")).toBeInTheDocument();
     const tryAgain = screen.getByRole("button", { name: /Try Again/i });
-    const backToImport = screen.getByRole("button", { name: /Back to Import/i });
+    const backToImport = screen.getByRole("button", {
+      name: /Back to Import/i,
+    });
     expect(tryAgain).toBeInTheDocument();
     expect(backToImport).toBeInTheDocument();
     /* Amber variant: Try Again is primary, Back to Import is secondary/ghost. */
@@ -379,7 +433,9 @@ describe("ImportErrorScreen", () => {
     expect(backToImport).toHaveClass("button-ghost");
     expect(screen.getByText("Back")).toBeInTheDocument();
 
-    const alert = screen.getByText("Incorrect Password").closest(".import-error-alert");
+    const alert = screen
+      .getByText("Incorrect Password")
+      .closest(".import-error-alert");
     expect(alert).not.toBeNull();
     expect(alert?.className).toContain("bg-[#EAB3081A]");
     expect(alert?.className).toContain("border-[#EAB30840]");
@@ -391,12 +447,14 @@ describe("ImportErrorScreen", () => {
     render(
       <MemoryRouter>
         <ImportErrorScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Backup Corrupted")).toBeInTheDocument();
     expect(screen.getByText(/could not be parsed/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Try Again/i })).toBeNull();
-    const backToImport = screen.getByRole("button", { name: /Back to Import/i });
+    const backToImport = screen.getByRole("button", {
+      name: /Back to Import/i,
+    });
     expect(backToImport).toBeInTheDocument();
     /*
      * VAL-IMP-005 requires the single CTA to render as the solid-blue
@@ -405,7 +463,9 @@ describe("ImportErrorScreen", () => {
     expect(backToImport).toHaveClass("button-primary");
     expect(backToImport).not.toHaveClass("button-ghost");
 
-    const alert = screen.getByText("Backup Corrupted").closest(".import-error-alert");
+    const alert = screen
+      .getByText("Backup Corrupted")
+      .closest(".import-error-alert");
     expect(alert).not.toBeNull();
     expect(alert?.className).toContain("red");
     expect(alert?.className).toContain("bg-[#EF44441A]");
@@ -417,17 +477,19 @@ describe("ImportErrorScreen", () => {
     render(
       <MemoryRouter>
         <ImportErrorScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Try Again/i }));
-    expect(mocks.navigate).toHaveBeenCalledWith("/import/decrypt", { state: { backupString: "bfprofile1abc123" } });
+    expect(mocks.navigate).toHaveBeenCalledWith("/import/decrypt", {
+      state: { backupString: "bfprofile1abc123" },
+    });
   });
 
   it("Back to Import button navigates to load backup screen (VAL-IMP-006)", () => {
     render(
       <MemoryRouter>
         <ImportErrorScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Back to Import/i }));
     expect(mocks.navigate).toHaveBeenCalledWith("/import");

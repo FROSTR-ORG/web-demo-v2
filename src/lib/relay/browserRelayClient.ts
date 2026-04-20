@@ -10,7 +10,7 @@ export class OnboardingRelayError extends Error {
   constructor(
     public readonly code: OnboardingRelayErrorCode,
     message: string,
-    public readonly details?: Record<string, unknown>
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "OnboardingRelayError";
@@ -21,7 +21,11 @@ export interface RelayConnection {
   url: string;
   connect(): Promise<void>;
   publish(event: unknown): Promise<void>;
-  subscribe(filter: RelayFilter, onEvent: (event: unknown) => void, onNotice?: (message: string) => void): RelaySubscription;
+  subscribe(
+    filter: RelayFilter,
+    onEvent: (event: unknown) => void,
+    onNotice?: (message: string) => void,
+  ): RelaySubscription;
   close(): void;
 }
 
@@ -33,12 +37,21 @@ interface WebSocketLike {
   readyState: number;
   send(data: string): void;
   close(): void;
-  addEventListener(type: "open" | "message" | "error" | "close", listener: (event: Event | MessageEvent) => void): void;
-  removeEventListener(type: "open" | "message" | "error" | "close", listener: (event: Event | MessageEvent) => void): void;
+  addEventListener(
+    type: "open" | "message" | "error" | "close",
+    listener: (event: Event | MessageEvent) => void,
+  ): void;
+  removeEventListener(
+    type: "open" | "message" | "error" | "close",
+    listener: (event: Event | MessageEvent) => void,
+  ): void;
 }
 
 export class BrowserRelayClient implements RelayClient {
-  constructor(private readonly createSocket: (url: string) => WebSocketLike = (url) => new WebSocket(url)) {}
+  constructor(
+    private readonly createSocket: (url: string) => WebSocketLike = (url) =>
+      new WebSocket(url),
+  ) {}
 
   connect(url: string): RelayConnection {
     return new BrowserRelayConnection(url, this.createSocket);
@@ -50,11 +63,12 @@ class BrowserRelayConnection implements RelayConnection {
   private subscriptionSeq = 0;
   private subscriptions = new Map<string, (event: unknown) => void>();
   private noticeListeners = new Set<(message: string) => void>();
-  private messageListener: ((event: Event | MessageEvent) => void) | null = null;
+  private messageListener: ((event: Event | MessageEvent) => void) | null =
+    null;
 
   constructor(
     public readonly url: string,
-    private readonly createSocket: (url: string) => WebSocketLike
+    private readonly createSocket: (url: string) => WebSocketLike,
   ) {}
 
   connect(): Promise<void> {
@@ -97,7 +111,11 @@ class BrowserRelayConnection implements RelayConnection {
     return Promise.resolve();
   }
 
-  subscribe(filter: RelayFilter, onEvent: (event: unknown) => void, onNotice?: (message: string) => void): RelaySubscription {
+  subscribe(
+    filter: RelayFilter,
+    onEvent: (event: unknown) => void,
+    onNotice?: (message: string) => void,
+  ): RelaySubscription {
     const socket = this.requireOpenSocket();
     const id = `onboard-${Date.now()}-${this.subscriptionSeq}`;
     this.subscriptionSeq += 1;
@@ -115,7 +133,7 @@ class BrowserRelayConnection implements RelayConnection {
         if (this.socket?.readyState === 1) {
           this.socket.send(JSON.stringify(["CLOSE", id]));
         }
-      }
+      },
     };
   }
 
@@ -176,7 +194,10 @@ export async function runOnboardingRelayHandshake<T>(input: {
   const connections = input.relays.map((relay) => relayClient.connect(relay));
   const abortError = () => {
     if (typeof DOMException !== "undefined") {
-      return new DOMException("Onboarding handshake was cancelled.", "AbortError");
+      return new DOMException(
+        "Onboarding handshake was cancelled.",
+        "AbortError",
+      );
     }
     const error = new Error("Onboarding handshake was cancelled.");
     error.name = "AbortError";
@@ -186,42 +207,18 @@ export async function runOnboardingRelayHandshake<T>(input: {
     connections.forEach((connection) => connection.close());
     throw abortError();
   }
-  const handleConnectAbort = () => {
-    connections.forEach((connection) => connection.close());
-  };
-  input.signal?.addEventListener("abort", handleConnectAbort, { once: true });
-  const connected = (
-    await Promise.allSettled(
-      connections.map(async (connection) => {
-        await connection.connect();
-        return connection;
-      })
-    )
-  )
-    .filter((result): result is PromiseFulfilledResult<RelayConnection> => result.status === "fulfilled")
-    .map((result) => result.value);
-  input.signal?.removeEventListener("abort", handleConnectAbort);
-
-  if (input.signal?.aborted) {
-    connections.forEach((connection) => connection.close());
-    throw abortError();
-  }
-
-  if (connected.length === 0) {
-    connections.forEach((connection) => connection.close());
-    throw new OnboardingRelayError("relay_unreachable", "Unable to connect to any onboarding relay.");
-  }
 
   const filter: RelayFilter = {
     kinds: [input.eventKind],
     authors: [input.sourcePeerPubkey],
-    "#p": [input.localPubkey]
+    "#p": [input.localPubkey],
   };
   const timeoutMs = input.timeoutMs ?? 30_000;
 
   return new Promise<T>((resolve, reject) => {
     let settled = false;
     const subscriptions: RelaySubscription[] = [];
+    let connected: RelayConnection[] = [];
     const cleanup = () => {
       globalThis.clearTimeout(timer);
       input.signal?.removeEventListener("abort", handleAbort);
@@ -237,7 +234,12 @@ export async function runOnboardingRelayHandshake<T>(input: {
 
     const timer = globalThis.setTimeout(() => {
       finish(() =>
-        reject(new OnboardingRelayError("onboard_timeout", "Onboarding peer did not respond before the timeout."))
+        reject(
+          new OnboardingRelayError(
+            "onboard_timeout",
+            "Onboarding peer did not respond before the timeout.",
+          ),
+        ),
       );
     }, timeoutMs);
     const handleAbort = () => {
@@ -247,6 +249,75 @@ export async function runOnboardingRelayHandshake<T>(input: {
     if (input.signal?.aborted) {
       handleAbort();
       return;
+    }
+
+    async function connectAndPublish() {
+      const connectedResults = await Promise.allSettled(
+        connections.map(async (connection) => {
+          await connection.connect();
+          return connection;
+        }),
+      );
+      if (settled) return;
+
+      connected = connectedResults
+        .filter(
+          (result): result is PromiseFulfilledResult<RelayConnection> =>
+            result.status === "fulfilled",
+        )
+        .map((result) => result.value);
+
+      if (input.signal?.aborted) {
+        handleAbort();
+        return;
+      }
+
+      if (connected.length === 0) {
+        finish(() =>
+          reject(
+            new OnboardingRelayError(
+              "relay_unreachable",
+              "Unable to connect to any onboarding relay.",
+            ),
+          ),
+        );
+        return;
+      }
+
+      for (const connection of connected) {
+        subscriptions.push(
+          connection.subscribe(filter, onEvent, (message) => {
+            input.onNotice?.({ relay: connection.url, message });
+          }),
+        );
+      }
+
+      const publishResults = await Promise.allSettled(
+        connected.map((connection) => connection.publish(requestEvent)),
+      );
+      if (settled) return;
+
+      const publishedCount = publishResults.filter(
+        (result) => result.status === "fulfilled",
+      ).length;
+      if (publishedCount > 0) {
+        return;
+      }
+
+      const firstFailure = publishResults.find(
+        (result): result is PromiseRejectedResult =>
+          result.status === "rejected",
+      );
+      finish(() =>
+        reject(
+          new OnboardingRelayError(
+            "relay_unreachable",
+            firstFailure?.reason instanceof Error
+              ? firstFailure.reason.message
+              : "Unable to publish onboarding request.",
+          ),
+        ),
+      );
     }
 
     const onEvent = (event: unknown) => {
@@ -264,40 +335,28 @@ export async function runOnboardingRelayHandshake<T>(input: {
                 ? error
                 : new OnboardingRelayError(
                     "invalid_onboard_response",
-                    error instanceof Error ? error.message : "Invalid onboarding response."
-                  )
-            )
+                    error instanceof Error
+                      ? error.message
+                      : "Invalid onboarding response.",
+                  ),
+            ),
           );
         });
     };
 
-    try {
-      for (const connection of connected) {
-        subscriptions.push(
-          connection.subscribe(filter, onEvent, (message) => {
-            input.onNotice?.({ relay: connection.url, message });
-          })
-        );
-      }
-      Promise.all(connected.map((connection) => connection.publish(requestEvent))).catch((error) => {
+    void connectAndPublish().catch((error) => {
+      if (!settled) {
         finish(() =>
           reject(
             new OnboardingRelayError(
               "relay_unreachable",
-              error instanceof Error ? error.message : "Unable to publish onboarding request."
-            )
-          )
+              error instanceof Error
+                ? error.message
+                : "Unable to use onboarding relay.",
+            ),
+          ),
         );
-      });
-    } catch (error) {
-      finish(() =>
-        reject(
-          new OnboardingRelayError(
-            "relay_unreachable",
-            error instanceof Error ? error.message : "Unable to use onboarding relay."
-          )
-        )
-      );
-    }
+      }
+    });
   });
 }

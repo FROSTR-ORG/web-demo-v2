@@ -27,9 +27,13 @@ import {
   type RecoveredNsecResult,
   type RotateKeysetBundleResult,
   type RuntimeSnapshotInput,
-  type SharePackageWire
+  type SharePackageWire,
 } from "./types";
-import { loadBridge, normalizeBifrostError, parseJsonResult } from "../wasm/loadBridge";
+import {
+  loadBridge,
+  normalizeBifrostError,
+  parseJsonResult,
+} from "../wasm/loadBridge";
 import type { z } from "zod";
 
 export interface CreateKeysetInput {
@@ -41,31 +45,39 @@ export interface CreateKeysetInput {
 export class BifrostPackageError extends Error {
   constructor(
     public readonly code: BifrostPackageErrorCode,
-    message: string
+    message: string,
   ) {
     super(message);
     this.name = "BifrostPackageError";
   }
 }
 
-function parseStructuredResult<T>(json: string, schema: z.ZodType<T>): T {
+function parseStructuredResult<TSchema extends z.ZodTypeAny>(
+  json: string,
+  schema: TSchema,
+): z.output<TSchema> {
   const result = StructuredBridgeResultSchema.parse(parseJsonResult(json));
   if (!result.ok) {
     const error = result.error;
-    throw new BifrostPackageError(error?.code ?? "invalid_payload", error?.message ?? "Bifrost package operation failed.");
+    throw new BifrostPackageError(
+      error?.code ?? "invalid_payload",
+      error?.message ?? "Bifrost package operation failed.",
+    );
   }
   return schema.parse(result.value);
 }
 
-export async function createKeysetBundle(input: CreateKeysetInput): Promise<KeysetBundle> {
+export async function createKeysetBundle(
+  input: CreateKeysetInput,
+): Promise<KeysetBundle> {
   try {
     const bridge = await loadBridge();
     const json = bridge.create_keyset_bundle(
       JSON.stringify({
         group_name: input.groupName.trim(),
         threshold: input.threshold,
-        count: input.count
-      })
+        count: input.count,
+      }),
     );
     return KeysetBundleSchema.parse(parseJsonResult(json));
   } catch (error) {
@@ -76,13 +88,17 @@ export async function createKeysetBundle(input: CreateKeysetInput): Promise<Keys
 export async function generateNsec(): Promise<GeneratedNsecResult> {
   try {
     const bridge = await loadBridge();
-    return GeneratedNsecResultSchema.parse(parseJsonResult(bridge.generate_nsec()));
+    return GeneratedNsecResultSchema.parse(
+      parseJsonResult(bridge.generate_nsec()),
+    );
   } catch (error) {
     throw normalizeBifrostError(error);
   }
 }
 
-export async function createKeysetBundleFromNsec(input: CreateKeysetInput & { nsec: string }): Promise<KeysetBundle> {
+export async function createKeysetBundleFromNsec(
+  input: CreateKeysetInput & { nsec: string },
+): Promise<KeysetBundle> {
   try {
     const bridge = await loadBridge();
     const json = bridge.create_keyset_bundle_from_nsec(
@@ -90,8 +106,8 @@ export async function createKeysetBundleFromNsec(input: CreateKeysetInput & { ns
         nsec: input.nsec,
         group_name: input.groupName.trim(),
         threshold: input.threshold,
-        count: input.count
-      })
+        count: input.count,
+      }),
     );
     return KeysetBundleSchema.parse(parseJsonResult(json));
   } catch (error) {
@@ -99,7 +115,9 @@ export async function createKeysetBundleFromNsec(input: CreateKeysetInput & { ns
   }
 }
 
-export async function deriveProfileIdFromShareSecret(shareSecret: string): Promise<string> {
+export async function deriveProfileIdFromShareSecret(
+  shareSecret: string,
+): Promise<string> {
   try {
     const bridge = await loadBridge();
     return bridge.derive_profile_id_from_share_secret(shareSecret);
@@ -110,18 +128,24 @@ export async function deriveProfileIdFromShareSecret(shareSecret: string): Promi
 
 export async function createProfilePackagePair(
   payload: BfProfilePayload,
-  password: string
+  password: string,
 ): Promise<ProfilePackagePair> {
   try {
     const bridge = await loadBridge();
-    const json = bridge.create_profile_package_pair(JSON.stringify(payload), password);
+    const json = bridge.create_profile_package_pair(
+      JSON.stringify(payload),
+      password,
+    );
     return ProfilePackagePairSchema.parse(parseJsonResult(json));
   } catch (error) {
     throw normalizeBifrostError(error);
   }
 }
 
-export async function encodeBfsharePackage(payload: BfSharePayload, password: string): Promise<string> {
+export async function encodeBfsharePackage(
+  payload: BfSharePayload,
+  password: string,
+): Promise<string> {
   try {
     BfSharePayloadSchema.parse(payload);
     const bridge = await loadBridge();
@@ -131,10 +155,16 @@ export async function encodeBfsharePackage(payload: BfSharePayload, password: st
   }
 }
 
-export async function decodeBfsharePackage(packageText: string, password: string): Promise<BfSharePayload> {
+export async function decodeBfsharePackage(
+  packageText: string,
+  password: string,
+): Promise<BfSharePayload> {
   try {
     const bridge = await loadBridge();
-    return parseStructuredResult(bridge.decode_bfshare_package_result(packageText, password), BfSharePayloadSchema);
+    return parseStructuredResult(
+      bridge.decode_bfshare_package_result(packageText, password),
+      BfSharePayloadSchema,
+    );
   } catch (error) {
     if (error instanceof BifrostPackageError) {
       throw error;
@@ -145,11 +175,14 @@ export async function decodeBfsharePackage(packageText: string, password: string
 
 export async function decodeProfilePackage(
   packageText: string,
-  password: string
+  password: string,
 ): Promise<BfProfilePayload> {
   try {
     const bridge = await loadBridge();
-    return parseStructuredResult(bridge.decode_bfprofile_package_result(packageText, password), BfProfilePayloadSchema) as BfProfilePayload;
+    return parseStructuredResult(
+      bridge.decode_bfprofile_package_result(packageText, password),
+      BfProfilePayloadSchema,
+    );
   } catch (error) {
     if (error instanceof BifrostPackageError) {
       throw error;
@@ -160,11 +193,14 @@ export async function decodeProfilePackage(
 
 export async function decodeBfonboardPackage(
   packageText: string,
-  password: string
+  password: string,
 ): Promise<BfOnboardPayload> {
   try {
     const bridge = await loadBridge();
-    return parseStructuredResult(bridge.decode_bfonboard_package_result(packageText, password), BfOnboardPayloadSchema);
+    return parseStructuredResult(
+      bridge.decode_bfonboard_package_result(packageText, password),
+      BfOnboardPayloadSchema,
+    );
   } catch (error) {
     if (error instanceof BifrostPackageError) {
       throw error;
@@ -196,9 +232,9 @@ export async function createOnboardingRequestBundle(input: {
           input.shareSecret,
           input.peerPubkey32Hex,
           BigInt(input.eventKind),
-          input.sentAtSeconds
-        )
-      )
+          input.sentAtSeconds,
+        ),
+      ),
     );
   } catch (error) {
     throw normalizeBifrostError(error);
@@ -216,13 +252,15 @@ export async function decodeOnboardingResponseEvent(input: {
     const bridge = await loadBridge();
     return parseStructuredResult(
       bridge.decode_onboarding_response_event_result(
-        typeof input.event === "string" ? input.event : JSON.stringify(input.event),
+        typeof input.event === "string"
+          ? input.event
+          : JSON.stringify(input.event),
         input.shareSecret,
         input.expectedPeerPubkey32Hex,
         input.expectedLocalPubkey32Hex,
-        input.requestId
+        input.requestId,
       ),
-      OnboardingResponseSchema.nullable()
+      OnboardingResponseSchema.nullable(),
     );
   } catch (error) {
     if (error instanceof BifrostPackageError) {
@@ -248,8 +286,8 @@ export async function buildOnboardingRuntimeSnapshot(input: {
         input.shareSecret,
         input.peerPubkey32Hex,
         JSON.stringify(input.responseNonces),
-        input.bootstrapStateHex
-      )
+        input.bootstrapStateHex,
+      ),
     );
   } catch (error) {
     throw normalizeBifrostError(error);
@@ -258,7 +296,7 @@ export async function buildOnboardingRuntimeSnapshot(input: {
 
 export async function encodeOnboardPackage(
   payload: BfOnboardPayload,
-  password: string
+  password: string,
 ): Promise<string> {
   try {
     BfOnboardPayloadSchema.parse(payload);
@@ -284,13 +322,13 @@ export async function rotateKeysetBundle(input: {
         group: input.group,
         shares: input.shares,
         threshold: input.threshold,
-        count: input.count
-      })
+        count: input.count,
+      }),
     );
     const result = parseJsonResult<RotateKeysetBundleResult>(json);
     return {
       ...result,
-      next: KeysetBundleSchema.parse(result.next)
+      next: KeysetBundleSchema.parse(result.next),
     };
   } catch (error) {
     throw normalizeBifrostError(error);
@@ -310,17 +348,20 @@ export async function recoverNsecFromShares(input: {
         bridge.recover_nsec_from_shares(
           JSON.stringify({
             group: input.group,
-            shares: input.shares
-          })
-        )
-      )
+            shares: input.shares,
+          }),
+        ),
+      ),
     );
   } catch (error) {
     throw normalizeBifrostError(error);
   }
 }
 
-export async function resolveShareIndex(group: GroupPackageWire, shareSecret: string): Promise<number> {
+export async function resolveShareIndex(
+  group: GroupPackageWire,
+  shareSecret: string,
+): Promise<number> {
   try {
     GroupPackageWireSchema.parse(group);
     const bridge = await loadBridge();
@@ -346,15 +387,15 @@ export function profilePayloadForShare(params: {
       name: params.deviceName.trim(),
       share_secret: params.share.seckey,
       manual_peer_policy_overrides: params.manualPeerPolicyOverrides ?? [],
-      relays: params.relays
+      relays: params.relays,
     },
-    group_package: params.group
+    group_package: params.group,
   });
 }
 
 export function defaultManualPeerPolicyOverrides(
   group: GroupPackageWire,
-  localShareIdx: number
+  localShareIdx: number,
 ): BfManualPeerPolicyOverride[] {
   GroupPackageWireSchema.parse(group);
   const allowAll: BfMethodPolicyOverride = {
@@ -362,7 +403,7 @@ export function defaultManualPeerPolicyOverrides(
     ping: "allow",
     onboard: "allow",
     sign: "allow",
-    ecdh: "allow"
+    ecdh: "allow",
   };
   return group.members
     .filter((member) => member.idx !== localShareIdx)
@@ -370,8 +411,8 @@ export function defaultManualPeerPolicyOverrides(
       pubkey: memberPubkeyXOnly(member),
       policy: {
         request: { ...allowAll },
-        respond: { ...allowAll }
-      }
+        respond: { ...allowAll },
+      },
     }));
 }
 
@@ -385,6 +426,6 @@ export function onboardPayloadForRemoteShare(params: {
   return BfOnboardPayloadSchema.parse({
     share_secret: params.remoteShare.seckey,
     relays: params.relays,
-    peer_pk: memberPubkeyXOnly(localMember)
+    peer_pk: memberPubkeyXOnly(localMember),
   });
 }
