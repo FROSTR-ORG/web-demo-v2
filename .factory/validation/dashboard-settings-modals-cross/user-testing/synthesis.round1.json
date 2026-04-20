@@ -1,0 +1,77 @@
+{
+  "milestone": "dashboard-settings-modals-cross",
+  "round": 1,
+  "status": "fail",
+  "assertionsSummary": {
+    "total": 37,
+    "passed": 35,
+    "failed": 2,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-CROSS-001",
+    "VAL-CROSS-002",
+    "VAL-CROSS-003",
+    "VAL-CROSS-004",
+    "VAL-CROSS-008",
+    "VAL-CROSS-009",
+    "VAL-CROSS-010",
+    "VAL-CROSS-011",
+    "VAL-CROSS-012",
+    "VAL-CROSS-013",
+    "VAL-CROSS-014",
+    "VAL-CROSS-015",
+    "VAL-CROSS-016",
+    "VAL-CROSS-017",
+    "VAL-CROSS-018",
+    "VAL-CROSS-019",
+    "VAL-CROSS-020",
+    "VAL-CROSS-021",
+    "VAL-CROSS-022",
+    "VAL-DSH-010",
+    "VAL-DSH-011",
+    "VAL-DSH-012",
+    "VAL-DSH-014",
+    "VAL-DSH-015",
+    "VAL-DSH-016",
+    "VAL-DSH-017",
+    "VAL-DSH-018",
+    "VAL-DSH-021",
+    "VAL-DSH-022",
+    "VAL-DSH-023",
+    "VAL-DSH-030",
+    "VAL-DSH-032",
+    "VAL-DSH-033",
+    "VAL-DSH-034",
+    "VAL-DSH-101"
+  ],
+  "failedAssertions": [
+    {
+      "id": "VAL-DSH-013",
+      "reason": "Icon presence passes, but clickability fails for all visible rows due pointer-event interception by the open settings sidebar."
+    },
+    {
+      "id": "VAL-DSH-031",
+      "reason": "After Done, sidebar is closed/hidden instead of remaining visible."
+    }
+  ],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Added Flow Validator Guidance: shell plus dashboard-specific selector/interactivity notes discovered during this run.",
+      "source": "setup|flow-report"
+    }
+  ],
+  "previousRound": null,
+  "flowReports": [
+    ".factory/validation/dashboard-settings-modals-cross/user-testing/flows/g1-sidebar-settings.json",
+    ".factory/validation/dashboard-settings-modals-cross/user-testing/flows/g2-modals.json",
+    ".factory/validation/dashboard-settings-modals-cross/user-testing/flows/g3-interactions-a.json",
+    ".factory/validation/dashboard-settings-modals-cross/user-testing/flows/g4-cross-browser.json",
+    ".factory/validation/dashboard-settings-modals-cross/user-testing/flows/g5-cross-shell.json",
+    ".factory/validation/dashboard-settings-modals-cross/user-testing/flows/g6-cross-remaining.json",
+    ".factory/validation/dashboard-settings-modals-cross/user-testing/flows/g7-recheck-failures.json",
+    ".factory/validation/dashboard-settings-modals-cross/user-testing/flows/g8-recheck-dsh012.json"
+  ]
+}

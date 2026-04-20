@@ -1,0 +1,88 @@
+{
+  "groupId": "g9-recheck-dsh013-dsh031",
+  "testedAt": "2026-04-20T02:10:52.795892+00:00",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "appUrl": "http://127.0.0.1:5173",
+    "originLocked": true,
+    "browserSession": "g9-recheck-dsh013-dsh031",
+    "assignedAssertions": ["VAL-DSH-013", "VAL-DSH-031"]
+  },
+  "toolsUsed": ["agent-browser", "curl"],
+  "assertions": [
+    {
+      "id": "VAL-DSH-013",
+      "title": "Peer rows expose trailing ellipsis + play-triangle icons when sidebar open",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/dashboard-settings-lock-profile with sidebar already open",
+          "expected": "Peer rows are visible while settings sidebar is open",
+          "observed": "Peers panel with rows #0/#1/#2 visible alongside open Settings sidebar"
+        },
+        {
+          "action": "Verify trailing controls per visible row",
+          "expected": "Each visible peer row has vertical-ellipsis and play-triangle controls",
+          "observed": "Accessible trailing controls present as labeled buttons for each row: Peer #0/#1/#2 actions + Open peer #0/#1/#2"
+        },
+        {
+          "action": "Attempt real clicks (no force) on all trailing controls for rows #0/#1/#2",
+          "expected": "All controls are clickable with no pointer interception",
+          "observed": "All six clicks succeeded (Peer #0 actions/open, Peer #1 actions/open, Peer #2 actions/open); no pointer interception errors"
+        }
+      ],
+      "evidence": {
+        "urlEvidence": [
+          "http://127.0.0.1:5173/demo/dashboard-settings-lock-profile"
+        ],
+        "screenshots": [
+          "dashboard-settings-modals-cross/g9-recheck-dsh013-dsh031/VAL-DSH-013-sidebar-open-annotated.png",
+          "dashboard-settings-modals-cross/g9-recheck-dsh013-dsh031/VAL-DSH-013-peer-controls-clicked-annotated.png"
+        ],
+        "consoleErrors": "none",
+        "pageErrors": "none",
+        "network": "No requests captured"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DSH-031",
+      "title": "Export Profile flow: sidebar → Export → submit → Backup Ready → Done",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From open settings sidebar, click Export in Export Profile row",
+          "expected": "Export Profile modal opens",
+          "observed": "Export Profile modal opened with Export Password + Confirm Password fields"
+        },
+        {
+          "action": "Fill matching passwords and submit Export",
+          "expected": "Flow advances to Export Complete modal",
+          "observed": "Export Complete modal displayed with Reveal backup string / Copy / Download / Done"
+        },
+        {
+          "action": "Click Done on Export Complete modal",
+          "expected": "Modal closes and sidebar remains visible",
+          "observed": "Done closed modal; Settings sidebar stayed open with Settings heading and DEVICE PROFILE/GROUP PROFILE sections visible"
+        }
+      ],
+      "evidence": {
+        "urlEvidence": [
+          "http://127.0.0.1:5173/demo/dashboard-settings-lock-profile"
+        ],
+        "screenshots": [
+          "dashboard-settings-modals-cross/g9-recheck-dsh013-dsh031/VAL-DSH-031-export-modal-open-annotated.png",
+          "dashboard-settings-modals-cross/g9-recheck-dsh013-dsh031/VAL-DSH-031-export-complete-modal-annotated.png",
+          "dashboard-settings-modals-cross/g9-recheck-dsh013-dsh031/VAL-DSH-031-done-closes-modal-sidebar-remains-annotated.png"
+        ],
+        "consoleErrors": "none",
+        "pageErrors": "none",
+        "network": "No requests captured"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Retested 2 assertions (VAL-DSH-013, VAL-DSH-031): both passed. Peer-row trailing controls are clickable with sidebar open, and Export Complete → Done closes modal while preserving sidebar visibility."
+}
