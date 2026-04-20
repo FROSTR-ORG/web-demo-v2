@@ -1,0 +1,48 @@
+{
+  "milestone": "misc-tech-debt",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx vitest run --config vitest.config.ts --maxWorkers=4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx tsc -b",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "failedFeatures": [
+      "misc-bridge-hydrated-reset"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "misc-bridge-hydrated-reset",
+      "severity": "blocking",
+      "description": "MockAppStateProvider stores app state from the value prop once and never re-syncs when the prop changes, causing stale demo state to leak across /demo/:scenarioId navigation."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "skills/ui-builder",
+      "suggestion": "Clarify that agent-browser is required only for UI surfaces; allow non-UI architecture/provider fixes to pass validation with automated tests and non-browser verification.",
+      "evidence": "Review report for misc-bridge-hydrated-reset identified conflicting ui-builder guidance: non-UI feature support versus mandatory agent-browser usage.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [],
+  "previousRound": null
+}

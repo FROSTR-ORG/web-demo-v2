@@ -1,0 +1,15 @@
+{
+  "featureId": "fix-mock-app-state-provider-scenario-resync",
+  "reviewedAt": "2026-04-20T00:59:44Z",
+  "commitId": "8f2f3f5863873fbd5a767f45ecd68d8c1d6407b7",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly addresses the prior blocking regression by forcing `MockAppStateProvider` remount on scenario changes (`key={scenario.id}` in `DemoScenarioPage`), which correctly re-seeds state from the new scenario. The added regression suite (`src/demo/__tests__/scenarioSwitch.test.tsx`) covers both navigation directions and would fail without the key, so it meaningfully pins the bug. Compared against the original failing commit, this change resolves stale-state carryover without altering the misc-bridge-hydrated-reset mutator semantics (clearCredentials/lockProfile/createSession behavior remains in `MockAppStateProvider`).",
+    "issues": []
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": ".factory/validation/misc-tech-debt/scrutiny/reviews/misc-bridge-hydrated-reset.json",
+  "summary": "Pass. I reviewed the fix feature transcript skeleton and both diffs (`misc-bridge-hydrated-reset` and this fix), and confirmed the remount-based change plus new scenario-switch regression tests adequately address the original failure."
+}

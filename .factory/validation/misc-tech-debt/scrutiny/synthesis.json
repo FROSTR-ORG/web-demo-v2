@@ -1,7 +1,7 @@
 {
   "milestone": "misc-tech-debt",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -21,28 +21,13 @@
   },
   "reviewsSummary": {
     "total": 1,
-    "passed": 0,
-    "failed": 1,
-    "failedFeatures": [
-      "misc-bridge-hydrated-reset"
-    ]
+    "passed": 1,
+    "failed": 0,
+    "failedFeatures": []
   },
-  "blockingIssues": [
-    {
-      "featureId": "misc-bridge-hydrated-reset",
-      "severity": "blocking",
-      "description": "MockAppStateProvider stores app state from the value prop once and never re-syncs when the prop changes, causing stale demo state to leak across /demo/:scenarioId navigation."
-    }
-  ],
+  "blockingIssues": [],
   "appliedUpdates": [],
-  "suggestedGuidanceUpdates": [
-    {
-      "target": "skills/ui-builder",
-      "suggestion": "Clarify that agent-browser is required only for UI surfaces; allow non-UI architecture/provider fixes to pass validation with automated tests and non-browser verification.",
-      "evidence": "Review report for misc-bridge-hydrated-reset identified conflicting ui-builder guidance: non-UI feature support versus mandatory agent-browser usage.",
-      "isSystemic": true
-    }
-  ],
+  "suggestedGuidanceUpdates": [],
   "rejectedObservations": [],
-  "previousRound": null
+  "previousRound": ".factory/validation/misc-tech-debt/scrutiny/synthesis.round1.json"
 }
