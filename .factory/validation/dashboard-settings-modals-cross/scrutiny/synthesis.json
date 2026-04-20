@@ -1,7 +1,8 @@
 {
   "milestone": "dashboard-settings-modals-cross",
   "round": 1,
-  "status": "fail",
+  "status": "overridden",
+  "overrideJustification": "The blocker is a legitimate contract tension, not a regression. VAL-DSH-010 enumerates the required Settings sidebar sections/rows (Device Profile, Group Profile, Rotate Share, Export & Backup, Profile Security) without forbidding extras. VAL-CROSS-008 requires a dashboard → /rotate-keyset click path with a button labelled 'Rotate' or 'Rotate Keyset'. Paper reference does not show any Rotate Keyset affordance anywhere on the dashboard surface (verified: rg 'Rotate|rotate' under igloo-paper/screens/dashboard/ returns only 'Rotate Share'). Placing a Rotate Keyset action row inside the sidebar's existing Rotate Share section is the minimum-viable resolution — it satisfies VAL-CROSS-008 without contradicting VAL-DSH-010's required row list. The existing DashboardSettingsSidebarFidelity.test.tsx still asserts all VAL-DSH-010 required sections/rows, and DashboardInteractions.test.tsx pins VAL-CROSS-008 via the sidebar Rotate Keyset click. Orchestrator applies override. The non-blocking 'metadata drift' observation is already being addressed feature-by-feature (6+ feature descriptions corrected mid-mission) and does not block sealing."
   "validatorsRun": {
     "test": {
       "passed": true,
