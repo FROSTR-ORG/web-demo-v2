@@ -207,6 +207,15 @@ export function SettingsSidebar({
               </div>
               <button type="button" className="settings-btn-blue" onClick={() => { onClose(); navigate('/rotate-share'); }}>Rotate Share</button>
             </div>
+            <div className="settings-action-row">
+              <div className="settings-action-info">
+                <div className="settings-action-name">Rotate Keyset</div>
+                <div className="settings-action-desc">
+                  Rotate the entire keyset — generate fresh shares for every device while keeping the same group public key.
+                </div>
+              </div>
+              <button type="button" className="settings-btn-blue" onClick={() => { onClose(); navigate('/rotate-keyset'); }}>Rotate Keyset</button>
+            </div>
           </div>
 
           {/* EXPORT & BACKUP */}
