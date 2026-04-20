@@ -12,9 +12,15 @@ export function DemoScenarioPage() {
     return <Navigate to="/demo" replace />;
   }
 
-  const index = demoScenarios.findIndex((entry) => entry.id === scenario.id);
-  const previous = demoScenarios[index - 1];
-  const next = demoScenarios[index + 1];
+  // Per VAL-CROSS-003: chrome toolbar Prev/Next must traverse canonical
+  // scenarios only. When the active scenario is itself a variant, we anchor
+  // navigation on its parent (variantOf) so Prev/Next return the user to the
+  // canonical sequence.
+  const canonicalScenarios = demoScenarios.filter((entry) => entry.canonical !== false);
+  const canonicalAnchorId = scenario.canonical === false ? scenario.variantOf ?? scenario.id : scenario.id;
+  const canonicalIndex = canonicalScenarios.findIndex((entry) => entry.id === canonicalAnchorId);
+  const previous = canonicalIndex > 0 ? canonicalScenarios[canonicalIndex - 1] : undefined;
+  const next = canonicalIndex >= 0 && canonicalIndex < canonicalScenarios.length - 1 ? canonicalScenarios[canonicalIndex + 1] : undefined;
   const nestedPath = scenario.location.pathname === "/" ? "" : scenario.location.pathname;
   const rawMode = new URLSearchParams(outerLocation.search).get("chrome") === "0";
   const scenarioLocation = {

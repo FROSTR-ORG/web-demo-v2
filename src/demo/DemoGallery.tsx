@@ -24,7 +24,11 @@ export function DemoGallery() {
         </div>
         <div className="demo-flow-list">
           {demoFlows.map((flow) => {
-            const scenarios = demoScenarios.filter((entry) => entry.flow === flow);
+            // Per VAL-CROSS-001: only canonical scenarios are listed as
+            // top-level gallery links; variants (canonical: false) are
+            // reachable only by direct URL and through the chrome toolbar
+            // of their parent scenario.
+            const scenarios = demoScenarios.filter((entry) => entry.flow === flow && entry.canonical !== false);
             return (
               <section className="demo-flow-group" key={flow}>
                 <div className="demo-flow-heading">
@@ -35,7 +39,7 @@ export function DemoGallery() {
                   {scenarios.map((scenario) => (
                     <Link className="demo-scenario-link" to={`/demo/${scenario.id}`} key={scenario.id}>
                       <span>{scenario.title}</span>
-                      <small>{scenario.canonical === false ? `Variant of ${scenario.variantOf}` : scenario.paperPath}</small>
+                      <small>{scenario.paperPath}</small>
                     </Link>
                   ))}
                 </div>

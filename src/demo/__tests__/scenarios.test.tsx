@@ -36,7 +36,7 @@ describe("demo scenarios", () => {
     }
   });
 
-  it("lists all scenarios in the gallery", () => {
+  it("lists only canonical scenarios in the gallery (VAL-CROSS-001)", () => {
     render(
       <MemoryRouter>
         <DemoGallery />
@@ -44,7 +44,12 @@ describe("demo scenarios", () => {
     );
 
     for (const scenario of demoScenarios) {
-      expect(screen.getByText(scenario.title)).toBeInTheDocument();
+      if (scenario.canonical === false) {
+        // Variants must NOT be listed as top-level gallery links
+        expect(screen.queryByText(scenario.title)).toBeNull();
+      } else {
+        expect(screen.getByText(scenario.title)).toBeInTheDocument();
+      }
     }
   });
 
