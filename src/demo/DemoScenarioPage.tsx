@@ -38,7 +38,19 @@ export function DemoScenarioPage() {
           </a>
         </aside>
       )}
-      <MockAppStateProvider value={scenario.appState}>
+      {/*
+        key={scenario.id} forces React to remount MockAppStateProvider whenever
+        the user navigates between scenarios (e.g. /demo/dashboard-running →
+        /demo/welcome-first-time). MockAppStateProvider captures profiles /
+        activeProfile / runtimeStatus / signerPaused / createSession from
+        `value` into useState only at mount, so without this key the provider
+        would keep scenario A's seed state when scenario B mounts with a new
+        `value` prop. Remounting is simpler and safer than adding per-field
+        useEffect resyncs — it also preserves the misc-bridge-hydrated-reset
+        contract that mutators (clearCredentials / lockProfile) truly update
+        the visible demo-shell state.
+      */}
+      <MockAppStateProvider key={scenario.id} value={scenario.appState}>
         <CoreRoutes location={scenarioLocation} relative />
       </MockAppStateProvider>
     </div>
