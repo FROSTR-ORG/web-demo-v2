@@ -32,6 +32,8 @@ This keeps you aligned with validators while flagging the planning-artifact drif
 
 - `agent-browser` — Used for manual visual verification of built screens. Invoke after implementation to navigate the app and confirm screens render correctly and navigation works.
 
+**When agent-browser is optional:** For pure non-UI features (provider/state/architecture refactors, bridge plumbing, type-only changes, demo-fixture shape changes) where no user-visible rendering is being added or modified, agent-browser verification can be skipped. In those cases, verify via vitest regression tests + tsc instead, and note explicitly in the handoff that agent-browser was skipped and why.
+
 ## Work Procedure
 
 ### 1. Understand the Feature
