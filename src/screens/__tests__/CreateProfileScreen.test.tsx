@@ -154,10 +154,11 @@ describe("CreateProfileScreen", () => {
     expect(screen.getByText("Peer #0")).toBeInTheDocument();
     expect(screen.getByText("Peer #1")).toBeInTheDocument();
     expect(screen.getByText("Peer #2")).toBeInTheDocument();
-    expect(screen.getAllByText("SIGN").length).toBeGreaterThanOrEqual(3);
-    expect(screen.getAllByText("ECDH").length).toBeGreaterThanOrEqual(3);
-    expect(screen.getAllByText("PING").length).toBeGreaterThanOrEqual(3);
-    expect(screen.getAllByText("ONBOARD").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByText("Local profile")).toBeInTheDocument();
+    expect(screen.getAllByText("SIGN").length).toBe(2);
+    expect(screen.getAllByText("ECDH").length).toBe(2);
+    expect(screen.getAllByText("PING").length).toBe(2);
+    expect(screen.getAllByText("ONBOARD").length).toBe(2);
   });
 
   it("navigates to /create/distribute on successful submit (VAL-SHR-005)", async () => {

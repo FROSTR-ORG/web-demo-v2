@@ -1,5 +1,9 @@
 import type { AppStateValue, CreateSession } from "../app/AppState";
-import type { KeysetBundle, RuntimeStatusSummary, StoredProfileSummary } from "../lib/bifrost/types";
+import type {
+  KeysetBundle,
+  RuntimeStatusSummary,
+  StoredProfileSummary,
+} from "../lib/bifrost/types";
 
 const now = Date.UTC(2026, 2, 8, 12, 0, 0);
 
@@ -30,12 +34,18 @@ export const DEMO_SHARE_PK_HEX_1 =
   "02d7e1b9f3a4c5d6e7f8a9b0c1d2e33b9e7d000000000000000000000000000000";
 export const DEMO_SHARE_PK_HEX_2 =
   "029c4a8e2f3b4c5d6e7f8a9b0c1d26a1f5e0000000000000000000000000000000";
-export const DEMO_BFPROFILE = "bfprofile1qvz8k2afcqqszq2v5v5hnpfdk2auecfnhge355m0dh8g6ms4e2f4j9p0x7z";
-export const DEMO_BFONBOARD = "bfonboard1qxy7k2afcqqszq2v5v5hnpfdk2auecfnhge355m0dh8g6ms4e";
-export const DEMO_BFSHARE = "bfshare1qvz8k2afcqqszq2v5v5hnpfdk2auecfnhge355m0dh8g6ms4e";
-export const PAPER_MASKED_PACKAGE = "bfonboard1•••••••••••••••••••••••••••••••••••";
-export const PAPER_MASKED_NSEC = "nsec1abc•••••••••••••••••••••••••••••••••••...";
-export const PAPER_RECOVERED_NSEC = "nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0";
+export const DEMO_BFPROFILE =
+  "bfprofile1qvz8k2afcqqszq2v5v5hnpfdk2auecfnhge355m0dh8g6ms4e2f4j9p0x7z";
+export const DEMO_BFONBOARD =
+  "bfonboard1qxy7k2afcqqszq2v5v5hnpfdk2auecfnhge355m0dh8g6ms4e";
+export const DEMO_BFSHARE =
+  "bfshare1qvz8k2afcqqszq2v5v5hnpfdk2auecfnhge355m0dh8g6ms4e";
+export const PAPER_MASKED_PACKAGE =
+  "bfonboard1•••••••••••••••••••••••••••••••••••";
+export const PAPER_MASKED_NSEC =
+  "nsec1abc•••••••••••••••••••••••••••••••••••...";
+export const PAPER_RECOVERED_NSEC =
+  "nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0";
 export const DEMO_PASSWORD = "paperpass";
 
 export const demoProfile: StoredProfileSummary = {
@@ -49,7 +59,7 @@ export const demoProfile: StoredProfileSummary = {
   groupPublicKey: DEMO_GROUP_PK,
   relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
   createdAt: now,
-  lastUsedAt: now
+  lastUsedAt: now,
 };
 
 export const demoProfiles: StoredProfileSummary[] = [
@@ -60,7 +70,7 @@ export const demoProfiles: StoredProfileSummary[] = [
     label: "Work Key",
     deviceName: "Work Laptop",
     localShareIdx: 0,
-    groupPublicKey: "npub1d8fabcdefghijklmnopqrstuvw9k2m"
+    groupPublicKey: "npub1d8fabcdefghijklmnopqrstuvw9k2m",
   },
   {
     ...demoProfile,
@@ -70,36 +80,36 @@ export const demoProfiles: StoredProfileSummary[] = [
     threshold: 3,
     memberCount: 5,
     localShareIdx: 2,
-    groupPublicKey: "npub1f7aabcdefghijklmnopqrstuvw4x1n"
+    groupPublicKey: "npub1f7aabcdefghijklmnopqrstuvw4x1n",
   },
   {
     ...demoProfile,
     id: "cold-storage-profile",
     label: "Cold Storage",
     deviceName: "Vault Device",
-    groupPublicKey: "npub1coldabcdefghijklmnopqrstuv8h6q"
+    groupPublicKey: "npub1coldabcdefghijklmnopqrstuv8h6q",
   },
   {
     ...demoProfile,
     id: "family-profile",
     label: "Family Key",
     deviceName: "Family Laptop",
-    groupPublicKey: "npub1famabcdefghijklmnopqrstuvw2d5r"
+    groupPublicKey: "npub1famabcdefghijklmnopqrstuvw2d5r",
   },
   {
     ...demoProfile,
     id: "joint-profile",
     label: "Joint Key",
     deviceName: "Shared Workstation",
-    groupPublicKey: "npub1jointabcdefghijklmnopqrstuv5m8t"
+    groupPublicKey: "npub1jointabcdefghijklmnopqrstuv5m8t",
   },
   ...Array.from({ length: 6 }, (_, index) => ({
     ...demoProfile,
     id: `archive-profile-${index + 1}`,
     label: `Archive Key ${index + 1}`,
     deviceName: `Archive Device ${index + 1}`,
-    groupPublicKey: `npub1archive${index + 1}abcdefghijklmnop${index + 1}q9z`
-  }))
+    groupPublicKey: `npub1archive${index + 1}abcdefghijklmnop${index + 1}q9z`,
+  })),
 ];
 
 export const demoKeyset: KeysetBundle = {
@@ -117,17 +127,19 @@ export const demoKeyset: KeysetBundle = {
     members: [
       { idx: 0, pubkey: DEMO_SHARE_PK_HEX_0 },
       { idx: 1, pubkey: DEMO_SHARE_PK_HEX_1 },
-      { idx: 2, pubkey: DEMO_SHARE_PK_HEX_2 }
-    ]
+      { idx: 2, pubkey: DEMO_SHARE_PK_HEX_2 },
+    ],
   },
   shares: [
     { idx: 0, seckey: "1".repeat(64) },
     { idx: 1, seckey: "2".repeat(64) },
-    { idx: 2, seckey: "3".repeat(64) }
-  ]
+    { idx: 2, seckey: "3".repeat(64) },
+  ],
 };
 
-export function createDemoSession(options: { profileCreated?: boolean; distributed?: boolean } = {}): CreateSession {
+export function createDemoSession(
+  options: { profileCreated?: boolean; distributed?: boolean } = {},
+): CreateSession {
   return {
     draft: { groupName: "My Signing Key", threshold: 2, count: 3 },
     keyset: demoKeyset,
@@ -138,9 +150,11 @@ export function createDemoSession(options: { profileCreated?: boolean; distribut
       memberPubkey: demoKeyset.group.members[index + 1].pubkey,
       packageText: `${DEMO_BFONBOARD}${share.idx}`,
       password: DEMO_PASSWORD,
+      packageCopied: Boolean(options.distributed && share.idx === 1),
+      passwordCopied: Boolean(options.distributed),
       copied: Boolean(options.distributed && share.idx === 1),
-      qrShown: Boolean(options.distributed && share.idx === 2)
-    }))
+      qrShown: Boolean(options.distributed && share.idx === 2),
+    })),
   };
 }
 
@@ -150,14 +164,14 @@ export const demoRuntimeStatus: RuntimeStatusSummary = {
     pending_ops: 0,
     last_active: now,
     known_peers: 3,
-    request_seq: 42
+    request_seq: 42,
   },
   metadata: {
     device_id: "demo-device",
     member_idx: 0,
     share_public_key: DEMO_SHARE_PK,
     group_public_key: DEMO_GROUP_PK,
-    peers: demoKeyset.group.members.map((member) => member.pubkey)
+    peers: demoKeyset.group.members.map((member) => member.pubkey),
   },
   readiness: {
     runtime_ready: true,
@@ -168,7 +182,7 @@ export const demoRuntimeStatus: RuntimeStatusSummary = {
     signing_peer_count: 2,
     ecdh_peer_count: 2,
     last_refresh_at: now,
-    degraded_reasons: []
+    degraded_reasons: [],
   },
   peers: [
     {
@@ -181,7 +195,7 @@ export const demoRuntimeStatus: RuntimeStatusSummary = {
       outgoing_available: 78,
       outgoing_spent: 12,
       can_sign: true,
-      should_send_nonces: true
+      should_send_nonces: true,
     },
     {
       idx: 1,
@@ -193,7 +207,7 @@ export const demoRuntimeStatus: RuntimeStatusSummary = {
       outgoing_available: 12,
       outgoing_spent: 3,
       can_sign: true,
-      should_send_nonces: false
+      should_send_nonces: false,
     },
     {
       idx: 2,
@@ -205,49 +219,92 @@ export const demoRuntimeStatus: RuntimeStatusSummary = {
       outgoing_available: 0,
       outgoing_spent: 0,
       can_sign: false,
-      should_send_nonces: false
-    }
+      should_send_nonces: false,
+    },
   ],
   peer_permission_states: [
     {
       pubkey: DEMO_SHARE_PK,
       manual_override: null,
       remote_observation: null,
-      effective_policy: { sign: "allow", ecdh: "allow", ping: "allow", onboard: "deny" }
+      effective_policy: {
+        sign: "allow",
+        ecdh: "allow",
+        ping: "allow",
+        onboard: "deny",
+      },
     },
     {
       pubkey: "02d7e1b9f3a4c5d6e7f8a9b0c1d2e33b9e7d",
       manual_override: null,
       remote_observation: null,
-      effective_policy: { sign: "allow", ecdh: "ask", ping: "allow", onboard: "allow" }
+      effective_policy: {
+        sign: "allow",
+        ecdh: "ask",
+        ping: "allow",
+        onboard: "allow",
+      },
     },
     {
       pubkey: "029c4a8e2f3b4c5d6e7f8a9b0c1d26a1f5e",
       manual_override: null,
       remote_observation: null,
-      effective_policy: { sign: "ask", ecdh: "deny", ping: "allow", onboard: "deny" }
-    }
+      effective_policy: {
+        sign: "ask",
+        ecdh: "deny",
+        ping: "allow",
+        onboard: "deny",
+      },
+    },
   ],
-  pending_operations: []
+  pending_operations: [],
 };
 
-export function createDemoAppState(overrides: Partial<AppStateValue> = {}): AppStateValue {
+export function createDemoAppState(
+  overrides: Partial<AppStateValue> = {},
+): AppStateValue {
   const state: AppStateValue = {
     profiles: [],
     activeProfile: null,
     runtimeStatus: null,
     signerPaused: false,
     createSession: null,
+    importSession: null,
+    onboardSession: null,
+    rotateKeysetSession: null,
+    recoverSession: null,
     reloadProfiles: async () => undefined,
     createKeyset: async () => undefined,
     createProfile: async () => DEMO_PROFILE_ID,
     updatePackageState: () => undefined,
     finishDistribution: async () => DEMO_PROFILE_ID,
+    clearCreateSession: () => undefined,
+    beginImport: () => undefined,
+    decryptImportBackup: async () => undefined,
+    saveImportedProfile: async () => DEMO_PROFILE_ID,
+    clearImportSession: () => undefined,
+    decodeOnboardPackage: async () => undefined,
+    startOnboardHandshake: async () => undefined,
+    saveOnboardedProfile: async () => DEMO_PROFILE_ID,
+    clearOnboardSession: () => undefined,
+    validateRotateKeysetSources: async () => undefined,
+    generateRotatedKeyset: async () => undefined,
+    createRotatedProfile: async () => DEMO_PROFILE_ID,
+    updateRotatePackageState: () => undefined,
+    finishRotateDistribution: async () => DEMO_PROFILE_ID,
+    clearRotateKeysetSession: () => undefined,
+    validateRecoverSources: async () => undefined,
+    recoverNsec: async () => ({
+      nsec: PAPER_RECOVERED_NSEC,
+      signing_key_hex: "0".repeat(64),
+    }),
+    clearRecoverSession: () => undefined,
+    expireRecoveredNsec: () => undefined,
     unlockProfile: async () => undefined,
     lockProfile: () => undefined,
     clearCredentials: async () => undefined,
     setSignerPaused: () => undefined,
-    refreshRuntime: () => undefined
+    refreshRuntime: () => undefined,
   };
 
   return { ...state, ...overrides };

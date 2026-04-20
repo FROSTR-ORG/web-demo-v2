@@ -1,5 +1,8 @@
-import type { RuntimeStatusSummary, StoredProfileSummary } from "../lib/bifrost/types";
-import type { AppStateValue, CreateSession } from "./AppState";
+import type {
+  RuntimeStatusSummary,
+  StoredProfileSummary,
+} from "../lib/bifrost/types";
+import type { AppStateValue } from "./AppState";
 
 /**
  * sessionStorage key used by the demo-to-real-app-state bridge.
@@ -30,21 +33,62 @@ export interface AppStateBridgeSnapshot {
   activeProfile: StoredProfileSummary | null;
   runtimeStatus: RuntimeStatusSummary | null;
   signerPaused: boolean;
-  createSession: CreateSession | null;
+  createSession: null;
+  importSession: null;
+  onboardSession: null;
+  rotateKeysetSession: null;
+  recoverSession: null;
 }
 
 /**
  * Extract the bridge-serialisable fields from an AppStateValue.
  */
 export function snapshotFromAppState(
-  value: Pick<AppStateValue, "profiles" | "activeProfile" | "runtimeStatus" | "signerPaused" | "createSession">
+  value: Pick<
+    AppStateValue,
+    | "profiles"
+    | "activeProfile"
+    | "runtimeStatus"
+    | "signerPaused"
+    | "createSession"
+    | "importSession"
+    | "onboardSession"
+    | "rotateKeysetSession"
+    | "recoverSession"
+  >,
 ): AppStateBridgeSnapshot {
   return {
     profiles: value.profiles,
     activeProfile: value.activeProfile,
     runtimeStatus: value.runtimeStatus,
     signerPaused: value.signerPaused,
-    createSession: value.createSession
+    // Setup sessions contain decoded shares, package passwords, or recovered
+    // keys. The demo bridge is only a visual hand-off convenience, so never
+    // write those secrets to sessionStorage.
+    createSession: null,
+    importSession: null,
+    onboardSession: null,
+    rotateKeysetSession: null,
+    recoverSession: null,
+  };
+}
+
+function normalizeAppStateBridgeSnapshot(
+  parsed: object,
+): AppStateBridgeSnapshot {
+  const snapshot = parsed as Partial<AppStateBridgeSnapshot>;
+  return {
+    profiles: Array.isArray(snapshot.profiles) ? snapshot.profiles : [],
+    activeProfile: snapshot.activeProfile ?? null,
+    runtimeStatus: snapshot.runtimeStatus ?? null,
+    signerPaused: Boolean(snapshot.signerPaused),
+    // Harden reads too: older snapshots or manually injected sessionStorage
+    // must not rehydrate setup-session secrets.
+    createSession: null,
+    importSession: null,
+    onboardSession: null,
+    rotateKeysetSession: null,
+    recoverSession: null,
   };
 }
 
@@ -100,7 +144,7 @@ export function consumeBridgeSnapshot(): AppStateBridgeSnapshot | null {
     if (!parsed || typeof parsed !== "object") {
       return null;
     }
-    return parsed as AppStateBridgeSnapshot;
+    return normalizeAppStateBridgeSnapshot(parsed);
   } catch {
     return null;
   }

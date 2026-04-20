@@ -1,4 +1,10 @@
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  cleanup,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CreateKeysetScreen } from "../CreateKeysetScreen";
@@ -9,11 +15,12 @@ import { GenerationProgressScreen } from "../GenerationProgressScreen";
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   createKeyset: vi.fn().mockResolvedValue(undefined),
+  generateNsec: vi.fn(),
   createSession: null as {
     draft: { groupName: string; threshold: number; count: number };
     keyset?: Record<string, unknown>;
     localShare?: Record<string, unknown>;
-  } | null
+  } | null,
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -21,15 +28,21 @@ vi.mock("react-router-dom", async () => {
   return {
     ...actual,
     useNavigate: () => mocks.navigate,
-    Navigate: ({ to }: { to: string }) => <div data-testid="navigate-redirect">{to}</div>
+    Navigate: ({ to }: { to: string }) => (
+      <div data-testid="navigate-redirect">{to}</div>
+    ),
   };
 });
 
 vi.mock("../../app/AppState", () => ({
   useAppState: () => ({
     createKeyset: mocks.createKeyset,
-    createSession: mocks.createSession
-  })
+    createSession: mocks.createSession,
+  }),
+}));
+
+vi.mock("../../lib/bifrost/packageService", () => ({
+  generateNsec: mocks.generateNsec,
 }));
 
 afterEach(() => {
@@ -39,6 +52,11 @@ afterEach(() => {
 beforeEach(() => {
   mocks.navigate.mockClear();
   mocks.createKeyset.mockClear();
+  mocks.generateNsec.mockReset();
+  mocks.generateNsec.mockResolvedValue({
+    nsec: "nsec1generatedtestkey0000000000000000000000000000000000000000000000",
+    signing_key_hex: "a".repeat(64),
+  });
   mocks.createSession = null;
 });
 
@@ -51,7 +69,7 @@ describe("CreateKeysetScreen", () => {
     render(
       <MemoryRouter>
         <CreateKeysetScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Create New Keyset")).toBeInTheDocument();
     expect(screen.getByText("Keyset Name")).toBeInTheDocument();
@@ -59,19 +77,23 @@ describe("CreateKeysetScreen", () => {
     expect(screen.getByText("Create Keyset")).toBeInTheDocument();
   });
 
-  it("shows inline validation error for invalid nsec", async () => {
+  it("blocks existing nsec input because splitting is not supported yet", async () => {
     render(
       <MemoryRouter>
         <CreateKeysetScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
-    const nsecInput = screen.getByPlaceholderText("Paste your existing nsec or generate a new one");
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste existing nsec (unsupported)",
+    );
     fireEvent.change(nsecInput, { target: { value: "not-a-valid-key" } });
     fireEvent.click(screen.getByText("Create Keyset"));
 
     await waitFor(() => {
-      expect(screen.getByText("Invalid nsec format. Must be a valid Nostr private key.")).toBeInTheDocument();
+      expect(
+        screen.getByText("Existing nsec splitting is not supported yet."),
+      ).toBeInTheDocument();
     });
 
     expect(nsecInput).toHaveClass("input-error");
@@ -83,7 +105,7 @@ describe("CreateKeysetScreen", () => {
     render(
       <MemoryRouter>
         <CreateKeysetScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByText("Create Keyset"));
@@ -92,10 +114,66 @@ describe("CreateKeysetScreen", () => {
       expect(mocks.createKeyset).toHaveBeenCalledWith({
         groupName: "My Signing Key",
         threshold: 2,
-        count: 3
+        count: 3,
       });
     });
 
+    expect(mocks.navigate).toHaveBeenCalledWith("/create/progress");
+  });
+
+  it("generates a real nsec into the same input field", async () => {
+    const generated =
+      "nsec1generatedtestkey0000000000000000000000000000000000000000000000";
+
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate NSEC" }));
+
+    await waitFor(() => {
+      expect(mocks.generateNsec).toHaveBeenCalled();
+      expect(
+        screen.getByPlaceholderText("Paste existing nsec (unsupported)"),
+      ).toHaveValue(generated);
+    });
+
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste existing nsec (unsupported)",
+    );
+    expect(nsecInput).toHaveAttribute("type", "password");
+    fireEvent.click(screen.getByRole("button", { name: "Reveal nsec" }));
+    expect(nsecInput).toHaveAttribute("type", "text");
+  });
+
+  it("submits a generated nsec without storing it in the create draft", async () => {
+    const generated =
+      "nsec1generatedtestkey0000000000000000000000000000000000000000000000";
+
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate NSEC" }));
+    await waitFor(() =>
+      expect(
+        screen.getByPlaceholderText("Paste existing nsec (unsupported)"),
+      ).toHaveValue(generated),
+    );
+    fireEvent.click(screen.getByText("Create Keyset"));
+
+    await waitFor(() => {
+      expect(mocks.createKeyset).toHaveBeenCalledWith({
+        groupName: "My Signing Key",
+        threshold: 2,
+        count: 3,
+        generatedNsec: generated,
+      });
+    });
     expect(mocks.navigate).toHaveBeenCalledWith("/create/progress");
   });
 
@@ -103,7 +181,7 @@ describe("CreateKeysetScreen", () => {
     render(
       <MemoryRouter>
         <CreateKeysetScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     const nameInput = screen.getByDisplayValue("My Signing Key");
@@ -119,7 +197,7 @@ describe("CreateKeysetScreen", () => {
     render(
       <MemoryRouter>
         <CreateKeysetScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     // Stepper step 1 "Create"; step 2 "Create Profile"; step 3 "Distribute Shares"
     expect(screen.getByText("Create Profile")).toBeInTheDocument();
@@ -132,10 +210,12 @@ describe("CreateKeysetScreen", () => {
     render(
       <MemoryRouter>
         <CreateKeysetScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(
-      screen.getByText("A friendly name for this keyset's group profile. Visible to all peers in the keyset.")
+      screen.getByText(
+        "A friendly name for this keyset's group profile. Visible to all peers in the keyset.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -143,23 +223,56 @@ describe("CreateKeysetScreen", () => {
     render(
       <MemoryRouter>
         <CreateKeysetScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(
-      screen.getByText("Any 2 of 3 shares can sign — min threshold is 2, min shares is 3")
+      screen.getByText(
+        "Any 2 of 3 shares can sign — min threshold is 2, min shares is 2",
+      ),
     ).toBeInTheDocument();
 
-    // Click the Total Shares + button to go 3 -> 4
+    fireEvent.click(screen.getByLabelText("Decrease Total Shares"));
+    expect(
+      screen.getByText(
+        "Any 2 of 2 shares can sign — min threshold is 2, min shares is 2",
+      ),
+    ).toBeInTheDocument();
+
+    // Click the Total Shares + button twice to go 2 -> 4
+    fireEvent.click(screen.getByLabelText("Increase Total Shares"));
     fireEvent.click(screen.getByLabelText("Increase Total Shares"));
     expect(
-      screen.getByText("Any 2 of 4 shares can sign — min threshold is 2, min shares is 3")
+      screen.getByText(
+        "Any 2 of 4 shares can sign — min threshold is 2, min shares is 2",
+      ),
     ).toBeInTheDocument();
 
     // Click Threshold + to go 2 -> 3
     fireEvent.click(screen.getByLabelText("Increase Threshold"));
     expect(
-      screen.getByText("Any 3 of 4 shares can sign — min threshold is 2, min shares is 3")
+      screen.getByText(
+        "Any 3 of 4 shares can sign — min threshold is 2, min shares is 3",
+      ),
     ).toBeInTheDocument();
+  });
+
+  it("allows a 2-of-2 keyset", async () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByLabelText("Decrease Total Shares"));
+    fireEvent.click(screen.getByText("Create Keyset"));
+
+    await waitFor(() => {
+      expect(mocks.createKeyset).toHaveBeenCalledWith({
+        groupName: "My Signing Key",
+        threshold: 2,
+        count: 2,
+      });
+    });
   });
 });
 
@@ -173,20 +286,22 @@ describe("GenerationProgressScreen", () => {
     render(
       <MemoryRouter>
         <GenerationProgressScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByTestId("navigate-redirect")).toHaveTextContent("/create");
+    expect(screen.getByTestId("navigate-redirect")).toHaveTextContent(
+      "/create",
+    );
   });
 
   it("renders progress screen with phases when keyset exists", () => {
     mocks.createSession = {
       draft: { groupName: "Test Key", threshold: 2, count: 3 },
-      keyset: { group: {} } as Record<string, unknown>
+      keyset: { group: {} } as Record<string, unknown>,
     };
     render(
       <MemoryRouter>
         <GenerationProgressScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Generation Progress")).toBeInTheDocument();
     expect(screen.getByText("Generate New Key")).toBeInTheDocument();
@@ -199,12 +314,12 @@ describe("GenerationProgressScreen", () => {
   it("shows Back link that navigates to /create", () => {
     mocks.createSession = {
       draft: { groupName: "Test Key", threshold: 2, count: 3 },
-      keyset: { group: {} } as Record<string, unknown>
+      keyset: { group: {} } as Record<string, unknown>,
     };
     render(
       <MemoryRouter>
         <GenerationProgressScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Back"));
     expect(mocks.navigate).toHaveBeenCalledWith("/create");
@@ -213,20 +328,22 @@ describe("GenerationProgressScreen", () => {
   it("auto-transitions to /create/profile after all phases complete", async () => {
     mocks.createSession = {
       draft: { groupName: "Test Key", threshold: 2, count: 3 },
-      keyset: { group: {} } as Record<string, unknown>
+      keyset: { group: {} } as Record<string, unknown>,
     };
     render(
       <MemoryRouter>
         <GenerationProgressScreen />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     /* Wait for auto-transition — phases advance every 800ms, 3 phases + 600ms transition delay */
     await waitFor(
       () => {
-        expect(mocks.navigate).toHaveBeenCalledWith("/create/profile", { replace: true });
+        expect(mocks.navigate).toHaveBeenCalledWith("/create/profile", {
+          replace: true,
+        });
       },
-      { timeout: 5000 }
+      { timeout: 5000 },
     );
   });
 });

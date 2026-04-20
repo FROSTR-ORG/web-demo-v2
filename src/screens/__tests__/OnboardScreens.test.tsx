@@ -13,7 +13,23 @@ const mocks = vi.hoisted(() => ({
   locationState: null as Record<string, unknown> | null,
   reloadProfiles: vi.fn().mockResolvedValue(undefined),
   createKeyset: vi.fn().mockResolvedValue(undefined),
-  createProfile: vi.fn().mockResolvedValue("profile-abc123")
+  createProfile: vi.fn().mockResolvedValue("profile-abc123"),
+  decodeOnboardPackage: vi.fn().mockResolvedValue(undefined),
+  startOnboardHandshake: vi.fn().mockResolvedValue(undefined),
+  saveOnboardedProfile: vi.fn().mockResolvedValue("profile-onboarded"),
+  clearOnboardSession: vi.fn(),
+  onboardSession: null as {
+    phase: "decoded" | "handshaking" | "ready_to_save" | "failed";
+    packageString: string;
+    payload: { share_secret: string; relays: string[]; peer_pk: string };
+    response?: {
+      group: { group_name: string; threshold: number; members: Array<{ idx: number; pubkey: string }> };
+      nonces: unknown[];
+    };
+    runtimeSnapshot?: { bootstrap: { share: { idx: number; seckey: string } }; state_hex: string };
+    localShareIdx?: number;
+    error?: { code: string; message: string };
+  } | null
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -33,10 +49,15 @@ vi.mock("react-router-dom", async () => {
 
 vi.mock("../../app/AppState", () => ({
   useAppState: () => ({
-    reloadProfiles: mocks.reloadProfiles,
-    createKeyset: mocks.createKeyset,
-    createProfile: mocks.createProfile
-  })
+	    reloadProfiles: mocks.reloadProfiles,
+	    createKeyset: mocks.createKeyset,
+	    createProfile: mocks.createProfile,
+	    decodeOnboardPackage: mocks.decodeOnboardPackage,
+	    startOnboardHandshake: mocks.startOnboardHandshake,
+	    saveOnboardedProfile: mocks.saveOnboardedProfile,
+	    onboardSession: mocks.onboardSession,
+	    clearOnboardSession: mocks.clearOnboardSession
+	  })
 }));
 
 afterEach(() => {
@@ -48,8 +69,51 @@ beforeEach(() => {
   mocks.createKeyset.mockClear();
   mocks.createProfile.mockClear();
   mocks.createProfile.mockResolvedValue("profile-abc123");
+  mocks.decodeOnboardPackage.mockClear();
+  mocks.decodeOnboardPackage.mockResolvedValue(undefined);
+  mocks.startOnboardHandshake.mockClear();
+  mocks.startOnboardHandshake.mockResolvedValue(undefined);
+  mocks.saveOnboardedProfile.mockClear();
+  mocks.saveOnboardedProfile.mockResolvedValue("profile-onboarded");
+  mocks.clearOnboardSession.mockClear();
+  mocks.onboardSession = null;
   mocks.locationState = null;
 });
+
+function makeOnboardSession() {
+  return {
+    phase: "decoded" as const,
+    packageString: "bfonboard1abc123",
+    payload: {
+      share_secret: "1".repeat(64),
+      relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
+      peer_pk: "02a3f8c2d1e4b7f9a0c3d2e1b6f8a7c4d2e1b9f3a4c5d6e7f8a9b0c1d28f2c"
+    }
+  };
+}
+
+function makeReadyOnboardSession() {
+  return {
+    ...makeOnboardSession(),
+    phase: "ready_to_save" as const,
+    response: {
+      group: {
+        group_name: "Live Onboard Key",
+        threshold: 2,
+        members: [
+          { idx: 0, pubkey: "02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+          { idx: 1, pubkey: "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+        ]
+      },
+      nonces: []
+    },
+    runtimeSnapshot: {
+      bootstrap: { share: { idx: 1, seckey: "1".repeat(64) } },
+      state_hex: "abcd"
+    },
+    localShareIdx: 1
+  };
+}
 
 describe("EnterPackageScreen", () => {
   it("renders heading, package input, QR button, password field, and begin button", () => {
@@ -75,7 +139,7 @@ describe("EnterPackageScreen", () => {
     );
     const textarea = screen.getByPlaceholderText("bfonboard1...");
     fireEvent.change(textarea, { target: { value: "bfonboard1abc123" } });
-    expect(screen.getByText(/Valid package/)).toBeInTheDocument();
+    expect(screen.getByText(/Valid bfonboard package format/)).toBeInTheDocument();
   });
 
   it("shows error feedback for invalid input", () => {
@@ -145,7 +209,7 @@ describe("EnterPackageScreen", () => {
 
 describe("HandshakeScreen", () => {
   it("renders timeline with progress states when package state is present", () => {
-    mocks.locationState = { packageString: "bfonboard1abc123", password: "test" };
+    mocks.onboardSession = makeOnboardSession();
     render(
       <MemoryRouter>
         <HandshakeScreen />
@@ -157,10 +221,11 @@ describe("HandshakeScreen", () => {
     expect(screen.getByText("Receiving keyset data")).toBeInTheDocument();
     expect(screen.getByText("Saving to device")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Cancel Onboarding/i })).toBeInTheDocument();
+    expect(mocks.startOnboardHandshake).toHaveBeenCalled();
   });
 
   it("does not render a Back link (VAL-ONB-002)", () => {
-    mocks.locationState = { packageString: "bfonboard1abc123", password: "test" };
+    mocks.onboardSession = makeOnboardSession();
     render(
       <MemoryRouter>
         <HandshakeScreen />
@@ -168,6 +233,20 @@ describe("HandshakeScreen", () => {
     );
     expect(screen.queryByRole("button", { name: /^Back$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Back to/i })).not.toBeInTheDocument();
+  });
+
+  it("retries a failed product session by starting the live handshake again", () => {
+    mocks.onboardSession = {
+      ...makeOnboardSession(),
+      phase: "failed",
+      error: { code: "onboard_timeout", message: "Timed out." }
+    };
+    render(
+      <MemoryRouter>
+        <HandshakeScreen />
+      </MemoryRouter>
+    );
+    expect(mocks.startOnboardHandshake).toHaveBeenCalled();
   });
 
   it("guard redirects to /onboard if no state", () => {
@@ -201,14 +280,26 @@ describe("OnboardingFailedScreen", () => {
     expect(alert?.className).not.toContain("red");
   });
 
-  it("Retry button navigates to handshake", () => {
+  it("Retry button returns to package entry when no decoded session exists", () => {
     render(
       <MemoryRouter>
         <OnboardingFailedScreen />
       </MemoryRouter>
     );
     fireEvent.click(screen.getByRole("button", { name: /^Retry$/i }));
-    expect(mocks.navigate).toHaveBeenCalledWith("/onboard/handshake", expect.anything());
+    expect(mocks.clearOnboardSession).toHaveBeenCalled();
+    expect(mocks.navigate).toHaveBeenCalledWith("/onboard");
+  });
+
+  it("Retry button returns to handshake when a decoded session exists", () => {
+    mocks.onboardSession = makeOnboardSession();
+    render(
+      <MemoryRouter>
+        <OnboardingFailedScreen />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Retry$/i }));
+    expect(mocks.navigate).toHaveBeenCalledWith("/onboard/handshake");
   });
 
   it("Back to Onboarding button navigates to enter package", () => {
@@ -218,6 +309,7 @@ describe("OnboardingFailedScreen", () => {
       </MemoryRouter>
     );
     fireEvent.click(screen.getByRole("button", { name: /Back to Onboarding/i }));
+    expect(mocks.clearOnboardSession).toHaveBeenCalled();
     expect(mocks.navigate).toHaveBeenCalledWith("/onboard");
   });
 
@@ -280,7 +372,7 @@ describe("onboard-error-alert red variant CSS rule (VAL-ONB-004)", () => {
 
 describe("OnboardingCompleteScreen", () => {
   it("renders success header, profile cards, password fields, and save button", () => {
-    mocks.locationState = { fromHandshake: true };
+    mocks.locationState = { fromHandshake: true, demoUi: { onboard: { packagePreset: "bfonboard1abc123" } } };
     render(
       <MemoryRouter>
         <OnboardingCompleteScreen />
@@ -307,8 +399,57 @@ describe("OnboardingCompleteScreen", () => {
     expect(container.textContent).toBe("");
   });
 
-  it("has no Back link (terminal success state)", () => {
+  it("redirects product complete attempts and never creates a fake profile", () => {
     mocks.locationState = { fromHandshake: true };
+    const { container } = render(
+      <MemoryRouter>
+        <OnboardingCompleteScreen />
+      </MemoryRouter>
+    );
+    expect(container.textContent).toBe("");
+    expect(mocks.createKeyset).not.toHaveBeenCalled();
+    expect(mocks.createProfile).not.toHaveBeenCalled();
+  });
+
+  it("renders real product completion from a ready onboarding session", () => {
+    mocks.locationState = null;
+    mocks.onboardSession = makeReadyOnboardSession();
+    render(
+      <MemoryRouter>
+        <OnboardingCompleteScreen />
+      </MemoryRouter>
+    );
+    expect(screen.getByText("Live Onboard Key")).toBeInTheDocument();
+    expect(screen.getByText("#1 (Index 1)")).toBeInTheDocument();
+    expect(screen.getByText("2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("2 connected")).toBeInTheDocument();
+    expect(screen.getByText("1 peers")).toBeInTheDocument();
+  });
+
+  it("product completion saves through saveOnboardedProfile instead of fake create flow", async () => {
+    mocks.locationState = null;
+    mocks.onboardSession = makeReadyOnboardSession();
+    render(
+      <MemoryRouter>
+        <OnboardingCompleteScreen />
+      </MemoryRouter>
+    );
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "local-password" } });
+    fireEvent.change(screen.getByLabelText("Confirm Password"), { target: { value: "local-password" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save & Launch Signer/i }));
+    await waitFor(() => {
+      expect(mocks.saveOnboardedProfile).toHaveBeenCalledWith({
+        password: "local-password",
+        confirmPassword: "local-password"
+      });
+    });
+    expect(mocks.createKeyset).not.toHaveBeenCalled();
+    expect(mocks.createProfile).not.toHaveBeenCalled();
+    expect(mocks.navigate).toHaveBeenCalledWith("/dashboard/profile-onboarded");
+  });
+
+  it("has no Back link (terminal success state)", () => {
+    mocks.locationState = { fromHandshake: true, demoUi: { onboard: { packagePreset: "bfonboard1abc123" } } };
     render(
       <MemoryRouter>
         <OnboardingCompleteScreen />
@@ -318,7 +459,7 @@ describe("OnboardingCompleteScreen", () => {
   });
 
   it("Save & Launch Signer creates keyset + profile and navigates to dashboard (VAL-ONB-005 / VAL-CROSS-007)", async () => {
-    mocks.locationState = { fromHandshake: true };
+    mocks.locationState = { fromHandshake: true, demoUi: { onboard: { packagePreset: "bfonboard1abc123" } } };
     render(
       <MemoryRouter>
         <OnboardingCompleteScreen />

@@ -1,7 +1,10 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { StoredProfileRecord, StoredProfileSummary } from "../../lib/bifrost/types";
+import type {
+  StoredProfileRecord,
+  StoredProfileSummary,
+} from "../../lib/bifrost/types";
 
 /* ---------- IndexedDB mock ---------- */
 
@@ -14,7 +17,7 @@ vi.mock("idb-keyval", () => ({
   }),
   del: vi.fn(async (key: string) => {
     storage.delete(key);
-  })
+  }),
 }));
 
 /* ---------- Mock heavyweight runtime deps so AppStateProvider imports cleanly ---------- */
@@ -30,7 +33,7 @@ vi.mock("../../lib/bifrost/runtimeClient", () => ({
     async init() {
       /* no-op */
     }
-  }
+  },
 }));
 
 vi.mock("../../lib/relay/localSimulator", () => ({
@@ -50,7 +53,7 @@ vi.mock("../../lib/relay/localSimulator", () => ({
     async attachVirtualPeers() {
       /* no-op */
     }
-  }
+  },
 }));
 
 /* ---------- Mock bifrost package + format helpers used by unlockProfile ---------- */
@@ -67,16 +70,23 @@ vi.mock("../../lib/bifrost/packageService", () => ({
       group_name: "My Signing Key",
       threshold: 2,
       group_pk: "0".repeat(64),
-      members: [{ idx: 0, pubkey: "0".repeat(66) }]
+      members: [{ idx: 0, pubkey: "0".repeat(66) }],
     },
-    device: { share_secret: "0".repeat(64) }
+    device: { share_secret: "0".repeat(64) },
   })),
   createKeysetBundle: vi.fn(),
+  createKeysetBundleFromNsec: vi.fn(),
+  generateNsec: vi.fn(),
   createProfilePackagePair: vi.fn(),
+  decodeBfonboardPackage: vi.fn(),
+  decodeBfsharePackage: vi.fn(),
   deriveProfileIdFromShareSecret: vi.fn(),
   encodeOnboardPackage: vi.fn(),
   onboardPayloadForRemoteShare: vi.fn(),
-  profilePayloadForShare: vi.fn()
+  profilePayloadForShare: vi.fn(),
+  recoverNsecFromShares: vi.fn(),
+  resolveShareIndex: vi.fn(async () => 0),
+  rotateKeysetBundle: vi.fn(),
 }));
 
 vi.mock("../../lib/bifrost/format", () => ({
@@ -85,16 +95,30 @@ vi.mock("../../lib/bifrost/format", () => ({
   memberPubkeyXOnly: vi.fn(),
   packagePasswordForShare: vi.fn(),
   runtimeBootstrapFromParts: vi.fn(() => ({})),
-  shortHex: (hex: string) => hex
+  shortHex: (hex: string) => hex,
 }));
 
 /* Import AFTER mocks are registered */
-import { AppStateProvider, MockAppStateProvider, useAppState, type AppStateValue } from "../AppState";
-import { BRIDGE_EVENT, BRIDGE_STORAGE_KEY, consumeBridgeSnapshot, snapshotFromAppState, writeBridgeSnapshot, type AppStateBridgeSnapshot } from "../appStateBridge";
+import {
+  AppStateProvider,
+  MockAppStateProvider,
+  useAppState,
+  type AppStateValue,
+} from "../AppState";
+import {
+  BRIDGE_EVENT,
+  BRIDGE_STORAGE_KEY,
+  consumeBridgeSnapshot,
+  snapshotFromAppState,
+  writeBridgeSnapshot,
+  type AppStateBridgeSnapshot,
+} from "../appStateBridge";
 
 /* ---------- Test helpers ---------- */
 
-function makeProfile(overrides: Partial<StoredProfileSummary> = {}): StoredProfileSummary {
+function makeProfile(
+  overrides: Partial<StoredProfileSummary> = {},
+): StoredProfileSummary {
   return {
     id: "prof_bridge_test",
     label: "My Signing Key",
@@ -107,22 +131,32 @@ function makeProfile(overrides: Partial<StoredProfileSummary> = {}): StoredProfi
     relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
     createdAt: 1_700_000_000_000,
     lastUsedAt: 1_700_000_000_000,
-    ...overrides
+    ...overrides,
   };
 }
 
-function makeSnapshot(overrides: Partial<AppStateBridgeSnapshot> = {}): AppStateBridgeSnapshot {
+function makeSnapshot(
+  overrides: Partial<AppStateBridgeSnapshot> = {},
+): AppStateBridgeSnapshot {
   return {
     profiles: [makeProfile()],
     activeProfile: makeProfile(),
     runtimeStatus: null,
     signerPaused: false,
     createSession: null,
-    ...overrides
+    importSession: null,
+    onboardSession: null,
+    rotateKeysetSession: null,
+    recoverSession: null,
+    ...overrides,
   };
 }
 
-function CapturedState({ onState }: { onState: (value: AppStateValue) => void }) {
+function CapturedState({
+  onState,
+}: {
+  onState: (value: AppStateValue) => void;
+}) {
   const state = useAppState();
   useEffect(() => {
     onState(state);
@@ -131,7 +165,9 @@ function CapturedState({ onState }: { onState: (value: AppStateValue) => void })
     <>
       <div data-testid="profile-count">{state.profiles.length}</div>
       <div data-testid="active-profile-id">{state.activeProfile?.id ?? ""}</div>
-      <div data-testid="active-profile-label">{state.activeProfile?.label ?? ""}</div>
+      <div data-testid="active-profile-label">
+        {state.activeProfile?.label ?? ""}
+      </div>
     </>
   );
 }
@@ -177,6 +213,30 @@ describe("appStateBridge helpers", () => {
     expect(window.sessionStorage.getItem(BRIDGE_STORAGE_KEY)).toBeNull();
   });
 
+  it("consumeBridgeSnapshot strips setup sessions from stale or injected snapshots", () => {
+    const injected = {
+      ...makeSnapshot(),
+      createSession: { onboardingPackages: [{ password: "secret" }] },
+      importSession: { payload: { device: { share_secret: "2".repeat(64) } } },
+      onboardSession: { payload: { share_secret: "3".repeat(64) } },
+      rotateKeysetSession: { sourceShares: [{ seckey: "4".repeat(64) }] },
+      recoverSession: { recovered: { nsec: "nsec1rawsecret" } },
+    };
+    window.sessionStorage.setItem(BRIDGE_STORAGE_KEY, JSON.stringify(injected));
+
+    const result = consumeBridgeSnapshot();
+
+    expect(result).toMatchObject({
+      createSession: null,
+      importSession: null,
+      onboardSession: null,
+      rotateKeysetSession: null,
+      recoverSession: null,
+    });
+    expect(JSON.stringify(result)).not.toContain("secret");
+    expect(JSON.stringify(result)).not.toContain("nsec1rawsecret");
+  });
+
   it("consumeBridgeSnapshot returns null when no key is present", () => {
     expect(window.sessionStorage.getItem(BRIDGE_STORAGE_KEY)).toBeNull();
     expect(consumeBridgeSnapshot()).toBeNull();
@@ -194,9 +254,16 @@ describe("appStateBridge helpers", () => {
       activeProfile: makeProfile(),
       runtimeStatus: null,
       signerPaused: true,
-      createSession: null,
+      createSession: { keyset: { shares: [{ seckey: "1".repeat(64) }] } },
+      importSession: { payload: { device: { share_secret: "2".repeat(64) } } },
+      onboardSession: {
+        payload: { share_secret: "3".repeat(64) },
+        password: "super-secret",
+      },
+      rotateKeysetSession: { sourceShares: [{ seckey: "4".repeat(64) }] },
+      recoverSession: { recovered: { nsec: "nsec1rawsecret" } },
       reloadProfiles: vi.fn(),
-      extraThing: "ignored"
+      extraThing: "ignored",
     } as unknown as AppStateValue;
 
     const snapshot = snapshotFromAppState(fake);
@@ -204,11 +271,23 @@ describe("appStateBridge helpers", () => {
     expect(Object.keys(snapshot).sort()).toEqual([
       "activeProfile",
       "createSession",
+      "importSession",
+      "onboardSession",
       "profiles",
+      "recoverSession",
+      "rotateKeysetSession",
       "runtimeStatus",
-      "signerPaused"
+      "signerPaused",
     ]);
     expect(snapshot.signerPaused).toBe(true);
+    expect(snapshot.createSession).toBeNull();
+    expect(snapshot.importSession).toBeNull();
+    expect(snapshot.onboardSession).toBeNull();
+    expect(snapshot.rotateKeysetSession).toBeNull();
+    expect(snapshot.recoverSession).toBeNull();
+    expect(JSON.stringify(snapshot)).not.toContain("super-secret");
+    expect(JSON.stringify(snapshot)).not.toContain("nsec1rawsecret");
+    expect(JSON.stringify(snapshot)).not.toContain("11111111");
   });
 });
 
@@ -222,7 +301,7 @@ describe("AppStateProvider bridge integration", () => {
     render(
       <AppStateProvider>
         <CapturedState onState={(value) => states.push(value)} />
-      </AppStateProvider>
+      </AppStateProvider>,
     );
 
     // Wait for the initial reloadProfiles effect to resolve.
@@ -240,7 +319,7 @@ describe("AppStateProvider bridge integration", () => {
     const existing = makeProfile({ id: "prof_existing", label: "Existing" });
     const record: StoredProfileRecord = {
       summary: existing,
-      encryptedProfilePackage: "bfprofile1fake"
+      encryptedProfilePackage: "bfprofile1fake",
     };
     storage.set("igloo.web-demo-v2.profile-index", [existing.id]);
     storage.set(`igloo.web-demo-v2.profile.${existing.id}`, record);
@@ -248,7 +327,7 @@ describe("AppStateProvider bridge integration", () => {
     render(
       <AppStateProvider>
         <CapturedState onState={() => undefined} />
-      </AppStateProvider>
+      </AppStateProvider>,
     );
 
     await waitFor(() => {
@@ -259,23 +338,30 @@ describe("AppStateProvider bridge integration", () => {
   });
 
   it("hydrates from sessionStorage when the bridge key is present on mount", async () => {
-    const bridged = makeProfile({ id: "prof_demo_123", label: "My Signing Key" });
+    const bridged = makeProfile({
+      id: "prof_demo_123",
+      label: "My Signing Key",
+    });
     const snapshot = makeSnapshot({
       profiles: [bridged],
-      activeProfile: bridged
+      activeProfile: bridged,
     });
     window.sessionStorage.setItem(BRIDGE_STORAGE_KEY, JSON.stringify(snapshot));
 
     render(
       <AppStateProvider>
         <CapturedState onState={() => undefined} />
-      </AppStateProvider>
+      </AppStateProvider>,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("active-profile-id").textContent).toBe("prof_demo_123");
+      expect(screen.getByTestId("active-profile-id").textContent).toBe(
+        "prof_demo_123",
+      );
     });
-    expect(screen.getByTestId("active-profile-label").textContent).toBe("My Signing Key");
+    expect(screen.getByTestId("active-profile-label").textContent).toBe(
+      "My Signing Key",
+    );
     expect(screen.getByTestId("profile-count").textContent).toBe("1");
   });
 
@@ -286,7 +372,7 @@ describe("AppStateProvider bridge integration", () => {
     render(
       <AppStateProvider>
         <CapturedState onState={() => undefined} />
-      </AppStateProvider>
+      </AppStateProvider>,
     );
 
     await waitFor(() => {
@@ -301,7 +387,7 @@ describe("AppStateProvider bridge integration", () => {
     render(
       <AppStateProvider>
         <CapturedState onState={() => undefined} />
-      </AppStateProvider>
+      </AppStateProvider>,
     );
 
     // Initially empty state (no bridge, no IndexedDB profiles).
@@ -309,10 +395,13 @@ describe("AppStateProvider bridge integration", () => {
       expect(screen.getByTestId("profile-count").textContent).toBe("0");
     });
 
-    const bridged = makeProfile({ id: "prof_late_bridge", label: "Late Bridge" });
+    const bridged = makeProfile({
+      id: "prof_late_bridge",
+      label: "Late Bridge",
+    });
     const snapshot = makeSnapshot({
       profiles: [bridged],
-      activeProfile: bridged
+      activeProfile: bridged,
     });
 
     act(() => {
@@ -320,7 +409,9 @@ describe("AppStateProvider bridge integration", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("active-profile-id").textContent).toBe("prof_late_bridge");
+      expect(screen.getByTestId("active-profile-id").textContent).toBe(
+        "prof_late_bridge",
+      );
     });
     // Key is consumed after the event-triggered read as well.
     expect(window.sessionStorage.getItem(BRIDGE_STORAGE_KEY)).toBeNull();
@@ -338,29 +429,57 @@ describe("MockAppStateProvider bridge arming", () => {
     runtimeStatus: null,
     signerPaused: false,
     createSession: null,
+    importSession: null,
+    onboardSession: null,
+    rotateKeysetSession: null,
+    recoverSession: null,
     reloadProfiles: async () => undefined,
     createKeyset: async () => undefined,
     createProfile: async () => "prof_mock",
     updatePackageState: () => undefined,
     finishDistribution: async () => "prof_mock",
+    clearCreateSession: () => undefined,
+    beginImport: () => undefined,
+    decryptImportBackup: async () => undefined,
+    saveImportedProfile: async () => "prof_mock",
+    clearImportSession: () => undefined,
+    decodeOnboardPackage: async () => undefined,
+    startOnboardHandshake: async () => undefined,
+    saveOnboardedProfile: async () => "prof_mock",
+    clearOnboardSession: () => undefined,
+    validateRotateKeysetSources: async () => undefined,
+    generateRotatedKeyset: async () => undefined,
+    createRotatedProfile: async () => "prof_mock",
+    updateRotatePackageState: () => undefined,
+    finishRotateDistribution: async () => "prof_mock",
+    clearRotateKeysetSession: () => undefined,
+    validateRecoverSources: async () => undefined,
+    recoverNsec: async () => ({
+      nsec: "nsec1mock",
+      signing_key_hex: "0".repeat(64),
+    }),
+    clearRecoverSession: () => undefined,
+    expireRecoveredNsec: () => undefined,
     unlockProfile: async () => undefined,
     lockProfile: () => undefined,
     clearCredentials: async () => undefined,
     setSignerPaused: () => undefined,
-    refreshRuntime: () => undefined
+    refreshRuntime: () => undefined,
   };
 
   it("writes a snapshot of its value to sessionStorage on mount", async () => {
     render(
       <MockAppStateProvider value={mockValue}>
         <span>child</span>
-      </MockAppStateProvider>
+      </MockAppStateProvider>,
     );
 
     await waitFor(() => {
       expect(window.sessionStorage.getItem(BRIDGE_STORAGE_KEY)).not.toBeNull();
     });
-    const parsed = JSON.parse(window.sessionStorage.getItem(BRIDGE_STORAGE_KEY)!);
+    const parsed = JSON.parse(
+      window.sessionStorage.getItem(BRIDGE_STORAGE_KEY)!,
+    );
     expect(parsed.activeProfile.id).toBe("prof_mock");
   });
 
@@ -368,7 +487,7 @@ describe("MockAppStateProvider bridge arming", () => {
     render(
       <MockAppStateProvider value={mockValue} bridge={false}>
         <span>child</span>
-      </MockAppStateProvider>
+      </MockAppStateProvider>,
     );
 
     // Give effects a chance to run.
@@ -388,7 +507,9 @@ describe("MockAppStateProvider bridge arming", () => {
       useEffect(() => {
         states.push(state);
       }, [state]);
-      return <div data-testid="real-active-id">{state.activeProfile?.id ?? ""}</div>;
+      return (
+        <div data-testid="real-active-id">{state.activeProfile?.id ?? ""}</div>
+      );
     }
 
     render(
@@ -398,11 +519,13 @@ describe("MockAppStateProvider bridge arming", () => {
           {/* Children don't need to read state for this test */}
           <span>demo-tree</span>
         </MockAppStateProvider>
-      </AppStateProvider>
+      </AppStateProvider>,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("real-active-id").textContent).toBe("prof_mock");
+      expect(screen.getByTestId("real-active-id").textContent).toBe(
+        "prof_mock",
+      );
     });
     expect(window.sessionStorage.getItem(BRIDGE_STORAGE_KEY)).toBeNull();
   });
@@ -415,7 +538,9 @@ describe("MockAppStateProvider bridge arming", () => {
       return (
         <>
           <div data-testid="mock-profile-count">{state.profiles.length}</div>
-          <div data-testid="mock-active-id">{state.activeProfile?.id ?? ""}</div>
+          <div data-testid="mock-active-id">
+            {state.activeProfile?.id ?? ""}
+          </div>
         </>
       );
     }
@@ -423,7 +548,7 @@ describe("MockAppStateProvider bridge arming", () => {
     render(
       <MockAppStateProvider value={mockValue}>
         <Probe />
-      </MockAppStateProvider>
+      </MockAppStateProvider>,
     );
 
     // Starts seeded from the mock value.
@@ -445,7 +570,9 @@ describe("MockAppStateProvider bridge arming", () => {
 
     // The bridge snapshot was rearmed with the empty state, so a subsequent
     // hand-off to the real AppStateProvider surfaces the no-profiles variant.
-    const parsed = JSON.parse(window.sessionStorage.getItem(BRIDGE_STORAGE_KEY)!);
+    const parsed = JSON.parse(
+      window.sessionStorage.getItem(BRIDGE_STORAGE_KEY)!,
+    );
     expect(parsed.profiles).toEqual([]);
     expect(parsed.activeProfile).toBeNull();
     expect(parsed.runtimeStatus).toBeNull();
@@ -454,7 +581,9 @@ describe("MockAppStateProvider bridge arming", () => {
   it("MockAppStateProvider.lockProfile clears runtimeStatus and activeProfile", async () => {
     const seeded: AppStateValue = {
       ...mockValue,
-      runtimeStatus: { pretend: true } as unknown as AppStateValue["runtimeStatus"]
+      runtimeStatus: {
+        pretend: true,
+      } as unknown as AppStateValue["runtimeStatus"],
     };
 
     let captured!: AppStateValue;
@@ -463,8 +592,12 @@ describe("MockAppStateProvider bridge arming", () => {
       captured = state;
       return (
         <>
-          <div data-testid="mock-active-id">{state.activeProfile?.id ?? ""}</div>
-          <div data-testid="mock-has-runtime">{state.runtimeStatus ? "yes" : "no"}</div>
+          <div data-testid="mock-active-id">
+            {state.activeProfile?.id ?? ""}
+          </div>
+          <div data-testid="mock-has-runtime">
+            {state.runtimeStatus ? "yes" : "no"}
+          </div>
         </>
       );
     }
@@ -472,7 +605,7 @@ describe("MockAppStateProvider bridge arming", () => {
     render(
       <MockAppStateProvider value={seeded}>
         <Probe />
-      </MockAppStateProvider>
+      </MockAppStateProvider>,
     );
 
     await waitFor(() => {
@@ -487,6 +620,65 @@ describe("MockAppStateProvider bridge arming", () => {
       expect(screen.getByTestId("mock-has-runtime").textContent).toBe("no");
     });
     expect(screen.getByTestId("mock-active-id").textContent).toBe("");
+  });
+
+  it("MockAppStateProvider.updatePackageState mirrors create-session package accounting without bridging secrets", async () => {
+    const seeded: AppStateValue = {
+      ...mockValue,
+      createSession: {
+        draft: { groupName: "My Signing Key", threshold: 2, count: 3 },
+        localShare: { idx: 0, seckey: "1".repeat(64) },
+        onboardingPackages: [
+          {
+            idx: 1,
+            memberPubkey: "02" + "1".repeat(64),
+            packageText: "bfonboard1secret",
+            password: "package-password",
+            packageCopied: false,
+            passwordCopied: false,
+            copied: false,
+            qrShown: false,
+          },
+        ],
+      },
+    };
+
+    let captured!: AppStateValue;
+    function Probe() {
+      const state = useAppState();
+      captured = state;
+      return (
+        <div data-testid="package-copied">
+          {state.createSession?.onboardingPackages[0]?.packageCopied
+            ? "yes"
+            : "no"}
+        </div>
+      );
+    }
+
+    render(
+      <MockAppStateProvider value={seeded}>
+        <Probe />
+      </MockAppStateProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("package-copied").textContent).toBe("no");
+    });
+
+    act(() => {
+      captured.updatePackageState(1, { copied: true });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("package-copied").textContent).toBe("yes");
+    });
+    const parsed = JSON.parse(
+      window.sessionStorage.getItem(BRIDGE_STORAGE_KEY)!,
+    );
+    expect(parsed.createSession).toBeNull();
+    expect(JSON.stringify(parsed)).not.toContain("bfonboard1secret");
+    expect(JSON.stringify(parsed)).not.toContain("package-password");
   });
 });
 
@@ -506,25 +698,37 @@ describe("AppStateProvider runtime-polling and bridge hydration", () => {
     const clearIntervalSpy = vi.spyOn(window, "clearInterval");
 
     try {
-      const bridged = makeProfile({ id: "prof_bridge_pause", label: "Bridged" });
+      const bridged = makeProfile({
+        id: "prof_bridge_pause",
+        label: "Bridged",
+      });
       const snapshot = makeSnapshot({
         profiles: [bridged],
         activeProfile: bridged,
-        runtimeStatus: { pretend: true } as unknown as AppStateBridgeSnapshot["runtimeStatus"]
+        runtimeStatus: {
+          pretend: true,
+        } as unknown as AppStateBridgeSnapshot["runtimeStatus"],
       });
-      window.sessionStorage.setItem(BRIDGE_STORAGE_KEY, JSON.stringify(snapshot));
+      window.sessionStorage.setItem(
+        BRIDGE_STORAGE_KEY,
+        JSON.stringify(snapshot),
+      );
 
       render(
         <AppStateProvider>
           <CapturedState onState={() => undefined} />
-        </AppStateProvider>
+        </AppStateProvider>,
       );
 
       await waitFor(() => {
-        expect(screen.getByTestId("active-profile-id").textContent).toBe("prof_bridge_pause");
+        expect(screen.getByTestId("active-profile-id").textContent).toBe(
+          "prof_bridge_pause",
+        );
       });
 
-      const pollCallsAtPause = setIntervalSpy.mock.calls.filter(([, delay]) => delay === 2500).length;
+      const pollCallsAtPause = setIntervalSpy.mock.calls.filter(
+        ([, delay]) => delay === 2500,
+      ).length;
       const clearedCalls = clearIntervalSpy.mock.calls.length;
 
       // Snapshot the steady state after hydration.
@@ -538,7 +742,9 @@ describe("AppStateProvider runtime-polling and bridge hydration", () => {
       // No NEW polling intervals should have been scheduled after hydration —
       // the polling count and clearInterval count must be stable (modulo the
       // initial schedule + its cleanup triggered when bridgeHydrated flipped).
-      const pollCallsAfter = setIntervalSpy.mock.calls.filter(([, delay]) => delay === 2500).length;
+      const pollCallsAfter = setIntervalSpy.mock.calls.filter(
+        ([, delay]) => delay === 2500,
+      ).length;
       const clearedAfter = clearIntervalSpy.mock.calls.length;
       expect(pollCallsAfter).toBe(before.pollCallsAtPause);
       expect(clearedAfter).toBe(before.clearedCalls);
@@ -564,11 +770,16 @@ describe("AppStateProvider runtime-polling and bridge hydration", () => {
     const clearIntervalSpy = vi.spyOn(window, "clearInterval");
 
     try {
-      const bridged = makeProfile({ id: "prof_bridge_resume", label: "Bridged" });
+      const bridged = makeProfile({
+        id: "prof_bridge_resume",
+        label: "Bridged",
+      });
       const snapshot = makeSnapshot({
         profiles: [bridged],
         activeProfile: bridged,
-        runtimeStatus: { pretend: true } as unknown as AppStateBridgeSnapshot["runtimeStatus"]
+        runtimeStatus: {
+          pretend: true,
+        } as unknown as AppStateBridgeSnapshot["runtimeStatus"],
       });
       // Pre-seed the IndexedDB-mock-backed profile record so unlockProfile can
       // resolve it. The mocked RuntimeClient is inert (see mocks at the top
@@ -576,34 +787,43 @@ describe("AppStateProvider runtime-polling and bridge hydration", () => {
       // short-circuit that via a local `decodeProfilePackage` mock below.
       const record: StoredProfileRecord = {
         summary: bridged,
-        encryptedProfilePackage: "bfprofile1fake"
+        encryptedProfilePackage: "bfprofile1fake",
       };
       storage.set("igloo.web-demo-v2.profile-index", [bridged.id]);
       storage.set(`igloo.web-demo-v2.profile.${bridged.id}`, record);
 
-      window.sessionStorage.setItem(BRIDGE_STORAGE_KEY, JSON.stringify(snapshot));
+      window.sessionStorage.setItem(
+        BRIDGE_STORAGE_KEY,
+        JSON.stringify(snapshot),
+      );
 
       let captured!: AppStateValue;
       function Probe() {
         const state = useAppState();
         captured = state;
-        return <div data-testid="active-id">{state.activeProfile?.id ?? ""}</div>;
+        return (
+          <div data-testid="active-id">{state.activeProfile?.id ?? ""}</div>
+        );
       }
 
       render(
         <AppStateProvider>
           <Probe />
-        </AppStateProvider>
+        </AppStateProvider>,
       );
 
       await waitFor(() => {
-        expect(screen.getByTestId("active-id").textContent).toBe("prof_bridge_resume");
+        expect(screen.getByTestId("active-id").textContent).toBe(
+          "prof_bridge_resume",
+        );
       });
 
       // After bridge hydration, the polling effect should be paused. Count
       // the pre-unlock polling schedules so the follow-up assertion is
       // agnostic to the initial pre-hydration schedule.
-      const pollCallsBefore = setIntervalSpy.mock.calls.filter(([, delay]) => delay === 2500).length;
+      const pollCallsBefore = setIntervalSpy.mock.calls.filter(
+        ([, delay]) => delay === 2500,
+      ).length;
 
       await act(async () => {
         await captured.unlockProfile(bridged.id, "pw");
@@ -612,7 +832,9 @@ describe("AppStateProvider runtime-polling and bridge hydration", () => {
       // After unlock → setRuntime → setBridgeHydrated(false), the polling
       // effect re-runs and schedules a NEW 2500ms interval. Compare the call
       // count before vs after the unlock to assert the polling loop resumed.
-      const pollCallsAfter = setIntervalSpy.mock.calls.filter(([, delay]) => delay === 2500).length;
+      const pollCallsAfter = setIntervalSpy.mock.calls.filter(
+        ([, delay]) => delay === 2500,
+      ).length;
       expect(pollCallsAfter).toBeGreaterThan(pollCallsBefore);
       // The cleanup side will fire on unmount via clearInterval — this spy is
       // attached to guarantee we don't leak timers in the test runner.

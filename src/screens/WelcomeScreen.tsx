@@ -1,7 +1,7 @@
 import type { FormEvent } from "react";
 import { ArrowDown, Info, Lock, Plus, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import logoUrl from "../assets/igloo-logo.png";
 import { useAppState } from "../app/AppState";
 import { AppShell } from "../components/shell";
@@ -11,11 +11,23 @@ import { shortHex } from "../lib/bifrost/format";
 
 export function WelcomeScreen() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { profiles, unlockProfile } = useAppState();
   const demoUi = useDemoUi();
+  const setupNotice = (
+    location.state as { setupNotice?: { code?: string } } | null
+  )?.setupNotice;
+  const setupNoticeMessage =
+    setupNotice?.code === "rotate_selection_missing"
+      ? "Choose a saved profile before rotating its keyset."
+      : null;
   const variant = demoUi.welcome?.variant;
-  const [unlocking, setUnlocking] = useState<string | null>(demoUi.welcome?.unlockingProfileId ?? null);
-  const [password, setPassword] = useState(demoUi.welcome?.passwordPreset ?? "");
+  const [unlocking, setUnlocking] = useState<string | null>(
+    demoUi.welcome?.unlockingProfileId ?? null,
+  );
+  const [password, setPassword] = useState(
+    demoUi.welcome?.passwordPreset ?? "",
+  );
   const [error, setError] = useState(demoUi.welcome?.unlockError ?? "");
   const returning = profiles.length > 0;
   const isMulti = profiles.length >= 2;
@@ -24,7 +36,9 @@ export function WelcomeScreen() {
 
   /* --- Scrollable list overflow tracking for 4+ profiles --- */
   const listRef = useRef<HTMLDivElement>(null);
-  const [hiddenBelow, setHiddenBelow] = useState(Math.max(0, profiles.length - 5));
+  const [hiddenBelow, setHiddenBelow] = useState(
+    Math.max(0, profiles.length - 5),
+  );
 
   const updateHiddenCount = useCallback(() => {
     const el = listRef.current;
@@ -32,7 +46,9 @@ export function WelcomeScreen() {
     const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
     /* approximate: each card is ~112px (104px + 8px gap) */
     const estimate = Math.max(0, Math.round(remaining / 112));
-    setHiddenBelow(profiles.length >= 10 ? Math.max(0, profiles.length - 5) : estimate);
+    setHiddenBelow(
+      profiles.length >= 10 ? Math.max(0, profiles.length - 5) : estimate,
+    );
   }, [profiles.length]);
 
   useEffect(() => {
@@ -45,7 +61,9 @@ export function WelcomeScreen() {
   }, [isMany, profiles.length, updateHiddenCount]);
 
   /* --- Unlock modal handler --- */
-  const unlockingProfile = unlocking ? profiles.find((p) => p.id === unlocking) : null;
+  const unlockingProfile = unlocking
+    ? profiles.find((p) => p.id === unlocking)
+    : null;
 
   const closeUnlock = useCallback(() => {
     setUnlocking(null);
@@ -74,7 +92,11 @@ export function WelcomeScreen() {
       await unlockProfile(unlocking, password);
       navigate(`/dashboard/${unlocking}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Incorrect password. Please try again.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Incorrect password. Please try again.",
+      );
     }
   }
 
@@ -87,7 +109,7 @@ export function WelcomeScreen() {
   /* --- Render helpers --- */
 
   /** Profile row card used by single, multi and many returning variants. */
-  function renderProfileRow(profile: typeof profiles[number]) {
+  function renderProfileRow(profile: (typeof profiles)[number]) {
     return (
       <div key={profile.id} className="profile-card">
         <span className="icon-tile">
@@ -97,7 +119,8 @@ export function WelcomeScreen() {
           <span>
             <span className="value">{profile.label}</span>
             <span className="help">
-              {profile.threshold}/{profile.memberCount} · #{profile.localShareIdx} · {paperKey(profile.groupPublicKey)}
+              {profile.threshold}/{profile.memberCount} · #
+              {profile.localShareIdx} · {paperKey(profile.groupPublicKey)}
             </span>
           </span>
         </span>
@@ -112,7 +135,9 @@ export function WelcomeScreen() {
           <button
             type="button"
             className="profile-row-btn rotate"
-            onClick={() => navigate("/rotate-keyset", { state: { profile } })}
+            onClick={() =>
+              navigate("/rotate-keyset", { state: { profileId: profile.id } })
+            }
           >
             Rotate
           </button>
@@ -126,13 +151,25 @@ export function WelcomeScreen() {
     return (
       <div className="returning-chip-actions">
         <span>or</span>
-        <button type="button" className="returning-chip-btn" onClick={() => navigate("/create")}>
+        <button
+          type="button"
+          className="returning-chip-btn"
+          onClick={() => navigate("/create")}
+        >
           New Keyset
         </button>
-        <button type="button" className="returning-chip-btn" onClick={() => navigate("/import")}>
+        <button
+          type="button"
+          className="returning-chip-btn"
+          onClick={() => navigate("/import")}
+        >
           Import Device Profile
         </button>
-        <button type="button" className="returning-chip-btn" onClick={() => navigate("/onboard")}>
+        <button
+          type="button"
+          className="returning-chip-btn"
+          onClick={() => navigate("/onboard")}
+        >
           Onboard
         </button>
       </div>
@@ -144,10 +181,18 @@ export function WelcomeScreen() {
     return (
       <div className="returning-chip-actions">
         <span>or</span>
-        <button type="button" className="returning-chip-btn" onClick={() => navigate("/onboard")}>
+        <button
+          type="button"
+          className="returning-chip-btn"
+          onClick={() => navigate("/onboard")}
+        >
           Onboard
         </button>
-        <button type="button" className="returning-chip-btn" onClick={() => navigate("/rotate-share")}>
+        <button
+          type="button"
+          className="returning-chip-btn"
+          onClick={() => navigate("/rotate-share")}
+        >
           Rotate Share
         </button>
       </div>
@@ -161,9 +206,19 @@ export function WelcomeScreen() {
           <img className="hero-logo" src={logoUrl} alt="" />
           <div>
             <h1 className="hero-title">Igloo Web</h1>
-            <p className="hero-subtitle">{returning ? "Welcome back." : "Split your Nostr key. Sign from anywhere."}</p>
+            <p className="hero-subtitle">
+              {returning
+                ? "Welcome back."
+                : "Split your Nostr key. Sign from anywhere."}
+            </p>
           </div>
         </div>
+
+        {setupNoticeMessage ? (
+          <div className="import-validation-error" role="status">
+            {setupNoticeMessage}
+          </div>
+        ) : null}
 
         {/* ---- First-time welcome (no profiles) ---- */}
         {!returning && !showRotateShareFirst && (
@@ -178,19 +233,34 @@ export function WelcomeScreen() {
                   <Info size={14} />
                 </span>
               </div>
-              <p className="welcome-card-copy">Generate a new threshold keyset and set up its first device profile.</p>
+              <p className="welcome-card-copy">
+                Generate a new threshold keyset and set up its first device
+                profile.
+              </p>
             </div>
             <div className="welcome-actions">
-              <Button type="button" size="full" onClick={() => navigate("/create")}>
+              <Button
+                type="button"
+                size="full"
+                onClick={() => navigate("/create")}
+              >
                 Create New Keyset
               </Button>
             </div>
             <div className="secondary-actions">
               <span>or</span>
-              <button type="button" className="returning-chip-btn" onClick={() => navigate("/import")}>
+              <button
+                type="button"
+                className="returning-chip-btn"
+                onClick={() => navigate("/import")}
+              >
                 Import Device Profile
               </button>
-              <button type="button" className="returning-chip-btn" onClick={() => navigate("/onboard")}>
+              <button
+                type="button"
+                className="returning-chip-btn"
+                onClick={() => navigate("/onboard")}
+              >
                 Onboard
               </button>
             </div>
@@ -211,7 +281,8 @@ export function WelcomeScreen() {
                 </span>
               </div>
               <p className="welcome-card-copy">
-                Use an Onboarding or Rotate package from another device to add this browser to an existing keyset.
+                Use an Onboarding or Rotate package from another device to add
+                this browser to an existing keyset.
               </p>
             </div>
             {renderRotateShareFirstActions()}
@@ -220,7 +291,14 @@ export function WelcomeScreen() {
 
         {/* ---- Single returning profile ---- */}
         {returning && !isMulti && (
-          <div style={{ width: "min(100%, 560px)", display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div
+            style={{
+              width: "min(100%, 560px)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+            }}
+          >
             {profiles.map(renderProfileRow)}
             {renderReturningChipActions()}
           </div>
@@ -229,7 +307,14 @@ export function WelcomeScreen() {
         {/* ---- Multi returning (2-3 profiles) ---- */}
         {isMulti && !isMany && (
           <>
-            <div style={{ width: "min(100%, 560px)", display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div
+              style={{
+                width: "min(100%, 560px)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              }}
+            >
               {profiles.map(renderProfileRow)}
             </div>
             {renderReturningChipActions()}
@@ -239,10 +324,7 @@ export function WelcomeScreen() {
         {/* ---- Many returning (4+ profiles) ---- */}
         {isMany && (
           <>
-            <div
-              ref={listRef}
-              className="profile-list-scrollable"
-            >
+            <div ref={listRef} className="profile-list-scrollable">
               {profiles.map(renderProfileRow)}
             </div>
             {hiddenBelow > 0 && (
@@ -273,7 +355,11 @@ export function WelcomeScreen() {
             }
           }}
         >
-          <form className="modal" onSubmit={submitUnlock} onClick={(event) => event.stopPropagation()}>
+          <form
+            className="modal"
+            onSubmit={submitUnlock}
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="unlock-modal-header">
               <span className="unlock-modal-icon">
                 <Lock size={20} />
@@ -282,7 +368,9 @@ export function WelcomeScreen() {
                 <h2 className="unlock-modal-title">Unlock Profile</h2>
                 {unlockingProfile && (
                   <span className="unlock-modal-subtitle">
-                    {unlockingProfile.label} · {unlockingProfile.threshold}/{unlockingProfile.memberCount} · #{unlockingProfile.localShareIdx}
+                    {unlockingProfile.label} · {unlockingProfile.threshold}/
+                    {unlockingProfile.memberCount} · #
+                    {unlockingProfile.localShareIdx}
                   </span>
                 )}
               </div>
@@ -316,4 +404,3 @@ function paperKey(value: string) {
   if (value.startsWith("npub1f7a")) return "npub1f7a...4x1n";
   return shortHex(value, 10, 8);
 }
-

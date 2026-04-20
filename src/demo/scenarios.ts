@@ -221,7 +221,7 @@ export const demoScenarios: DemoScenario[] = [
     "/onboard/complete",
     noProfiles,
     "Onboarding Complete",
-    { fromHandshake: true, demoUi: { onboard: { passwordPreset: DEMO_PASSWORD } } }
+    { fromHandshake: true, demoUi: { onboard: { packagePreset: DEMO_BFONBOARD, passwordPreset: DEMO_PASSWORD } } }
   ),
 
   // `createKeysetState` (not `noProfiles`) primes the mock with a valid
@@ -238,7 +238,7 @@ export const demoScenarios: DemoScenario[] = [
     "screens/create/1b-validation-error",
     "/create",
     noProfiles,
-    "Invalid nsec format",
+    "Existing nsec splitting is not supported yet.",
     { demoUi: { create: { validationError: true, nsecPreset: "not-a-valid-key" } } }
   ),
   scenario(
@@ -268,7 +268,7 @@ export const demoScenarios: DemoScenario[] = [
   scenario("dashboard-policy-prompt", "dashboard", "Dashboard - 5. Signer Policy Prompt", "screens/dashboard/5-signer-policy-prompt", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Signer Policy", { demoUi: { dashboard: { modal: "policy-prompt", hideMockControls: true, paperPanels: true } } }),
   scenario("dashboard-signing-failed", "dashboard", "Dashboard - 6. Signing Failed", "screens/dashboard/6-signing-failed", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Signing Failed", { demoUi: { dashboard: { modal: "signing-failed", hideMockControls: true, paperPanels: true } } }),
 
-  scenario("rotate-keyset-intake", "rotate-keyset", "Rotate Keyset - 1. Rotate Keyset", "screens/rotate-keyset/1-rotate-keyset", "/rotate-keyset", dashboardState, "Rotate Keyset", { profile: demoProfile }),
+  scenario("rotate-keyset-intake", "rotate-keyset", "Rotate Keyset - 1. Rotate Keyset", "screens/rotate-keyset/1-rotate-keyset", "/rotate-keyset", dashboardState, "Rotate Keyset", { profileId: demoProfile.id }),
   scenario("rotate-keyset-review-generate", "rotate-keyset", "Rotate Keyset - 1d. Review & Generate", "screens/rotate-keyset/1d-review-generate", "/rotate-keyset/review", dashboardState, "Review & Generate", { demoUi: { rotateKeyset: { passwordPreset: DEMO_PASSWORD } } }),
   scenario("rotate-keyset-generation-progress", "rotate-keyset", "Rotate Keyset - 1e. Generation Progress", "screens/rotate-keyset/1e-generation-progress", "/rotate-keyset/progress", dashboardState, "Generation Progress", { demoUi: { progress: { frozen: true, activeIndex: 2, completedCount: 2 } } }),
   scenario("rotate-keyset-error-wrong-password", "rotate-keyset", "Rotate Keyset - Error: Wrong Password", "screens/rotate-keyset/error-wrong-password", "/rotate-keyset/error-password", dashboardState, "Wrong password"),
@@ -284,7 +284,8 @@ export const demoScenarios: DemoScenario[] = [
       "screens/shared/2-create-profile",
       "/rotate-keyset/profile",
       dashboardState,
-      "Create Profile"
+      "Create Profile",
+      { demoUi: { rotateKeyset: { passwordPreset: DEMO_PASSWORD } } }
     ),
     paperReference: paperReference("shared-create-profile")
   },
@@ -296,7 +297,8 @@ export const demoScenarios: DemoScenario[] = [
       "screens/shared/3-distribute-shares",
       "/rotate-keyset/distribute",
       dashboardState,
-      "Distribute Shares"
+      "Distribute Shares",
+      { demoUi: { rotateKeyset: { passwordPreset: DEMO_PASSWORD }, shared: { completionPreset: true } } }
     ),
     paperReference: paperReference("shared-distribute-shares")
   },
@@ -308,7 +310,8 @@ export const demoScenarios: DemoScenario[] = [
       "screens/shared/3b-distribution-completion",
       "/rotate-keyset/complete",
       dashboardState,
-      "Distribution Completion"
+      "Distribution Completion",
+      { demoUi: { rotateKeyset: { passwordPreset: DEMO_PASSWORD }, shared: { completionPreset: true } } }
     ),
     paperReference: paperReference("shared-distribution-completion")
   },
