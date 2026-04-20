@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { paperGroupKey } from "../mocks";
 
@@ -43,6 +43,18 @@ export function SettingsSidebar({
       : [...initialRelays, PAPER_SIDEBAR_RELAY]
   );
   const [newRelay, setNewRelay] = useState("");
+  const [deviceName, setDeviceName] = useState(profile.deviceName);
+  const [editingDeviceName, setEditingDeviceName] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const shareCopyTimerRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    return () => {
+      if (shareCopyTimerRef.current !== undefined) {
+        window.clearTimeout(shareCopyTimerRef.current);
+      }
+    };
+  }, []);
 
   function handleRemoveRelay(index: number) {
     setRelays((prev) => prev.filter((_, i) => i !== index));
@@ -56,6 +68,17 @@ export function SettingsSidebar({
     }
   }
 
+  function handleCopyShare() {
+    if (shareCopyTimerRef.current !== undefined) {
+      window.clearTimeout(shareCopyTimerRef.current);
+    }
+    setShareCopied(true);
+    shareCopyTimerRef.current = window.setTimeout(() => {
+      setShareCopied(false);
+      shareCopyTimerRef.current = undefined;
+    }, 1800);
+  }
+
   return (
     <>
       {/* Scrim — stacked above dashboard content (z-index: 100) */}
@@ -66,14 +89,14 @@ export function SettingsSidebar({
         style={{ zIndex: 100 }}
       />
 
-      {/* Sidebar panel — stacked above the scrim (z-index: 101) so it overlays
-          the dashboard primary panel without clipping. */}
+      {/* Sidebar panel — stacked above the scrim and dashboard peer actions so it
+          overlays the dashboard primary panel without clipping. */}
       <div
         className="settings-sidebar"
         role="dialog"
         aria-label="Settings"
         data-testid="settings-sidebar"
-        style={{ zIndex: 101 }}
+        style={{ zIndex: 103 }}
       >
         <div className="settings-sidebar-scroll">
           {/* Header */}
@@ -107,8 +130,38 @@ export function SettingsSidebar({
               <div className="settings-row">
                 <span className="settings-row-label">Profile Name</span>
                 <div className="settings-row-value">
-                  <span>{profile.deviceName}</span>
-                  <span className="settings-edit-icon">✎</span>
+                  {editingDeviceName ? (
+                    <input
+                      className="settings-inline-input"
+                      aria-label="Profile Name"
+                      value={deviceName}
+                      onChange={(event) => setDeviceName(event.target.value)}
+                      onBlur={() => {
+                        if (!deviceName.trim()) setDeviceName(profile.deviceName);
+                        setEditingDeviceName(false);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.currentTarget.blur();
+                        }
+                        if (event.key === "Escape") {
+                          setDeviceName(profile.deviceName);
+                          setEditingDeviceName(false);
+                        }
+                      }}
+                      autoFocus
+                    />
+                  ) : (
+                    <span>{deviceName}</span>
+                  )}
+                  <button
+                    type="button"
+                    className="settings-edit-icon"
+                    aria-label="Edit profile name"
+                    onClick={() => setEditingDeviceName(true)}
+                  >
+                    ✎
+                  </button>
                 </div>
               </div>
               <div className="settings-row">
@@ -207,15 +260,7 @@ export function SettingsSidebar({
               </div>
               <button type="button" className="settings-btn-blue" onClick={() => { onClose(); navigate('/rotate-share'); }}>Rotate Share</button>
             </div>
-            <div className="settings-action-row">
-              <div className="settings-action-info">
-                <div className="settings-action-name">Rotate Keyset</div>
-                <div className="settings-action-desc">
-                  Rotate the entire keyset — generate fresh shares for every device while keeping the same group public key.
-                </div>
-              </div>
-              <button type="button" className="settings-btn-blue" onClick={() => { onClose(); navigate('/rotate-keyset'); }}>Rotate Keyset</button>
-            </div>
+
           </div>
 
           {/* EXPORT & BACKUP */}
@@ -241,7 +286,9 @@ export function SettingsSidebar({
                     Unencrypted share key in hex
                   </div>
                 </div>
-                <button type="button" className="settings-btn-muted">Copy</button>
+                <button type="button" className="settings-btn-muted" onClick={handleCopyShare}>
+                  {shareCopied ? "Copied" : "Copy"}
+                </button>
               </div>
             </div>
           </div>

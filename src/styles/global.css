@@ -1638,9 +1638,9 @@ a {
 /* Peer row trailing action icons — rendered only when the Settings sidebar is
    open, per Paper `dashboard/3-settings-lock-profile/screen.html` (VAL-DSH-013).
    Lifted above the `.settings-scrim` (z-index: 100) so the ellipsis + play
-   buttons receive pointer events while the sidebar overlay is visible. The
-   sidebar panel itself (z-index: 101) does not visually overlap this column,
-   and modals (z-index: 200+) continue to render above everything. */
+   buttons receive pointer events where the dashboard is still exposed. The
+   sidebar panel itself stays above this layer, and modals (z-index: 200+)
+   continue to render above everything. */
 .peer-row-trailing {
   display: flex;
   align-items: center;
@@ -2707,6 +2707,159 @@ a {
   gap: 10px;
 }
 
+.dash-capacity-alert {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(239, 68, 68, 0.12);
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.dash-capacity-label {
+  width: 112px;
+  flex: 0 0 auto;
+  color: rgba(147, 197, 253, 0.72);
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 10px;
+  line-height: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dash-capacity-track {
+  height: 3px;
+  flex: 1 1 auto;
+  border-radius: 3px;
+  background: #374151;
+}
+
+.dash-capacity-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  color: #ef4444;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+}
+
+.dash-capacity-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(239, 68, 68, 0.7);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 12px;
+}
+
+.relay-offline-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.relay-offline-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: min(100%, 700px);
+  padding: 16px;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.relay-offline-alert-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.25);
+  color: #f87171;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.relay-offline-alert-title {
+  color: #f87171;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 700;
+}
+
+.relay-offline-alert-copy {
+  margin-top: 4px;
+  color: #fca5a5;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.relay-health-table {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(30, 58, 138, 0.22);
+  border-radius: 10px;
+  opacity: 0.55;
+}
+
+.relay-health-head,
+.relay-health-row {
+  display: grid;
+  grid-template-columns: minmax(210px, 1.5fr) 140px 100px 120px minmax(110px, 1fr);
+  align-items: center;
+  column-gap: 16px;
+  padding: 12px 20px;
+}
+
+.relay-health-head {
+  background: rgba(30, 41, 59, 0.32);
+  color: #64748b;
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.relay-health-row {
+  border-top: 1px solid rgba(30, 58, 138, 0.16);
+  color: #475569;
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.relay-health-url {
+  color: #60a5fa;
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+}
+
+.relay-health-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.relay-health-status.offline {
+  color: #ef4444;
+}
+
+.relay-health-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
 /* ========================================
    Policies View
    ======================================== */
@@ -2749,6 +2902,10 @@ a {
   line-height: 16px;
 }
 
+.policies-dropdown-wrap {
+  position: relative;
+}
+
 .policies-dropdown {
   display: flex;
   align-items: center;
@@ -2757,6 +2914,7 @@ a {
   border-radius: 3px;
   background: rgba(30, 58, 138, 0.2);
   border: 1px solid var(--ig-border);
+  cursor: pointer;
 }
 
 .policies-dropdown-text {
@@ -2769,6 +2927,53 @@ a {
   color: #d1d5db;
   font-size: 12px;
   line-height: 12px;
+}
+
+.policies-dropdown-menu,
+.event-log-filter-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 4;
+  display: flex;
+  min-width: 168px;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(30, 58, 138, 0.42);
+  border-radius: 8px;
+  background: #0f172a;
+  box-shadow: 0 18px 48px rgba(2, 6, 23, 0.46);
+}
+
+.policies-dropdown-menu button,
+.event-log-filter-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid rgba(30, 58, 138, 0.16);
+  background: transparent;
+  color: #cbd5e1;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  padding: 9px 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.policies-dropdown-menu button:last-child,
+.event-log-filter-menu button:last-child {
+  border-bottom: 0;
+}
+
+.policies-dropdown-menu button:hover,
+.policies-dropdown-menu button.active,
+.event-log-filter-menu button:hover,
+.event-log-filter-menu button.active {
+  background: rgba(59, 130, 246, 0.12);
+  color: #e2e8f0;
 }
 
 .policies-panel-body {
@@ -2865,6 +3070,15 @@ a {
   background: rgba(239, 68, 68, 0.15);
   border-color: rgba(239, 68, 68, 0.3);
   color: var(--ig-red);
+}
+
+.policies-empty {
+  padding: 12px 14px;
+  border: 1px dashed rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 18px;
 }
 
 .policies-peer-list {
@@ -3024,6 +3238,11 @@ a {
   text-transform: uppercase;
 }
 
+.policy-request-badge.ecdh {
+  border-color: rgba(168, 85, 247, 0.3);
+  color: #c084fc;
+}
+
 .policy-request-peer {
   color: #e2e8f0;
   font-family: var(--font-inter, Inter, system-ui, sans-serif);
@@ -3069,6 +3288,10 @@ a {
   font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
   font-size: 11px;
   line-height: 14px;
+}
+
+.policy-details-table.ecdh .policy-detail-label {
+  width: 110px;
 }
 
 .policy-detail-value {
@@ -3341,7 +3564,7 @@ a {
 .settings-scrim {
   position: fixed;
   inset: 0;
-  background: rgba(11, 17, 32, 0.8);
+  background: rgba(11, 17, 32, 0.6);
   z-index: 100;
 }
 
@@ -3351,9 +3574,10 @@ a {
   right: 0;
   width: 420px;
   height: 100vh;
-  background: #111827;
-  border-left: 1px solid var(--ig-border-soft);
-  z-index: 101;
+  background: var(--ig-panel);
+  backdrop-filter: blur(18px);
+  border-left: 1px solid var(--ig-border);
+  z-index: 103;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3436,7 +3660,7 @@ a {
   flex-direction: column;
   border-radius: 8px;
   overflow: hidden;
-  background: rgba(17, 24, 39, 0.4);
+  background: var(--ig-panel-card);
   border: 1px solid var(--ig-border);
 }
 
@@ -3492,7 +3716,31 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   cursor: pointer;
+}
+
+.settings-edit-icon:hover {
+  color: var(--ig-blue-soft);
+  background: rgba(96, 165, 250, 0.08);
+}
+
+.settings-inline-input {
+  width: 150px;
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.72);
+  color: var(--ig-text);
+  font: inherit;
+  line-height: 16px;
+  padding: 5px 8px;
+  outline: none;
+}
+
+.settings-inline-input:focus {
+  border-color: rgba(96, 165, 250, 0.8);
 }
 
 .settings-change-btn {
@@ -3534,7 +3782,7 @@ a {
   flex: 1;
   border-radius: 6px;
   padding: 8px 12px;
-  background: rgba(15, 23, 42, 0.6);
+  background: #0f172a;
   border: 1px solid var(--ig-border);
   color: #cbd5e1;
   font-family: 'Share Tech Mono', system-ui, sans-serif;
@@ -3565,7 +3813,7 @@ a {
   flex: 1;
   border-radius: 6px;
   padding: 8px 12px;
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(15, 23, 42, 0.8);
   border: 1px solid var(--ig-border);
   color: #cbd5e1;
   font-family: 'Share Tech Mono', system-ui, sans-serif;
@@ -5530,11 +5778,31 @@ a {
   font: inherit;
   font-size: 12px;
   padding: 5px 10px;
+  cursor: pointer;
 }
 
 .event-log-link {
   border-color: transparent;
   padding-inline: 0;
+}
+
+.event-log-link:hover,
+.event-log-filter:hover,
+.pending-open:hover {
+  color: var(--ig-text);
+  background: rgba(148, 163, 184, 0.06);
+}
+
+.event-log-filter-wrap {
+  position: relative;
+}
+
+.event-log-item {
+  border-bottom: 1px solid rgba(30, 58, 138, 0.1);
+}
+
+.event-log-item:last-child {
+  border-bottom: 0;
 }
 
 .event-log-row,
@@ -5545,6 +5813,21 @@ a {
   min-height: 36px;
   padding: 8px 20px;
   border-bottom: 1px solid rgba(30, 58, 138, 0.1);
+}
+
+.event-log-row {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.event-log-row:hover {
+  background: rgba(59, 130, 246, 0.06);
 }
 
 .event-log-row:last-child,
@@ -5579,11 +5862,52 @@ a {
 .event-log-type.signer-policy { color: #818cf8; border-color: rgba(129, 140, 248, 0.3); }
 .event-log-type.ping { color: #a855f7; border-color: rgba(168, 85, 247, 0.3); }
 .event-log-type.echo { color: #f472b6; border-color: rgba(244, 114, 182, 0.3); }
+.event-log-type.error { color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
 
 .event-log-copy,
 .pending-detail {
   color: var(--ig-muted);
   font-size: 13px;
+}
+
+.event-log-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.event-log-chevron {
+  width: 16px;
+  flex: 0 0 auto;
+  color: rgba(148, 163, 184, 0.4);
+  font-size: 16px;
+  line-height: 16px;
+  text-align: center;
+  transition: transform 0.16s ease;
+}
+
+.event-log-row[aria-expanded="true"] .event-log-chevron {
+  transform: rotate(180deg);
+  color: #60a5fa;
+}
+
+.event-log-expanded {
+  margin: 0;
+  padding: 12px 20px 14px 120px;
+  border-top: 1px solid rgba(30, 58, 138, 0.14);
+  background: rgba(2, 6, 23, 0.34);
+  color: #94a3b8;
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 12px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.event-log-empty {
+  padding: 28px 20px;
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
 }
 
 .pending-star,

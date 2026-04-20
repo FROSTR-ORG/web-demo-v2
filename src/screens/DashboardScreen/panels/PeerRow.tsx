@@ -23,7 +23,9 @@ export function PeerRow({ peer, paper, sidebarOpen }: { peer: PeerStatus; paper?
         {peer.online ? (
           <span className="inline-actions">
             {peer.can_sign ? <PermissionBadge>SIGN</PermissionBadge> : null}
-            {peer.should_send_nonces ? <PermissionBadge tone="info">ECDH</PermissionBadge> : <PermissionBadge tone="ping">PING</PermissionBadge>}
+            {peer.should_send_nonces ? <PermissionBadge tone="info">ECDH</PermissionBadge> : null}
+            {paper ? <PermissionBadge tone="ping">PING</PermissionBadge> : !peer.should_send_nonces ? <PermissionBadge tone="ping">PING</PermissionBadge> : null}
+            {paper && peer.idx === 1 ? <PermissionBadge tone="onboard">ONBOARD</PermissionBadge> : null}
           </span>
         ) : null}
       </div>
@@ -54,8 +56,7 @@ export function PeerRow({ peer, paper, sidebarOpen }: { peer: PeerStatus; paper?
           data-testid={`peer-row-trailing-${peer.idx}`}
           // When the Settings sidebar is open, the scrim (`z-index: 100`)
           // covers the dashboard main area. Lift the trailing action cluster
-          // into a higher stacking position so its buttons receive clicks
-          // instead of being intercepted by the scrim (VAL-DSH-013).
+          // above the scrim while keeping the sidebar panel itself on top.
           // Inline mirror of `.peer-row-trailing` rule in global.css so
           // jsdom-based regression tests can observe the computed z-index.
           style={{ position: "relative", zIndex: 102 }}

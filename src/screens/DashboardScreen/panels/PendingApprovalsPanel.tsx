@@ -1,35 +1,39 @@
 import { ChevronDown, Clock } from "lucide-react";
 import { StatusPill } from "../../../components/ui";
-import { MOCK_PENDING_APPROVAL_ROWS } from "../mocks";
+import { MOCK_PENDING_APPROVAL_ROWS, type DashboardApprovalRow, type PolicyPromptRequest } from "../mocks";
 
 export function PendingApprovalsPanel({
+  rows = MOCK_PENDING_APPROVAL_ROWS,
   onOpenPolicyPrompt,
 }: {
-  onOpenPolicyPrompt?: () => void;
+  rows?: DashboardApprovalRow[];
+  onOpenPolicyPrompt?: (request: PolicyPromptRequest) => void;
 } = {}) {
+  const nearest = rows[0]?.ttl ?? "—";
+
   return (
     <div className="pending-approvals-panel">
       <div className="pending-approvals-header">
         <span className="pending-star">✦</span>
         <div className="pending-title">Pending Approvals</div>
-        <StatusPill tone="warning">3 pending</StatusPill>
+        <StatusPill tone="warning">{rows.length} pending</StatusPill>
         <span className="event-log-spacer" />
         <Clock size={12} />
-        <span className="pending-nearest">Nearest: 42s</span>
+        <span className="pending-nearest">Nearest: {nearest}</span>
         <ChevronDown size={14} />
       </div>
-      {MOCK_PENDING_APPROVAL_ROWS.map(([kind, peer, key, detail, ttl], rowIdx) => (
-        <div className="pending-row" key={`${kind}-${peer}-${detail}`}>
+      {rows.map((row, rowIdx) => (
+        <div className="pending-row" key={row.id}>
           <span className="pending-dot" />
-          <span className={`pending-kind ${kind.toLowerCase()}`}>{kind}</span>
-          <span className="pending-peer">{peer}</span>
-          <span className="pending-key">{key}</span>
-          <span className="pending-detail">{detail}</span>
-          <span className="pending-ttl">{ttl}</span>
+          <span className={`pending-kind ${row.kind.toLowerCase()}`}>{row.kind}</span>
+          <span className="pending-peer">{row.peer}</span>
+          <span className="pending-key">{row.key}</span>
+          <span className="pending-detail">{row.detail}</span>
+          <span className="pending-ttl">{row.ttl}</span>
           <button
             type="button"
             className="pending-open"
-            onClick={rowIdx === 0 ? onOpenPolicyPrompt : undefined}
+            onClick={() => onOpenPolicyPrompt?.(row.request)}
             aria-label={`Open approval ${rowIdx + 1}`}
           >
             Open

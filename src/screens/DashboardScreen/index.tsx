@@ -19,6 +19,7 @@ import { RelaysOfflineState } from "./states/RelaysOfflineState";
 import { RunningState } from "./states/RunningState";
 import { SigningBlockedState } from "./states/SigningBlockedState";
 import { StoppedState } from "./states/StoppedState";
+import { DEFAULT_POLICY_PROMPT_REQUEST, type PolicyPromptRequest } from "./mocks";
 import type { DashboardState, ModalState } from "./types";
 
 export type { DashboardState, ModalState } from "./types";
@@ -31,9 +32,10 @@ export function DashboardScreen() {
   const [mockState, setMockState] = useState<DashboardState>(demoUi.dashboard?.state ?? "running");
   const [showPolicies, setShowPolicies] = useState(Boolean(demoUi.dashboard?.showPolicies));
   const [activeModal, setActiveModal] = useState<ModalState>(demoUi.dashboard?.modal ?? "none");
+  const [policyPromptRequest, setPolicyPromptRequest] = useState<PolicyPromptRequest>(DEFAULT_POLICY_PROMPT_REQUEST);
   const [settingsOpen, setSettingsOpen] = useState(Boolean(demoUi.dashboard?.settingsOpen));
   const showMockControls = Boolean(demoUi.dashboard?.showMockControls);
-  const paperPanels = Boolean(demoUi.dashboard?.paperPanels);
+  const paperPanels = demoUi.dashboard?.paperPanels ?? true;
 
   if (!profileId) {
     return <Navigate to="/" replace />;
@@ -124,7 +126,10 @@ export function DashboardScreen() {
                 sidebarOpen={settingsOpen}
                 onStop={() => setMockState("stopped")}
                 onRefresh={refreshRuntime}
-                onOpenPolicyPrompt={() => setActiveModal("policy-prompt")}
+                onOpenPolicyPrompt={(request) => {
+                  setPolicyPromptRequest(request);
+                  setActiveModal("policy-prompt");
+                }}
               />
             )}
 
@@ -144,14 +149,21 @@ export function DashboardScreen() {
             )}
 
             {mockState === "signing-blocked" && (
-              <SigningBlockedState onStop={() => setMockState("stopped")} />
+              <SigningBlockedState
+                onStop={() => setMockState("stopped")}
+                onOpenPolicies={() => setShowPolicies(true)}
+                onReviewApprovals={() => {
+                  setPolicyPromptRequest(DEFAULT_POLICY_PROMPT_REQUEST);
+                  setActiveModal("policy-prompt");
+                }}
+              />
             )}
           </>
         )}
       </section>
 
       {activeModal === "policy-prompt" && (
-        <PolicyPromptModal onClose={() => setActiveModal("none")} />
+        <PolicyPromptModal request={policyPromptRequest} onClose={() => setActiveModal("none")} />
       )}
       {activeModal === "signing-failed" && (
         <SigningFailedModal onClose={() => setActiveModal("none")} />

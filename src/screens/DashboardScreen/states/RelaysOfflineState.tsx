@@ -1,11 +1,14 @@
 import { Button } from "../../../components/ui";
+import { MOCK_RELAY_HEALTH_ROWS, type DashboardRelayHealthRow } from "../mocks";
 
 export function RelaysOfflineState({
   onStop,
   onRetry,
+  relays = MOCK_RELAY_HEALTH_ROWS,
 }: {
   onStop: () => void;
   onRetry: () => void;
+  relays?: DashboardRelayHealthRow[];
 }) {
   return (
     <>
@@ -65,6 +68,40 @@ export function RelaysOfflineState({
           <Button type="button" variant="primary" onClick={onRetry}>
             Retry Connections
           </Button>
+        </div>
+      </div>
+
+      <div className="relay-offline-section">
+        <div className="relay-offline-alert" role="status">
+          <span className="relay-offline-alert-icon">!</span>
+          <div>
+            <div className="relay-offline-alert-title">All Relays Offline</div>
+            <div className="relay-offline-alert-copy">
+              Unable to reach any configured relay. Signing, ECDH, and peer communication unavailable.
+            </div>
+          </div>
+        </div>
+
+        <div className="relay-health-table" aria-label="Relay health">
+          <div className="relay-health-head">
+            <span>Relay</span>
+            <span>Status</span>
+            <span>Latency</span>
+            <span>Events</span>
+            <span>Last Seen</span>
+          </div>
+          {relays.map((relay) => (
+            <div className="relay-health-row" key={relay.relay}>
+              <span className="relay-health-url">{relay.relay}</span>
+              <span className={`relay-health-status ${relay.status.toLowerCase()}`}>
+                <span className="relay-health-dot" />
+                {relay.status}
+              </span>
+              <span>{relay.latency}</span>
+              <span>{relay.events}</span>
+              <span>{relay.lastSeen}</span>
+            </div>
+          ))}
         </div>
       </div>
     </>

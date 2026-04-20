@@ -1,5 +1,6 @@
 import { Button } from "../../../components/ui";
 import type { PeerStatus } from "../../../lib/bifrost/types";
+import type { PolicyPromptRequest } from "../mocks";
 import { EventLogPanel } from "../panels/EventLogPanel";
 import { PeersPanel } from "../panels/PeersPanel";
 import { PendingApprovalsPanel } from "../panels/PendingApprovalsPanel";
@@ -25,7 +26,7 @@ export function RunningState({
   sidebarOpen?: boolean;
   onStop: () => void;
   onRefresh: () => void;
-  onOpenPolicyPrompt?: () => void;
+  onOpenPolicyPrompt?: (request: PolicyPromptRequest) => void;
 }) {
   return (
     <>

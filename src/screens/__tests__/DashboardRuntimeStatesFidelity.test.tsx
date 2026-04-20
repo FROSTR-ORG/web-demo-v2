@@ -102,7 +102,48 @@ function renderAt(demoUi: DemoUi) {
   );
 }
 
+function renderWithoutDemoUi() {
+  return render(
+    <MemoryRouter initialEntries={["/dashboard/test-profile-id"]}>
+      <Routes>
+        <Route path="/dashboard/:profileId" element={<DashboardScreen />} />
+        <Route path="/" element={<div data-testid="welcome-screen">Welcome</div>} />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
 describe("Dashboard runtime-state fidelity", () => {
+  describe("Default app dashboard", () => {
+    it("uses the Paper running dashboard when /dashboard/:id has no demoUi state", () => {
+      renderWithoutDemoUi();
+      expect(screen.getByText("Signer Running")).toBeInTheDocument();
+      expect(screen.getByText("~186 ready")).toBeInTheDocument();
+      expect(screen.getByText("Avg: 31ms")).toBeInTheDocument();
+      expect(screen.getByText("Event Log")).toBeInTheDocument();
+      expect(screen.getByText("8 events")).toBeInTheDocument();
+      expect(
+        screen.getByText("Pool sync with peer #0 — 50 received · 50 sent")
+      ).toBeInTheDocument();
+      expect(screen.getByText("Pending Approvals")).toBeInTheDocument();
+      expect(screen.getByText("3 pending")).toBeInTheDocument();
+      expect(screen.getByText("kind:1 Short Text Note")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByLabelText("Open approval 1"));
+      expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
+    });
+
+    it("keeps the explicit raw runtime-panel opt-out available", () => {
+      renderAt({ dashboard: { state: "running", paperPanels: false } });
+      expect(screen.getByText("Signer Running")).toBeInTheDocument();
+      expect(screen.getByText("2/2 sign ready")).toBeInTheDocument();
+      expect(screen.getByText("Avg: --")).toBeInTheDocument();
+      expect(screen.queryByText("Event Log")).not.toBeInTheDocument();
+      expect(screen.queryByText("Pending Approvals")).not.toBeInTheDocument();
+      expect(screen.queryByText("Pending Operations")).not.toBeInTheDocument();
+    });
+  });
+
   describe("VAL-DSH-002: Running status card exposes only Stop Signer CTA (no inline Lock)", () => {
     it("renders the Stop Signer button but no Lock button inside the status card", () => {
       renderAt({ dashboard: { state: "running", paperPanels: true } });
@@ -212,9 +253,14 @@ describe("Dashboard runtime-state fidelity", () => {
   describe("Relays Offline renders amber banner label and Retry Connections", () => {
     it("shows Ready count degraded amber pill + Retry Connections CTA", () => {
       renderAt({ dashboard: { state: "relays-offline" } });
-      expect(screen.getByText("All Relays Offline")).toBeInTheDocument();
+      expect(screen.getAllByText("All Relays Offline").length).toBeGreaterThanOrEqual(2);
       expect(screen.getByText("Ready count degraded")).toBeInTheDocument();
       expect(screen.getByText("Retry Connections")).toBeInTheDocument();
+      expect(screen.getByText("Unable to reach any configured relay. Signing, ECDH, and peer communication unavailable.")).toBeInTheDocument();
+      expect(screen.getByText("wss://relay.damus.io")).toBeInTheDocument();
+      expect(screen.getByText("wss://nos.lol")).toBeInTheDocument();
+      expect(screen.getByText("wss://relay.primal.net")).toBeInTheDocument();
+      expect(document.querySelectorAll(".relay-health-row").length).toBe(3);
     });
   });
 

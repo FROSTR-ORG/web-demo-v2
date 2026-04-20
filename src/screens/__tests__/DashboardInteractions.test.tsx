@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *  • VAL-DSH-032 — Clear Credentials Cancel dismisses modal without data loss
  *  • VAL-DSH-033 — Sidebar Lock → /
  *  • VAL-DSH-034 — Policies header toggle on/off
- *  • VAL-CROSS-008 — Dashboard Rotate Keyset → /rotate-keyset
+ *  • VAL-CROSS-008 — Sidebar does NOT show Rotate Keyset (runtime-only)
  *  • VAL-CROSS-009 — Sidebar Rotate Share → /rotate-share
  *  • VAL-CROSS-010 — Header Recover → /recover/{profileId}
  *  • VAL-CROSS-011 — Dashboard Export flow end-to-end (URL remains /dashboard/{id})
@@ -359,20 +359,70 @@ describe("VAL-DSH-034 — Policies header toggle", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Dashboard Event Log controls
+// ---------------------------------------------------------------------------
+
+describe("Dashboard Event Log controls", () => {
+  it("filters rows, expands details, and clears visible events", () => {
+    renderAt({ dashboard: { state: "running", paperPanels: true } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Sign" }));
+    expect(screen.getByText("2 events")).toBeInTheDocument();
+    expect(screen.queryByText("Pool sync with peer #0 — 50 received · 50 sent")).not.toBeInTheDocument();
+    expect(screen.getByText("Signature request received from 02a3f8...8f2c")).toBeInTheDocument();
+
+    const signRequest = screen.getByText("Signature request received from 02a3f8...8f2c").closest("button");
+    expect(signRequest).not.toBeNull();
+    fireEvent.click(signRequest!);
+    expect(signRequest!.getAttribute("aria-expanded")).toBe("true");
+    expect(document.querySelector(".event-log-expanded")?.textContent).toContain('"round_id": "r-0x4f2a"');
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(screen.getByText("0 events")).toBeInTheDocument();
+    expect(screen.getByText("No events yet")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pending approval rows open request-specific policy prompts
+// ---------------------------------------------------------------------------
+
+describe("Pending approval policy prompt wiring", () => {
+  it("opens the ECDH approval as the ECDH policy prompt variant", () => {
+    renderAt({ dashboard: { state: "running", paperPanels: true } });
+
+    fireEvent.click(screen.getByLabelText("Open approval 2"));
+    expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
+    expect(
+      screen.getByText("A peer is requesting permission for an encryption operation")
+    ).toBeInTheDocument();
+    expect(screen.getByText("from Peer #1")).toBeInTheDocument();
+    expect(screen.getByText("OPERATION")).toBeInTheDocument();
+    expect(screen.getByText("TARGET PUBKEY")).toBeInTheDocument();
+    expect(screen.getByText("RELAY")).toBeInTheDocument();
+    expect(screen.getByText("NIP-44 Encryption")).toBeInTheDocument();
+    expect(screen.getByText("wss://relay.primal.net")).toBeInTheDocument();
+    expect(screen.getByText("Expires in 1m 12s")).toBeInTheDocument();
+    expect(screen.getByText("Always for ECDH")).toBeInTheDocument();
+    expect(screen.getByText("Always deny for ECDH")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // VAL-CROSS-008 — Dashboard Rotate Keyset → /rotate-keyset
 // ---------------------------------------------------------------------------
 
-describe("VAL-CROSS-008 — Sidebar Rotate Keyset navigates to /rotate-keyset", () => {
-  it("Clicking Rotate Keyset in sidebar navigates to /rotate-keyset", () => {
+describe("VAL-CROSS-008 — Sidebar does NOT show Rotate Keyset (runtime-only)", () => {
+  it("Rotate Keyset button is absent from the settings sidebar at runtime", () => {
     renderAt({ dashboard: { settingsOpen: true, paperPanels: true } });
-    // Find the Rotate Keyset action button specifically (not the section header)
-    const rotateKeysetBtns = screen.getAllByText("Rotate Keyset");
+    // Rotate Keyset is only available outside the runtime (before profile
+    // is decrypted). The dashboard sidebar should NOT expose it.
+    const rotateKeysetBtns = screen.queryAllByText("Rotate Keyset");
     const actionBtn = rotateKeysetBtns.find(
       (el) => el.tagName === "BUTTON" && el.classList.contains("settings-btn-blue")
     );
-    expect(actionBtn).toBeDefined();
-    fireEvent.click(actionBtn!);
-    expect(screen.getByTestId("rotate-keyset-screen")).toBeInTheDocument();
+    expect(actionBtn).toBeUndefined();
   });
 });
 

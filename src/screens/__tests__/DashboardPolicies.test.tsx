@@ -125,6 +125,28 @@ describe("DashboardScreen — Policies view", () => {
     expect(removeButtons.length).toBe(3);
   });
 
+  it("default policy dropdown changes value and remove buttons delete rules", () => {
+    renderDashboard();
+    fireEvent.click(screen.getByText("Policies"));
+
+    fireEvent.click(screen.getByRole("button", { name: /Ask every time/ }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Deny by default" }));
+    expect(screen.getByRole("button", { name: /Deny by default/ })).toBeInTheDocument();
+
+    let removeButtons = screen.getAllByLabelText("Remove rule");
+    fireEvent.click(removeButtons[0]);
+    expect(screen.queryByText("sign_event:1")).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText("Remove rule").length).toBe(2);
+
+    removeButtons = screen.getAllByLabelText("Remove rule");
+    fireEvent.click(removeButtons[0]);
+    fireEvent.click(screen.getAllByLabelText("Remove rule")[0]);
+    expect(screen.queryAllByLabelText("Remove rule").length).toBe(0);
+    expect(
+      screen.getByText("No explicit signer policies. Default policy applies to new requests.")
+    ).toBeInTheDocument();
+  });
+
   it("Peer Policies panel shows per-peer rows with permission badges", () => {
     renderDashboard();
     fireEvent.click(screen.getByText("Policies"));

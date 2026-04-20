@@ -197,6 +197,24 @@ describe("Settings Sidebar", () => {
     fireEvent.click(screen.getByText("Add"));
     expect(screen.getByText("wss://nos.lol")).toBeInTheDocument();
   });
+
+  it("edits the profile name inline and shows export-share copy feedback", () => {
+    renderDashboard();
+    fireEvent.click(screen.getByLabelText("Settings"));
+
+    fireEvent.click(screen.getByLabelText("Edit profile name"));
+    const nameInput = screen.getByLabelText("Profile Name") as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: "Igloo Desk" } });
+    fireEvent.keyDown(nameInput, { key: "Enter" });
+    fireEvent.blur(nameInput);
+    expect(screen.getByText("Igloo Desk")).toBeInTheDocument();
+
+    const exportShareRow = screen.getByText("Export Share").closest(".settings-action-row");
+    expect(exportShareRow).not.toBeNull();
+    const copyButton = exportShareRow!.querySelector(".settings-btn-muted") as HTMLElement;
+    fireEvent.click(copyButton);
+    expect(copyButton.textContent).toBe("Copied");
+  });
 });
 
 describe("Clear Credentials Modal", () => {

@@ -1,8 +1,22 @@
+import { useState } from "react";
 import { PermissionBadge } from "../../../components/ui";
 import type { PeerStatus } from "../../../lib/bifrost/types";
 import { MOCK_PEER_POLICIES, MOCK_SIGNER_RULES } from "../mocks";
 
 export function PoliciesState({ peers: _peers }: { peers: PeerStatus[] }) {
+  const [defaultPolicy, setDefaultPolicy] = useState("Ask every time");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [hiddenRules, setHiddenRules] = useState<Set<string>>(() => new Set());
+  const visibleRules = MOCK_SIGNER_RULES.filter((rule) => !hiddenRules.has(rule.method));
+
+  function removeRule(method: string) {
+    setHiddenRules((previous) => {
+      const next = new Set(previous);
+      next.add(method);
+      return next;
+    });
+  }
+
   return (
     <>
       {/* Signer Policies Panel */}
@@ -11,9 +25,35 @@ export function PoliciesState({ peers: _peers }: { peers: PeerStatus[] }) {
           <div className="policies-panel-title">Signer Policies</div>
           <div className="policies-header-right">
             <span className="policies-default-label">Default policy</span>
-            <div className="policies-dropdown">
-              <span className="policies-dropdown-text">Ask every time</span>
-              <span className="policies-dropdown-caret">▾</span>
+            <div className="policies-dropdown-wrap">
+              <button
+                type="button"
+                className="policies-dropdown"
+                aria-expanded={dropdownOpen}
+                onClick={() => setDropdownOpen((value) => !value)}
+              >
+                <span className="policies-dropdown-text">{defaultPolicy}</span>
+                <span className="policies-dropdown-caret">▾</span>
+              </button>
+              {dropdownOpen ? (
+                <div className="policies-dropdown-menu" role="menu" aria-label="Default policy options">
+                  {["Ask every time", "Allow known peers", "Deny by default"].map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={defaultPolicy === option}
+                      className={defaultPolicy === option ? "active" : undefined}
+                      onClick={() => {
+                        setDefaultPolicy(option);
+                        setDropdownOpen(false);
+                      }}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -22,7 +62,7 @@ export function PoliciesState({ peers: _peers }: { peers: PeerStatus[] }) {
             Controls how this signer responds to external signing and encryption requests.
           </p>
           <div className="policies-rules-list">
-            {MOCK_SIGNER_RULES.map((rule) => (
+            {visibleRules.map((rule) => (
               <div className="policies-rule-row" key={rule.method}>
                 <span className="policies-method">{rule.method}</span>
                 <span className="policies-domain">{rule.domain}</span>
@@ -32,11 +72,14 @@ export function PoliciesState({ peers: _peers }: { peers: PeerStatus[] }) {
                 >
                   {rule.permission}
                 </span>
-                <button type="button" className="policies-remove-btn" aria-label="Remove rule">
+                <button type="button" className="policies-remove-btn" aria-label="Remove rule" onClick={() => removeRule(rule.method)}>
                   ✕
                 </button>
               </div>
             ))}
+            {visibleRules.length === 0 ? (
+              <div className="policies-empty">No explicit signer policies. Default policy applies to new requests.</div>
+            ) : null}
           </div>
         </div>
       </div>

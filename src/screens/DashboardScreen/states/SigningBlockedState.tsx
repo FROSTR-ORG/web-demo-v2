@@ -1,6 +1,14 @@
 import { Button } from "../../../components/ui";
 
-export function SigningBlockedState({ onStop }: { onStop: () => void }) {
+export function SigningBlockedState({
+  onStop,
+  onOpenPolicies,
+  onReviewApprovals,
+}: {
+  onStop: () => void;
+  onOpenPolicies?: () => void;
+  onReviewApprovals?: () => void;
+}) {
   return (
     <>
       <div className="dash-hero-card">
@@ -28,6 +36,14 @@ export function SigningBlockedState({ onStop }: { onStop: () => void }) {
         <p className="dash-blocked-copy">
           Requests are not failing outright, but they cannot complete until the blocking condition clears. Use this state for policy prompts, pending operator review, or temporary readiness gating that stops signing before execution.
         </p>
+        <div className="dash-capacity-alert" aria-label="Signing capacity">
+          <span className="dash-capacity-label">Signing Capacity</span>
+          <span className="dash-capacity-track" />
+          <span className="dash-capacity-state">
+            <span className="dash-capacity-x">×</span>
+            0 ready
+          </span>
+        </div>
         <div className="dash-two-col">
           <div className="dash-sub-panel">
             <div className="dash-panel-kicker">Common Causes</div>
@@ -41,10 +57,10 @@ export function SigningBlockedState({ onStop }: { onStop: () => void }) {
               Review approvals or open policies before retrying. If readiness is the issue, wait for relay and peer health to recover.
             </p>
             <div className="dash-action-row">
-              <Button type="button" variant="primary">
+              <Button type="button" variant="primary" onClick={onOpenPolicies}>
                 Open Policies
               </Button>
-              <Button type="button" variant="ghost">
+              <Button type="button" variant="ghost" onClick={onReviewApprovals}>
                 Review Approvals
               </Button>
             </div>

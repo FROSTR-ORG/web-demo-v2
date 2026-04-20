@@ -1,6 +1,39 @@
 import { Clock, X } from "lucide-react";
+import { DEFAULT_POLICY_PROMPT_REQUEST, type PolicyPromptRequest } from "../mocks";
 
-export function PolicyPromptModal({ onClose }: { onClose: () => void }) {
+function scopeLabel(request: PolicyPromptRequest) {
+  if (request.kind === "ECDH") return "ECDH";
+  const { eventKind } = request;
+  const match = eventKind.match(/^kind:\d+/);
+  if (match) return match[0];
+  return eventKind;
+}
+
+export function PolicyPromptModal({
+  onClose,
+  request = DEFAULT_POLICY_PROMPT_REQUEST,
+}: {
+  onClose: () => void;
+  request?: PolicyPromptRequest;
+}) {
+  const isEcdh = request.kind === "ECDH";
+  const scope = scopeLabel(request);
+  const subtitle = isEcdh
+    ? "A peer is requesting permission for an encryption operation"
+    : "A peer is requesting permission to sign on your behalf";
+  const detailRows: Array<{ label: string; value: string; className?: string }> = isEcdh
+    ? [
+        { label: "OPERATION", value: request.eventKind },
+        { label: "TARGET PUBKEY", value: request.pubkey, className: "mono" },
+        { label: "RELAY", value: request.relay ?? request.domain, className: "mono" },
+      ]
+    : [
+        { label: "EVENT KIND", value: request.eventKind },
+        { label: "CONTENT", value: request.content },
+        { label: "PUBKEY", value: request.pubkey, className: "mono" },
+        { label: "DOMAIN", value: request.domain, className: "bold" },
+      ];
+
   return (
     <div className="policy-modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="policy-modal" onClick={(e) => e.stopPropagation()}>
@@ -21,42 +54,32 @@ export function PolicyPromptModal({ onClose }: { onClose: () => void }) {
             </button>
           </div>
           <p className="policy-modal-subtitle">
-            A peer is requesting permission to sign on your behalf
+            {subtitle}
           </p>
         </div>
 
         {/* Request info */}
         <div className="policy-modal-request">
-          <span className="policy-request-badge">SIGN</span>
-          <span className="policy-request-peer">from Peer #2</span>
-          <span className="policy-request-key">029c4a...1f5e</span>
-          <span className="policy-request-domain"> · primal.net</span>
+          <span className={`policy-request-badge ${request.kind.toLowerCase()}`}>{request.kind}</span>
+          <span className="policy-request-peer">from {request.peer}</span>
+          <span className="policy-request-key">{request.key}</span>
+          <span className="policy-request-domain"> · {request.domain}</span>
         </div>
 
         {/* Details table */}
-        <div className="policy-details-table">
-          <div className="policy-detail-row">
-            <span className="policy-detail-label">EVENT KIND</span>
-            <span className="policy-detail-value">kind:1 (Short Text Note)</span>
-          </div>
-          <div className="policy-detail-row">
-            <span className="policy-detail-label">CONTENT</span>
-            <span className="policy-detail-value">&ldquo;gm nostr, anyone up for a coffee meetup...&rdquo;</span>
-          </div>
-          <div className="policy-detail-row">
-            <span className="policy-detail-label">PUBKEY</span>
-            <span className="policy-detail-value mono">029c4a...1f5e</span>
-          </div>
-          <div className="policy-detail-row">
-            <span className="policy-detail-label">DOMAIN</span>
-            <span className="policy-detail-value bold">primal.net</span>
-          </div>
+        <div className={`policy-details-table ${isEcdh ? "ecdh" : "sign"}`}>
+          {detailRows.map((row) => (
+            <div className="policy-detail-row" key={row.label}>
+              <span className="policy-detail-label">{row.label}</span>
+              <span className={`policy-detail-value ${row.className ?? ""}`}>{row.value}</span>
+            </div>
+          ))}
         </div>
 
         {/* Expiration timer */}
         <div className="policy-expiry">
           <Clock size={14} />
-          <span>Expires in 42s</span>
+          <span>Expires in {request.ttl}</span>
         </div>
 
         {/* Action buttons — 3 rows × 2 buttons */}
@@ -74,15 +97,15 @@ export function PolicyPromptModal({ onClose }: { onClose: () => void }) {
               Always allow
             </button>
             <button type="button" className="policy-btn allow-outline" onClick={onClose}>
-              Always for kind:1
+              Always for {scope}
             </button>
           </div>
           <div className="policy-action-row">
             <button type="button" className="policy-btn deny-outline" onClick={onClose}>
-              Always deny for kind:1
+              Always deny for {scope}
             </button>
             <button type="button" className="policy-btn deny-outline" onClick={onClose}>
-              Always deny for primal.net
+              Always deny for {request.domain}
             </button>
           </div>
         </div>

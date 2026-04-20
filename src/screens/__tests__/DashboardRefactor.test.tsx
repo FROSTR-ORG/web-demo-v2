@@ -260,6 +260,19 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
       expect(screen.getByText("Open Policies")).toBeInTheDocument();
       expect(screen.getByText("Review Approvals")).toBeInTheDocument();
     });
+
+    it("opens policies view when Open Policies is clicked", () => {
+      renderAt({ dashboard: { state: "signing-blocked" } });
+      fireEvent.click(screen.getByText("Open Policies"));
+      expect(screen.getByText("Signer Policies")).toBeInTheDocument();
+      expect(screen.getByText("Peer Policies")).toBeInTheDocument();
+    });
+
+    it("opens policy prompt modal when Review Approvals is clicked", () => {
+      renderAt({ dashboard: { state: "signing-blocked" } });
+      fireEvent.click(screen.getByText("Review Approvals"));
+      expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
+    });
   });
 
   describe("VAL-DSH-010 / DSH-011: Settings sidebar", () => {
