@@ -198,7 +198,7 @@ export function CreateKeysetScreen() {
         </div>
         <div className="help">
           Any {threshold} of {count} shares can sign — min threshold is 2, min
-          shares is 2
+          shares is {threshold}
         </div>
         {error ? <div className="error">{error}</div> : null}
         <Button type="submit" size="full" disabled={busy}>

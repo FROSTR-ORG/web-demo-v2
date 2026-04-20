@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
@@ -8,9 +8,11 @@ import { useDemoUi } from "../demo/demoUi";
 
 export function DistributionCompleteScreen() {
   const navigate = useNavigate();
-  const { createSession, finishDistribution, clearCreateSession } = useAppState();
+  const { createSession, finishDistribution, clearCreateSession } =
+    useAppState();
   const demoUi = useDemoUi();
   const [handoffStarted, setHandoffStarted] = useState(false);
+  const handoffStartedRef = useRef(false);
 
   if (!createSession?.createdProfileId) {
     return handoffStarted ? null : <Navigate to="/" replace />;
@@ -19,10 +21,19 @@ export function DistributionCompleteScreen() {
   const total = createSession.onboardingPackages.length;
   const accounted = demoUi.shared?.completionPreset
     ? total
-    : createSession.onboardingPackages.filter((pkg) => (pkg.packageCopied || pkg.copied || pkg.qrShown) && pkg.passwordCopied).length;
+    : createSession.onboardingPackages.filter(
+        (pkg) =>
+          (pkg.packageCopied || pkg.copied || pkg.qrShown) &&
+          pkg.passwordCopied,
+      ).length;
   const complete = accounted === total;
 
   async function finish() {
+    if (handoffStartedRef.current) {
+      return;
+    }
+    handoffStartedRef.current = true;
+    setHandoffStarted(true);
     /*
      * VAL-SHR-011 — ensure we always navigate to a concrete
      * `/dashboard/{profileId}` URL even if the async finishDistribution()
@@ -41,9 +52,10 @@ export function DistributionCompleteScreen() {
       // Swallow — we still navigate below using the fallback.
     }
     if (!profileId) {
+      handoffStartedRef.current = false;
+      setHandoffStarted(false);
       return;
     }
-    setHandoffStarted(true);
     navigate(`/dashboard/${profileId}`);
     window.setTimeout(clearCreateSession, 0);
   }
@@ -61,22 +73,44 @@ export function DistributionCompleteScreen() {
           <div className="kicker">Distribution Status</div>
           <div className="completion-list">
             {createSession.onboardingPackages.map((pkg, index) => {
-              const packageHandedOff = pkg.packageCopied || pkg.copied || pkg.qrShown;
+              const packageHandedOff =
+                pkg.packageCopied || pkg.copied || pkg.qrShown;
               const distributed = packageHandedOff && pkg.passwordCopied;
-              const paperRows: { title: string; device: string; statuses: string[] }[] = [
-                { title: "Member #1 - Igloo Mobile", device: "Existing Device", statuses: ["Copied", "QR shown"] },
-                { title: "Member #2 - Igloo Desktop", device: "New Device", statuses: ["QR shown"] }
+              const paperRows: {
+                title: string;
+                device: string;
+                statuses: string[];
+              }[] = [
+                {
+                  title: "Member #1 - Igloo Mobile",
+                  device: "Existing Device",
+                  statuses: ["Copied", "QR shown"],
+                },
+                {
+                  title: "Member #2 - Igloo Desktop",
+                  device: "New Device",
+                  statuses: ["QR shown"],
+                },
               ];
-              const paperRow = demoUi.shared?.completionPreset ? paperRows[index] : undefined;
+              const paperRow = demoUi.shared?.completionPreset
+                ? paperRows[index]
+                : undefined;
               return (
                 <div className="completion-row" key={pkg.idx}>
                   <div className="completion-main">
-                    <span className={`completion-check ${paperRow || distributed ? "" : "pending"}`}>
+                    <span
+                      className={`completion-check ${paperRow || distributed ? "" : "pending"}`}
+                    >
                       <Check size={13} />
                     </span>
                     <span>
-                      <span className="value">{paperRow?.title ?? `Member #${pkg.idx + 1} - Igloo Device`}</span>
-                      <span className="help">{paperRow?.device ?? "New Device"}</span>
+                      <span className="value">
+                        {paperRow?.title ??
+                          `Member #${pkg.idx + 1} - Igloo Device`}
+                      </span>
+                      <span className="help">
+                        {paperRow?.device ?? "New Device"}
+                      </span>
                     </span>
                   </div>
                   <div className="inline-actions">
@@ -87,10 +121,22 @@ export function DistributionCompleteScreen() {
                           </span>
                         ))
                       : null}
-                    {!paperRow && packageHandedOff ? <span className="completion-status-ok">Package ready</span> : null}
-                    {!paperRow && pkg.passwordCopied ? <span className="completion-status-ok">Password copied</span> : null}
-                    {!paperRow && pkg.qrShown ? <span className="completion-status-ok">QR shown</span> : null}
-                    {!paperRow && !distributed ? <span className="help">Pending</span> : null}
+                    {!paperRow && packageHandedOff ? (
+                      <span className="completion-status-ok">
+                        Package ready
+                      </span>
+                    ) : null}
+                    {!paperRow && pkg.passwordCopied ? (
+                      <span className="completion-status-ok">
+                        Password copied
+                      </span>
+                    ) : null}
+                    {!paperRow && pkg.qrShown ? (
+                      <span className="completion-status-ok">QR shown</span>
+                    ) : null}
+                    {!paperRow && !distributed ? (
+                      <span className="help">Pending</span>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -98,12 +144,22 @@ export function DistributionCompleteScreen() {
           </div>
         </div>
         <div className="success-callout">
-          <strong>{complete ? "All packages distributed" : "Distribution can continue"}</strong>
+          <strong>
+            {complete
+              ? "All packages distributed"
+              : "Distribution can continue"}
+          </strong>
           <span>
-            {accounted} of {total} remote bfonboard packages have been accounted for. Continue when device adoption handoff can proceed.
+            {accounted} of {total} remote bfonboard packages have been accounted
+            for. Continue when device adoption handoff can proceed.
           </span>
         </div>
-        <Button type="button" size="full" disabled={!complete} onClick={() => void finish()}>
+        <Button
+          type="button"
+          size="full"
+          disabled={!complete || handoffStarted}
+          onClick={() => void finish()}
+        >
           Finish Distribution
         </Button>
       </section>

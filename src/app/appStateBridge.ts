@@ -1,4 +1,7 @@
-import type { RuntimeStatusSummary, StoredProfileSummary } from "../lib/bifrost/types";
+import type {
+  RuntimeStatusSummary,
+  StoredProfileSummary,
+} from "../lib/bifrost/types";
 import type { AppStateValue } from "./AppState";
 
 /**
@@ -52,7 +55,7 @@ export function snapshotFromAppState(
     | "onboardSession"
     | "rotateKeysetSession"
     | "recoverSession"
-  >
+  >,
 ): AppStateBridgeSnapshot {
   return {
     profiles: value.profiles,
@@ -66,7 +69,26 @@ export function snapshotFromAppState(
     importSession: null,
     onboardSession: null,
     rotateKeysetSession: null,
-    recoverSession: null
+    recoverSession: null,
+  };
+}
+
+function normalizeAppStateBridgeSnapshot(
+  parsed: object,
+): AppStateBridgeSnapshot {
+  const snapshot = parsed as Partial<AppStateBridgeSnapshot>;
+  return {
+    profiles: Array.isArray(snapshot.profiles) ? snapshot.profiles : [],
+    activeProfile: snapshot.activeProfile ?? null,
+    runtimeStatus: snapshot.runtimeStatus ?? null,
+    signerPaused: Boolean(snapshot.signerPaused),
+    // Harden reads too: older snapshots or manually injected sessionStorage
+    // must not rehydrate setup-session secrets.
+    createSession: null,
+    importSession: null,
+    onboardSession: null,
+    rotateKeysetSession: null,
+    recoverSession: null,
   };
 }
 
@@ -122,7 +144,7 @@ export function consumeBridgeSnapshot(): AppStateBridgeSnapshot | null {
     if (!parsed || typeof parsed !== "object") {
       return null;
     }
-    return parsed as AppStateBridgeSnapshot;
+    return normalizeAppStateBridgeSnapshot(parsed);
   } catch {
     return null;
   }

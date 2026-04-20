@@ -1,4 +1,5 @@
 import {
+  act,
   render,
   screen,
   fireEvent,
@@ -93,6 +94,35 @@ describe("DistributionCompleteScreen finish handler — VAL-SHR-011", () => {
     );
     await waitFor(() => {
       expect(mocks.finishDistribution).toHaveBeenCalled();
+      expect(mocks.navigate).toHaveBeenCalledWith(
+        `/dashboard/${DEMO_PROFILE_ID}`,
+      );
+      expect(mocks.clearCreateSession).toHaveBeenCalled();
+    });
+  });
+
+  it("prevents a second finish run while the dashboard handoff is in flight", async () => {
+    let resolveFinish!: (value: string) => void;
+    mocks.finishDistribution.mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveFinish = resolve;
+      }),
+    );
+    renderScreen();
+
+    const finishButton = screen.getByRole("button", {
+      name: /Finish Distribution/,
+    });
+    fireEvent.click(finishButton);
+    fireEvent.click(finishButton);
+
+    expect(mocks.finishDistribution).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(finishButton).toBeDisabled());
+
+    await act(async () => {
+      resolveFinish(DEMO_PROFILE_ID);
+    });
+    await waitFor(() => {
       expect(mocks.navigate).toHaveBeenCalledWith(
         `/dashboard/${DEMO_PROFILE_ID}`,
       );

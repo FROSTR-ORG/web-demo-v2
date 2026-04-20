@@ -213,6 +213,30 @@ describe("appStateBridge helpers", () => {
     expect(window.sessionStorage.getItem(BRIDGE_STORAGE_KEY)).toBeNull();
   });
 
+  it("consumeBridgeSnapshot strips setup sessions from stale or injected snapshots", () => {
+    const injected = {
+      ...makeSnapshot(),
+      createSession: { onboardingPackages: [{ password: "secret" }] },
+      importSession: { payload: { device: { share_secret: "2".repeat(64) } } },
+      onboardSession: { payload: { share_secret: "3".repeat(64) } },
+      rotateKeysetSession: { sourceShares: [{ seckey: "4".repeat(64) }] },
+      recoverSession: { recovered: { nsec: "nsec1rawsecret" } },
+    };
+    window.sessionStorage.setItem(BRIDGE_STORAGE_KEY, JSON.stringify(injected));
+
+    const result = consumeBridgeSnapshot();
+
+    expect(result).toMatchObject({
+      createSession: null,
+      importSession: null,
+      onboardSession: null,
+      rotateKeysetSession: null,
+      recoverSession: null,
+    });
+    expect(JSON.stringify(result)).not.toContain("secret");
+    expect(JSON.stringify(result)).not.toContain("nsec1rawsecret");
+  });
+
   it("consumeBridgeSnapshot returns null when no key is present", () => {
     expect(window.sessionStorage.getItem(BRIDGE_STORAGE_KEY)).toBeNull();
     expect(consumeBridgeSnapshot()).toBeNull();
