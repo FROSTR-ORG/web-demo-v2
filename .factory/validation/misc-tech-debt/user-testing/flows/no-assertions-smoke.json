@@ -1,0 +1,29 @@
+{
+  "milestone": "misc-tech-debt",
+  "groupId": "no-assertions-smoke",
+  "testedAt": "2026-04-20T01:04:41.806979Z",
+  "status": "pass",
+  "isolation": {
+    "surface": "browser-ui",
+    "appUrl": "http://127.0.0.1:5173",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db"
+  },
+  "toolsUsed": [
+    "agent-browser",
+    "curl"
+  ],
+  "assertionsTested": [],
+  "assertions": [],
+  "evidence": {
+    "smokeUrl": "http://127.0.0.1:5173/demo",
+    "pageTitle": "Igloo Web",
+    "screenshots": [
+      "misc-tech-debt/no-assertions-smoke/demo-loaded.png"
+    ],
+    "consoleErrors": "none",
+    "network": "not captured (smoke-only flow)"
+  },
+  "frictions": [],
+  "blockers": [],
+  "summary": "No assertions were assigned for misc-tech-debt. Browser-ui smoke check passed: /demo loaded and screenshot evidence was captured."
+}
