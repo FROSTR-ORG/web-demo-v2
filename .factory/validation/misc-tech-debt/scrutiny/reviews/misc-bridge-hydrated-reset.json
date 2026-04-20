@@ -1,0 +1,28 @@
+{
+  "featureId": "misc-bridge-hydrated-reset",
+  "reviewedAt": "2026-04-20T00:49:19Z",
+  "commitId": "5e32538d3a078c3d629fe1f3329a5c7e8b890a8e",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature correctly resets bridgeHydrated on live runtime establishment, removes the Dashboard workaround, and adds strong regression coverage. However, the new stateful MockAppStateProvider introduces a behavioral regression: it no longer responds to updated `value` props, so demo scenario switches can carry stale state between scenarios.",
+    "issues": [
+      {
+        "file": "src/app/AppState.tsx",
+        "line": 415,
+        "severity": "blocking",
+        "description": "MockAppStateProvider initializes `profiles/activeProfile/runtimeStatus/signerPaused/createSession` from `value` only once via `useState(...)` and never re-syncs when `value` changes. DemoScenarioPage passes `value={scenario.appState}` based on route params (`src/demo/DemoScenarioPage.tsx:41`), so navigating between `/demo/:scenarioId` entries can retain prior scenario state instead of applying the new scenario's seed state. This is a regression from prior behavior where provider output tracked `value` directly."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-builder skill has conflicting guidance for non-UI features: it explicitly allows architecture/provider-only work, but still marks `agent-browser` as a required skill and includes mandatory manual UI verification steps. This mismatch led to a transcript that did not invoke `agent-browser` while handoff feedback still marked procedure as followed.",
+      "evidence": ".factory/skills/ui-builder/SKILL.md:22 (non-UI features are valid) vs :31-34 (agent-browser required); worker transcript skeleton for session 6296db94-8c4a-4e76-b1c4-bac7355248d2 shows only mission-worker-base + ui-builder skill invocations and no agent-browser call."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Failing review due to one blocking regression: MockAppStateProvider became stateful without syncing prop updates, which can leak stale appState across demo scenario switches. Core bridgeHydrated reset behavior and added regression tests are otherwise implemented well."
+}
