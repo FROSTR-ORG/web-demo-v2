@@ -1,0 +1,151 @@
+{
+  "groupId": "g5-cross-shell",
+  "testedAt": "2026-04-20T01:26:41Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "runFrom": "repo root only",
+    "sharedDevServer5173": "not stopped"
+  },
+  "toolsUsed": [
+    "shell"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-CROSS-016",
+      "title": "TypeScript build clean",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `npx tsc -b` from repo root and capture output",
+          "expected": "Exit code 0 and no `error TS` diagnostics",
+          "observed": "Command exited 0; build log produced no diagnostics and `error TS` search returned none."
+        }
+      ],
+      "evidence": {
+        "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx tsc -b",
+        "exitCode": 0,
+        "artifacts": [
+          "dashboard-settings-modals-cross/g5-cross-shell/VAL-CROSS-016-tsc.log",
+          "dashboard-settings-modals-cross/g5-cross-shell/VAL-CROSS-016-ts-errors-check.log"
+        ],
+        "summary": "__EXIT_CODE__=0; No error TS diagnostics found"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-017",
+      "title": "Unit tests passing",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `npx vitest run --config vitest.config.ts` from repo root",
+          "expected": "Exit code 0 with 0 failed tests and no unhandled errors",
+          "observed": "Command exited 0 with `29 passed` test files and `374 passed` tests; no failed or unhandled-error summary reported."
+        }
+      ],
+      "evidence": {
+        "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx vitest run --config vitest.config.ts",
+        "exitCode": 0,
+        "artifacts": [
+          "dashboard-settings-modals-cross/g5-cross-shell/VAL-CROSS-017-021-vitest.log"
+        ],
+        "summary": "Test Files: 29 passed (29); Tests: 374 passed (374)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-018",
+      "title": "E2E gallery pass (desktop)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `npx playwright test --project=desktop` from repo root",
+          "expected": "Exit code 0 and desktop gallery assertions pass",
+          "observed": "Command exited 0; desktop run reported 4 passed, 1 skipped, including `renders every demo scenario on desktop without page errors`."
+        }
+      ],
+      "evidence": {
+        "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx playwright test --project=desktop",
+        "exitCode": 0,
+        "artifacts": [
+          "dashboard-settings-modals-cross/g5-cross-shell/VAL-CROSS-018-playwright-desktop.log"
+        ],
+        "summary": "4 passed, 1 skipped (desktop project)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-019",
+      "title": "Mobile representative pass",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `npx playwright test --project=mobile` from repo root",
+          "expected": "Exit code 0 and mobile representative scenario assertion passes",
+          "observed": "Command exited 0; mobile run reported 2 passed, 3 skipped, including `renders representative dense demo scenarios on mobile`."
+        },
+        {
+          "action": "Confirm representative IDs asserted by the mobile test",
+          "expected": "Test covers `welcome-returning-many`, `dashboard-settings-lock-profile`, `shared-create-profile`, `rotate-keyset-intake`, `recover-success`",
+          "observed": "The `representativeIds` array in `src/e2e/demo-gallery.spec.ts` matches all five required scenario IDs."
+        }
+      ],
+      "evidence": {
+        "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx playwright test --project=mobile",
+        "exitCode": 0,
+        "artifacts": [
+          "dashboard-settings-modals-cross/g5-cross-shell/VAL-CROSS-019-playwright-mobile.log"
+        ],
+        "summary": "2 passed, 3 skipped (mobile project); representative mobile scenario test passed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-020",
+      "title": "Playwright project names exist",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Search `playwright.config.ts` for desktop/mobile project definitions and required viewports",
+          "expected": "Config defines `desktop` (Desktop Chrome, 1440x1080) and `mobile` (Pixel 5, 390x844)",
+          "observed": "Search output shows `name: \"desktop\"` with Desktop Chrome 1440x1080 and `name: \"mobile\"` with Pixel 5 390x844."
+        }
+      ],
+      "evidence": {
+        "command": "rg -n \"name: \\\"desktop\\\"|name: \\\"mobile\\\"|Desktop Chrome|Pixel 5|width: 1440|height: 1080|width: 390|height: 844\" playwright.config.ts",
+        "exitCode": 0,
+        "artifacts": [
+          "dashboard-settings-modals-cross/g5-cross-shell/VAL-CROSS-020-playwright-projects.log"
+        ],
+        "summary": "Desktop and mobile project entries with required device+viewport settings found"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-021",
+      "title": "Unit test baseline count",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Extract Vitest summary from the same run used for VAL-CROSS-017",
+          "expected": "Total tests >= 204 baseline",
+          "observed": "Vitest summary reports 374 passed tests, exceeding baseline 204."
+        }
+      ],
+      "evidence": {
+        "command": "rg -n \"Test Files|Tests|passed|failed|Unhandled\" /Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/evidence/dashboard-settings-modals-cross/g5-cross-shell/VAL-CROSS-017-021-vitest.log",
+        "exitCode": 0,
+        "artifacts": [
+          "dashboard-settings-modals-cross/g5-cross-shell/VAL-CROSS-021-vitest-summary.log",
+          "dashboard-settings-modals-cross/g5-cross-shell/VAL-CROSS-017-021-vitest.log"
+        ],
+        "summary": "Tests: 374 passed (374), baseline threshold: >= 204"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 6 assigned shell assertions (VAL-CROSS-016..021): all 6 passed. Typecheck, vitest, desktop playwright, and mobile playwright commands exited 0; Playwright desktop/mobile project definitions and vitest baseline count were verified."
+}

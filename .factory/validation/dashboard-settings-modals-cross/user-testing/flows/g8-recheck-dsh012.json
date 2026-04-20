@@ -1,0 +1,60 @@
+{
+  "groupId": "g8-recheck-dsh012",
+  "testedAt": "2026-04-20T01:50:36Z",
+  "isolation": {
+    "origin": "http://127.0.0.1:5173",
+    "browserSession": "f885e149dacc__g8",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "assertionIds": ["VAL-DSH-012"],
+    "url": "http://127.0.0.1:5173/demo/dashboard-settings-lock-profile"
+  },
+  "toolsUsed": ["agent-browser"],
+  "assertions": [
+    {
+      "id": "VAL-DSH-012",
+      "title": "Settings header uses Share Tech Mono typography",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/dashboard-settings-lock-profile and wait for networkidle",
+          "expected": "Settings sidebar is visible for selector-accurate style checks",
+          "observed": "Settings sidebar visible"
+        },
+        {
+          "action": "Measure computed font-family on .settings-title (text heading) and .settings-header (container)",
+          "expected": ".settings-title computed font-family contains Share Tech Mono or Share_Tech_Mono; .settings-header captured for comparison",
+          "observed": ".settings-title => \"Share Tech Mono\", system-ui, sans-serif; .settings-header => Inter, system-ui, sans-serif"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g8-recheck-dsh012/VAL-DSH-012-settings-sidebar.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json => [])",
+        "network": "none captured (not required for this typography assertion)",
+        "raw": {
+          "selectorCounts": {
+            ".settings-title": 1,
+            ".settings-header": 1
+          },
+          "titleText": "Settings",
+          "computedFontFamily": {
+            ".settings-title": "\"Share Tech Mono\", system-ui, sans-serif",
+            ".settings-header": "Inter, system-ui, sans-serif"
+          }
+        }
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Prior ambiguity was container-vs-title targeting; this recheck required explicit selector-specific computed-style sampling.",
+      "resolved": true,
+      "resolution": "Measured both .settings-title and .settings-header and recorded raw computed font-family strings side-by-side.",
+      "affectedAssertions": ["VAL-DSH-012"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Rechecked VAL-DSH-012 with selector-accurate measurement: pass. The actual title element (.settings-title) computes to Share Tech Mono, while the container (.settings-header) computes to Inter."
+}

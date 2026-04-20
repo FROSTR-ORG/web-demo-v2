@@ -1,0 +1,204 @@
+{
+  "groupId": "g6-cross-remaining",
+  "testedAt": "2026-04-20T01:39:55Z",
+  "isolation": {
+    "repo": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "appUrl": "http://127.0.0.1:5173",
+    "originLimit": "http://127.0.0.1:5173",
+    "browserSession": "f885e149dacc__g6",
+    "surface": "browser-ui via agent-browser",
+    "assignedAssertions": [
+      "VAL-CROSS-011",
+      "VAL-CROSS-012",
+      "VAL-CROSS-013",
+      "VAL-CROSS-014",
+      "VAL-DSH-101"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-CROSS-011",
+      "title": "Dashboard → export path end-to-end",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /dashboard/demo-profile, open Settings, and click Export in Export Profile row",
+          "expected": "Export Profile modal opens from dashboard sidebar context",
+          "observed": "Export Profile modal opened with Export Password and Confirm Password fields."
+        },
+        {
+          "action": "Enter matching passwords and submit Export",
+          "expected": "Backup Ready (Export Complete) modal opens",
+          "observed": "Backup Ready modal opened with Copy/Download and Done actions."
+        },
+        {
+          "action": "Click Done",
+          "expected": "Modal closes and URL remains /dashboard/{id}",
+          "observed": "Modal closed and final URL remained http://127.0.0.1:5173/dashboard/demo-profile."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-011-dashboard-start.png",
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-011-sidebar-open.png",
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-011-export-modal.png",
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-011-export-complete.png",
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-011-after-done.png"
+        ],
+        "artifacts": [
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-011-014-checks.json"
+        ],
+        "consoleErrors": "none",
+        "network": "Dashboard document/asset navigation only; no API/XHR calls observed in this flow."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-012",
+      "title": "Dashboard → clear credentials → welcome",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From /dashboard/demo-profile open Settings and click Clear",
+          "expected": "Clear Credentials confirmation modal opens",
+          "observed": "Clear Credentials modal opened with Cancel and Clear Credentials actions."
+        },
+        {
+          "action": "Confirm Clear Credentials",
+          "expected": "Navigate to / with Welcome no-profiles variant",
+          "observed": "Navigated to http://127.0.0.1:5173/ and hero text 'Split your Nostr key. Sign from anywhere.' was visible (no-profiles variant)."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-012-sidebar-open.png",
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-012-clear-modal.png",
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-012-after-confirm-welcome.png"
+        ],
+        "artifacts": [
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-011-014-checks.json"
+        ],
+        "consoleErrors": "none",
+        "network": "Route transition to / after confirmation; no API/XHR calls observed."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-013",
+      "title": "Lock profile returns to welcome",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From /dashboard/demo-profile open Settings and click Lock",
+          "expected": "Navigate to / with returning Welcome variant",
+          "observed": "Navigated to http://127.0.0.1:5173/ and returning copy 'Welcome back.' was visible."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-013-sidebar-open.png",
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-013-after-lock.png"
+        ],
+        "artifacts": [
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-011-014-checks.json"
+        ],
+        "consoleErrors": "none",
+        "network": "Route transition to / after lock; no API/XHR calls observed."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-014",
+      "title": "Unknown route fallback",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /no-such-route",
+          "expected": "Redirect to /",
+          "observed": "Final URL resolved to http://127.0.0.1:5173/."
+        },
+        {
+          "action": "Navigate to /dashboard (missing :profileId)",
+          "expected": "Redirect to /",
+          "observed": "Final URL resolved to http://127.0.0.1:5173/."
+        },
+        {
+          "action": "Navigate to /create/bogus",
+          "expected": "Redirect to /",
+          "observed": "Final URL resolved to http://127.0.0.1:5173/."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-014-no-such-route.png",
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-014-dashboard-missing-id.png",
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-014-create-bogus.png"
+        ],
+        "artifacts": [
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-CROSS-011-014-checks.json"
+        ],
+        "consoleErrors": "none (only Vite debug/info logs observed, no console.error or pageerror)",
+        "network": "Three direct route navigations all resolved to root route /."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DSH-101",
+      "title": "Refactor preserves audit-gap details",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/dashboard-running and inspect running status card inline actions",
+          "expected": "Only Stop Signer inline CTA; no Lock in running status card",
+          "observed": "Inline action container class 'inline-actions' contained only 'Stop Signer'; lock CTA absent."
+        },
+        {
+          "action": "Inspect Pending Approvals rows on /demo/dashboard-running",
+          "expected": "Subjects and TTLs match: kind:1 Short Text Note (42s), NIP-44 key exchange (1m 12s), kind:4 Encrypted DM (3m 05s)",
+          "observed": "All three rows matched expected subject strings and TTLs exactly."
+        },
+        {
+          "action": "Open /demo/dashboard-settings-lock-profile and inspect settings sidebar",
+          "expected": "Relays ordered primal/damus/nos.lol; Settings header uses Share Tech Mono; peer rows expose ellipsis + play-triangle actions",
+          "observed": "Relay order matched; .settings-title computed fontFamily was '\"Share Tech Mono\", system-ui, sans-serif'; peer action labels included Peer #0/#1/#2 actions and Open peer #0/#1/#2."
+        },
+        {
+          "action": "Open /demo/dashboard-running, toggle Policies and inspect active button styles",
+          "expected": "Policies button active highlight (blue) while Recover/Export remain inactive gray",
+          "observed": "Policies button color/stroke resolved to rgb(147, 197, 253) with aria-pressed=true; Recover/Export remained rgb(209, 213, 219)."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-DSH-101-running.png",
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-DSH-101-running-status-and-approvals.png",
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-DSH-101-settings-sidebar.png",
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-DSH-101-policies-active.png",
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-DSH-101-peer-icons-annotated.png"
+        ],
+        "artifacts": [
+          "dashboard-settings-modals-cross/g6-cross-remaining/VAL-DSH-101-checks.json"
+        ],
+        "consoleErrors": "none (no console.error or pageerror; only Vite debug/info logs)",
+        "network": "Demo route navigations only; no API/XHR requests observed during checks."
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "agent-browser eval with heredoc plus trailing shell chaining caused a one-off shell parse error while setting up the unlock step.",
+      "resolved": true,
+      "resolution": "Re-ran setup as separate commands (open/snapshot/click/wait) and continued successfully.",
+      "affectedAssertions": [
+        "VAL-CROSS-013"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 5 assigned browser assertions (VAL-CROSS-011/012/013/014 and VAL-DSH-101) in session f885e149dacc__g6; all 5 passed with screenshots and structured evidence artifacts captured."
+}

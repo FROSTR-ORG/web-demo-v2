@@ -60,6 +60,8 @@ For cross-flow assertions starting from the main app `/`, the initial state is d
 - In the create happy path, `Finish Distribution` may remain disabled until remote package handoff actions are completed on `/create/distribute`; complete required Copy/QR actions before asserting completion navigation.
 - In main-app import flow checks (`/import`, `/import/decrypt`), Continue/Decrypt CTAs stay disabled until required inputs are populated (backup text and passwords); provide sample values before asserting navigation.
 - In main-app onboard flow checks (`/onboard`), `Begin Onboarding` remains disabled until both onboarding package and package password are populated; fill both fields before asserting handshake navigation.
+- For dashboard typography checks (VAL-DSH-012), measure computed style on `.settings-title` (the visible "Settings" title text), not the `.settings-header` container.
+- For peer-row icon interaction checks (VAL-DSH-013), use direct role/label click attempts per row and record pointer-interception errors explicitly if sidebar overlay blocks clicks.
 
 ## Flow Validator Guidance: browser-ui
 
@@ -69,6 +71,14 @@ For cross-flow assertions starting from the main app `/`, the initial state is d
 - Allowed app origin: `http://127.0.0.1:5173` only.
 - Evidence boundary: write screenshots/log artifacts only inside the assigned mission evidence folder.
 - Evidence priority for SPA assertions: URL checks + screenshots + console/page errors are primary; network capture is secondary context.
+
+## Flow Validator Guidance: shell
+
+- Surface/tool: shell validators execute local project commands only (`npx tsc -b`, `npx vitest run --config vitest.config.ts`, `npx playwright test --project=desktop`, `npx playwright test --project=mobile`).
+- Isolation boundary: run commands from repo root `/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2`; do not edit source files or shared config.
+- Shared-state constraint: shell validators must not stop the shared dev server used by browser validators and must not clean/delete test outputs used by other validators.
+- Evidence boundary: capture command, exit code, and key summary lines in the assigned flow report.
+- Failure reporting: include first concrete failing diagnostic (or timeout detail) and whether failure is deterministic on retry.
 
 ## Mission Tool Mandates
 

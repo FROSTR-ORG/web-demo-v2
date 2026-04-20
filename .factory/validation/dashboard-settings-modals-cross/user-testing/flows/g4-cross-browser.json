@@ -1,0 +1,190 @@
+{
+  "groupId": "g4-cross-browser",
+  "testedAt": "2026-04-20T01:32:29Z",
+  "isolation": {
+    "repo": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "appUrl": "http://127.0.0.1:5173",
+    "originLimit": "http://127.0.0.1:5173",
+    "browserSession": "f885e149dacc__g4",
+    "surface": "browser-ui via agent-browser",
+    "assignedAssertions": [
+      "VAL-CROSS-001",
+      "VAL-CROSS-002",
+      "VAL-CROSS-003",
+      "VAL-CROSS-004",
+      "VAL-CROSS-015",
+      "VAL-CROSS-022"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-CROSS-001",
+      "title": "DemoGallery entry point renders all flow sections + scenario links",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo and inspect gallery headings and links",
+          "expected": "Paper Screen Gallery heading, all flow sections in order, canonical links present, variant links hidden from top-level list",
+          "observed": "Heading and all nine flow section labels were present; canonical spot-check links were present; /demo/import-error-corrupted and /demo/onboard-failed-rejected were absent from top-level links."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-001-demo-gallery.png"
+        ],
+        "artifacts": [
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-001-004-assertion-checks.json"
+        ],
+        "consoleErrors": "none observed while validating /demo",
+        "network": "Browser navigation to /demo succeeded and rendered SPA gallery content."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-002",
+      "title": "Gallery \u2192 scenario navigation",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From /demo, click scenario links for welcome-first-time, import-load-backup, onboard-enter-package, create-keyset, shared-create-profile, dashboard-running, rotate-keyset-intake, rotate-share-enter-package, recover-collect-shares",
+          "expected": "Each click navigates to /demo/{id} and expected text is visible",
+          "observed": "All 9 spot-check navigations landed on expected /demo/{id} URLs and each expected text was visible."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-002-welcome-first-time.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-002-import-load-backup.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-002-onboard-enter-package.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-002-create-keyset.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-002-shared-create-profile.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-002-dashboard-running.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-002-rotate-keyset-intake.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-002-rotate-share-enter-package.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-002-recover-collect-shares.png"
+        ],
+        "artifacts": [
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-001-004-assertion-checks.json"
+        ],
+        "consoleErrors": "none observed during spot-check navigation",
+        "network": "Nine /demo/{id} route navigations succeeded via gallery link clicks."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-003",
+      "title": "Scenario chrome toolbar renders All screens + Prev/Next + Raw + Reference",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/welcome-returning-multi and verify toolbar links/hrefs",
+          "expected": "Toolbar shows All screens, Previous, Next, Raw, Reference with correct destinations",
+          "observed": "All toolbar controls rendered with expected hrefs: /demo, /demo/welcome-returning-single, /demo/welcome-returning-many, /demo/welcome-returning-multi?chrome=0, /paper-reference/welcome-returning-multi.png."
+        },
+        {
+          "action": "Use Previous/Next controls",
+          "expected": "Previous traverses to welcome-returning-single; Next traverses canonical sequence",
+          "observed": "Previous navigated to /demo/welcome-returning-single; Next returned to /demo/welcome-returning-multi then advanced to /demo/welcome-returning-many."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-003-toolbar-welcome-returning-multi.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-003-prev-to-single.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-003-next-to-many.png"
+        ],
+        "artifacts": [
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-001-004-assertion-checks.json"
+        ],
+        "consoleErrors": "none observed while traversing toolbar links",
+        "network": "Navigations across canonical welcome scenarios succeeded via toolbar links."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-004",
+      "title": "Raw mode hides chrome toolbar",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/welcome-first-time?chrome=0 and then /demo/welcome-first-time",
+          "expected": "Raw mode hides demo toolbar; normal mode restores it",
+          "observed": "Raw mode had no \"All screens\" toolbar text; removing query restored toolbar with \"All screens\" visible."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-004-raw-mode.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-004-chrome-restored.png"
+        ],
+        "artifacts": [
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-001-004-assertion-checks.json"
+        ],
+        "consoleErrors": "none observed in raw/normal mode toggles",
+        "network": "Both /demo/welcome-first-time?chrome=0 and /demo/welcome-first-time loaded successfully."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-015",
+      "title": "Console cleanliness across demo scenarios",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Iterate all demo scenarios (canonical + variants), clearing console/errors before each open, then wait for networkidle + 500ms",
+          "expected": "0 console.error and 0 pageerror events across every scenario",
+          "observed": "Scanned 51 scenarios; failureCount=0; no console.error or pageerror events detected."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-015-sample-dashboard-running.png"
+        ],
+        "artifacts": [
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-015-console-scan.json"
+        ],
+        "consoleErrors": "none across 51 scenarios",
+        "network": "Each scenario route /demo/{id} loaded and stabilized (networkidle + 500ms) during scan."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-022",
+      "title": "Paper reference assets resolve",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open representative /paper-reference/{id}.png assets for each flow in browser",
+          "expected": "Reference assets resolve without 404",
+          "observed": "Checked 9 representative paper-reference assets; allResolved=True; each loaded as image/png with no 404 text, console errors, or page errors."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-022-paper-reference-welcome-first-time.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-022-paper-reference-import-load-backup.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-022-paper-reference-onboard-enter-package.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-022-paper-reference-create-keyset.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-022-paper-reference-shared-create-profile.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-022-paper-reference-dashboard-running.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-022-paper-reference-rotate-keyset-intake.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-022-paper-reference-rotate-share-enter-package.png",
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-022-paper-reference-recover-collect-shares.png"
+        ],
+        "artifacts": [
+          "dashboard-settings-modals-cross/g4-cross-browser/VAL-CROSS-022-paper-reference-check.json"
+        ],
+        "consoleErrors": "none during reference asset checks",
+        "network": "Representative /paper-reference/*.png requests resolved in-browser as image/png (no 404 state observed)."
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 6 assigned browser assertions (VAL-CROSS-001/002/003/004/015/022) in session f885e149dacc__g4; all 6 passed with screenshot and console evidence captured."
+}

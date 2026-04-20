@@ -1,0 +1,146 @@
+{
+  "groupId": "g1-sidebar-settings",
+  "testedAt": "2026-04-19T20:29:00Z",
+  "isolation": {
+    "appOrigin": "http://127.0.0.1:5173",
+    "browserSession": "f885e149dacc__g1",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "assignedAssertions": [
+      "VAL-DSH-010",
+      "VAL-DSH-011",
+      "VAL-DSH-012",
+      "VAL-DSH-013",
+      "VAL-DSH-021"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-DSH-010",
+      "title": "Settings sidebar renders Device Profile, Group Profile, Share, Security sections",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/dashboard-settings-lock-profile",
+          "expected": "Settings sidebar with required sections and rows is visible",
+          "observed": "Sidebar rendered with Settings header, DEVICE PROFILE, GROUP PROFILE, Rotate Share, Export Profile, Export Share, and PROFILE SECURITY sections including Lock/Clear rows."
+        },
+        {
+          "action": "Verify key group metadata and note copy",
+          "expected": "Created/Updated dates and shared-note text match contract",
+          "observed": "Created = Feb 24, 2026; Updated = Mar 8, 2026; note text 'Shared across all peers. Synced via Nostr.' present."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g1-sidebar-settings/VAL-DSH-010-settings-sidebar-full.png",
+          "dashboard-settings-modals-cross/g1-sidebar-settings/VAL-DSH-010-settings-sidebar.png"
+        ],
+        "consoleErrors": "none",
+        "network": "GET /demo/dashboard-settings-lock-profile (document) plus Vite module scripts; no failed requests observed in agent-browser logs"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DSH-011",
+      "title": "Settings sidebar Device Profile lists three relays",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect relay rows in Device Profile",
+          "expected": "Exactly three relays in order: primal, damus, nos.lol",
+          "observed": "Relay remove-button aria labels resolved in order: wss://relay.primal.net, wss://relay.damus.io, wss://nos.lol; add row appears separately below."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g1-sidebar-settings/VAL-DSH-011-relays-order.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Same page-load request set as VAL-DSH-010; no failed requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DSH-012",
+      "title": "Settings header uses Share Tech Mono typography",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Read computed style for visible 'Settings' sidebar header",
+          "expected": "font-family contains Share_Tech_Mono",
+          "observed": "Computed style returned fontFamily='Inter, system-ui, sans-serif' (fontSize=16px, fontWeight=400)."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g1-sidebar-settings/VAL-DSH-012-settings-font.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Same page-load request set as VAL-DSH-010; no failed requests observed"
+      },
+      "issues": "Typography regression: settings header is using Inter instead of Share Tech Mono."
+    },
+    {
+      "id": "VAL-DSH-013",
+      "title": "Peer rows expose trailing ellipsis + play-triangle icons when sidebar open",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Open /demo/dashboard-settings-lock-profile and inspect peer rows",
+          "expected": "Each visible peer row shows two trailing icon buttons and both are clickable",
+          "observed": "DOM contains two trailing buttons per row (Peer #0/#1/#2) with aria labels for actions/open; however direct click attempts fail because the settings sidebar intercepts pointer events over the peer area."
+        },
+        {
+          "action": "Attempt click on 'Peer #0 actions' via agent-browser",
+          "expected": "Click succeeds",
+          "observed": "Playwright click timed out with repeated 'settings-sidebar subtree intercepts pointer events' errors."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g1-sidebar-settings/VAL-DSH-013-peer-trailing-icons.png",
+          "dashboard-settings-modals-cross/g1-sidebar-settings/VAL-DSH-013-peer-trailing-icons-annotated.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Same page-load request set as VAL-DSH-010; no failed requests observed"
+      },
+      "issues": "Interactivity regression: trailing peer-row icons are not clickable while settings sidebar is open due overlay interception."
+    },
+    {
+      "id": "VAL-DSH-021",
+      "title": "Peer row trailing icons are absent when sidebar is closed",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /demo/dashboard-running (sidebar closed)",
+          "expected": "No trailing ellipsis/play buttons in peer rows",
+          "observed": "For Peer #0/#1/#2, .peer-row-trailing node absent and trailing button count is 0 for each row; only standard dashboard controls remain interactive."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g1-sidebar-settings/VAL-DSH-021-sidebar-closed.png",
+          "dashboard-settings-modals-cross/g1-sidebar-settings/VAL-DSH-021-sidebar-closed-annotated.png"
+        ],
+        "consoleErrors": "none",
+        "network": "GET /demo/dashboard-running (document) plus Vite module scripts; no failed requests observed"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "agent-browser interactive snapshot did not list peer trailing icon buttons while settings sidebar was open, even though DOM inspection showed them.",
+      "resolved": true,
+      "resolution": "Validated icon presence/interactivity via DOM inspection + explicit label-based click attempts; click attempts confirmed pointer interception failure.",
+      "affectedAssertions": [
+        "VAL-DSH-013"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 5 assertions: 3 passed (VAL-DSH-010, VAL-DSH-011, VAL-DSH-021) and 2 failed (VAL-DSH-012 typography mismatch; VAL-DSH-013 peer trailing icons not clickable while sidebar is open)."
+}

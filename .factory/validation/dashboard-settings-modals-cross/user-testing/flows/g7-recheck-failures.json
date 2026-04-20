@@ -1,0 +1,150 @@
+{
+  "groupId": "g7-recheck-failures",
+  "testedAt": "2026-04-20T01:47:50Z",
+  "isolation": {
+    "origin": "http://127.0.0.1:5173",
+    "browserSession": "f885e149dacc__g7",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db",
+    "assertionIds": ["VAL-DSH-012", "VAL-DSH-013", "VAL-DSH-031"]
+  },
+  "toolsUsed": ["agent-browser"],
+  "assertions": [
+    {
+      "id": "VAL-DSH-012",
+      "title": "Settings header uses Share Tech Mono typography",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Open /demo/dashboard-settings-lock-profile, wait for networkidle, then wait an additional 1000ms",
+          "expected": "Settings sidebar is visible and ready for style measurement",
+          "observed": "Settings sidebar visible"
+        },
+        {
+          "action": "Read computed style of visible Settings header text",
+          "expected": "font-family contains Share_Tech_Mono",
+          "observed": "Computed font-family: Inter, system-ui, sans-serif"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g7-recheck-failures/VAL-DSH-012-013-settings-sidebar.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json => [])",
+        "network": "none captured (agent-browser network requests --json => [])",
+        "raw": {
+          "computedStyle": {
+            "tag": "DIV",
+            "className": "settings-header",
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": "16px",
+            "fontWeight": "400"
+          }
+        }
+      },
+      "issues": "Font regression: Settings header is rendered with Inter instead of Share_Tech_Mono."
+    },
+    {
+      "id": "VAL-DSH-013",
+      "title": "Peer rows expose trailing ellipsis + play-triangle icons when sidebar open",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Inspect visible peer rows (#0/#1/#2) with sidebar open",
+          "expected": "Each row shows both trailing icons (ellipsis + play)",
+          "observed": "All 3 rows render two trailing icon buttons each: aria-labels 'Peer #N actions' and 'Open peer #N'."
+        },
+        {
+          "action": "Click Peer #0 trailing icons",
+          "expected": "Both icon buttons are clickable",
+          "observed": "Peer #0 actions: failure; Open peer #0: failure; interception: settings-sidebar subtree intercepts pointer events."
+        },
+        {
+          "action": "Click Peer #1 trailing icons",
+          "expected": "Both icon buttons are clickable",
+          "observed": "Peer #1 actions: failure; Open peer #1: failure; interception: settings-sidebar subtree intercepts pointer events."
+        },
+        {
+          "action": "Click Peer #2 trailing icons",
+          "expected": "Both icon buttons are clickable",
+          "observed": "Peer #2 actions: failure; Open peer #2: failure; interception: settings-sidebar subtree intercepts pointer events."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g7-recheck-failures/VAL-DSH-013-peer-row-icons-with-sidebar-open.png",
+          "dashboard-settings-modals-cross/g7-recheck-failures/VAL-DSH-013-peer-row-icons-annotated.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json => [])",
+        "network": "none captured (agent-browser network requests --json => [])",
+        "raw": {
+          "presenceByRow": {
+            "Peer #0": {
+              "buttons": ["Peer #0 actions", "Open peer #0"],
+              "iconShape": ["vertical-ellipsis (3 circles)", "play-triangle (path M4.5 2.5L10.5 7L4.5 11.5V2.5Z)"]
+            },
+            "Peer #1": {
+              "buttons": ["Peer #1 actions", "Open peer #1"],
+              "iconShape": ["vertical-ellipsis (3 circles)", "play-triangle (path M4.5 2.5L10.5 7L4.5 11.5V2.5Z)"]
+            },
+            "Peer #2": {
+              "buttons": ["Peer #2 actions", "Open peer #2"],
+              "iconShape": ["vertical-ellipsis (3 circles)", "play-triangle (path M4.5 2.5L10.5 7L4.5 11.5V2.5Z)"]
+            }
+          },
+          "clickResults": {
+            "Peer #0 actions": "failure - settings-sidebar subtree intercepts pointer events",
+            "Open peer #0": "failure - settings-sidebar subtree intercepts pointer events",
+            "Peer #1 actions": "failure - settings-sidebar subtree intercepts pointer events",
+            "Open peer #1": "failure - settings-sidebar subtree intercepts pointer events",
+            "Peer #2 actions": "failure - settings-sidebar subtree intercepts pointer events",
+            "Open peer #2": "failure - settings-sidebar subtree intercepts pointer events"
+          }
+        }
+      },
+      "issues": "Icon presence passes, but clickability fails for all visible rows due pointer-event interception by the open settings sidebar."
+    },
+    {
+      "id": "VAL-DSH-031",
+      "title": "Export Profile flow: sidebar → Export → submit → Backup Ready → Done",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "From open settings sidebar, click Export row action",
+          "expected": "Export Profile modal opens",
+          "observed": "Export Profile modal opened"
+        },
+        {
+          "action": "Fill Export Password + Confirm Password with matching values and submit Export",
+          "expected": "Backup Ready modal appears",
+          "observed": "Backup Ready modal appeared"
+        },
+        {
+          "action": "Click Done on Backup Ready modal",
+          "expected": "Modal closes and sidebar remains visible",
+          "observed": "Modal closed, but sidebar no longer visible (no Close settings button or sidebar controls in interactive tree)."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g7-recheck-failures/VAL-DSH-031-export-modal-open.png",
+          "dashboard-settings-modals-cross/g7-recheck-failures/VAL-DSH-031-backup-ready-modal.png",
+          "dashboard-settings-modals-cross/g7-recheck-failures/VAL-DSH-031-after-done-sidebar-state.png"
+        ],
+        "consoleErrors": "none (agent-browser errors --json => [])",
+        "network": "none captured (agent-browser network requests --json => [])",
+        "url": "http://127.0.0.1:5173/demo/dashboard-settings-lock-profile"
+      },
+      "issues": "After Done, sidebar is closed/hidden instead of remaining visible."
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Peer-row trailing icon buttons are present in DOM while sidebar is open but are not exposed in snapshot interactive refs; role-based direct click checks were required.",
+      "resolved": true,
+      "resolution": "Validated presence via DOM inspection and validated clickability via role-based click attempts for each row/icon pair.",
+      "affectedAssertions": ["VAL-DSH-013"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Rechecked 3 assertions: 0 passed, 3 failed. VAL-DSH-012 failed on computed font-family (Inter), VAL-DSH-013 failed clickability (all peer-row icons intercepted by sidebar), and VAL-DSH-031 failed because sidebar is not visible after Done from Backup Ready."
+}

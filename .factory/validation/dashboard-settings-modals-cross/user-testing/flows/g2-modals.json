@@ -1,0 +1,208 @@
+{
+  "groupId": "g2-modals",
+  "testedAt": "2026-04-20T01:27:17Z",
+  "isolation": {
+    "appOrigin": "http://127.0.0.1:5173",
+    "browserSession": "f885e149dacc__g2",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-DSH-014",
+      "title": "Clear Credentials modal renders destructive copy + dual CTAs",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/dashboard-clear-credentials-modal",
+          "expected": "Clear Credentials modal is visible",
+          "observed": "Modal rendered with title \"Clear Credentials\""
+        },
+        {
+          "action": "Verify identity/subtitle and destructive body copy",
+          "expected": "Subtitle and full destructive warning text match contract",
+          "observed": "Subtitle \"My Signing Key · Share #0 · Igloo Web\" and destructive copy including \"This action cannot be undone.\" are present"
+        },
+        {
+          "action": "Verify actions",
+          "expected": "Cancel + Clear Credentials buttons present",
+          "observed": "Both CTAs are visible with expected labels"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g2-modals/VAL-DSH-014-clear-credentials-modal.png"
+        ],
+        "consoleErrors": "none",
+        "network": "GET /demo/dashboard-clear-credentials-modal (document); no API/XHR requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DSH-015",
+      "title": "Export Profile modal renders password form + actions",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/dashboard-export-profile",
+          "expected": "Export Profile modal is visible",
+          "observed": "Modal rendered with title \"Export Profile\""
+        },
+        {
+          "action": "Verify scope line and form fields",
+          "expected": "Scope metadata and Export Password/Confirm Password fields appear",
+          "observed": "Scope line and both labeled password fields are present"
+        },
+        {
+          "action": "Verify action row",
+          "expected": "Cancel + Export buttons visible",
+          "observed": "Both CTAs render with expected labels"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g2-modals/VAL-DSH-015-export-profile-modal.png"
+        ],
+        "consoleErrors": "none",
+        "network": "GET /demo/dashboard-export-profile (document); no API/XHR requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DSH-016",
+      "title": "Export Complete modal renders Backup Ready + copy/download + Done",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/dashboard-export-complete",
+          "expected": "Backup Ready modal appears",
+          "observed": "Modal title \"Backup Ready\" is visible"
+        },
+        {
+          "action": "Verify actions and warning copy",
+          "expected": "Copy/Download actions, warning text, and Done button are present",
+          "observed": "Copy + Download controls, warning sentence, and Done CTA are present"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g2-modals/VAL-DSH-016-export-complete-modal.png"
+        ],
+        "consoleErrors": "none",
+        "network": "GET /demo/dashboard-export-complete (document); no API/XHR requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DSH-017",
+      "title": "Signer Policy Prompt modal renders request meta + decision CTAs",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/dashboard-policy-prompt",
+          "expected": "Signer Policy modal and lead text are visible",
+          "observed": "Title \"Signer Policy\" and lead \"A peer is requesting permission to sign on your behalf\" are present"
+        },
+        {
+          "action": "Verify metadata + countdown",
+          "expected": "SIGN/EVENT KIND/CONTENT/PUBKEY/DOMAIN rows and Expires in 42s are present",
+          "observed": "All required labels and \"Expires in 42s\" are visible"
+        },
+        {
+          "action": "Verify decision controls",
+          "expected": "Deny/Allow once/Always allow plus scoped allow/deny options are visible",
+          "observed": "All required top-level and scoped CTAs are present"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g2-modals/VAL-DSH-017-policy-prompt-modal.png"
+        ],
+        "consoleErrors": "none",
+        "network": "GET /demo/dashboard-policy-prompt (document); no API/XHR requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DSH-018",
+      "title": "Signing Failed modal renders error detail + Dismiss/Retry",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/dashboard-signing-failed",
+          "expected": "Signing Failed modal is visible",
+          "observed": "Title \"Signing Failed\" appears with expected summary text"
+        },
+        {
+          "action": "Verify detail and actions",
+          "expected": "Detailed round/peer/error string and Dismiss/Retry buttons are present",
+          "observed": "Full detail string plus Dismiss and Retry CTAs are visible"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g2-modals/VAL-DSH-018-signing-failed-modal.png"
+        ],
+        "consoleErrors": "none",
+        "network": "GET /demo/dashboard-signing-failed (document); no API/XHR requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DSH-022",
+      "title": "Pending Approvals \"Open\" action behavior",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/dashboard-running",
+          "expected": "Pending Approvals section is visible",
+          "observed": "Pending Approvals panel rendered with Open actions"
+        },
+        {
+          "action": "Click first Open action",
+          "expected": "Signer Policy prompt opens",
+          "observed": "Signer Policy modal opened with matching policy-prompt content"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g2-modals/VAL-DSH-022-open-approval-policy-modal.png"
+        ],
+        "consoleErrors": "none",
+        "network": "GET /demo/dashboard-running (document); no API/XHR requests observed during modal open"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DSH-023",
+      "title": "Signing Failed modal CTAs",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/dashboard-signing-failed and click Dismiss",
+          "expected": "Modal closes",
+          "observed": "Dismiss removed modal overlay; only running dashboard controls remained in interactive snapshot"
+        },
+        {
+          "action": "Re-open /demo/dashboard-signing-failed and click Retry",
+          "expected": "Modal closes and user returns to running dashboard state",
+          "observed": "Retry removed modal overlay and returned to running dashboard surface (no persistent modal controls visible)"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g2-modals/VAL-DSH-023-dismiss-result.png",
+          "dashboard-settings-modals-cross/g2-modals/VAL-DSH-023-retry-result.png"
+        ],
+        "consoleErrors": "none",
+        "network": "GET /demo/dashboard-signing-failed (document); no API/XHR requests observed during Dismiss/Retry actions"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 7 assertions (VAL-DSH-014, 015, 016, 017, 018, 022, 023): all passed in browser-ui validation using session f885e149dacc__g2."
+}

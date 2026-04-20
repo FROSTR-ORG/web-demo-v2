@@ -1,0 +1,216 @@
+{
+  "groupId": "g3-interactions-a",
+  "testedAt": "2026-04-20T01:30:16.423256+00:00",
+  "isolation": {
+    "appUrl": "http://127.0.0.1:5173",
+    "originLimit": "http://127.0.0.1:5173",
+    "browserSession": "f885e149dacc__g3",
+    "missionDir": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-DSH-030",
+      "title": "Settings gear opens sidebar; Close dismisses it",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo/dashboard-running and click top-nav Settings gear",
+          "expected": "Settings sidebar opens with Settings heading and profile sections",
+          "observed": "Sidebar opened with settings controls (Close settings, relay list, Rotate/Export/Lock/Clear rows)."
+        },
+        {
+          "action": "Click Close settings",
+          "expected": "Sidebar closes and running dashboard panels reappear without sidebar",
+          "observed": "Sidebar dismissed; running dashboard content shown again on /demo/dashboard-running."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g3-interactions-a/VAL-DSH-030-settings-open.png",
+          "dashboard-settings-modals-cross/g3-interactions-a/VAL-DSH-030-settings-closed.png"
+        ],
+        "url": "http://127.0.0.1:5173/demo/dashboard-running",
+        "consoleErrors": "none",
+        "network": "No API requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DSH-031",
+      "title": "Export Profile flow: sidebar \u2192 Export \u2192 submit \u2192 Backup Ready \u2192 Done",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "From open sidebar, click Export row",
+          "expected": "Export Profile modal opens",
+          "observed": "Export modal opened with Export Password + Confirm Password fields."
+        },
+        {
+          "action": "Enter matching passwords and click Export",
+          "expected": "Backup Ready (Export Complete) modal appears",
+          "observed": "Backup Ready modal appeared with Copy/Download and Done actions."
+        },
+        {
+          "action": "Click Done",
+          "expected": "Modal closes and sidebar remains visible",
+          "observed": "Modal closed but sidebar was also closed; returned to main running dashboard without sidebar."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g3-interactions-a/VAL-DSH-031-sidebar-open.png",
+          "dashboard-settings-modals-cross/g3-interactions-a/VAL-DSH-031-export-modal.png",
+          "dashboard-settings-modals-cross/g3-interactions-a/VAL-DSH-031-export-complete.png",
+          "dashboard-settings-modals-cross/g3-interactions-a/VAL-DSH-031-after-done-sidebar-not-visible.png"
+        ],
+        "url": "http://127.0.0.1:5173/demo/dashboard-running",
+        "consoleErrors": "none",
+        "network": "No API requests observed"
+      },
+      "issues": "Done closes both the export-complete modal and the settings sidebar, contrary to expected sidebar persistence."
+    },
+    {
+      "id": "VAL-DSH-032",
+      "title": "Clear Credentials Cancel dismisses modal without data loss",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From sidebar, click Clear",
+          "expected": "Clear Credentials confirmation modal opens",
+          "observed": "Destructive clear-credentials modal opened with Cancel and Clear Credentials buttons."
+        },
+        {
+          "action": "Click Cancel",
+          "expected": "Modal closes and sidebar content remains",
+          "observed": "Modal dismissed; sidebar remained visible with same profile/group rows and actions."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g3-interactions-a/VAL-DSH-032-sidebar-open.png",
+          "dashboard-settings-modals-cross/g3-interactions-a/VAL-DSH-032-clear-modal.png",
+          "dashboard-settings-modals-cross/g3-interactions-a/VAL-DSH-032-cancel-sidebar-retained.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DSH-033",
+      "title": "Lock action from sidebar \u2192 Welcome",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From open sidebar, click Lock",
+          "expected": "Navigate to / with Welcome screen and no dashboard chrome",
+          "observed": "Navigated to http://127.0.0.1:5173/ and dashboard runtime/sidebar chrome was no longer present."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g3-interactions-a/VAL-DSH-033-after-lock-welcome.png"
+        ],
+        "url": "http://127.0.0.1:5173/",
+        "consoleErrors": "none",
+        "network": "No API requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DSH-034",
+      "title": "Policies view toggle on/off",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Click Policies in dashboard header",
+          "expected": "Policies view opens with active Policies button",
+          "observed": "Policies view opened; snapshot reported Policies button as pressed and policy controls visible."
+        },
+        {
+          "action": "Click Policies again",
+          "expected": "Return to running dashboard view without Signer Policies headings",
+          "observed": "Returned to running dashboard panels (status, peers, event log, approvals)."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g3-interactions-a/VAL-DSH-034-policies-open.png",
+          "dashboard-settings-modals-cross/g3-interactions-a/VAL-DSH-034-policies-closed-running.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No API requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-008",
+      "title": "Dashboard \u2192 rotate-keyset path",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From dashboard settings, click Rotate Keyset",
+          "expected": "Navigate to /rotate-keyset with Rotate Keyset screen",
+          "observed": "Navigated to http://127.0.0.1:5173/rotate-keyset with Rotate Keyset heading visible."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g3-interactions-a/VAL-CROSS-008-rotate-keyset-route.png"
+        ],
+        "url": "http://127.0.0.1:5173/rotate-keyset",
+        "consoleErrors": "none",
+        "network": "No API requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-009",
+      "title": "Dashboard \u2192 rotate-share path",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From dashboard settings sidebar, click Rotate Share",
+          "expected": "Navigate to /rotate-share",
+          "observed": "Navigated to http://127.0.0.1:5173/rotate-share with Enter Rotate Package content visible."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g3-interactions-a/VAL-CROSS-009-rotate-share-route.png"
+        ],
+        "url": "http://127.0.0.1:5173/rotate-share",
+        "consoleErrors": "none",
+        "network": "No API requests observed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-010",
+      "title": "Dashboard \u2192 recover path",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "From dashboard header, click Recover",
+          "expected": "Navigate to /recover/{DEMO_PROFILE_ID}",
+          "observed": "Navigated to http://127.0.0.1:5173/recover/demo-profile with Recover NSEC screen visible."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "dashboard-settings-modals-cross/g3-interactions-a/VAL-CROSS-010-recover-route.png"
+        ],
+        "url": "http://127.0.0.1:5173/recover/demo-profile",
+        "consoleErrors": "none",
+        "network": "No API requests observed"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 8 assertions: 7 passed, 1 failed (VAL-DSH-031: clicking Done on Backup Ready closes the settings sidebar instead of leaving it open)."
+}
