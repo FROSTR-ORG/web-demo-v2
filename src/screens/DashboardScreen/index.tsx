@@ -193,7 +193,11 @@ export function DashboardScreen() {
           onLock={handleLock}
           onClearCredentials={() => setActiveModal("clear-credentials")}
           onExport={() => {
-            setSettingsOpen(false);
+            // Keep the Settings sidebar open while the Export Profile and
+            // Export Complete modals are shown so clicking Done on the
+            // Backup Ready modal returns the user to the same sidebar rows
+            // (VAL-DSH-031 / VAL-CROSS-011). The modals stack above the
+            // sidebar via `.export-modal-backdrop { z-index: 200 }`.
             setActiveModal("export-profile");
           }}
         />

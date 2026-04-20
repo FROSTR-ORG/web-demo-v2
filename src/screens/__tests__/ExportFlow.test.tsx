@@ -268,8 +268,11 @@ describe("Export from Settings Sidebar", () => {
     expect(exportBtn).toBeTruthy();
     fireEvent.click(exportBtn!);
 
-    // Sidebar should close and export modal should open
-    expect(screen.queryByTestId("settings-sidebar")).not.toBeInTheDocument();
+    // VAL-DSH-031: Settings sidebar stays open while the Export Profile
+    // and Export Complete modals are shown; the modal layer (z-index 200)
+    // renders above the sidebar (z-index 101). Clicking Done on the
+    // Backup Ready modal returns the user to the same sidebar rows.
+    expect(screen.getByTestId("settings-sidebar")).toBeInTheDocument();
     expect(screen.getByTestId("export-profile-modal")).toBeInTheDocument();
   });
 });

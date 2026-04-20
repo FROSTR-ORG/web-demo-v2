@@ -262,6 +262,64 @@ describe("dashboard-settings-sidebar-fidelity", () => {
     });
   });
 
+  describe("VAL-DSH-013 regression: peer-row-trailing is stacked above settings-scrim (clickable)", () => {
+    it("peer-row-trailing has position:relative and z-index greater than settings-scrim's z-index", () => {
+      renderWith({
+        dashboard: { settingsOpen: true, paperPanels: true, state: "running" },
+      });
+      const scrim = screen.getByTestId("settings-scrim") as HTMLElement;
+      const trailing0 = screen.getByTestId("peer-row-trailing-0") as HTMLElement;
+      const trailing1 = screen.getByTestId("peer-row-trailing-1") as HTMLElement;
+      const trailing2 = screen.getByTestId("peer-row-trailing-2") as HTMLElement;
+
+      const scrimZ = Number(window.getComputedStyle(scrim).zIndex);
+      expect(Number.isNaN(scrimZ)).toBe(false);
+
+      for (const trailing of [trailing0, trailing1, trailing2]) {
+        const computed = window.getComputedStyle(trailing);
+        expect(computed.position).toBe("relative");
+        const z = Number(computed.zIndex);
+        expect(Number.isNaN(z)).toBe(false);
+        // Must be above the scrim so pointer events reach the buttons.
+        expect(z).toBeGreaterThan(scrimZ);
+      }
+    });
+
+    it("peer-row-trailing buttons receive click events while sidebar is open", () => {
+      renderWith({
+        dashboard: { settingsOpen: true, paperPanels: true, state: "running" },
+      });
+      const ellipsis0 = screen.getByLabelText("Peer #0 actions");
+      const play0 = screen.getByLabelText("Open peer #0");
+      const ellipsis1 = screen.getByLabelText("Peer #1 actions");
+      const ellipsis2 = screen.getByLabelText("Peer #2 actions");
+
+      // Clicks should land on the buttons (not be swallowed by a parent).
+      // We assert the click event target is the button itself, which it will
+      // be only if the button is the top-most element at its coordinates.
+      const ellipsis0Clicks: EventTarget[] = [];
+      ellipsis0.addEventListener("click", (e) => ellipsis0Clicks.push(e.target as EventTarget));
+      fireEvent.click(ellipsis0);
+      expect(ellipsis0Clicks).toContain(ellipsis0);
+
+      const play0Clicks: EventTarget[] = [];
+      play0.addEventListener("click", (e) => play0Clicks.push(e.target as EventTarget));
+      fireEvent.click(play0);
+      expect(play0Clicks).toContain(play0);
+
+      // Spot-check the other rows too — all three must be clickable.
+      const ellipsis1Clicks: EventTarget[] = [];
+      ellipsis1.addEventListener("click", (e) => ellipsis1Clicks.push(e.target as EventTarget));
+      fireEvent.click(ellipsis1);
+      expect(ellipsis1Clicks).toContain(ellipsis1);
+
+      const ellipsis2Clicks: EventTarget[] = [];
+      ellipsis2.addEventListener("click", (e) => ellipsis2Clicks.push(e.target as EventTarget));
+      fireEvent.click(ellipsis2);
+      expect(ellipsis2Clicks).toContain(ellipsis2);
+    });
+  });
+
   describe("VAL-DSH-021: Peer row trailing icons are absent when sidebar is closed", () => {
     it("does not render trailing ellipsis + play buttons on /demo/dashboard-running (sidebar closed)", () => {
       renderWith({

@@ -217,6 +217,59 @@ describe("VAL-DSH-031 / VAL-CROSS-011 — Export flow end-to-end", () => {
     // Dashboard content still rendered (URL unchanged)
     expect(screen.getByText("Signer Running")).toBeInTheDocument();
   });
+
+  it("Done on Backup Ready dismisses only the modal — Settings sidebar stays open with its rows", () => {
+    // VAL-DSH-031 regression guard: earlier the sidebar was closed the moment
+    // Export was clicked, so clicking Done later left the sidebar hidden.
+    // The fixed Done handler must close only `activeModal` — `settingsOpen`
+    // must still be true and the sidebar content (Lock Profile / Export
+    // Profile rows) must remain in the DOM.
+    renderAt({ dashboard: { settingsOpen: true, paperPanels: true } });
+    expect(screen.getByTestId("settings-sidebar")).toBeInTheDocument();
+
+    const exportRow = screen.getByText("Export Profile").closest(".settings-action-row");
+    expect(exportRow).not.toBeNull();
+    const sidebarExportBtn = exportRow!.querySelector(".settings-btn-blue") as HTMLElement;
+    fireEvent.click(sidebarExportBtn);
+
+    // Submit with matching passwords to reach Backup Ready.
+    fireEvent.change(screen.getByLabelText("Export Password"), { target: { value: "abc123" } });
+    fireEvent.change(screen.getByLabelText("Confirm Password"), { target: { value: "abc123" } });
+    const submit = screen
+      .getByTestId("export-profile-modal")
+      .querySelector(".export-btn-submit") as HTMLElement;
+    fireEvent.click(submit);
+    expect(screen.getByTestId("export-complete-modal")).toBeInTheDocument();
+
+    // Sidebar is still behind the modal.
+    expect(screen.getByTestId("settings-sidebar")).toBeInTheDocument();
+
+    // Done must close only the modal, not the sidebar.
+    fireEvent.click(screen.getByText("Done"));
+    expect(screen.queryByTestId("export-complete-modal")).not.toBeInTheDocument();
+    expect(screen.getByTestId("settings-sidebar")).toBeInTheDocument();
+
+    // Sidebar content (Lock Profile / Export Profile rows) still visible.
+    expect(screen.getByText("Lock Profile")).toBeInTheDocument();
+    expect(screen.getByText("Export Profile")).toBeInTheDocument();
+  });
+
+  it("VAL-DSH-016 preserved: Done still dismisses Backup Ready when reached without the sidebar open", () => {
+    // When the export-complete modal is shown without the sidebar (direct
+    // entry from /demo/dashboard-export-complete without settingsOpen), Done
+    // still dismisses the modal and no sidebar appears (since it was never
+    // opened).
+    renderAt({ dashboard: { modal: "export-complete", paperPanels: true } });
+    expect(screen.getByTestId("export-complete-modal")).toBeInTheDocument();
+    expect(screen.queryByTestId("settings-sidebar")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Done"));
+    expect(screen.queryByTestId("export-complete-modal")).not.toBeInTheDocument();
+    // Sidebar never opened — should still be absent.
+    expect(screen.queryByTestId("settings-sidebar")).not.toBeInTheDocument();
+    // Dashboard still visible.
+    expect(screen.getByText("Signer Running")).toBeInTheDocument();
+  });
 });
 
 // ---------------------------------------------------------------------------

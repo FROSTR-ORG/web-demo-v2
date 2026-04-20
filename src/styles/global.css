@@ -1500,7 +1500,13 @@ a {
   border-bottom: 0;
 }
 
-.peer-row.offline {
+/* Apply the offline dimming to the inner content only. Applying opacity to
+   `.peer-row` itself creates a stacking context (opacity < 1), which would
+   trap the `.peer-row-trailing` buttons under the settings-scrim/sidebar and
+   break VAL-DSH-013 for the offline peer row. Excluding `.peer-row-trailing`
+   from the opacity also keeps its action icons fully legible while the
+   sidebar is open, matching Paper. */
+.peer-row.offline > *:not(.peer-row-trailing) {
   opacity: 0.55;
 }
 
@@ -1630,12 +1636,18 @@ a {
 }
 
 /* Peer row trailing action icons — rendered only when the Settings sidebar is
-   open, per Paper `dashboard/3-settings-lock-profile/screen.html` (VAL-DSH-013). */
+   open, per Paper `dashboard/3-settings-lock-profile/screen.html` (VAL-DSH-013).
+   Lifted above the `.settings-scrim` (z-index: 100) so the ellipsis + play
+   buttons receive pointer events while the sidebar overlay is visible. The
+   sidebar panel itself (z-index: 101) does not visually overlap this column,
+   and modals (z-index: 200+) continue to render above everything. */
 .peer-row-trailing {
   display: flex;
   align-items: center;
   flex-shrink: 0;
   gap: 8px;
+  position: relative;
+  z-index: 102;
 }
 
 .peer-row-trailing-btn {

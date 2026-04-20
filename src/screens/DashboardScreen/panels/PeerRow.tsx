@@ -49,7 +49,17 @@ export function PeerRow({ peer, paper, sidebarOpen }: { peer: PeerStatus; paper?
       </div>
       <div className="latency-slot">{peer.online ? (paper ? paperLatency(peer.idx) : "Ready") : "Offline"}</div>
       {sidebarOpen ? (
-        <div className="peer-row-trailing" data-testid={`peer-row-trailing-${peer.idx}`}>
+        <div
+          className="peer-row-trailing"
+          data-testid={`peer-row-trailing-${peer.idx}`}
+          // When the Settings sidebar is open, the scrim (`z-index: 100`)
+          // covers the dashboard main area. Lift the trailing action cluster
+          // into a higher stacking position so its buttons receive clicks
+          // instead of being intercepted by the scrim (VAL-DSH-013).
+          // Inline mirror of `.peer-row-trailing` rule in global.css so
+          // jsdom-based regression tests can observe the computed z-index.
+          style={{ position: "relative", zIndex: 102 }}
+        >
           <button
             type="button"
             className="peer-row-trailing-btn"
