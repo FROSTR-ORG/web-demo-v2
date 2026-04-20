@@ -113,6 +113,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     runtimeRef.current = runtime;
     simulatorRef.current = simulator ?? null;
     setRuntimeStatus(runtime.runtimeStatus());
+    // A live RuntimeClient just came online in this SPA session — re-enable the
+    // runtime-polling interval by clearing the bridge-hydration flag. Without
+    // this reset, `bridgeHydrated` would stay `true` forever after any demo
+    // hand-off, permanently disabling the refresh loop even though a real
+    // runtime is now backing `runtimeRef`.
+    setBridgeHydrated(false);
   }, []);
 
   const createKeyset = useCallback(async (draft: CreateDraft) => {
@@ -217,6 +223,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setRuntimeStatus(simulator.pump(4));
       runtimeRef.current = runtime;
       simulatorRef.current = simulator;
+      // A real RuntimeClient is now backing runtimeRef — clear the
+      // bridge-hydration flag so the runtime-polling interval resumes (see
+      // `setRuntime` for the matching reset on the unlock path).
+      setBridgeHydrated(false);
       setActiveProfile(record.summary);
       setSignerPausedState(false);
       setCreateSession({
@@ -329,9 +339,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     // When the provider was hydrated from the demo bridge there is no real
     // RuntimeClient backing the visible runtimeStatus — running the tick loop
     // would immediately null it out and force a redirect to "/". Skip the
-    // interval in that case; a live unlock from the real flow resets
-    // `bridgeHydrated` to false implicitly by replacing `runtimeStatus` before
-    // the next scheduling pass.
+    // interval in that case. Whenever a live RuntimeClient is subsequently
+    // established (unlockProfile → setRuntime, or the tail of createProfile),
+    // `bridgeHydrated` is explicitly reset to `false` so this effect re-runs
+    // and the polling interval resumes.
     if (bridgeHydrated && !runtimeRef.current) {
       return;
     }
@@ -388,19 +399,81 @@ export function MockAppStateProvider({
   children: ReactNode;
   /**
    * When true (default), the mock provider writes a sessionStorage bridge
-   * snapshot on mount and whenever `value` changes, so the real
+   * snapshot on mount and whenever its internal state changes, so the real
    * AppStateProvider can rehydrate if the user navigates out of `/demo/*`
    * into a real application route like `/dashboard/:id`. Pass `false` in
    * isolated test setups where the bridge would be noise.
    */
   bridge?: boolean;
 }) {
+  // MockAppStateProvider owns its own bridge-serialisable fields so that
+  // mutators like `clearCredentials` and `lockProfile` can truly update the
+  // visible state from inside the demo shell (e.g. clearing profiles before
+  // a navigate("/") hand-off to the real AppStateProvider). The `value` prop
+  // supplies the initial seed and all non-state callbacks; internal setters
+  // override the mutators that must participate in demo-side state changes.
+  const [profiles, setProfiles] = useState(value.profiles);
+  const [activeProfile, setActiveProfile] = useState(value.activeProfile);
+  const [runtimeStatus, setRuntimeStatus] = useState(value.runtimeStatus);
+  const [signerPaused, setSignerPausedState] = useState(value.signerPaused);
+  const [createSession, setCreateSession] = useState(value.createSession);
+
+  const lockProfile = useCallback(() => {
+    // Forward to any caller-supplied behaviour first (fixtures may observe).
+    value.lockProfile();
+    setRuntimeStatus(null);
+    setActiveProfile(null);
+    setSignerPausedState(false);
+  }, [value]);
+
+  const clearCredentials = useCallback(async () => {
+    await value.clearCredentials();
+    setProfiles([]);
+    setActiveProfile(null);
+    setRuntimeStatus(null);
+    setSignerPausedState(false);
+    setCreateSession(null);
+  }, [value]);
+
+  const setSignerPaused = useCallback(
+    (paused: boolean) => {
+      value.setSignerPaused(paused);
+      setSignerPausedState(paused);
+    },
+    [value]
+  );
+
+  const stateful = useMemo<AppStateValue>(
+    () => ({
+      ...value,
+      profiles,
+      activeProfile,
+      runtimeStatus,
+      signerPaused,
+      createSession,
+      lockProfile,
+      clearCredentials,
+      setSignerPaused
+    }),
+    [
+      value,
+      profiles,
+      activeProfile,
+      runtimeStatus,
+      signerPaused,
+      createSession,
+      lockProfile,
+      clearCredentials,
+      setSignerPaused
+    ]
+  );
+
   useEffect(() => {
     if (!bridge) return;
-    writeBridgeSnapshot(snapshotFromAppState(value));
-  }, [value, bridge]);
+    writeBridgeSnapshot(snapshotFromAppState(stateful));
+  }, [stateful, bridge]);
 
-  return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
+  return <AppStateContext.Provider value={stateful}>{children}</AppStateContext.Provider>;
 }
 
 export function useAppState(): AppStateValue {

@@ -2,7 +2,6 @@ import { Download, FileText, Settings, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAppState } from "../../app/AppState";
-import { writeBridgeSnapshot } from "../../app/appStateBridge";
 import { AppShell } from "../../components/shell";
 import { Button } from "../../components/ui";
 import { useDemoUi } from "../../demo/demoUi";
@@ -52,23 +51,12 @@ export function DashboardScreen() {
   }
 
   async function handleClearCredentials() {
+    // Both providers' `clearCredentials` now truly empty `profiles` (and
+    // clear the active profile + runtime). The MockAppStateProvider is
+    // stateful, so its bridge-write effect then writes the empty snapshot
+    // before the `navigate("/")` reaches the real AppStateProvider — no
+    // Dashboard-side workaround required.
     await clearCredentials();
-    // In the demo context the MockAppStateProvider's `clearCredentials` is a
-    // no-op, so the sessionStorage bridge still carries the demo profile. The
-    // real AppStateProvider would then rehydrate with that profile and show
-    // the "Welcome back." variant. To satisfy VAL-CROSS-012 ("Welcome
-    // no-profiles variant" after clear), we explicitly overwrite the bridge
-    // with an empty snapshot before navigating. In production this is a safe
-    // redundant write — the real `clearCredentials` has already emptied the
-    // provider state and the bridge effect will then write the same empty
-    // snapshot anyway.
-    writeBridgeSnapshot({
-      profiles: [],
-      activeProfile: null,
-      runtimeStatus: null,
-      signerPaused: false,
-      createSession: null,
-    });
     navigate("/");
   }
 
