@@ -1,0 +1,15 @@
+{
+  "featureId": "cross-area-final-gate",
+  "reviewedAt": "2026-04-20T01:16:31Z",
+  "commitId": "31239560386a4ad6b3711359f650458ab8fa312f",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The implementation aligns with the feature contract: DemoGallery now lists canonical scenarios only (VAL-CROSS-001), DemoScenarioPage Prev/Next traverses canonical scenarios and anchors variants via variantOf (VAL-CROSS-003), and a new regression suite (crossAreaFinalGate.test.tsx) comprehensively validates canonical/variant scenario rendering, raw mode chrome hiding, unknown-route fallback, and paper-reference asset presence (VAL-CROSS-002/004/014/022). The worker transcript and handoff also show successful full-gate validation runs (tsc, vitest >=204, Playwright desktop/mobile, and reference asset checks), with no contract regressions evident in the reviewed diff.",
+    "issues": []
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": null,
+  "summary": "Pass. I reviewed the transcript skeleton and commit 3123956 diff, and found the feature correctly closes the specified cross-area gates without introducing regressions."
+}

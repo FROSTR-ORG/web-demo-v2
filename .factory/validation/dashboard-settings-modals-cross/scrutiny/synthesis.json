@@ -1,0 +1,59 @@
+{
+  "milestone": "dashboard-settings-modals-cross",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx vitest run --config vitest.config.ts --maxWorkers=4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && npx tsc -b",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "cd /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 && echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 5,
+    "passed": 4,
+    "failed": 1,
+    "failedFeatures": [
+      "dashboard-settings-sidebar-fidelity"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "dashboard-settings-sidebar-fidelity",
+      "severity": "blocking",
+      "description": "Settings sidebar still includes a \"Rotate Keyset\" action row/button in src/screens/DashboardScreen/sidebar/SettingsSidebar.tsx:212, which violates the feature contract for sidebar scope."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Add a mission-authoring rule that each feature's description, expectedBehavior, and validation-contract IDs must be internally consistent before assignment; if they conflict, contract text is authoritative and the mismatch must be recorded in discoveredIssues.",
+      "evidence": "Multiple dashboard-settings-modals-cross reviews reported feature metadata drift (sidebar scope, export modal content/close affordance wording, and recover-path phrasing) that conflicted with contract/Paper expectations.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "In ui-builder handoff requirements, explicitly require a discoveredIssues entry whenever feature metadata conflicts with validation-contract behavior, even when implementation follows the contract.",
+      "evidence": "dashboard-interactions review noted an unlogged mismatch between feature metadata and contract regarding Recover navigation surface.",
+      "isSystemic": false
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Treat each individual metadata wording drift as an independent guidance update.",
+      "reason": "duplicate"
+    }
+  ],
+  "previousRound": null
+}

@@ -1,0 +1,26 @@
+{
+  "featureId": "dashboard-modals-fidelity",
+  "reviewedAt": "2026-04-20T01:17:01Z",
+  "commitId": "c8e6d33",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The commit cleanly wires VAL-DSH-022 by threading an `onOpenPolicyPrompt` callback from `DashboardScreen` -> `RunningState` -> `PendingApprovalsPanel` and binding it to the first Pending Approvals row. It also adds focused fidelity tests for VAL-DSH-014..018, VAL-DSH-022, and VAL-DSH-023, including modal dismissal behavior for Signing Failed. No blocking regressions were found in the reviewed diff.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Feature artifact drift exists inside features.json for this feature: its `expectedBehavior` still describes outdated Export modal content (masked bfprofile preview in Export Profile, 'Exported' + QR button in Export Complete), while the feature description and validation contract require the newer Paper-aligned content.",
+      "evidence": "features.json:1167-1168 vs validation-contract.md:514-516 and features.json:1159"
+    },
+    {
+      "area": "conventions",
+      "observation": "Another requirement drift: feature description says every dashboard modal has a top-right close affordance, but the Paper reference for Export Complete does not show one; implementation follows Paper and contract by using a Done-only close path.",
+      "evidence": "features.json:1159, igloo-paper/screens/dashboard/4b-export-complete/screen.html:805-829, src/screens/DashboardScreen/modals/ExportCompleteModal.tsx:34-72"
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Pass. Diff implements the missing Pending Approvals -> Policy Prompt wiring and adds high-signal fidelity coverage for all assigned VAL IDs without introducing regressions. Shared-state notes recorded for feature/contract wording drift."
+}

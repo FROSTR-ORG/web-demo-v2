@@ -1,0 +1,34 @@
+{
+  "featureId": "dashboard-settings-sidebar-fidelity",
+  "reviewedAt": "2026-04-20T01:16:54Z",
+  "commitId": "523f98d",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The commit correctly adds the Settings-only third relay, mono header typography, sidebar/scrim z-index layering, and peer trailing icons gated by sidebar state. However, it still renders a Rotate Keyset row inside the Settings sidebar, which conflicts with the contract for this feature and with the assigned requirement to keep Rotate Keyset/Recover out of the sidebar.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen/sidebar/SettingsSidebar.tsx",
+        "line": 212,
+        "severity": "blocking",
+        "description": "Settings sidebar still includes a \"Rotate Keyset\" action row/button. For this feature, the sidebar should contain Device Profile, Group Profile, Rotate Share, Export & Backup, and Profile Security content only (no Rotate Keyset/Recover rows in the sidebar)."
+      },
+      {
+        "file": "src/screens/__tests__/DashboardSettingsSidebarFidelity.test.tsx",
+        "line": 142,
+        "severity": "non_blocking",
+        "description": "VAL-DSH-010 test asserts section labels/order but does not assert absence of non-contract rows (e.g., Rotate Keyset), allowing the parity violation to pass tests."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Feature metadata is internally inconsistent about sidebar row scope, which likely contributed to retaining Rotate Keyset in the sidebar.",
+      "evidence": "features.json: description for dashboard-settings-sidebar-fidelity says NOT Rotate Keyset/Recover in sidebar, while expectedBehavior still lists Rotate Keyset and Recover rows (lines ~1123 vs ~1130 in mission features.json)."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review failed due to a blocking parity issue: Rotate Keyset is still rendered in the Settings sidebar. Other requested changes in this commit (three-relay sidebar list, mono header, peer trailing icon gating, scrim/sidebar z-index and click-outside close) are implemented."
+}

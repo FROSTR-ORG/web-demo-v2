@@ -1,0 +1,21 @@
+{
+  "featureId": "dashboard-interactions",
+  "reviewedAt": "2026-04-20T01:17:02Z",
+  "commitId": "2205070",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Reviewed commit 2205070 and found the implementation aligned with the dashboard interaction contract: Rotate Keyset wiring was added in settings, clear-credentials now hands off to Welcome no-profiles for demo-to-real transitions, and dedicated tests cover VAL-DSH-030..034 plus VAL-CROSS-008..013.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The feature metadata expects Recover navigation while settings are open, but the contract/tests validate Recover from the dashboard header. The worker followed the contract behavior but did not explicitly log this feature-metadata mismatch in discoveredIssues.",
+      "evidence": "/Users/plebdev/.factory/missions/78b31ed8-f90b-4b78-a67f-c8ed021439db/features.json:1211 and src/screens/__tests__/DashboardInteractions.test.tsx:344-350; ui-builder SKILL.md requires documenting contract-vs-feature conflicts."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Handoff, transcript skeleton, and diff were reviewed; the feature is contract-compliant with no blocking regressions identified."
+}
