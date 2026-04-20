@@ -5,7 +5,7 @@ import {
   cleanup,
   waitFor,
 } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   RotateKeysetFormScreen,
@@ -78,6 +78,13 @@ vi.mock("../../app/AppState", () => ({
 vi.mock("../../demo/demoUi", () => ({
   useDemoUi: () => mocks.demoUi,
 }));
+
+function RouteStateProbe() {
+  const location = useLocation();
+  return (
+    <output data-testid="route-state">{JSON.stringify(location.state)}</output>
+  );
+}
 
 afterEach(() => {
   cleanup();
@@ -404,6 +411,35 @@ describe("ReviewGenerateScreen", () => {
    ========================================================== */
 
 describe("RotateGenerationProgressScreen", () => {
+  /* Product guard regression: review is the route that owns the selected saved
+     profile context, so blocked redirects must carry profileId back with them. */
+  it("preserves profile route state when product progress redirects back to review", async () => {
+    mocks.demoUi = {};
+    mocks.rotateKeysetSession = {
+      phase: "sources_validated",
+      sourceProfile: { id: "prof_work", label: "Work Key" },
+      sourceShares: [],
+    };
+
+    render(
+      <MemoryRouter initialEntries={["/rotate-keyset/progress"]}>
+        <Routes>
+          <Route path="/rotate-keyset/review" element={<RouteStateProbe />} />
+          <Route
+            path="/rotate-keyset/progress"
+            element={<RotateGenerationProgressScreen />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("route-state")).toHaveTextContent(
+        '"profileId":"prof_work"',
+      );
+    });
+  });
+
   it("renders heading and 4-phase checklist", () => {
     render(
       <MemoryRouter>
@@ -675,6 +711,35 @@ describe("RotateGenerationFailedScreen", () => {
    ========================================================== */
 
 describe("RotateCreateProfileScreen", () => {
+  /* Same guard invariant as progress: a premature profile step should fall back
+     to review without losing the source profile selected for rotation. */
+  it("preserves profile route state when product profile setup redirects back to review", async () => {
+    mocks.demoUi = {};
+    mocks.rotateKeysetSession = {
+      phase: "sources_validated",
+      sourceProfile: { id: "prof_work", label: "Work Key" },
+      sourceShares: [],
+    };
+
+    render(
+      <MemoryRouter initialEntries={["/rotate-keyset/profile"]}>
+        <Routes>
+          <Route path="/rotate-keyset/review" element={<RouteStateProbe />} />
+          <Route
+            path="/rotate-keyset/profile"
+            element={<RotateCreateProfileScreen />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("route-state")).toHaveTextContent(
+        '"profileId":"prof_work"',
+      );
+    });
+  });
+
   it("renders Create Profile heading and stepper with Rotate Keyset label", () => {
     render(
       <MemoryRouter>
