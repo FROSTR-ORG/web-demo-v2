@@ -14,6 +14,7 @@ export function RunningState({
   sidebarOpen,
   onStop,
   onRefresh,
+  onOpenPolicyPrompt,
 }: {
   relays: string[];
   onlineCount: number;
@@ -24,6 +25,7 @@ export function RunningState({
   sidebarOpen?: boolean;
   onStop: () => void;
   onRefresh: () => void;
+  onOpenPolicyPrompt?: () => void;
 }) {
   return (
     <>
@@ -56,7 +58,7 @@ export function RunningState({
       {paperPanels ? (
         <>
           <EventLogPanel />
-          <PendingApprovalsPanel />
+          <PendingApprovalsPanel onOpenPolicyPrompt={onOpenPolicyPrompt} />
         </>
       ) : pendingOperations.length > 0 ? (
         <div className="panel panel-pad">

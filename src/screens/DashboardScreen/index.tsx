@@ -114,6 +114,7 @@ export function DashboardScreen() {
                 sidebarOpen={settingsOpen}
                 onStop={() => setMockState("stopped")}
                 onRefresh={refreshRuntime}
+                onOpenPolicyPrompt={() => setActiveModal("policy-prompt")}
               />
             )}
 
