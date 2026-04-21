@@ -123,3 +123,15 @@ Design system primitives (shared): `.settings-section`, `.settings-card`, `.sett
 - **Demo gallery e2e** (Playwright at `src/e2e/demo-gallery.spec.ts`): visits `/demo/:scenarioId` and checks Paper parity + no console errors
 - **Multi-device e2e** (new in this mission): two Playwright pages sharing a spawned local `bifrost-devtools relay`, each seeded with a different share of the same keyset (pattern copied from frostr-infra `chrome-pwa-pairing.spec.ts`)
 - **Manual validation** (agent-browser): 1–3 concurrent sessions, public relays, orchestrated scenarios
+
+## Runtime `pending_operations` Context Shapes (observed)
+
+`runtime_status.pending_operations[*]` carries operation-specific `context` payloads. The real runtime shape for SIGN is **nested** under a session object, not flat at the context root. Workers reading previews or classifying pending operations MUST handle the nested shape; legacy flat shapes may exist in tests but are not what bifrost-rs emits.
+
+Observed shapes (capture with `__debug.runtimeStatus()` or bifrost-devtools):
+
+- **SIGN**: `context = { session: { message_hex_32: "<64-hex>", ... } }` (nested under `session` / `SignSession`). Preview helpers must read `context?.session?.message_hex_32 ?? context?.SignSession?.message_hex_32 ?? context?.message_hex_32` (last branch is a defensive legacy fallback).
+- **ECDH**: `context = { peer_pubkey: "<hex>", ... }` — flat.
+- **PING / REFRESH_ALL**: `context` may be empty `{}` or carry `initiated_by: 'self' | 'peer'`.
+
+When the bifrost-rs payload shape is unclear, capture evidence via `__debug.runtimeStatus()` rather than guessing. Vitest coverage for any pending-operation rendering MUST include at least one case using the real nested shape — synthetic flat payloads do not prove the code works against the real runtime.
