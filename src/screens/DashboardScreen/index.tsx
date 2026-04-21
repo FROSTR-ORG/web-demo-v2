@@ -12,6 +12,7 @@ import { PolicyPromptModal } from "./modals/PolicyPromptModal";
 import { SigningFailedModal } from "./modals/SigningFailedModal";
 import { DashboardSummaryBar } from "./panels/DashboardSummaryBar";
 import { MockStateToggle } from "./panels/MockStateToggle";
+import { TestSignPanel } from "./panels/TestSignPanel";
 import { SettingsSidebar } from "./sidebar/SettingsSidebar";
 import { deriveDashboardState } from "./dashboardState";
 import { ConnectingState } from "./states/ConnectingState";
@@ -106,6 +107,16 @@ export function DashboardScreen() {
   const dashboardState = hasDemoDashboardState
     ? mockState
     : deriveDashboardState({ signerPaused, runtimeStatus, runtimeRelays });
+  // Derive the "signing blocked" gate used by the dev-only TestSign panel.
+  // Per the validation contract this is whatever the runtime surfaces as
+  // `signing_state === 'SIGNING_BLOCKED'` — we compute it from the exposed
+  // readiness fields plus paused/blocked dashboard states.
+  const signingBlocked =
+    signerPaused ||
+    !runtimeStatus.readiness.sign_ready ||
+    dashboardState === "signing-blocked" ||
+    dashboardState === "stopped" ||
+    dashboardState === "relays-offline";
   const relayRows = relayHealthRowsFromRuntime(runtimeRelays, activeProfile.relays);
   const completionMode = exportResult?.mode ?? exportMode;
   const completionPackage = exportResult?.packageText ?? mockPackageForMode(completionMode);
@@ -279,6 +290,14 @@ export function DashboardScreen() {
             )}
           </>
         )}
+
+        {/* Dev-only TestSign affordance. Gated on `import.meta.env.DEV` so
+         * `vite build` dead-code-eliminates it from the production bundle.
+         * Also hidden when Paper reference panels are active so pixel-parity
+         * demo scenarios are unaffected. */}
+        {import.meta.env.DEV && !paperPanels ? (
+          <TestSignPanel signingBlocked={signingBlocked} />
+        ) : null}
       </section>
 
       {activeModal === "policy-prompt" && (
