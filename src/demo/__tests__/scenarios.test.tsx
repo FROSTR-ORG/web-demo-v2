@@ -20,6 +20,7 @@ describe("demo scenarios", () => {
     const variants = demoScenarios.filter((scenario) => scenario.canonical === false);
     expect(canonical).toHaveLength(49);
     expect(variants.map((scenario) => scenario.id).sort()).toEqual([
+      "dashboard-peer-policy-chips",
       "import-error-corrupted",
       "onboard-failed-rejected",
       "welcome-replace-share-first",

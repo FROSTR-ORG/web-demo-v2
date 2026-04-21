@@ -269,6 +269,7 @@ describe("Cross-area final gate — every canonical scenario", () => {
     // promotions of variants to canonical.
     expect(canonical.length).toBeGreaterThanOrEqual(47);
     expect(variants.map((entry) => entry.id).sort()).toEqual([
+      "dashboard-peer-policy-chips",
       "import-error-corrupted",
       "onboard-failed-rejected",
       "welcome-replace-share-first",

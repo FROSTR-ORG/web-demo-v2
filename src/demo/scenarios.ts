@@ -258,7 +258,12 @@ export const demoScenarios: DemoScenario[] = [
   scenario("dashboard-running", "dashboard", "Dashboard - 1. Signer Dashboard", "screens/dashboard/1-signer-dashboard", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Signer Running", { demoUi: { dashboard: { state: "running", hideMockControls: true, paperPanels: true } } }),
   scenario("dashboard-connecting", "dashboard", "Dashboard - 1b. Connecting", "screens/dashboard/1b-connecting", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Signer Connecting", { demoUi: { dashboard: { state: "connecting", hideMockControls: true } } }),
   scenario("dashboard-policies", "dashboard", "Dashboard - 1b. Policies", "screens/dashboard/1b-policies", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Signer Policies", { demoUi: { dashboard: { showPolicies: true, hideMockControls: true } } }),
-  scenario("dashboard-peer-policy-chips", "dashboard", "Dashboard - 1b. Policies (runtime chips)", "screens/dashboard/1b-policies", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Peer Policies", { demoUi: { dashboard: { showPolicies: true, hideMockControls: true, paperPanels: false } } }),
+  // Runtime-only testing shim: exercises PoliciesState + PeerRow in
+  // "paperPanels=false" mode (effective_policy-driven chips and badges).
+  // Visually aligned with the canonical "dashboard-policies" screen, so
+  // it reuses that screen's paper-reference PNG rather than carrying its
+  // own — hence variantOf and canonical:false.
+  variantScenario("dashboard-peer-policy-chips", "dashboard-policies", "dashboard", "Dashboard - 1b. Policies (runtime chips)", "screens/dashboard/1b-policies", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Peer Policies", { demoUi: { dashboard: { showPolicies: true, hideMockControls: true, paperPanels: false } } }),
   scenario("dashboard-stopped", "dashboard", "Dashboard - 2. Stopped", "screens/dashboard/2-stopped", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Signer Stopped", { demoUi: { dashboard: { state: "stopped", hideMockControls: true } } }),
   scenario("dashboard-relays-offline", "dashboard", "Dashboard - 2b. All Relays Offline", "screens/dashboard/2b-all-relays-offline", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "All Relays Offline", { demoUi: { dashboard: { state: "relays-offline", hideMockControls: true } } }),
   scenario("dashboard-signing-blocked", "dashboard", "Dashboard - 2c. Signing Blocked", "screens/dashboard/2c-signing-blocked", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Signing Blocked", { demoUi: { dashboard: { state: "signing-blocked", hideMockControls: true } } }),
