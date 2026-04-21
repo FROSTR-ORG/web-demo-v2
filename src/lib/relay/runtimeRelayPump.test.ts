@@ -362,4 +362,88 @@ describe("RuntimeRelayPump", () => {
     );
     expect(synthetic).toBeTruthy();
   });
+
+  /**
+   * VAL-OPS-028 — page unload must tell each open relay socket to close
+   * with a well-formed close frame (default 1001 "going-away") so the
+   * eventual close reported post-reopen is clean, not the default 1006
+   * abnormal that the OS produces when the tab is torn down.
+   */
+  it("closeCleanly emits a clean (1001) close event for every active relay socket", async () => {
+    const runtime = new FakeRuntime();
+    const events: unknown[] = [];
+    class MiniFakeSocket {
+      readyState = 0;
+      closeCalls: Array<{ code?: number; reason?: string }> = [];
+      private openL: Array<(event: Event | MessageEvent) => void> = [];
+      private closeL: Array<(event: Event | MessageEvent) => void> = [];
+      constructor(readonly url: string) {}
+      send() {
+        /* no-op */
+      }
+      close(code?: number, reason?: string) {
+        this.closeCalls.push({ code, reason });
+        this.readyState = 3;
+      }
+      addEventListener(
+        type: "open" | "message" | "error" | "close",
+        listener: (event: Event | MessageEvent) => void,
+      ) {
+        if (type === "open") {
+          this.openL.push(listener);
+          queueMicrotask(() => {
+            this.readyState = 1;
+            listener(new Event("open"));
+          });
+        }
+        if (type === "close") {
+          this.closeL.push(listener);
+        }
+      }
+      removeEventListener() {
+        /* no-op */
+      }
+    }
+    const createdSockets: MiniFakeSocket[] = [];
+    const { BrowserRelayClient } = await import("./browserRelayClient");
+    const relayClient = new BrowserRelayClient({
+      createSocket: (url) => {
+        const socket = new MiniFakeSocket(url);
+        createdSockets.push(socket);
+        return socket;
+      },
+      onSocketEvent: (event) => events.push(event),
+    });
+    const pump = new RuntimeRelayPump({
+      runtime: runtime as never,
+      relays: ["wss://primal.test", "wss://damus.test"],
+      relayClient,
+      eventKind: 27000,
+      now: () => 42,
+    });
+    await pump.start();
+
+    pump.closeCleanly();
+
+    // Each underlying socket received socket.close(1001, 'going-away').
+    expect(
+      createdSockets
+        .map((socket) => socket.closeCalls)
+        .sort((a, b) =>
+          JSON.stringify(a).localeCompare(JSON.stringify(b)),
+        ),
+    ).toEqual([
+      [{ code: 1001, reason: "going-away" }],
+      [{ code: 1001, reason: "going-away" }],
+    ]);
+
+    const closes = events.filter(
+      (event) => (event as { type: string }).type === "close",
+    );
+    expect(closes.length).toBe(2);
+    closes.forEach((close) => {
+      expect((close as { code: number }).code).toBe(1001);
+      expect((close as { wasClean: boolean }).wasClean).toBe(true);
+    });
+  });
 });

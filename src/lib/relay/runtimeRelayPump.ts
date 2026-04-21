@@ -286,6 +286,56 @@ export class RuntimeRelayPump {
     });
   }
 
+  /**
+   * VAL-OPS-028 — close every currently-open relay socket with a
+   * well-formed close frame (default `1001 'going-away'`). Intended for
+   * `AppStateProvider`'s `beforeunload` handler so the relay observes a
+   * clean close and the persisted `__debug.relayHistory` ring buffer
+   * shows `lastCloseCode=1001 wasClean=true` after the tab reopens
+   * instead of the default 1006 abnormal-close the OS would produce
+   * otherwise.
+   *
+   * Connections that expose `closeCleanly` (the production
+   * {@link BrowserRelayConnection}) receive the full clean-close path
+   * with synthesised close event. Connections that don't (test fakes
+   * from unit tests that mock the RelayClient directly) fall back to a
+   * plain `close()` so behavior in those tests is preserved.
+   */
+  closeCleanly(
+    code: number = 1001,
+    reason: string = "going-away",
+  ): void {
+    this.connections.forEach((entry) => {
+      const connection = entry.connection;
+      entry.subscription?.close();
+      entry.subscription = null;
+      if (!connection) return;
+      entry.connection = null;
+      if (
+        "closeCleanly" in connection &&
+        typeof (connection as { closeCleanly?: unknown }).closeCleanly ===
+          "function"
+      ) {
+        try {
+          (
+            connection as unknown as {
+              closeCleanly: (c: number, r: string) => void;
+            }
+          ).closeCleanly(code, reason);
+        } catch {
+          // Fall through to a plain close if the clean-close path fails.
+          try {
+            connection.close();
+          } catch {
+            // Already closed — nothing more to do.
+          }
+        }
+      } else {
+        connection.close();
+      }
+    });
+  }
+
   private async connectOne(
     entry: RuntimeRelayConnectionState,
     filter: RelayFilter,

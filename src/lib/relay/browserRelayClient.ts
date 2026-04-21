@@ -36,7 +36,13 @@ export interface RelayClient {
 interface WebSocketLike {
   readyState: number;
   send(data: string): void;
-  close(): void;
+  /**
+   * Close the underlying socket. Optional `code`/`reason` arguments are
+   * forwarded when provided so callers can emit a well-formed WebSocket
+   * close frame (e.g. 1001 "going-away" during page unload — VAL-OPS-028).
+   * When omitted the browser defaults apply (1005 "no status rcvd").
+   */
+  close(code?: number, reason?: string): void;
   addEventListener(
     type: "open" | "message" | "error" | "close",
     listener: (event: Event | MessageEvent) => void,
@@ -83,6 +89,14 @@ export interface BrowserRelayClientOptions {
 export class BrowserRelayClient implements RelayClient {
   private readonly createSocket: (url: string) => WebSocketLike;
   private readonly onSocketEvent?: (event: RelaySocketEvent) => void;
+  /**
+   * Every BrowserRelayConnection this client has issued that has not yet
+   * been closed. Used by {@link closeCleanly} to iterate managed sockets
+   * during page unload (VAL-OPS-028). Connections remove themselves from
+   * this set on {@link BrowserRelayConnection.close} /
+   * {@link BrowserRelayConnection.closeCleanly}.
+   */
+  private readonly managedConnections = new Set<BrowserRelayConnection>();
 
   constructor(
     options?:
@@ -98,7 +112,41 @@ export class BrowserRelayClient implements RelayClient {
   }
 
   connect(url: string): RelayConnection {
-    return new BrowserRelayConnection(url, this.createSocket, this.onSocketEvent);
+    const connection = new BrowserRelayConnection(
+      url,
+      this.createSocket,
+      this.onSocketEvent,
+      (closed) => {
+        this.managedConnections.delete(closed);
+      },
+    );
+    this.managedConnections.add(connection);
+    return connection;
+  }
+
+  /**
+   * VAL-OPS-028 — cleanly close every currently-managed relay socket with
+   * a well-formed close frame (default `1001 'going-away'`). Browsers
+   * default to code 1006 (abnormal) when the OS tears down the socket
+   * AFTER `beforeunload`, so the AppStateProvider teardown path must
+   * invoke this proactively before the tab dies. Safe to call when no
+   * connections exist. Errors from individual sockets are swallowed so a
+   * single bad relay cannot block the others.
+   */
+  closeCleanly(
+    code: number = 1001,
+    reason: string = "going-away",
+  ): void {
+    // Copy to an array first: closeCleanly() mutates `managedConnections`
+    // via the onDispose callback.
+    const managed = Array.from(this.managedConnections);
+    for (const connection of managed) {
+      try {
+        connection.closeCleanly(code, reason);
+      } catch {
+        // Best-effort during unload. Continue with the remaining sockets.
+      }
+    }
   }
 }
 
@@ -124,6 +172,13 @@ class BrowserRelayConnection implements RelayConnection {
     public readonly url: string,
     private readonly createSocket: (url: string) => WebSocketLike,
     private readonly onSocketEvent?: (event: RelaySocketEvent) => void,
+    /**
+     * Invoked when this connection is definitively torn down (either via
+     * {@link close} or {@link closeCleanly}) so {@link BrowserRelayClient}
+     * can drop it from its `managedConnections` set. No-op when the owner
+     * is not a BrowserRelayClient (e.g. direct callers in tests).
+     */
+    private readonly onDispose?: (self: BrowserRelayConnection) => void,
   ) {}
 
   connect(): Promise<void> {
@@ -189,6 +244,62 @@ class BrowserRelayConnection implements RelayConnection {
     this.close();
   }
 
+  /**
+   * VAL-OPS-028 — close the underlying WebSocket with a well-formed close
+   * frame (default 1001 "going-away"). Emits a synthesized close event
+   * with `wasClean=true` so observers (e.g. the dev-only
+   * `window.__debug.relayHistory` recorder) see the clean transition
+   * *before* the browser tears the tab down; the subsequent real close
+   * event is suppressed so the ring buffer records exactly one entry per
+   * relay. Safe to call when the connection was never opened (no-op).
+   */
+  closeCleanly(
+    code: number = 1001,
+    reason: string = "going-away",
+  ): void {
+    if (!this.socket) {
+      // Never opened a socket — nothing to close, but still notify the
+      // owner so it can drop us from its managed set.
+      this.onDispose?.(this);
+      return;
+    }
+    const socket = this.socket;
+    this.suppressNextCloseReport = true;
+    this.emitSocketEvent({
+      type: "close",
+      url: this.url,
+      at: Date.now(),
+      code,
+      wasClean: true,
+    });
+    // Attempt socket.close(code, reason) to send a proper close frame.
+    // Some implementations may throw on invalid codes/reasons; fall back
+    // to an argument-less close so the socket still terminates.
+    try {
+      socket.close(code, reason);
+    } catch {
+      try {
+        socket.close();
+      } catch {
+        // Already closed — nothing more to do.
+      }
+    }
+    // Drop internal listeners/subscriptions WITHOUT calling close() again
+    // (we already closed the socket above with the clean code).
+    if (this.messageListener) {
+      socket.removeEventListener("message", this.messageListener);
+    }
+    if (this.persistentCloseListener) {
+      socket.removeEventListener("close", this.persistentCloseListener);
+    }
+    this.subscriptions.clear();
+    this.noticeListeners.clear();
+    this.socket = null;
+    this.messageListener = null;
+    this.persistentCloseListener = null;
+    this.onDispose?.(this);
+  }
+
   private attachPersistentCloseListener(socket: WebSocketLike): void {
     if (this.persistentCloseListener) {
       socket.removeEventListener("close", this.persistentCloseListener);
@@ -199,12 +310,25 @@ class BrowserRelayConnection implements RelayConnection {
         return;
       }
       const closeEvent = event as Event & { code?: number; wasClean?: boolean };
+      const code =
+        typeof closeEvent.code === "number" ? closeEvent.code : null;
+      // VAL-OPS-028: codes 1000 ("normal"), 1001 ("going-away"), and
+      // 1002 ("protocol error", still a structured close) represent a
+      // cooperative shutdown and must surface as `wasClean=true` in
+      // telemetry even when the browser-native CloseEvent.wasClean flag
+      // is false (it can lag for 1001 on tab unload). Any other code
+      // (1006 abnormal, 1011 server error, etc.) keeps wasClean=false
+      // so VAL-OPS-016's abnormal-drop expectations continue to hold.
+      const wasClean =
+        code !== null
+          ? code >= 1000 && code <= 1002
+          : Boolean(closeEvent.wasClean);
       this.emitSocketEvent({
         type: "close",
         url: this.url,
         at: Date.now(),
-        code: typeof closeEvent.code === "number" ? closeEvent.code : null,
-        wasClean: Boolean(closeEvent.wasClean),
+        code,
+        wasClean,
       });
     };
     this.persistentCloseListener = listener;
@@ -265,6 +389,7 @@ class BrowserRelayConnection implements RelayConnection {
     this.socket = null;
     this.messageListener = null;
     this.persistentCloseListener = null;
+    this.onDispose?.(this);
   }
 
   private requireOpenSocket(): WebSocketLike {

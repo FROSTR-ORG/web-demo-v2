@@ -2218,6 +2218,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     // closed tab emitted. The helper is DEV-gated so this flush is a
     // no-op in production bundles.
     function onBeforeUnload() {
+      // VAL-OPS-028: send a clean WebSocket close frame (1001 "going-away")
+      // on every active relay socket BEFORE anything else. Browsers
+      // default to code 1006 (abnormal) when the OS tears down sockets
+      // after `beforeunload` returns, so we must proactively emit the
+      // close here so the subsequently-persisted `__debug.relayHistory`
+      // ring buffer records `lastCloseCode=1001 wasClean=true` (rather
+      // than 1006) for the validator to observe after tab reopen.
+      try {
+        relayPumpRef.current?.closeCleanly();
+      } catch {
+        // best-effort cleanup during teardown
+      }
       try {
         relayPumpRef.current?.stop();
       } catch {
