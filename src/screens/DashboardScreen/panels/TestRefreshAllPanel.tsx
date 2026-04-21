@@ -21,15 +21,25 @@ import { useAppState } from "../../../app/AppState";
  */
 export function TestRefreshAllPanel({
   refreshBlocked,
+  refreshBlockedReason = null,
 }: {
   /**
    * When true, the Refresh All button is force-disabled and a status hint
-   * is rendered. Derived by the caller from `runtime_status.readiness`
-   * plus signer-paused / stopped / relays-offline dashboard states — a
-   * broadcast refresh cannot travel the wire while the runtime is
-   * unavailable.
+   * is rendered. Mirrors the PeersPanel "Refresh peers" icon contract:
+   * disabled only when the runtime is truly unavailable (paused or
+   * stopped) — `connecting`, `relays-offline`, and `signing-blocked`
+   * states all keep it live because a broadcast ping is exactly what the
+   * user reaches for to kick the pump in those states.
    */
   refreshBlocked: boolean;
+  /**
+   * Human-readable reason surfaced alongside the disabled button so the
+   * user (and VAL-OPS-025 validator) sees *why* the control is off — per
+   * feature `fix-m1-test-ping-and-refresh-all-enablement` requirement
+   * "When signerPaused=true, both buttons are disabled with an
+   * accessible reason". When null, a neutral fallback copy is shown.
+   */
+  refreshBlockedReason?: string | null;
 }) {
   const { handleRuntimeCommand, refreshRuntime } = useAppState();
   const [dispatching, setDispatching] = useState(false);
@@ -89,8 +99,13 @@ export function TestRefreshAllPanel({
             {dispatching ? "Refreshing…" : "Refresh All"}
           </button>
           {refreshBlocked ? (
-            <span className="help" role="status">
-              Refresh All unavailable — runtime not ready.
+            <span
+              className="help"
+              role="status"
+              data-testid="test-refresh-all-blocked-reason"
+            >
+              {refreshBlockedReason ??
+                "Refresh All unavailable — runtime not ready."}
             </span>
           ) : null}
         </div>

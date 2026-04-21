@@ -439,16 +439,26 @@ export function DashboardScreen() {
     !runtimeStatus.readiness.ecdh_ready ||
     dashboardState === "stopped" ||
     dashboardState === "relays-offline";
-  // Ping / refresh_all_peers require only that the runtime is alive on the
-  // wire — they don't need quorum or ECDH peers. Gate on the paused state
-  // plus the broader not-running dashboard states so the dev-only Ping /
-  // Refresh All buttons never dispatch into a dead runtime.
-  const pingBlocked =
-    signerPaused ||
-    !runtimeStatus.readiness.runtime_ready ||
-    dashboardState === "stopped" ||
-    dashboardState === "relays-offline" ||
-    dashboardState === "connecting";
+  // Ping / refresh_all_peers are thin wire-probes: they don't need
+  // quorum, ECDH peers, or even every relay to be `online`. A single
+  // relay in `connecting` is enough to carry the ping once the socket
+  // upgrades, and refresh_all_peers is exactly what users reach for in
+  // `relays-offline` / `connecting` / `signing-blocked` to force the
+  // pump. The PeersPanel header "Refresh peers" icon has always been
+  // unconditionally clickable — the keyboard-first Test Ping / Test
+  // Refresh All siblings mirror that contract, blocked ONLY when the
+  // runtime is truly unavailable (paused or stopped). A future
+  // `readiness.ping_ready` field (currently absent from
+  // `RuntimeReadiness`) would plug in here via `=== false`, but the
+  // bridge does not expose such a flag today, so we only react to
+  // paused/stopped signals that definitively prove no wire is alive.
+  // See VAL-OPS-025 + feature fix-m1-test-ping-and-refresh-all-enablement.
+  const pingBlocked = signerPaused || dashboardState === "stopped";
+  const pingBlockedReason: string | null = signerPaused
+    ? "Signer paused — resume to ping peers."
+    : dashboardState === "stopped"
+      ? "Runtime stopped — start the signer to ping peers."
+      : null;
   const relayRows = relayHealthRowsFromRuntime(runtimeRelays, activeProfile.relays);
   const completionMode = exportResult?.mode ?? exportMode;
   const completionPackage = exportResult?.packageText ?? mockPackageForMode(completionMode);
@@ -659,8 +669,14 @@ export function DashboardScreen() {
              * Refresh All) within <=10 tab-stops. Wired through
              * `handleRuntimeCommand` so Enter/Space/click dispatch go
              * through the same code path as a pointer click. */}
-            <TestPingPanel pingBlocked={pingBlocked} />
-            <TestRefreshAllPanel refreshBlocked={pingBlocked} />
+            <TestPingPanel
+              pingBlocked={pingBlocked}
+              pingBlockedReason={pingBlockedReason}
+            />
+            <TestRefreshAllPanel
+              refreshBlocked={pingBlocked}
+              refreshBlockedReason={pingBlockedReason}
+            />
             {/* Recent Sign Activity — surfaces the runtime lifecycle of
              * every dispatched sign / ECDH / ping so validators and users
              * observe the dispatched -> pending -> completed|failed

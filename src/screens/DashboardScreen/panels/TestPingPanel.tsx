@@ -32,15 +32,25 @@ const HEX_RE = /^[0-9a-fA-F]{64}$/;
  */
 export function TestPingPanel({
   pingBlocked,
+  pingBlockedReason = null,
 }: {
   /**
    * When true, the submit button is force-disabled and a status hint is
    * rendered even if the input is valid. Derived by the caller from
-   * `runtime_status.readiness.runtime_ready` plus signer-paused / stopped
-   * / relays-offline dashboard states — a ping cannot round-trip while the
-   * wire is down.
+   * signer-paused / stopped dashboard states — a ping can still round-
+   * trip while the wire is in `connecting` / `relays-offline` /
+   * `signing-blocked`, mirroring the PeersPanel "Refresh peers" icon
+   * which is unconditionally clickable.
    */
   pingBlocked: boolean;
+  /**
+   * Human-readable reason surfaced alongside the disabled button so the
+   * user (and VAL-OPS-025 validator) sees *why* the control is off — per
+   * feature `fix-m1-test-ping-and-refresh-all-enablement` requirement
+   * "When signerPaused=true, both buttons are disabled with an
+   * accessible reason". When null, a neutral fallback copy is shown.
+   */
+  pingBlockedReason?: string | null;
 }) {
   const { handleRuntimeCommand } = useAppState();
   const inputId = useId();
@@ -141,8 +151,12 @@ export function TestPingPanel({
             {dispatching ? "Pinging…" : "Ping"}
           </button>
           {pingBlocked ? (
-            <span className="help" role="status">
-              Ping unavailable — runtime not ready.
+            <span
+              className="help"
+              role="status"
+              data-testid="test-ping-blocked-reason"
+            >
+              {pingBlockedReason ?? "Ping unavailable — runtime not ready."}
             </span>
           ) : null}
         </div>
