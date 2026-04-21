@@ -1,16 +1,20 @@
 import type {
   BfOnboardPayload,
   BfProfilePayload,
+  CompletedOperation,
   KeysetBundle,
   OnboardingPackageView,
   OnboardingResponse,
+  OperationFailure,
   RecoveredNsecResult,
   RotateKeysetBundleResult,
+  RuntimeEvent,
   RuntimeSnapshotInput,
   RuntimeStatusSummary,
   SharePackageWire,
   StoredProfileSummary,
 } from "../lib/bifrost/types";
+import type { RuntimeCommand } from "../lib/bifrost/runtimeClient";
 import type { RuntimeRelayStatus } from "../lib/relay/runtimeRelayPump";
 import type { RuntimeExportPackages } from "./runtimeExports";
 
@@ -168,6 +172,19 @@ export class SetupFlowError extends Error {
   }
 }
 
+/**
+ * Return value of {@link AppStateValue.handleRuntimeCommand}. When the
+ * dispatched command produces a new entry in `runtime_status.pending_operations`
+ * (sign / ecdh / ping / onboard), the correlating `request_id` captured from
+ * that snapshot is returned here. For commands that never register a pending
+ * op (e.g. `refresh_all_peers`) or for dedup'd rapid-fire duplicates, the
+ * `requestId` is `null` and `debounced` is `true`.
+ */
+export interface HandleRuntimeCommandResult {
+  requestId: string | null;
+  debounced: boolean;
+}
+
 export interface AppStateValue {
   profiles: StoredProfileSummary[];
   activeProfile: StoredProfileSummary | null;
@@ -180,6 +197,24 @@ export interface AppStateValue {
   rotateKeysetSession: RotateKeysetSession | null;
   replaceShareSession: ReplaceShareSession | null;
   recoverSession: RecoverSession | null;
+  /**
+   * Successful operation completions drained from the runtime, ordered by
+   * ascending `request_id`. Populated each refresh tick by AppStateProvider
+   * reading `RuntimeClient.drainCompletions()`.
+   */
+  runtimeCompletions: CompletedOperation[];
+  /**
+   * Operation failures drained from the runtime, ordered by ascending
+   * `request_id`. Populated each refresh tick by AppStateProvider reading
+   * `RuntimeClient.drainFailures()`.
+   */
+  runtimeFailures: OperationFailure[];
+  /**
+   * Lifecycle events drained from the runtime via
+   * `RuntimeClient.drainRuntimeEvents()`. Not consumed by UI in this feature
+   * (reserved for M4 event log). Order matches drain order (insertion).
+   */
+  lifecycleEvents: RuntimeEvent[];
   reloadProfiles: () => Promise<void>;
   createKeyset: (draft: CreateKeysetDraft) => Promise<void>;
   createProfile: (draft: CreateProfileDraft) => Promise<string>;
@@ -252,6 +287,25 @@ export interface AppStateValue {
   setSignerPaused: (paused: boolean) => void;
   refreshRuntime: () => void;
   restartRuntimeConnections: () => Promise<void>;
+  /**
+   * Dispatches a runtime command to the underlying
+   * `RuntimeClient.handleCommand`. The call is synchronous on the bridge but
+   * the captured `request_id` is read from the *next* `pending_operations`
+   * snapshot, so callers must await the returned promise.
+   *
+   * Identical command dispatches arriving within a short debounce window
+   * (<=300ms) are coalesced — the returned `debounced: true` indicates the
+   * underlying command was NOT forwarded to the runtime a second time.
+   */
+  handleRuntimeCommand: (
+    cmd: RuntimeCommand,
+  ) => Promise<HandleRuntimeCommandResult>;
 }
 
 export type { RuntimeExportPackages, RuntimeExportMetadata } from "./runtimeExports";
+export type {
+  CompletedOperation,
+  OperationFailure,
+  RuntimeEvent,
+} from "../lib/bifrost/types";
+export type { RuntimeCommand } from "../lib/bifrost/runtimeClient";

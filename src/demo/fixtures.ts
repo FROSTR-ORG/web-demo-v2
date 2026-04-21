@@ -328,7 +328,52 @@ export function createDemoAppState(
     setSignerPaused: () => undefined,
     refreshRuntime: () => undefined,
     restartRuntimeConnections: async () => undefined,
+    runtimeCompletions: [],
+    runtimeFailures: [],
+    lifecycleEvents: [],
+    handleRuntimeCommand: createMockHandleRuntimeCommand(),
   };
 
   return { ...state, ...overrides };
+}
+
+/**
+ * Per-instance mock implementation of `handleRuntimeCommand`. Emits
+ * monotonically-increasing `mock-request-N` ids and honours a 300ms debounce
+ * window so tests can assert the rapid-fire contract (VAL-OPS-019) without
+ * booting a WASM runtime. Each call to `createMockHandleRuntimeCommand`
+ * returns a fresh closure with isolated counter state.
+ */
+function createMockHandleRuntimeCommand(): AppStateValue["handleRuntimeCommand"] {
+  let seq = 0;
+  let lastDispatch: { key: string; at: number } | null = null;
+  return async (cmd) => {
+    const key = serializeCommand(cmd);
+    const now = Date.now();
+    if (lastDispatch && lastDispatch.key === key && now - lastDispatch.at < 300) {
+      return { requestId: null, debounced: true };
+    }
+    lastDispatch = { key, at: now };
+    seq += 1;
+    return { requestId: `mock-request-${seq}`, debounced: false };
+  };
+}
+
+function serializeCommand(
+  cmd: Parameters<AppStateValue["handleRuntimeCommand"]>[0],
+): string {
+  switch (cmd.type) {
+    case "sign":
+      return `sign:${cmd.message_hex_32}`;
+    case "ecdh":
+      return `ecdh:${cmd.pubkey32_hex}`;
+    case "ping":
+      return `ping:${cmd.peer_pubkey32_hex}`;
+    case "refresh_peer":
+      return `refresh_peer:${cmd.peer_pubkey32_hex}`;
+    case "refresh_all_peers":
+      return "refresh_all_peers";
+    case "onboard":
+      return `onboard:${cmd.peer_pubkey32_hex}`;
+  }
 }

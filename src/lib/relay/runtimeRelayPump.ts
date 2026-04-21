@@ -1,6 +1,11 @@
 import { defaultBifrostEventKind } from "../bifrost/packageService";
 import { RuntimeClient } from "../bifrost/runtimeClient";
-import type { RuntimeStatusSummary } from "../bifrost/types";
+import type {
+  CompletedOperation,
+  OperationFailure,
+  RuntimeEvent,
+  RuntimeStatusSummary,
+} from "../bifrost/types";
 import { BrowserRelayClient, type RelayClient, type RelayConnection } from "./browserRelayClient";
 import type { RelayFilter, RelaySubscription } from "./relayPort";
 
@@ -13,6 +18,12 @@ export interface RuntimeRelayStatus {
   lastError?: string;
 }
 
+export interface RuntimeDrainBatch {
+  completions: CompletedOperation[];
+  failures: OperationFailure[];
+  events: RuntimeEvent[];
+}
+
 interface RuntimeRelayPumpOptions {
   runtime: RuntimeClient;
   relays: string[];
@@ -21,6 +32,13 @@ interface RuntimeRelayPumpOptions {
   connectTimeoutMs?: number;
   now?: () => number;
   onRelayStatusChange?: (statuses: RuntimeRelayStatus[]) => void;
+  /**
+   * Invoked after every pump tick with the batch of drained completions,
+   * failures, and lifecycle runtime events. Callers should not mutate the
+   * arrays; the pump reuses new arrays on each invocation. Never called with
+   * results that were produced before `start()`.
+   */
+  onDrains?: (drains: RuntimeDrainBatch) => void;
 }
 
 interface RuntimeRelayConnectionState {
@@ -43,6 +61,7 @@ export class RuntimeRelayPump {
   private readonly connectTimeoutMs: number;
   private readonly now: () => number;
   private readonly onRelayStatusChange?: (statuses: RuntimeRelayStatus[]) => void;
+  private readonly onDrains?: (drains: RuntimeDrainBatch) => void;
   private readonly connections: RuntimeRelayConnectionState[];
   private relayStatusesValue: RuntimeRelayStatus[];
   private stopped = true;
@@ -55,6 +74,7 @@ export class RuntimeRelayPump {
     this.connectTimeoutMs = options.connectTimeoutMs ?? 8_000;
     this.now = options.now ?? (() => Date.now());
     this.onRelayStatusChange = options.onRelayStatusChange;
+    this.onDrains = options.onDrains;
     this.connections = relays.map((url) => ({
       url,
       connection: null,
@@ -114,9 +134,19 @@ export class RuntimeRelayPump {
     if (!this.stopped) {
       await this.publishOutboundEvents();
     }
-    this.runtime.drainCompletions();
-    this.runtime.drainFailures();
-    this.runtime.drainRuntimeEvents();
+    const completions = this.runtime.drainCompletions();
+    const failures = this.runtime.drainFailures();
+    const events = this.runtime.drainRuntimeEvents();
+    if (
+      this.onDrains &&
+      (completions.length > 0 || failures.length > 0 || events.length > 0)
+    ) {
+      try {
+        this.onDrains({ completions, failures, events });
+      } catch {
+        // Callback must not break pumping. Swallow and continue.
+      }
+    }
     return this.runtime.runtimeStatus();
   }
 

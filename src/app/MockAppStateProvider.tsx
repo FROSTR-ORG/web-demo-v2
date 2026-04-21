@@ -18,6 +18,7 @@ import type {
   ImportProfileDraft,
   OnboardingPackageStatePatch,
   ProfileDraft,
+  RuntimeCommand,
 } from "./AppStateTypes";
 
 export function MockAppStateProvider({
@@ -57,6 +58,15 @@ export function MockAppStateProvider({
     value.replaceShareSession,
   );
   const [recoverSession, setRecoverSession] = useState(value.recoverSession);
+  const [runtimeCompletions, setRuntimeCompletions] = useState(
+    value.runtimeCompletions ?? [],
+  );
+  const [runtimeFailures, setRuntimeFailures] = useState(
+    value.runtimeFailures ?? [],
+  );
+  const [lifecycleEvents, setLifecycleEvents] = useState(
+    value.lifecycleEvents ?? [],
+  );
 
   const createKeyset = useCallback(
     async (draft: CreateKeysetDraft) => {
@@ -353,6 +363,9 @@ export function MockAppStateProvider({
     setRotateKeysetSession(null);
     setReplaceShareSession(null);
     setRecoverSession(null);
+    setRuntimeCompletions([]);
+    setRuntimeFailures([]);
+    setLifecycleEvents([]);
   }, [value]);
 
   const clearCredentials = useCallback(async () => {
@@ -368,6 +381,9 @@ export function MockAppStateProvider({
     setRotateKeysetSession(null);
     setReplaceShareSession(null);
     setRecoverSession(null);
+    setRuntimeCompletions([]);
+    setRuntimeFailures([]);
+    setLifecycleEvents([]);
   }, [value]);
 
   const setSignerPaused = useCallback(
@@ -395,6 +411,18 @@ export function MockAppStateProvider({
     [value],
   );
 
+  /**
+   * Delegates to the seed's `handleRuntimeCommand`. The default fixture
+   * (`createDemoAppState`) supplies a stateful mock that generates fresh
+   * `mock-request-N` ids and honours the 300ms debounce contract. Tests
+   * that want to intercept the dispatch can override by passing their own
+   * function as `value.handleRuntimeCommand`.
+   */
+  const handleRuntimeCommand: AppStateValue["handleRuntimeCommand"] =
+    useCallback((cmd: RuntimeCommand) => value.handleRuntimeCommand(cmd), [
+      value,
+    ]);
+
   const stateful = useMemo<AppStateValue>(
     () => ({
       ...value,
@@ -409,6 +437,10 @@ export function MockAppStateProvider({
       rotateKeysetSession,
       replaceShareSession,
       recoverSession,
+      runtimeCompletions,
+      runtimeFailures,
+      lifecycleEvents,
+      handleRuntimeCommand,
       createKeyset,
       createProfile,
       updatePackageState,
@@ -456,6 +488,10 @@ export function MockAppStateProvider({
       rotateKeysetSession,
       replaceShareSession,
       recoverSession,
+      runtimeCompletions,
+      runtimeFailures,
+      lifecycleEvents,
+      handleRuntimeCommand,
       createKeyset,
       createProfile,
       updatePackageState,
@@ -503,3 +539,5 @@ export function MockAppStateProvider({
     </AppStateContext.Provider>
   );
 }
+
+

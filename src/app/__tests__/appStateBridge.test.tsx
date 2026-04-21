@@ -596,6 +596,10 @@ describe("MockAppStateProvider bridge arming", () => {
     setSignerPaused: () => undefined,
     refreshRuntime: () => undefined,
     restartRuntimeConnections: async () => undefined,
+    runtimeCompletions: [],
+    runtimeFailures: [],
+    lifecycleEvents: [],
+    handleRuntimeCommand: async () => ({ requestId: null, debounced: false }),
   };
 
   it("writes a snapshot of its value to sessionStorage on mount", async () => {

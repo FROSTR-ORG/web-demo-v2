@@ -26,15 +26,19 @@ import {
   resolveShareIndex,
   rotateKeysetBundle,
 } from "../lib/bifrost/packageService";
-import { RuntimeClient } from "../lib/bifrost/runtimeClient";
+import { RuntimeClient, type RuntimeCommand } from "../lib/bifrost/runtimeClient";
 import type {
   BfProfilePayload,
+  CompletedOperation,
+  OperationFailure,
+  RuntimeEvent,
   RuntimeSnapshotInput,
   RuntimeStatusSummary,
   StoredProfileSummary,
 } from "../lib/bifrost/types";
 import {
   RuntimeRelayPump,
+  type RuntimeDrainBatch,
   type RuntimeRelayStatus,
 } from "../lib/relay/runtimeRelayPump";
 import {
@@ -79,6 +83,7 @@ import type {
   CreateKeysetDraft,
   CreateProfileDraft,
   CreateSession,
+  HandleRuntimeCommandResult,
   ImportProfileDraft,
   ImportSession,
   OnboardingPackageStatePatch,
@@ -114,11 +119,24 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [recoverSession, setRecoverSession] = useState<RecoverSession | null>(
     null,
   );
+  const [runtimeCompletions, setRuntimeCompletions] = useState<
+    CompletedOperation[]
+  >([]);
+  const [runtimeFailures, setRuntimeFailures] = useState<OperationFailure[]>(
+    [],
+  );
+  const [lifecycleEvents, setLifecycleEvents] = useState<RuntimeEvent[]>([]);
   const [bridgeHydrated, setBridgeHydrated] = useState(false);
   const runtimeRef = useRef<RuntimeClient | null>(null);
   const simulatorRef = useRef<LocalRuntimeSimulator | null>(null);
   const relayPumpRef = useRef<RuntimeRelayPump | null>(null);
   const liveRelayUrlsRef = useRef<string[]>([]);
+  /**
+   * Serialised shape of the most-recent command dispatched via
+   * `handleRuntimeCommand`. Used to debounce rapid-fire identical dispatches
+   * (e.g. double-clicked buttons) — see VAL-OPS-019 for the contract.
+   */
+  const lastDispatchRef = useRef<{ key: string; at: number } | null>(null);
   const onboardHandshakeRef = useRef<{
     id: number;
     controller: AbortController;
@@ -178,6 +196,45 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * Merge a drained batch into the accumulated completions / failures /
+   * lifecycle-events slices. Completions and failures are kept sorted by
+   * ascending `request_id` (stable string compare) per the feature contract.
+   * Callers correlate to originating `pending_operations` entries via the
+   * same `request_id`.
+   *
+   * `completion.request_id` lives inside the discriminated CompletedOperation
+   * union; we extract it defensively.
+   */
+  const absorbDrains = useCallback((drains: RuntimeDrainBatch) => {
+    if (drains.completions.length > 0) {
+      setRuntimeCompletions((previous) => {
+        const merged = [...previous, ...drains.completions];
+        merged.sort((a, b) =>
+          completionRequestId(a).localeCompare(completionRequestId(b)),
+        );
+        return merged;
+      });
+    }
+    if (drains.failures.length > 0) {
+      setRuntimeFailures((previous) => {
+        const merged = [...previous, ...drains.failures];
+        merged.sort((a, b) => a.request_id.localeCompare(b.request_id));
+        return merged;
+      });
+    }
+    if (drains.events.length > 0) {
+      setLifecycleEvents((previous) => [...previous, ...drains.events]);
+    }
+  }, []);
+
+  const resetDrainSlices = useCallback(() => {
+    setRuntimeCompletions([]);
+    setRuntimeFailures([]);
+    setLifecycleEvents([]);
+    lastDispatchRef.current = null;
+  }, []);
+
   const startLiveRelayPump = useCallback(
     async (runtime: RuntimeClient, relayUrls: string[]) => {
       const relays = Array.from(
@@ -185,6 +242,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       );
       liveRelayUrlsRef.current = relays;
       stopRelayPump(false);
+      resetDrainSlices();
       if (relays.length === 0) {
         setRuntimeRelays([]);
         return runtime.runtimeStatus();
@@ -194,6 +252,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         runtime,
         relays,
         onRelayStatusChange: setRuntimeRelays,
+        onDrains: absorbDrains,
       });
       relayPumpRef.current = pump;
       setRuntimeRelays(pump.relayStatuses());
@@ -203,7 +262,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       return status;
     },
-    [stopRelayPump],
+    [absorbDrains, resetDrainSlices, stopRelayPump],
   );
 
   const setRuntime = useCallback(
@@ -214,6 +273,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     ) => {
       if (simulatorRef.current && simulatorRef.current !== simulator) {
         simulatorRef.current.stop();
+        simulatorRef.current.setOnDrains(undefined);
       }
       if (!relayUrls?.length) {
         liveRelayUrlsRef.current = [];
@@ -221,6 +281,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       runtimeRef.current = runtime;
       simulatorRef.current = simulator ?? null;
+      if (simulator) {
+        simulator.setOnDrains(absorbDrains);
+      }
+      resetDrainSlices();
       setRuntimeStatus(runtime.runtimeStatus());
       if (relayUrls?.length && !simulator) {
         void startLiveRelayPump(runtime, relayUrls).catch((error) => {
@@ -243,7 +307,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // runtime is now backing `runtimeRef`.
       setBridgeHydrated(false);
     },
-    [startLiveRelayPump, stopRelayPump],
+    [absorbDrains, resetDrainSlices, startLiveRelayPump, stopRelayPump],
   );
 
   const startRuntimeFromPayload = useCallback(
@@ -1333,6 +1397,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     liveRelayUrlsRef.current = [];
     stopRelayPump();
     simulatorRef.current?.stop();
+    simulatorRef.current?.setOnDrains(undefined);
     simulatorRef.current = null;
     setRuntimeStatus(null);
     setActiveProfile(null);
@@ -1343,7 +1408,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setRotateKeysetSession(null);
     setReplaceShareSession(null);
     setRecoverSession(null);
-  }, [abortOnboardHandshake, stopRelayPump]);
+    resetDrainSlices();
+  }, [abortOnboardHandshake, resetDrainSlices, stopRelayPump]);
 
   const clearCredentials = useCallback(async () => {
     abortOnboardHandshake();
@@ -1352,6 +1418,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     liveRelayUrlsRef.current = [];
     stopRelayPump();
     simulatorRef.current?.stop();
+    simulatorRef.current?.setOnDrains(undefined);
     simulatorRef.current = null;
     setRuntimeStatus(null);
     setActiveProfile(null);
@@ -1362,11 +1429,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setRotateKeysetSession(null);
     setReplaceShareSession(null);
     setRecoverSession(null);
+    resetDrainSlices();
     if (id) {
       await removeProfile(id);
     }
     await reloadProfiles();
-  }, [abortOnboardHandshake, activeProfile, reloadProfiles, stopRelayPump]);
+  }, [
+    abortOnboardHandshake,
+    activeProfile,
+    reloadProfiles,
+    resetDrainSlices,
+    stopRelayPump,
+  ]);
 
   const exportRuntimePackages = useCallback(
     async (password: string) => {
@@ -1457,6 +1531,88 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, [restartRuntimeConnections, stopRelayPump]);
 
+  /**
+   * Forward a runtime command (sign / ecdh / ping / refresh / onboard) to the
+   * underlying WASM runtime and return the generated `request_id` captured
+   * from the next `pending_operations` snapshot.
+   *
+   * Debounce contract: identical commands (by serialised payload) dispatched
+   * within {@link HANDLE_COMMAND_DEBOUNCE_WINDOW_MS} of the previous
+   * dispatch are coalesced. The returned `debounced` flag tells the caller
+   * whether the underlying runtime received the command this call — this is
+   * deterministic and safe to assert in tests (VAL-OPS-019).
+   *
+   * No plaintext command payload is logged to console; the only visible
+   * error paths surface `BifrostError` objects the runtime itself produced.
+   */
+  const handleRuntimeCommand = useCallback(
+    async (cmd: RuntimeCommand): Promise<HandleRuntimeCommandResult> => {
+      const runtime = runtimeRef.current;
+      if (!runtime) {
+        throw new Error(
+          "Cannot dispatch runtime command: no runtime is active.",
+        );
+      }
+      const key = commandKey(cmd);
+      const now = Date.now();
+      const previous = lastDispatchRef.current;
+      if (
+        previous &&
+        previous.key === key &&
+        now - previous.at < HANDLE_COMMAND_DEBOUNCE_MS
+      ) {
+        return { requestId: null, debounced: true };
+      }
+      lastDispatchRef.current = { key, at: now };
+
+      const before = new Set<string>();
+      const expectedType = pendingOpTypeFor(cmd);
+      try {
+        const statusBefore = runtime.runtimeStatus();
+        for (const op of statusBefore.pending_operations) {
+          before.add(op.request_id);
+        }
+      } catch {
+        // If the runtime can't produce a status snapshot before dispatch we
+        // still forward the command. Callers lose the request_id correlation
+        // for this call but the operation itself is unaffected.
+      }
+
+      runtime.handleCommand(cmd);
+
+      if (expectedType === null) {
+        // refresh_all_peers fans out to pings internally; no single pending
+        // op represents the command's request_id.
+        return { requestId: null, debounced: false };
+      }
+
+      // The runtime queues the command on `handleCommand` but does not update
+      // `pending_operations` until the next tick processes the queue. Drive
+      // one immediately so the captured request_id is visible to this call.
+      try {
+        runtime.tick(now);
+      } catch {
+        // tick failure is surfaced through the status snapshot below.
+      }
+
+      let requestId: string | null = null;
+      try {
+        const statusAfter = runtime.runtimeStatus();
+        for (const op of statusAfter.pending_operations) {
+          if (op.op_type === expectedType && !before.has(op.request_id)) {
+            requestId = op.request_id;
+            break;
+          }
+        }
+        setRuntimeStatus(statusAfter);
+      } catch {
+        requestId = null;
+      }
+      return { requestId, debounced: false };
+    },
+    [],
+  );
+
   const refreshRuntime = useCallback(() => {
     const runtime = runtimeRef.current;
     if (!runtime) {
@@ -1472,6 +1628,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (!signerPaused && relayPumpRef.current) {
+      // refreshAll() fans out refresh_all_peers then calls pump() internally;
+      // pump() is what invokes our onDrains callback, so completions and
+      // failures will flow into the slices on this tick.
       void relayPumpRef.current.refreshAll().then((status) => {
         if (runtimeRef.current === runtime) {
           setRuntimeStatus(status);
@@ -1479,9 +1638,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       });
       return;
     }
+    // Fallback (no relay pump, no simulator): tick the runtime directly and
+    // drain completions/failures/events ourselves so the AppState slices stay
+    // synchronised even in unit-test scenarios that skip the pump.
     runtime.tick(Date.now());
+    const drains: RuntimeDrainBatch = {
+      completions: runtime.drainCompletions(),
+      failures: runtime.drainFailures(),
+      events: runtime.drainRuntimeEvents(),
+    };
+    absorbDrains(drains);
     setRuntimeStatus(runtime.runtimeStatus());
-  }, [signerPaused]);
+  }, [absorbDrains, signerPaused]);
 
   useEffect(() => {
     // When the provider was hydrated from the demo bridge there is no real
@@ -1498,6 +1666,46 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(timer);
   }, [refreshRuntime, bridgeHydrated]);
 
+  useEffect(() => {
+    // VAL-OPS-021: re-show of a hidden tab must deliver any pending
+    // completions that accumulated while hidden (within 3s of visible). When
+    // the browser re-fires visibilitychange with `visible`, force an extra
+    // refresh tick so any drained completions immediately populate state.
+    function onVisibility() {
+      if (typeof document === "undefined") return;
+      if (document.visibilityState === "visible" && runtimeRef.current) {
+        refreshRuntime();
+      }
+    }
+    if (typeof document === "undefined") return;
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [refreshRuntime]);
+
+  useEffect(() => {
+    // VAL-OPS-028: window-close during an in-flight op must leave no ghost
+    // pending op in IndexedDB. pending_operations is held in runtime memory
+    // (never persisted), but we still tear down pumps and simulator so the
+    // relay sockets are closed cleanly (code 1000/1001). On next mount the
+    // runtime is re-initialised from the stored encrypted profile with an
+    // empty pending_operations set, regardless of what was in-flight here.
+    function onBeforeUnload() {
+      try {
+        relayPumpRef.current?.stop();
+      } catch {
+        // best-effort cleanup during teardown
+      }
+      try {
+        simulatorRef.current?.stop();
+      } catch {
+        // best-effort cleanup during teardown
+      }
+    }
+    if (typeof window === "undefined") return;
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
+
   const value = useMemo<AppStateValue>(
     () => ({
       profiles,
@@ -1511,7 +1719,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       rotateKeysetSession,
       replaceShareSession,
       recoverSession,
+      runtimeCompletions,
+      runtimeFailures,
+      lifecycleEvents,
       reloadProfiles,
+      handleRuntimeCommand,
       createKeyset,
       createProfile,
       updatePackageState,
@@ -1560,7 +1772,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       rotateKeysetSession,
       replaceShareSession,
       recoverSession,
+      runtimeCompletions,
+      runtimeFailures,
+      lifecycleEvents,
       reloadProfiles,
+      handleRuntimeCommand,
       createKeyset,
       createProfile,
       updatePackageState,
@@ -1605,3 +1821,65 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     </AppStateContext.Provider>
   );
 }
+
+/**
+ * Extracts the `request_id` field from a {@link CompletedOperation} regardless
+ * of which variant it is. All variants (Sign/Ecdh/Ping/Onboard) carry an
+ * interior `request_id` string on their single payload key.
+ */
+function completionRequestId(completion: CompletedOperation): string {
+  const payload =
+    (completion as { Sign?: { request_id: string } }).Sign ??
+    (completion as { Ecdh?: { request_id: string } }).Ecdh ??
+    (completion as { Ping?: { request_id: string } }).Ping ??
+    (completion as { Onboard?: { request_id: string } }).Onboard;
+  return payload?.request_id ?? "";
+}
+
+/**
+ * Serialise a RuntimeCommand into a deterministic string suitable for
+ * identity comparison across dispatch calls. Two semantically-identical
+ * commands (same verb + payload) must produce the same string so that the
+ * debounce window can coalesce them.
+ */
+function commandKey(cmd: RuntimeCommand): string {
+  switch (cmd.type) {
+    case "sign":
+      return `sign:${cmd.message_hex_32}`;
+    case "ecdh":
+      return `ecdh:${cmd.pubkey32_hex}`;
+    case "ping":
+      return `ping:${cmd.peer_pubkey32_hex}`;
+    case "refresh_peer":
+      return `refresh_peer:${cmd.peer_pubkey32_hex}`;
+    case "refresh_all_peers":
+      return "refresh_all_peers";
+    case "onboard":
+      return `onboard:${cmd.peer_pubkey32_hex}`;
+  }
+}
+
+/**
+ * Map a RuntimeCommand verb to the PendingOperation `op_type` string used by
+ * the WASM runtime_status snapshot. Returns `null` for commands that do not
+ * register a pending entry (e.g. `refresh_all_peers` fans out to pings
+ * already).
+ */
+function pendingOpTypeFor(cmd: RuntimeCommand): string | null {
+  switch (cmd.type) {
+    case "sign":
+      return "Sign";
+    case "ecdh":
+      return "Ecdh";
+    case "ping":
+    case "refresh_peer":
+      return "Ping";
+    case "onboard":
+      return "Onboard";
+    case "refresh_all_peers":
+      return null;
+  }
+}
+
+const HANDLE_COMMAND_DEBOUNCE_MS = 300;
+export const HANDLE_COMMAND_DEBOUNCE_WINDOW_MS = HANDLE_COMMAND_DEBOUNCE_MS;
