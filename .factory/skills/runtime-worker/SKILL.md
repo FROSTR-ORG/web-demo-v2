@@ -19,7 +19,7 @@ Do NOT use for pure screen styling work, pure settings persistence (use `ui-scre
 
 ## Required Skills
 
-- **agent-browser** — for manual verification of wired behavior end-to-end (multi-device sign/ECDH round-trips). Invoke when verifying an operation actually completes through the UI.
+- **agent-browser** — for manual verification of UI-surfaced behavior end-to-end (multi-device sign/ECDH round-trips, any new visible dashboard control). Invoke when the feature adds or changes what a user interacts with. **Pure state-derivation / non-UI logic fixes** (e.g., narrowing a helper function, adjusting a reducer, changing a bridge-shape mapping that produces no new visual element) may skip agent-browser if ALL of the following are true: (1) the feature description explicitly has no new UI affordance, (2) vitest + typecheck fully cover the behavior, (3) existing demo-gallery Playwright run still passes. Otherwise agent-browser is required — if you omit it, you MUST set `followedProcedure: false` and list the omission under `deviations`.
 
 ## Work Procedure
 
@@ -43,7 +43,7 @@ Do NOT use for pure screen styling work, pure settings persistence (use `ui-scre
    - `npx tsc --noEmit -p tsconfig.json --pretty false` — must be 0 errors.
    - `npx tsc --noEmit -p tsconfig.node.json --pretty false` — must be 0 errors.
    - `npx vitest run --config vitest.config.ts` — all tests pass, no `.skip` additions.
-   - `npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop --workers 1` — gallery still passes.
+   - `npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop --workers 1` — gallery still passes, **except** for the known pre-existing failures documented under `AGENTS.md > Known Pre-Existing Issues` (do not re-fail the feature on those; call them out explicitly in your verification log and continue).
    - If your feature's `fulfills` contains any VAL-OPS-/VAL-EVENTLOG-/VAL-APPROVALS-/VAL-POLICIES-/VAL-SETTINGS-*-<nnn> assertion requiring a multi-device round-trip, run the multi-device spec too.
 
 6. **Manual verification via agent-browser.** For every assertion your feature fulfills, drive through it in agent-browser and record an `interactiveChecks` entry with the sequence and observed outcome. For multi-device assertions, use 2–3 concurrent sessions.

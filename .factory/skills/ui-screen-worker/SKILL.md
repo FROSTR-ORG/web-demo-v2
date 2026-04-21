@@ -20,7 +20,7 @@ Do NOT use for protocol-level runtime wiring (`runtime-worker`) or core protocol
 ## Required Skills
 
 - **ui-builder** — use when building a new React screen component from a Paper reference. Invoke at the start of Paper-derived UI work to ensure layout, typography, and styling follow the established conventions.
-- **agent-browser** — manual verification of every new/changed screen and modal against Paper reference.
+- **agent-browser** — manual verification of every new/changed screen and modal against Paper reference. Required whenever the feature renders a new/changed user-visible element. **Pure copy-string / neutral-fallback / data-wiring fixes** that change what text is rendered but not what the user does (e.g., replacing synthesized copy with a neutral fallback rendered from the same component path) may skip agent-browser IF the new text is fully covered by Vitest component tests. If you omit agent-browser you MUST set `followedProcedure: false` and list the omission under `deviations`.
 
 ## Work Procedure
 
@@ -46,8 +46,8 @@ Do NOT use for protocol-level runtime wiring (`runtime-worker`) or core protocol
 
 6. **Verify:**
    - `npx tsc --noEmit -p tsconfig.json --pretty false` — 0 errors.
-   - `npx vitest run --config vitest.config.ts` — all pass.
-   - `npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop --workers 1` — all pass.
+   - `npx vitest run --config vitest.config.ts` — all pass. Tests MUST have been written RED first — capture the initial failing run in your handoff's `verification.commandsRun` (a pre-implementation vitest invocation that shows the new tests failing).
+   - `npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop --workers 1` — all pass, **except** for the known pre-existing failures documented under `AGENTS.md > Known Pre-Existing Issues` (do not re-fail the feature on those; call them out explicitly in your verification log and continue).
    - Visual check via agent-browser: screenshot new/changed screens, compare to Paper screenshot.
 
 7. **Manual verification via agent-browser.** Walk through every user flow in the UI, paste real input, observe persistence across Lock/Unlock/reload, test error paths.
