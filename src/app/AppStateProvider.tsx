@@ -469,28 +469,52 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const resolvePeerDenial = useCallback(
     async (id: string, decision: PolicyPromptDecision) => {
       peerDenialResolvedRef.current.add(id);
+      // Use the full queue snapshot captured via a ref rather than the
+      // closure variable so we always resolve against the entry that was
+      // at `id` at dispatch time. Capture BEFORE dropping from the queue
+      // so the broadcast payload can include the peer + verb for
+      // cross-tab propagation.
+      const pending = peerDenialQueueRef.current.find(
+        (entry) => entry.id === id,
+      );
       setPeerDenialQueue((previous) =>
         previous.filter((entry) => entry.id !== id),
       );
-      // Multi-tab: broadcast the resolution so any mirror queue in a
-      // sibling tab drops its matching entry without re-dispatching the
-      // policy override a second time (VAL-APPROVALS-024).
+      // Multi-tab: broadcast the full decision payload so sibling tabs
+      // (a) drop the mirrored queued entry by id and (b) apply the same
+      // policy override to their own runtime state without prompting the
+      // user a second time. Previously we only posted a dismissal hint
+      // (`{ type: "policy-resolved", id }`) which closed the mirror modal
+      // but left cross-tab runtime state divergent.
+      //
+      // Contract: sibling receivers must NOT re-broadcast on receipt
+      // (no echo loop — see the BroadcastChannel install effect below).
+      // Receivers remain tolerant to the legacy `policy-resolved` shape
+      // so a mid-upgrade tab that only knows how to emit the old message
+      // still causes this tab's mirror queue to dismiss.
       try {
-        policyResolvedChannelRef.current?.postMessage({
-          type: "policy-resolved",
-          id,
-        });
+        if (pending) {
+          policyResolvedChannelRef.current?.postMessage({
+            type: "decision",
+            promptId: id,
+            peerPubkey: pending.peer_pubkey,
+            decision: decision.action,
+            scope: { verb: pending.verb },
+          });
+        } else {
+          // Fallback dismissal-only post when the entry was already
+          // drained locally (e.g. double-resolve race). Keeps sibling
+          // tabs in sync without fabricating override data.
+          policyResolvedChannelRef.current?.postMessage({
+            type: "policy-resolved",
+            id,
+          });
+        }
       } catch {
         // BroadcastChannel is best-effort
       }
       const runtime = runtimeRef.current;
       if (!runtime) return;
-      // Use the full queue snapshot captured via a ref rather than the
-      // closure variable so we always resolve against the entry that was
-      // at `id` at dispatch time.
-      const pending = peerDenialQueueRef.current.find(
-        (entry) => entry.id === id,
-      );
       if (!pending) return;
       const peer = pending.peer_pubkey;
       const verb = pending.verb;
@@ -1992,11 +2016,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     peerDenialQueueRef.current = peerDenialQueue;
   }, [peerDenialQueue]);
 
-  // Install the multi-tab BroadcastChannel for VAL-APPROVALS-024. The
-  // channel is a lightweight hint — each tab still carries its own
-  // queue but propagates "resolved" ids so mirrored modals close when
-  // any tab actions a denial. Gated on BroadcastChannel availability
-  // (Node/jsdom lacks it in some test setups).
+  // Install the multi-tab BroadcastChannel for VAL-APPROVALS-024.
+  //
+  // Each tab carries its own denial queue and runtime. The channel
+  // propagates a sibling's full policy decision so this tab:
+  //   (a) drops the mirrored queued entry by promptId / id, AND
+  //   (b) applies the same policy override locally (peer override on
+  //       runtime) so cross-tab state converges — e.g. an
+  //       `always-allow` decision in tab A causes tab B's Peer Policies
+  //       view to reflect the allow without re-prompting.
+  //
+  // Two message shapes are accepted for forward/backward compat:
+  //   1. `{ type: "decision", promptId, peerPubkey, decision, scope? }`
+  //      — full payload (current).
+  //   2. `{ type: "policy-resolved", id }`
+  //      — legacy dismissal hint (older tabs may still emit this).
+  //
+  // Receivers MUST NOT re-broadcast on receipt (no echo loop). Only
+  // the tab whose user actioned the modal posts.
+  //
+  // Gated on BroadcastChannel availability (Node / some test
+  // environments lack it).
   useEffect(() => {
     if (typeof BroadcastChannel === "undefined") return;
     let channel: BroadcastChannel;
@@ -2006,16 +2046,120 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       return;
     }
     policyResolvedChannelRef.current = channel;
-    function onMessage(event: MessageEvent) {
-      const data = event.data as { type?: string; id?: string } | null;
-      if (!data || data.type !== "policy-resolved") return;
-      const id = data.id;
-      if (typeof id !== "string") return;
+
+    function applyDismissal(id: string) {
       peerDenialResolvedRef.current.add(id);
       setPeerDenialQueue((previous) =>
         previous.filter((entry) => entry.id !== id),
       );
     }
+
+    function applyRemoteDecision(
+      peerPubkey: string,
+      verb: "sign" | "ecdh" | "ping" | "onboard",
+      action: PolicyPromptDecision["action"],
+    ) {
+      const runtime = runtimeRef.current;
+      if (!runtime) return;
+      const overrideKey = `${peerPubkey}:respond.${verb}`;
+      try {
+        switch (action) {
+          case "allow-once":
+            runtime.setPolicyOverride({
+              peer: peerPubkey,
+              direction: "respond",
+              method: verb,
+              value: "allow",
+            });
+            sessionAllowOnceRef.current.add(overrideKey);
+            break;
+          case "allow-always":
+            runtime.setPolicyOverride({
+              peer: peerPubkey,
+              direction: "respond",
+              method: verb,
+              value: "allow",
+            });
+            sessionAllowOnceRef.current.delete(overrideKey);
+            break;
+          case "deny-always":
+            runtime.setPolicyOverride({
+              peer: peerPubkey,
+              direction: "respond",
+              method: verb,
+              value: "deny",
+            });
+            sessionAllowOnceRef.current.delete(overrideKey);
+            break;
+          case "deny":
+            // No-op at the policy layer (VAL-APPROVALS-011) — mirrors
+            // the local resolvePeerDenial semantics.
+            break;
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error(
+          `cross-tab set_policy_override dispatch failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+
+    function onMessage(event: MessageEvent) {
+      const data = event.data as
+        | {
+            type?: string;
+            id?: string;
+            promptId?: string;
+            peerPubkey?: string;
+            decision?: string;
+            scope?: { verb?: string };
+          }
+        | null;
+      if (!data || typeof data.type !== "string") return;
+
+      if (data.type === "policy-resolved") {
+        const id = data.id;
+        if (typeof id !== "string") return;
+        applyDismissal(id);
+        return;
+      }
+
+      if (data.type === "decision") {
+        const promptId = data.promptId;
+        if (typeof promptId !== "string") return;
+        applyDismissal(promptId);
+        const peerPubkey = data.peerPubkey;
+        const action = data.decision as PolicyPromptDecision["action"];
+        const verb = data.scope?.verb as
+          | "sign"
+          | "ecdh"
+          | "ping"
+          | "onboard"
+          | undefined;
+        const validAction =
+          action === "allow-once" ||
+          action === "allow-always" ||
+          action === "deny" ||
+          action === "deny-always";
+        const validVerb =
+          verb === "sign" ||
+          verb === "ecdh" ||
+          verb === "ping" ||
+          verb === "onboard";
+        if (
+          typeof peerPubkey === "string" &&
+          peerPubkey.length > 0 &&
+          validAction &&
+          validVerb
+        ) {
+          applyRemoteDecision(peerPubkey, verb, action);
+        }
+        return;
+      }
+    }
+
     channel.addEventListener("message", onMessage);
     return () => {
       channel.removeEventListener("message", onMessage);

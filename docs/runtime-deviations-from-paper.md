@@ -190,3 +190,29 @@ and the validation assertion IDs that cover it.
   `setPolicyOverride` call is made on timeout (VAL-APPROVALS-020).
 - **Assertion IDs covered**: VAL-APPROVALS-014 (countdown accuracy within ±200ms/s) and
   VAL-APPROVALS-020 (TTL expiry is policy-neutral).
+
+### PolicyPromptModal — full decision payload on cross-tab `BroadcastChannel` (VAL-APPROVALS-024)
+
+- **Paper / task source**: `igloo-paper` does not spec cross-tab behaviour; the Paper flow
+  assumes a single signer UI. VAL-APPROVALS-024 in the validation contract extends the
+  signer UX to converge cross-tab so that a decision actioned in tab A applies in tab B
+  without re-prompting the user.
+- **web-demo-v2 implementation**:
+  `src/app/AppStateProvider.tsx` (`resolvePeerDenial` posts, BroadcastChannel install effect
+  receives). The sender emits
+  `{ type: "decision", promptId, peerPubkey, decision: "allow-once"|"allow-always"|"deny"|"deny-always", scope: { verb } }`
+  on `BroadcastChannel("igloo-policy-denials")`. Sibling receivers drop the mirrored queued
+  entry by `promptId` AND apply the same `setPolicyOverride({ peer, direction: "respond",
+  method: verb, value })` against their own live runtime so the Peer Policies / peer
+  override state converges. Receivers MUST NOT re-broadcast (no echo loop).
+- **Protocol / data constraint**: Prior to this deviation, the channel only carried a
+  dismissal hint (`{ type: "policy-resolved", id }`), which closed the mirror modal but did
+  not propagate the user's decision into the sibling tab's runtime state. The bifrost
+  runtime does not persist peer overrides across tabs automatically because each tab owns
+  its own WASM runtime instance. Cross-tab sync is therefore a UI-layer concern.
+- **Backward compatibility**: Receivers remain tolerant of the legacy
+  `{ type: "policy-resolved", id }` shape so a mid-upgrade sibling tab that has not
+  updated to the new sender still causes this tab's mirror queue to dismiss (runtime state
+  diverges in that case — this is the pre-mission baseline).
+- **Assertion IDs covered**: VAL-APPROVALS-024 (cross-tab decision propagation — both
+  modal dismissal and runtime peer-override convergence).
