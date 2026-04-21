@@ -74,6 +74,9 @@ export function MockAppStateProvider({
   const [signLifecycleLog, setSignLifecycleLog] = useState<
     SignLifecycleEntry[]
   >(value.signLifecycleLog ?? []);
+  const [pendingDispatchIndex, setPendingDispatchIndex] = useState<
+    Record<string, import("./AppStateTypes").PendingDispatchEntry>
+  >(value.pendingDispatchIndex ?? {});
 
   const createKeyset = useCallback(
     async (draft: CreateKeysetDraft) => {
@@ -375,6 +378,7 @@ export function MockAppStateProvider({
     setLifecycleEvents([]);
     setSignDispatchLog({});
     setSignLifecycleLog([]);
+    setPendingDispatchIndex({});
   }, [value]);
 
   const clearCredentials = useCallback(async () => {
@@ -395,6 +399,7 @@ export function MockAppStateProvider({
     setLifecycleEvents([]);
     setSignDispatchLog({});
     setSignLifecycleLog([]);
+    setPendingDispatchIndex({});
   }, [value]);
 
   const setSignerPaused = useCallback(
@@ -500,6 +505,7 @@ export function MockAppStateProvider({
       lifecycleEvents,
       signDispatchLog,
       signLifecycleLog,
+      pendingDispatchIndex,
       handleRuntimeCommand,
       createKeyset,
       createProfile,
@@ -553,6 +559,7 @@ export function MockAppStateProvider({
       lifecycleEvents,
       signDispatchLog,
       signLifecycleLog,
+      pendingDispatchIndex,
       handleRuntimeCommand,
       createKeyset,
       createProfile,

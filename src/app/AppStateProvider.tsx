@@ -86,12 +86,14 @@ import type {
   CreateKeysetDraft,
   CreateProfileDraft,
   CreateSession,
+  EnrichedOperationFailure,
   HandleRuntimeCommandResult,
   ImportProfileDraft,
   ImportSession,
   NoncePoolSnapshot,
   OnboardingPackageStatePatch,
   OnboardSession,
+  PendingDispatchEntry,
   ProfileDraft,
   RecoverSession,
   RecoverSourceSummary,
@@ -127,9 +129,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [runtimeCompletions, setRuntimeCompletions] = useState<
     CompletedOperation[]
   >([]);
-  const [runtimeFailures, setRuntimeFailures] = useState<OperationFailure[]>(
-    [],
-  );
+  const [runtimeFailures, setRuntimeFailures] = useState<
+    EnrichedOperationFailure[]
+  >([]);
+  const [pendingDispatchIndex, setPendingDispatchIndex] = useState<
+    Record<string, PendingDispatchEntry>
+  >({});
   const [lifecycleEvents, setLifecycleEvents] = useState<RuntimeEvent[]>([]);
   const [signDispatchLog, setSignDispatchLog] = useState<
     Record<string, string>
@@ -148,6 +153,30 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
    * (e.g. double-clicked buttons) — see VAL-OPS-019 for the contract.
    */
   const lastDispatchRef = useRef<{ key: string; at: number } | null>(null);
+  /**
+   * FIFO queue of dispatches whose `request_id` was not captured
+   * synchronously in `handleRuntimeCommand` (e.g. the runtime tick ran
+   * but the pending_operations snapshot did not yet reflect the new op).
+   * Each subsequent observation of `pending_operations` attempts to
+   * correlate any new request_id that is NOT yet in
+   * `pendingDispatchIndex` against the oldest matching entry here,
+   * then promotes the entry into the index with the captured request_id
+   * so failure enrichment works regardless of how fast the runtime
+   * turns the op around.
+   */
+  const pendingUnmatchedDispatchesRef = useRef<
+    Array<PendingDispatchEntry & { pendingOpType: "Sign" | "Ecdh" | "Ping" | "Onboard" }>
+  >([]);
+  /**
+   * Latest value of {@link pendingDispatchIndex} accessible from inside
+   * callbacks that would otherwise need to re-create on every state
+   * change. The ref is kept in lock-step with the state via an effect
+   * below so `absorbDrains` and the refresh loop can read the current
+   * index without stale closures.
+   */
+  const pendingDispatchIndexRef = useRef<Record<string, PendingDispatchEntry>>(
+    {},
+  );
   /**
    * Mirror of `signerPaused` as a ref so `handleRuntimeCommand` (whose
    * `useCallback` identity must remain stable) can check the latest value
@@ -277,8 +306,29 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
     }
     if (drains.failures.length > 0) {
+      // Enrich failures with message_hex_32 / peer_pubkey from the
+      // pendingDispatchIndex at drain-time so SigningFailedModal's Retry
+      // button can always resolve the originating message when the
+      // correlation exists (VAL-OPS-007). Falls back to the raw payload
+      // when no correlation is available; the UI renders a clear
+      // "message not resolvable" reason in that case.
+      const indexSnapshot = pendingDispatchIndexRef.current;
+      const enriched: EnrichedOperationFailure[] = drains.failures.map(
+        (failure) => {
+          const entry = indexSnapshot[failure.request_id];
+          if (!entry) return { ...failure };
+          const result: EnrichedOperationFailure = { ...failure };
+          if (entry.message_hex_32 !== undefined) {
+            result.message_hex_32 = entry.message_hex_32;
+          }
+          if (entry.peer_pubkey !== undefined) {
+            result.peer_pubkey = entry.peer_pubkey;
+          }
+          return result;
+        },
+      );
       setRuntimeFailures((previous) => {
-        const merged = [...previous, ...drains.failures];
+        const merged = [...previous, ...enriched];
         merged.sort((a, b) => a.request_id.localeCompare(b.request_id));
         return merged;
       });
@@ -312,6 +362,36 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (drains.events.length > 0) {
       setLifecycleEvents((previous) => [...previous, ...drains.events]);
     }
+    // Mark pendingDispatchIndex entries that just settled (completion or
+    // failure) so the 60s retention window starts from this moment. We
+    // keep entries around so Retry handlers and late-arriving failure
+    // enrichment can still look up the originating message even after
+    // the pending op is gone from `pending_operations`.
+    if (drains.completions.length > 0 || drains.failures.length > 0) {
+      const now = Date.now();
+      const settledIds = new Set<string>();
+      for (const completion of drains.completions) {
+        const id = completionRequestId(completion);
+        if (id) settledIds.add(id);
+      }
+      for (const failure of drains.failures) {
+        settledIds.add(failure.request_id);
+      }
+      if (settledIds.size > 0) {
+        setPendingDispatchIndex((previous) => {
+          let changed = false;
+          const next: Record<string, PendingDispatchEntry> = { ...previous };
+          for (const id of settledIds) {
+            const existing = next[id];
+            if (existing && existing.settledAt === undefined) {
+              next[id] = { ...existing, settledAt: now };
+              changed = true;
+            }
+          }
+          return changed ? next : previous;
+        });
+      }
+    }
   }, []);
 
   const resetDrainSlices = useCallback(() => {
@@ -320,6 +400,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setLifecycleEvents([]);
     setSignDispatchLog({});
     setSignLifecycleLog([]);
+    setPendingDispatchIndex({});
+    pendingDispatchIndexRef.current = {};
+    pendingUnmatchedDispatchesRef.current = [];
     lastDispatchRef.current = null;
   }, []);
 
@@ -365,11 +448,51 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  /**
+   * Correlate a `pending_operations` snapshot against any
+   * dispatched-but-unmatched commands in
+   * {@link pendingUnmatchedDispatchesRef}. For each pending op whose
+   * `request_id` is not yet in `pendingDispatchIndex`, pop the oldest
+   * matching (by `pendingOpType`) unmatched dispatch and store a
+   * correlating entry. This is the async fallback for the synchronous
+   * capture path inside `handleRuntimeCommand` — when the runtime tick
+   * completes before the pending_operations snapshot reflects the new
+   * op, the request_id becomes observable here on the next refresh
+   * tick.
+   */
+  const correlatePendingOperations = useCallback(
+    (pendingOps: RuntimeStatusSummary["pending_operations"]) => {
+      const unmatched = pendingUnmatchedDispatchesRef.current;
+      if (unmatched.length === 0) return;
+      const index = pendingDispatchIndexRef.current;
+      const additions: Record<string, PendingDispatchEntry> = {};
+      const stillUnmatched = [...unmatched];
+      for (const op of pendingOps) {
+        if (index[op.request_id]) continue;
+        if (additions[op.request_id]) continue;
+        const matchIdx = stillUnmatched.findIndex(
+          (candidate) => candidate.pendingOpType === op.op_type,
+        );
+        if (matchIdx === -1) continue;
+        const match = stillUnmatched.splice(matchIdx, 1)[0];
+        const { pendingOpType: _ignore, ...entry } = match;
+        additions[op.request_id] = entry;
+      }
+      if (Object.keys(additions).length === 0) return;
+      pendingUnmatchedDispatchesRef.current = stillUnmatched;
+      setPendingDispatchIndex((previous) => ({ ...previous, ...additions }));
+    },
+    [],
+  );
+
   const applyRuntimeStatus = useCallback(
     (status: RuntimeStatusSummary | null) => {
       setRuntimeStatus(augmentStatus(status));
+      if (status) {
+        correlatePendingOperations(status.pending_operations);
+      }
     },
-    [augmentStatus],
+    [augmentStatus, correlatePendingOperations],
   );
 
   /**
@@ -1662,6 +1785,47 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, [activeProfile, startLiveRelayPump]);
 
+  // Keep pendingDispatchIndexRef in lock-step with state so callbacks
+  // that read the latest index (absorbDrains, correlation helper) can do
+  // so without re-creating on every state change.
+  useEffect(() => {
+    pendingDispatchIndexRef.current = pendingDispatchIndex;
+  }, [pendingDispatchIndex]);
+
+  // GC sweep: prune pendingDispatchIndex entries whose `settledAt` is
+  // older than {@link PENDING_DISPATCH_RETENTION_MS}. Runs once a second
+  // while the index contains any settled entries; idle-tick cost is zero
+  // when the index is empty. 60s matches the feature contract so Retry
+  // and late-arriving failure enrichment paths can still resolve
+  // originating messages long after the operation was drained.
+  useEffect(() => {
+    const hasSettled = Object.values(pendingDispatchIndex).some(
+      (entry) => entry.settledAt !== undefined,
+    );
+    if (!hasSettled) return;
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      setPendingDispatchIndex((previous) => {
+        let changed = false;
+        const next: Record<string, PendingDispatchEntry> = {};
+        for (const [requestId, entry] of Object.entries(previous)) {
+          if (
+            entry.settledAt !== undefined &&
+            now - entry.settledAt >= PENDING_DISPATCH_RETENTION_MS
+          ) {
+            changed = true;
+            continue;
+          }
+          next[requestId] = entry;
+        }
+        return changed ? next : previous;
+      });
+    }, 1000);
+    return () => {
+      window.clearInterval(id);
+    };
+  }, [pendingDispatchIndex]);
+
   // Keep the signerPausedRef in lock-step with the signerPaused state so
   // `handleRuntimeCommand` (which reads the ref to avoid re-creating the
   // callback on every state change) always sees the latest value — including
@@ -1774,6 +1938,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         // for this call but the operation itself is unaffected.
       }
 
+      // Push a provisional pendingDispatchIndex entry into the unmatched
+      // FIFO queue BEFORE dispatch so that even if the request_id is not
+      // captured synchronously on this call, a subsequent
+      // `pending_operations` observation can correlate and populate the
+      // index (VAL-OPS-007). For commands that do not register a pending
+      // op (`refresh_all_peers`), no queue entry is pushed.
+      const dispatchedAt = now;
+      const dispatchMetadata = dispatchMetadataForCommand(cmd);
+      if (dispatchMetadata && expectedType !== null) {
+        pendingUnmatchedDispatchesRef.current.push({
+          ...dispatchMetadata,
+          dispatchedAt,
+          pendingOpType: expectedType as "Sign" | "Ecdh" | "Ping" | "Onboard",
+        });
+      }
+
       runtime.handleCommand(cmd);
 
       if (expectedType === null) {
@@ -1792,8 +1972,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
 
       let requestId: string | null = null;
+      let statusAfter: RuntimeStatusSummary | null = null;
       try {
-        const statusAfter = runtime.runtimeStatus();
+        statusAfter = runtime.runtimeStatus();
         for (const op of statusAfter.pending_operations) {
           if (op.op_type === expectedType && !before.has(op.request_id)) {
             requestId = op.request_id;
@@ -1803,6 +1984,49 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setRuntimeStatus(statusAfter);
       } catch {
         requestId = null;
+      }
+      // If the synchronous capture succeeded, remove the newest unmatched
+      // entry matching the dispatch metadata and promote it into the
+      // pendingDispatchIndex keyed by the captured request_id.
+      if (requestId && dispatchMetadata && expectedType !== null) {
+        const queue = pendingUnmatchedDispatchesRef.current;
+        // Find from the end (LIFO) to match THIS dispatch — avoids
+        // robbing a correlation spot from an older unmatched dispatch
+        // that's still waiting for an async correlation via
+        // correlatePendingOperations.
+        for (let i = queue.length - 1; i >= 0; i -= 1) {
+          const candidate = queue[i];
+          if (
+            candidate.pendingOpType === expectedType &&
+            candidate.message_hex_32 === dispatchMetadata.message_hex_32 &&
+            candidate.peer_pubkey === dispatchMetadata.peer_pubkey &&
+            candidate.dispatchedAt === dispatchedAt
+          ) {
+            queue.splice(i, 1);
+            break;
+          }
+        }
+        const indexEntry: PendingDispatchEntry = {
+          type: dispatchMetadata.type,
+          dispatchedAt,
+        };
+        if (dispatchMetadata.message_hex_32 !== undefined) {
+          indexEntry.message_hex_32 = dispatchMetadata.message_hex_32;
+        }
+        if (dispatchMetadata.peer_pubkey !== undefined) {
+          indexEntry.peer_pubkey = dispatchMetadata.peer_pubkey;
+        }
+        const capturedRequestId = requestId;
+        setPendingDispatchIndex((prev) =>
+          prev[capturedRequestId] ? prev : { ...prev, [capturedRequestId]: indexEntry },
+        );
+      }
+      // After capturing our own dispatch, run the async correlation pass
+      // against the observed pending_operations snapshot so any older
+      // unmatched dispatches get picked up now that their request_id may
+      // be visible.
+      if (statusAfter) {
+        correlatePendingOperations(statusAfter.pending_operations);
       }
       // Record sign-command metadata so callers (SigningFailedModal) can
       // correlate later `OperationFailure`s back to the original
@@ -1848,7 +2072,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       return { requestId, debounced: false };
     },
-    [],
+    [correlatePendingOperations],
   );
 
   const refreshRuntime = useCallback(() => {
@@ -1971,6 +2195,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       lifecycleEvents,
       signDispatchLog,
       signLifecycleLog,
+      pendingDispatchIndex,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,
@@ -2026,6 +2251,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       lifecycleEvents,
       signDispatchLog,
       signLifecycleLog,
+      pendingDispatchIndex,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,
@@ -2288,6 +2514,41 @@ function pendingOpTypeFor(cmd: RuntimeCommand): string | null {
 
 const HANDLE_COMMAND_DEBOUNCE_MS = 300;
 export const HANDLE_COMMAND_DEBOUNCE_WINDOW_MS = HANDLE_COMMAND_DEBOUNCE_MS;
+
+/**
+ * Retention window for {@link PendingDispatchEntry} after settlement
+ * (completion or failure). Entries older than this are pruned by the
+ * provider-side GC sweep so `pendingDispatchIndex` never grows without
+ * bound. 60s matches the feature contract so Retry handlers can still
+ * resolve originating messages well after the pending op has been
+ * drained.
+ */
+const PENDING_DISPATCH_RETENTION_MS = 60_000;
+
+/**
+ * Extract the dispatch metadata stored in the pendingDispatchIndex from
+ * a RuntimeCommand. Returns `null` for commands that do not register a
+ * single pending op (e.g. `refresh_all_peers`).
+ */
+function dispatchMetadataForCommand(
+  cmd: RuntimeCommand,
+):
+  | (Pick<PendingDispatchEntry, "type" | "message_hex_32" | "peer_pubkey">)
+  | null {
+  switch (cmd.type) {
+    case "sign":
+      return { type: "sign", message_hex_32: cmd.message_hex_32 };
+    case "ecdh":
+      return { type: "ecdh", peer_pubkey: cmd.pubkey32_hex };
+    case "ping":
+    case "refresh_peer":
+      return { type: "ping", peer_pubkey: cmd.peer_pubkey32_hex };
+    case "onboard":
+      return { type: "onboard", peer_pubkey: cmd.peer_pubkey32_hex };
+    case "refresh_all_peers":
+      return null;
+  }
+}
 
 /**
  * Map a RuntimeCommand to the lifecycle op_type recorded in

@@ -2,6 +2,18 @@ import { X, XCircle } from "lucide-react";
 import { shortHex } from "../../../lib/bifrost/format";
 import type { OperationFailure } from "../../../lib/bifrost/types";
 
+/**
+ * Optional forward-compat fields the runtime may begin to emit on an
+ * {@link OperationFailure} payload so the modal can surface a real
+ * peer-response ratio. Defined as a structural-widening overlay so the
+ * modal can accept an enriched failure today without another type
+ * migration when the bridge exposes the fields.
+ */
+interface FailureWithPeerResponse extends OperationFailure {
+  peers_responded?: number;
+  total_peers?: number;
+}
+
 export interface SigningFailedModalProps {
   /**
    * Closes the modal (used by the backdrop and the top-right × control). The
@@ -12,9 +24,11 @@ export interface SigningFailedModalProps {
    * Real runtime failure payload captured from `runtimeFailures`. When
    * provided the modal renders the runtime's real `request_id` (surfaced as
    * the "Round" field), the failed peer short-identifier when present, and
-   * the runtime's `code` + `message`. No peer-response ratio is
-   * synthesized: the runtime does not emit a `peers_responded` /
-   * `round_id` pair (see `docs/runtime-deviations-from-paper.md`).
+   * the runtime's `code` + `message`. The modal ALWAYS renders a labelled
+   * "Peer responses" line — either `Peer responses: <N> of <M>` when the
+   * runtime reports a real ratio (`peers_responded` / `total_peers`) or
+   * the neutral fallback `Peer responses: not reported by runtime` when
+   * it does not. See `docs/runtime-deviations-from-paper.md`.
    * Required for real-failure mode (VAL-OPS-006).
    */
   failure?: OperationFailure;
@@ -48,11 +62,19 @@ function formatRoundId(requestId: string): string {
 }
 
 /**
- * Builds the stacked "Round / Code / Error / Failed peer" summary from a
- * real {@link OperationFailure} payload. Only fields the runtime actually
- * emits are rendered; missing fields render a neutral em-dash placeholder
- * rather than inventing a peer-response ratio. See VAL-OPS-006 and
- * `docs/runtime-deviations-from-paper.md` for the contract gap rationale.
+ * Builds the stacked "Round / Code / Error / Peer responses / Failed
+ * peer" summary from a real {@link OperationFailure} payload.
+ *
+ * The "Peer responses" line is ALWAYS rendered so validators can
+ * observe a clearly-labelled value for every failure shape:
+ *   - When the failure carries a real `peers_responded` / `total_peers`
+ *     pair (enrichment path, future runtime extension), render
+ *     "Peer responses: <N> of <M>" verbatim.
+ *   - Otherwise render the neutral fallback
+ *     "Peer responses: not reported by runtime" — NEVER a hard-coded
+ *     "1/2" placeholder or fabricated denominator.
+ * See VAL-OPS-006 and `docs/runtime-deviations-from-paper.md` for the
+ * contract gap rationale.
  */
 function buildFailureSummary(
   failure: OperationFailure,
@@ -64,10 +86,11 @@ function buildFailureSummary(
       label: "Error",
       value: failure.message?.trim() ? failure.message.trim() : "—",
     },
+    {
+      label: "Peer responses",
+      value: formatPeerResponseValue(failure as FailureWithPeerResponse),
+    },
   ];
-  // Failed peer is the only peer-response metadata the runtime emits. If
-  // absent we omit the row entirely rather than render an invented
-  // ratio or denominator (see VAL-OPS-006 deviation doc entry).
   if (failure.failed_peer) {
     rows.push({
       label: "Failed peer",
@@ -75,6 +98,27 @@ function buildFailureSummary(
     });
   }
   return rows;
+}
+
+/**
+ * Produce the value half of the "Peer responses" row. When the runtime
+ * supplies a structured `peers_responded` / `total_peers` pair, render
+ * it verbatim as "N of M". Otherwise fall back to a labelled
+ * "not reported by runtime" copy that documents the contract gap
+ * instead of inventing a ratio.
+ */
+function formatPeerResponseValue(failure: FailureWithPeerResponse): string {
+  const responded = failure.peers_responded;
+  const total = failure.total_peers;
+  if (
+    typeof responded === "number" &&
+    Number.isFinite(responded) &&
+    typeof total === "number" &&
+    Number.isFinite(total)
+  ) {
+    return `${responded} of ${total}`;
+  }
+  return "not reported by runtime";
 }
 
 export function SigningFailedModal({
@@ -88,12 +132,32 @@ export function SigningFailedModal({
   const description = hasFailure
     ? `Unable to complete signing request ${formatRoundId(failure!.request_id)}. The runtime reported ${failure!.code} before the signature could be aggregated.`
     : "Unable to complete the signing request. Failure details are unavailable.";
+  // Build the summary rows even in the no-failure fallback so the
+  // labelled "Peer responses" line is ALWAYS rendered — the fallback
+  // copy ends in "Failure details unavailable." with the peer-response
+  // line appended after it.
   const summaryRows = hasFailure
     ? buildFailureSummary(failure!)
-    : null;
+    : [
+        { label: "Status", value: "Failure details unavailable." },
+        { label: "Peer responses", value: "not reported by runtime" },
+      ];
 
   const handleDismiss = onDismiss ?? onClose;
-  const retryDisabled = hasFailure && !messageHex;
+  // Retry is enabled only when the failure is a sign type AND a message
+  // hex is resolvable. When disabled, surface a clear tooltip so users
+  // and validators can observe the reason (VAL-OPS-007: "Retry is
+  // disabled (with a clear reason) only when the failure record
+  // genuinely has no resolvable message").
+  const isSignFailure = !hasFailure || failure!.op_type === "sign";
+  const retryDisabled = hasFailure && (!isSignFailure || !messageHex);
+  const retryDisabledReason = !hasFailure
+    ? undefined
+    : !isSignFailure
+      ? "Retry is only available for sign operations."
+      : !messageHex
+        ? "Retry unavailable: originating sign message could not be correlated from runtime state."
+        : undefined;
   const handleRetry = () => {
     if (retryDisabled) return;
     if (onRetry) {
@@ -147,10 +211,8 @@ export function SigningFailedModal({
               data-testid="signing-failed-code-text"
             >
               {summaryRows
-                ? summaryRows
-                    .map((row) => `${row.label}: ${row.value}`)
-                    .join(" · ")
-                : "Failure details unavailable."}
+                .map((row) => `${row.label}: ${row.value}`)
+                .join(" · ")}
             </span>
           </div>
         </div>
@@ -170,6 +232,7 @@ export function SigningFailedModal({
             onClick={handleRetry}
             disabled={retryDisabled}
             aria-disabled={retryDisabled}
+            title={retryDisabled ? retryDisabledReason : undefined}
           >
             Retry
           </button>

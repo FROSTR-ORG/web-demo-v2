@@ -91,15 +91,22 @@ and the validation assertion IDs that cover it.
   reference material for this mission and must not be modified to add one.
 - **What the app renders instead**: the modal shows `Round`, `Code`, and `Error` sourced
   verbatim from the real `OperationFailure` payload (`request_id` → `Round: r-<8>`;
-  `code` → `Code`; `message` → `Error`). When `failed_peer` is present it adds a `Failed
-  peer: <shortHex>` row. When `failed_peer` is absent the row is omitted entirely — the
-  UI does NOT synthesize "no peers responded", "0/N", or any other fabricated denominator.
-  The Retry button still dispatches `handleRuntimeCommand({ type: "sign", message_hex_32 })`
-  with the same message that produced the failure (via `signDispatchLog[request_id]`), and
-  Dismiss still closes without dispatch. If the bifrost bridge later grows a real
-  peers-responded field, the optional schema extension point is `OperationFailure` in
-  `src/lib/bifrost/types.ts` and the rendering site in `buildFailureSummary` in the modal.
+  `code` → `Code`; `message` → `Error`). It ALSO renders a labelled `Peer responses`
+  row on every failure shape — `Peer responses: <N> of <M>` when the runtime emits a
+  `peers_responded` / `total_peers` pair on the enriched failure record, else the
+  neutral fallback `Peer responses: not reported by runtime`. Under no circumstances
+  is a hard-coded ratio (`1/2`, `0/N`, etc.) fabricated. When `failed_peer` is present
+  it adds a `Failed peer: <shortHex>` row. The Retry button dispatches
+  `handleRuntimeCommand({ type: "sign", message_hex_32 })` with the same message that
+  produced the failure — resolved from the enriched
+  `runtimeFailures[i].message_hex_32` attached at drain-time via the AppState's
+  `pendingDispatchIndex`, falling back to `signDispatchLog[request_id]` only when the
+  enrichment path did not capture a correlation (see feature
+  `fix-m1-signing-failed-modal-peer-response-and-retry-correlation`). Dismiss still
+  closes without dispatch. If the bifrost bridge later begins emitting a real
+  peers-responded pair, the optional schema extension lives at
+  `EnrichedOperationFailure` in `src/app/AppStateTypes.ts`; the rendering site in
+  `buildFailureSummary` already consumes those fields.
 - **Assertion IDs covered**: VAL-OPS-006 (SigningFailedModal populated from real failure
-  payload, not Paper placeholders). The "peer-response ratio" clause in that assertion is
-  reconciled here against the runtime contract: a ratio would have to be fabricated to
-  appear, so the modal shows only fields the runtime actually emits.
+  payload with an always-labelled Peer responses line, not Paper placeholders); VAL-OPS-007
+  (Retry correlates via enriched `message_hex_32` from `pendingDispatchIndex`).

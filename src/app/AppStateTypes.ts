@@ -228,6 +228,49 @@ export interface SignLifecycleEntry {
 }
 
 /**
+ * An {@link OperationFailure} optionally enriched with the originating
+ * command's metadata at drain-time via {@link PendingDispatchEntry} lookup.
+ *
+ * `message_hex_32` / `peer_pubkey` are present when the failure's
+ * `request_id` had a correlating entry in
+ * `AppStateValue.pendingDispatchIndex` at the moment the failure was
+ * drained. Downstream consumers (notably the `SigningFailedModal` Retry
+ * handler) prefer these enriched fields to the legacy `signDispatchLog`
+ * mapping, falling back only when both paths fail to resolve a message.
+ *
+ * Future runtime-emitted fields for peer-response reporting
+ * (`peers_responded` / `total_peers`) are declared here as optional so the
+ * UI can surface them when the bridge begins emitting them without
+ * another type migration — see
+ * `docs/runtime-deviations-from-paper.md` entry for
+ * `SigningFailedModal — no peers_responded / round_id peer-response
+ * ratio`.
+ */
+export type EnrichedOperationFailure = OperationFailure & {
+  message_hex_32?: string;
+  peer_pubkey?: string;
+  peers_responded?: number;
+  total_peers?: number;
+};
+
+/**
+ * Single entry in {@link AppStateValue.pendingDispatchIndex}. `type`
+ * mirrors the {@link RuntimeCommand} verb (minus `refresh_all_peers`
+ * which has no single correlatable request_id).
+ *
+ * `settledAt` is set when the corresponding completion or failure has
+ * been drained; entries whose `settledAt` is older than 60s are pruned
+ * by a provider-side GC sweep so the index never grows without bound.
+ */
+export interface PendingDispatchEntry {
+  type: "sign" | "ecdh" | "ping" | "onboard";
+  message_hex_32?: string;
+  peer_pubkey?: string;
+  dispatchedAt: number;
+  settledAt?: number;
+}
+
+/**
  * Return value of {@link AppStateValue.handleRuntimeCommand}. When the
  * dispatched command produces a new entry in `runtime_status.pending_operations`
  * (sign / ecdh / ping / onboard), the correlating `request_id` captured from
@@ -288,8 +331,14 @@ export interface AppStateValue {
    * Operation failures drained from the runtime, ordered by ascending
    * `request_id`. Populated each refresh tick by AppStateProvider reading
    * `RuntimeClient.drainFailures()`.
+   *
+   * Each entry is enriched via {@link AppStateValue.pendingDispatchIndex}
+   * before landing here — sign-type failures carry their originating
+   * `message_hex_32` so the SigningFailedModal's Retry can re-dispatch
+   * the same command without depending on `signDispatchLog`
+   * (VAL-OPS-007).
    */
-  runtimeFailures: OperationFailure[];
+  runtimeFailures: EnrichedOperationFailure[];
   /**
    * Lifecycle events drained from the runtime via
    * `RuntimeClient.drainRuntimeEvents()`. Not consumed by UI in this feature
@@ -326,6 +375,30 @@ export interface AppStateValue {
    * description for full behavior (VAL-OPS-002 / VAL-OPS-004 / VAL-OPS-013).
    */
   signLifecycleLog: SignLifecycleEntry[];
+  /**
+   * Map of `request_id → {type, message_hex_32?, peer_pubkey?, dispatchedAt,
+   * settledAt?}` for every runtime operation whose origin we can correlate.
+   *
+   * Populated in two paths:
+   *  1. Synchronously by {@link AppStateValue.handleRuntimeCommand} when the
+   *     `request_id` is captured from the next `pending_operations` snapshot
+   *     after dispatch.
+   *  2. Asynchronously on each `pending_operations` observation tick — new
+   *     pending ops that still lack an entry are matched against the FIFO
+   *     queue of dispatched-but-unmatched commands so the index is filled
+   *     before the op is removed (and before its failure is drained).
+   *
+   * When an `OperationFailure` / `CompletedOperation` is drained, the
+   * corresponding entry is marked with `settledAt`. Entries remain in the
+   * index for 60s after settlement so callers (notably the
+   * SigningFailedModal Retry handler) can still resolve the originating
+   * `message_hex_32` long after the pending op has been removed.
+   *
+   * Reset to `{}` on `lockProfile()` and `clearCredentials()` together
+   * with the other drain slices so dispatch metadata never bleeds across
+   * profiles.
+   */
+  pendingDispatchIndex: Record<string, PendingDispatchEntry>;
   reloadProfiles: () => Promise<void>;
   createKeyset: (draft: CreateKeysetDraft) => Promise<void>;
   createProfile: (draft: CreateProfileDraft) => Promise<string>;

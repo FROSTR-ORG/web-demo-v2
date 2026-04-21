@@ -2,7 +2,7 @@ import { Download, FileText, Settings, SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAppState } from "../../app/AppState";
-import type { OperationFailure } from "../../lib/bifrost/types";
+import type { EnrichedOperationFailure } from "../../app/AppStateTypes";
 import type { PeerRefreshErrorInfo } from "./panels/PeerRow";
 import { AppShell } from "../../components/shell";
 import { Button } from "../../components/ui";
@@ -108,7 +108,7 @@ export function DashboardScreen() {
   // user. `consumedFailureIds` tracks request_ids we've already shown (or
   // dismissed) so the same failure payload never re-opens the modal after
   // Dismiss/Retry — even though it lingers in `runtimeFailures` (VAL-OPS-008).
-  const [activeSignFailure, setActiveSignFailure] = useState<OperationFailure | null>(null);
+  const [activeSignFailure, setActiveSignFailure] = useState<EnrichedOperationFailure | null>(null);
   const consumedFailureIdsRef = useRef<Set<string>>(new Set());
   // --- Non-sign failure surface (VAL-OPS-011 / VAL-OPS-015) ------------
   // Per `fix-m1-non-sign-failure-surface`: every non-sign OperationFailure
@@ -190,7 +190,12 @@ export function DashboardScreen() {
       setActiveModal("none");
       return;
     }
-    const messageHex = signDispatchLog[failure.request_id];
+    // Prefer the enriched failure's `message_hex_32` (populated by the
+    // AppStateProvider via `pendingDispatchIndex` at drain-time — see
+    // VAL-OPS-007) and fall back to the legacy `signDispatchLog` only
+    // when enrichment did not resolve.
+    const messageHex =
+      failure.message_hex_32 ?? signDispatchLog[failure.request_id];
     // Mark the original failure consumed and close the modal BEFORE the
     // runtime dispatch: even if the retry throws, the stale failure UI
     // must not linger (VAL-OPS-007).
@@ -395,7 +400,8 @@ export function DashboardScreen() {
   const activeSignFailureMessageHex = useMemo(
     () =>
       activeSignFailure
-        ? signDispatchLog[activeSignFailure.request_id]
+        ? activeSignFailure.message_hex_32 ??
+          signDispatchLog[activeSignFailure.request_id]
         : undefined,
     [activeSignFailure, signDispatchLog],
   );
