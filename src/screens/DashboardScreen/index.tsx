@@ -2,7 +2,11 @@ import { Download, FileText, Settings, SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAppState } from "../../app/AppState";
-import type { EnrichedOperationFailure } from "../../app/AppStateTypes";
+import type {
+  EnrichedOperationFailure,
+  PeerDeniedEvent,
+  PolicyPromptDecision,
+} from "../../app/AppStateTypes";
 import type { PeerRefreshErrorInfo } from "./panels/PeerRow";
 import { AppShell } from "../../components/shell";
 import { Button } from "../../components/ui";
@@ -95,6 +99,10 @@ export function DashboardScreen() {
     runtimeFailures = [],
     signDispatchLog = {},
     handleRuntimeCommand,
+    lifecycleEvents = [],
+    peerDenialQueue = [],
+    enqueuePeerDenial = () => undefined,
+    resolvePeerDenial = async () => undefined,
   } = useAppState();
   const demoUi = useDemoUi();
   const hasDemoDashboardState = Boolean(demoUi.dashboard?.state || demoUi.dashboard?.showMockControls);
@@ -408,6 +416,122 @@ export function DashboardScreen() {
     [activeSignFailure, signDispatchLog],
   );
 
+  // VAL-APPROVALS-007 / VAL-APPROVALS-018: observe the lifecycleEvents
+  // slice for `peer_denied` kind entries and enqueue them through the
+  // AppState FIFO queue. `consumedPeerDenialIdsRef` tracks which
+  // lifecycle entries we've already routed so subsequent ticks don't
+  // re-enqueue the same event. Events without the required payload
+  // (peer_pubkey / verb) are ignored — no synthetic fallback.
+  const consumedPeerDenialIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!lifecycleEvents || lifecycleEvents.length === 0) return;
+    for (const raw of lifecycleEvents as unknown[]) {
+      const entry = raw as {
+        kind?: string;
+        peer_denied?: Partial<PeerDeniedEvent>;
+        payload?: Partial<PeerDeniedEvent>;
+      };
+      if (!entry || entry.kind !== "peer_denied") continue;
+      const payload = entry.peer_denied ?? entry.payload;
+      if (!payload || typeof payload !== "object") continue;
+      const id =
+        typeof payload.id === "string" && payload.id.length > 0
+          ? payload.id
+          : undefined;
+      const peerPubkey =
+        typeof payload.peer_pubkey === "string" &&
+        payload.peer_pubkey.length > 0
+          ? payload.peer_pubkey
+          : undefined;
+      const verb = payload.verb as PeerDeniedEvent["verb"] | undefined;
+      if (!id || !peerPubkey || !verb) continue;
+      if (consumedPeerDenialIdsRef.current.has(id)) continue;
+      consumedPeerDenialIdsRef.current.add(id);
+      enqueuePeerDenial({
+        id,
+        peer_pubkey: peerPubkey,
+        verb,
+        denied_at:
+          typeof payload.denied_at === "number"
+            ? payload.denied_at
+            : Date.now(),
+        peer_label:
+          typeof payload.peer_label === "string"
+            ? payload.peer_label
+            : undefined,
+        ttl_ms:
+          typeof payload.ttl_ms === "number" ? payload.ttl_ms : undefined,
+        ttl_source: payload.ttl_source,
+        event_kind:
+          typeof payload.event_kind === "string"
+            ? payload.event_kind
+            : undefined,
+        content:
+          typeof payload.content === "string" ? payload.content : undefined,
+        domain:
+          typeof payload.domain === "string" ? payload.domain : undefined,
+        relay:
+          typeof payload.relay === "string" ? payload.relay : undefined,
+        target_pubkey:
+          typeof payload.target_pubkey === "string"
+            ? payload.target_pubkey
+            : undefined,
+      });
+    }
+  }, [lifecycleEvents, enqueuePeerDenial]);
+
+  // Convert the Paper-fixture legacy `PolicyPromptRequest` into the
+  // canonical `PeerDeniedEvent` shape so the modal can render both the
+  // demo Open-from-panel path and the runtime reactive path through a
+  // single component. Runtime-mode callers skip this adapter entirely.
+  const paperPromptEvent = useMemo<PeerDeniedEvent | null>(() => {
+    if (activeModal !== "policy-prompt") return null;
+    const req = policyPromptRequest;
+    return {
+      id: `paper:${req.kind}:${req.peer}:${req.pubkey}`,
+      peer_pubkey: req.pubkey,
+      peer_label: req.peer,
+      verb: req.kind.toLowerCase() as PeerDeniedEvent["verb"],
+      denied_at: Date.now(),
+      event_kind: req.eventKind,
+      content: req.content,
+      domain: req.domain,
+      relay: req.relay,
+      target_pubkey: req.pubkey,
+    };
+  }, [activeModal, policyPromptRequest]);
+
+  // The runtime-driven reactive prompt (front of the queue) takes
+  // precedence over the Paper demo's manually-opened modal so validators
+  // that push a synthetic peer_denied event are guaranteed to see the
+  // runtime payload, not the Paper fixture (VAL-APPROVALS-007).
+  const activePeerDenial: PeerDeniedEvent | null = peerDenialQueue[0] ?? null;
+  const policyModalEvent = activePeerDenial ?? paperPromptEvent;
+  const policyModalOpen = Boolean(policyModalEvent);
+
+  const handleResolvePolicyPrompt = useCallback(
+    async (decision: PolicyPromptDecision) => {
+      if (activePeerDenial) {
+        await resolvePeerDenial(activePeerDenial.id, decision);
+      } else {
+        // Paper demo path: close the modal without dispatching policy.
+        setActiveModal("none");
+      }
+    },
+    [activePeerDenial, resolvePeerDenial],
+  );
+
+  const handleDismissPolicyPrompt = useCallback(() => {
+    if (activePeerDenial) {
+      // Dismiss = policy-neutral deny (VAL-APPROVALS-011 / VAL-APPROVALS-016
+      // / VAL-APPROVALS-020). `resolvePeerDenial` with "deny" is a no-op
+      // at the policy layer and advances the FIFO queue.
+      void resolvePeerDenial(activePeerDenial.id, { action: "deny" });
+      return;
+    }
+    setActiveModal("none");
+  }, [activePeerDenial, resolvePeerDenial]);
+
   if (!profileId) {
     return <Navigate to="/" replace />;
   }
@@ -687,9 +811,13 @@ export function DashboardScreen() {
         ) : null}
       </section>
 
-      {activeModal === "policy-prompt" && (
-        <PolicyPromptModal request={policyPromptRequest} onClose={() => setActiveModal("none")} />
-      )}
+      {policyModalOpen && policyModalEvent ? (
+        <PolicyPromptModal
+          event={policyModalEvent}
+          onResolve={handleResolvePolicyPrompt}
+          onDismiss={handleDismissPolicyPrompt}
+        />
+      ) : null}
       {activeModal === "signing-failed" && (
         <SigningFailedModal
           failure={activeSignFailure ?? undefined}

@@ -334,6 +334,9 @@ export function createDemoAppState(
     signDispatchLog: {},
     signLifecycleLog: [],
     pendingDispatchIndex: {},
+    peerDenialQueue: [],
+    enqueuePeerDenial: () => undefined,
+    resolvePeerDenial: async () => undefined,
     handleRuntimeCommand: createMockHandleRuntimeCommand(),
   };
 

@@ -110,3 +110,83 @@ and the validation assertion IDs that cover it.
 - **Assertion IDs covered**: VAL-OPS-006 (SigningFailedModal populated from real failure
   payload with an always-labelled Peer responses line, not Paper placeholders); VAL-OPS-007
   (Retry correlates via enriched `message_hex_32` from `pendingDispatchIndex`).
+
+### PolicyPromptModal — scoped (kind / domain) CTA variants not exposed (VAL-APPROVALS-013)
+
+- **Paper / task source**: `igloo-paper/screens/dashboard/.../PolicyPromptModal` renders six
+  decision CTAs when a peer denial surfaces: `Deny`, `Allow once`, `Always allow`, plus the
+  scoped variants `Always for kind:<N>`, `Always deny for kind:<N>`, and
+  `Always deny for <domain>`. The scoped buttons imply the signer can persist a policy
+  override keyed on `(peer, event_kind)` or `(peer, domain)` granularity.
+- **web-demo-v2 implementation**:
+  `src/screens/DashboardScreen/modals/PolicyPromptModal.tsx` (feature
+  `m2-reactive-policy-prompt-modal`).
+- **Protocol / data constraint**: Per
+  `bifrost-rs/crates/bifrost-bridge-wasm/src/lib.rs` (`RuntimeClient::setPolicyOverride`)
+  and the underlying signer policy in `bifrost-rs/crates/bifrost-signer/src/policy.rs`, the
+  exposed override surface accepts **only** peer-level granularity — a `(peer_pubkey, allow|deny)`
+  tuple. There is no kind-scoped or domain-scoped override shape plumbed to the WASM bridge
+  or to the signer policy struct. `bifrost-rs` is read-only reference material for this
+  mission and must not be modified to add one.
+- **What the app renders instead**: four peer-level decision buttons —
+  `Allow once`, `Always allow`, `Deny`, `Always deny`. "Allow once" is tracked
+  client-side in a session-scoped `sessionAllowOnceRef` set and automatically rolled back
+  to the signer via `setPolicyOverride(peer, "deny")` on `lockProfile()` (VAL-APPROVALS-009),
+  while `Always allow` / `Always deny` persist through the runtime's peer-level override.
+  The scoped CTAs are deliberately NOT rendered: exposing them would silently route through
+  the same peer-level write, violating the user's assumption that clicking
+  `Always deny for kind:1` only denies kind:1. The `DENIED_VARIANTS` comment block inside
+  the modal source links back to this entry.
+- **Assertion IDs covered**: VAL-APPROVALS-013 (peer-level override granularity documented);
+  the four peer-level CTAs still satisfy VAL-APPROVALS-010 / VAL-APPROVALS-011 /
+  VAL-APPROVALS-016 / VAL-APPROVALS-017 since they map 1:1 to the `{allow-once,
+  allow-always, deny, deny-always}` union in `PolicyPromptDecision`.
+
+### PolicyPromptModal — `peer_denied` enqueued from synthetic RuntimeEvent payload (VAL-APPROVALS-007)
+
+- **Paper / task source**: `igloo-paper` treats `peer_denied` as a first-class runtime event
+  that the UI observes on `lifecycleEvents`. The Paper contract implies the bifrost bridge
+  emits `RuntimeEvent { kind: "peer_denied", payload: {...} }` whenever the signer's policy
+  layer denies an inbound request.
+- **web-demo-v2 implementation**:
+  `src/screens/DashboardScreen/index.tsx` (lifecycleEvents observer that filters
+  `kind === "peer_denied"` and routes the payload through `enqueuePeerDenial`) and
+  `src/app/AppStateProvider.tsx` (FIFO queue + BroadcastChannel multi-tab sync).
+- **Protocol / data constraint**: Per
+  `bifrost-rs/crates/bifrost-signer/src/lib.rs` (lines ~1618, 1655, 1720, 1791 at time of
+  writing), the `peer_denied` denial code is emitted ONLY as a `BridgePayload::Error` envelope
+  back to the denying peer — it is not surfaced as a `RuntimeEvent` kind on the WASM bridge's
+  public event stream. The event shape consumed by the UI is therefore synthetic: it is
+  currently produced by the `runtimeSimulator` and by future wire-ups that translate a
+  `BridgePayload::Error { code: "peer_denied", .. }` observation into a
+  `RuntimeEvent { kind: "peer_denied", payload: { id, peer_pubkey, verb, denied_at, ... } }`.
+  `bifrost-rs` is read-only reference material for this mission and must not be modified.
+- **What the app assumes**: the `PeerDeniedEvent` schema defined in
+  `src/app/AppStateTypes.ts` (`id`, `peer_pubkey`, `verb`, `denied_at`, optional
+  `peer_label` / `ttl_ms` / `ttl_source` / `event_kind` / `content` / `domain` / `relay` /
+  `target_pubkey`). The dashboard's lifecycleEvents observer discards entries without the
+  three required fields — no synthetic fallback is constructed when the payload is
+  incomplete. Each `id` is consumed exactly once per tab via
+  `consumedPeerDenialIdsRef`, and cross-tab dedupe rides the
+  `BroadcastChannel("igloo-policy-denials")` channel (VAL-APPROVALS-024).
+- **Assertion IDs covered**: VAL-APPROVALS-007 (modal opens reactively when a `peer_denied`
+  event is enqueued); VAL-APPROVALS-018 (FIFO ordering); VAL-APPROVALS-024 (multi-tab
+  resolution sync). If bifrost-rs later begins emitting `peer_denied` as a first-class
+  `RuntimeEvent`, the observer continues to match its `kind` string without code change.
+
+### PolicyPromptModal — client-side TTL fallback when event omits `ttl_ms` (VAL-APPROVALS-014)
+
+- **Paper / task source**: `igloo-paper` renders an "Expires in Ns" countdown tied to the
+  runtime-provided TTL of the denied request. The Paper source implies the bifrost runtime
+  always supplies a numeric `ttl_ms` on the denial event.
+- **web-demo-v2 implementation**:
+  `src/screens/DashboardScreen/modals/PolicyPromptModal.tsx` (CLIENT_TTL_MS = 60_000; the
+  modal exposes `data-ttl-source="event|session"` on the backdrop for validators).
+- **Protocol / data constraint**: Since `peer_denied` is not yet emitted as a canonical
+  `RuntimeEvent` by the WASM bridge (see the previous deviation entry), there is no
+  guarantee that future synthetic producers will populate `ttl_ms`. The modal therefore
+  honours `event.ttl_ms` when present and falls back to a client-side 60-second timer
+  otherwise. Either way, the TTL expiry dispatches a policy-neutral `onDismiss()` — no
+  `setPolicyOverride` call is made on timeout (VAL-APPROVALS-020).
+- **Assertion IDs covered**: VAL-APPROVALS-014 (countdown accuracy within ±200ms/s) and
+  VAL-APPROVALS-020 (TTL expiry is policy-neutral).

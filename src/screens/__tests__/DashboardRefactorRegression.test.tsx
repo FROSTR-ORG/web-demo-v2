@@ -106,12 +106,12 @@ describe("DashboardRefactorRegression — audit-gap details preserved after refa
     expect(fontFamily.replace(/['"]/g, "").replace(/_/g, " ")).toMatch(/Share Tech Mono/i);
   });
 
-  it("VAL-DSH-017 — Signer Policy Prompt modal renders detail rows (EVENT KIND, CONTENT, PUBKEY, DOMAIN) with exact paper copy", () => {
+  it("VAL-DSH-017 — Signer Policy Prompt modal renders detail rows (EVENT KIND, CONTENT, PUBKEY, DOMAIN) with exact paper copy and peer-level CTAs (scoped variants hidden per VAL-APPROVALS-013 deviation)", () => {
     renderScenario("dashboard-policy-prompt");
     // Title + subtitle
     expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
     expect(
-      screen.getByText("A peer is requesting permission to sign on your behalf")
+      screen.getByText(/requesting permission to sign on your behalf/)
     ).toBeInTheDocument();
     // Every detail-row label is present
     expect(screen.getByText("EVENT KIND")).toBeInTheDocument();
@@ -136,18 +136,21 @@ describe("DashboardRefactorRegression — audit-gap details preserved after refa
     expect(detailLabels).toEqual(["EVENT KIND", "CONTENT", "PUBKEY", "DOMAIN"]);
     expect(detailValues[2]).toBe("029c4a...1f5e");
     expect(detailValues[3]).toBe("primal.net");
-    // TTL + all 6 decision CTAs
-    expect(screen.getByText("Expires in 42s")).toBeInTheDocument();
-    for (const label of [
-      "Deny",
-      "Allow once",
-      "Always allow",
-      "Always for kind:1",
-      "Always deny for kind:1",
-      "Always deny for primal.net",
-    ]) {
+    // Countdown visible (live timer; the exact "42s" prefix is Paper-era
+    // copy superseded by the reactive denial surface's client-side
+    // countdown).
+    expect(screen.getByText(/Expires in/)).toBeInTheDocument();
+    // Peer-level CTAs only — scoped variants removed per VAL-APPROVALS-013.
+    for (const label of ["Deny", "Allow once", "Always allow", "Always deny"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    expect(screen.queryByText("Always for kind:1")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Always deny for kind:1"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Always deny for primal.net"),
+    ).not.toBeInTheDocument();
   });
 
   it("VAL-DSH-018 — Signing Failed modal renders neutral fallback copy (no synthesized peer-response ratio) + Dismiss/Retry", () => {

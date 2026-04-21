@@ -602,6 +602,9 @@ describe("MockAppStateProvider bridge arming", () => {
     signDispatchLog: {},
     signLifecycleLog: [],
     pendingDispatchIndex: {},
+    peerDenialQueue: [],
+    enqueuePeerDenial: () => undefined,
+    resolvePeerDenial: async () => undefined,
     handleRuntimeCommand: async () => ({ requestId: null, debounced: false }),
   };
 

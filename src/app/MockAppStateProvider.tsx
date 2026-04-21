@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -77,6 +78,38 @@ export function MockAppStateProvider({
   const [pendingDispatchIndex, setPendingDispatchIndex] = useState<
     Record<string, import("./AppStateTypes").PendingDispatchEntry>
   >(value.pendingDispatchIndex ?? {});
+  const [peerDenialQueue, setPeerDenialQueue] = useState<
+    import("./AppStateTypes").PeerDeniedEvent[]
+  >(value.peerDenialQueue ?? []);
+  const resolvedDenialIdsRef = useRef<Set<string>>(new Set());
+
+  const enqueuePeerDenial = useCallback(
+    (event: import("./AppStateTypes").PeerDeniedEvent) => {
+      if (!event || typeof event.id !== "string" || event.id.length === 0) {
+        return;
+      }
+      if (resolvedDenialIdsRef.current.has(event.id)) return;
+      setPeerDenialQueue((previous) =>
+        previous.some((queued) => queued.id === event.id)
+          ? previous
+          : [...previous, event],
+      );
+    },
+    [],
+  );
+
+  const resolvePeerDenial = useCallback(
+    async (
+      id: string,
+      _decision: import("./AppStateTypes").PolicyPromptDecision,
+    ) => {
+      resolvedDenialIdsRef.current.add(id);
+      setPeerDenialQueue((previous) =>
+        previous.filter((entry) => entry.id !== id),
+      );
+    },
+    [],
+  );
 
   const createKeyset = useCallback(
     async (draft: CreateKeysetDraft) => {
@@ -506,6 +539,9 @@ export function MockAppStateProvider({
       signDispatchLog,
       signLifecycleLog,
       pendingDispatchIndex,
+      peerDenialQueue,
+      enqueuePeerDenial,
+      resolvePeerDenial,
       handleRuntimeCommand,
       createKeyset,
       createProfile,
@@ -560,6 +596,9 @@ export function MockAppStateProvider({
       signDispatchLog,
       signLifecycleLog,
       pendingDispatchIndex,
+      peerDenialQueue,
+      enqueuePeerDenial,
+      resolvePeerDenial,
       handleRuntimeCommand,
       createKeyset,
       createProfile,

@@ -284,6 +284,65 @@ export interface HandleRuntimeCommandResult {
 }
 
 /**
+ * A single reactive peer-denial prompt. Queued via
+ * {@link AppStateValue.enqueuePeerDenial} and consumed by
+ * `PolicyPromptModal` in the Dashboard.
+ *
+ * The shape is client-defined (the upstream bifrost-rs runtime does not
+ * currently surface denial notifications as `RuntimeEvent`s — see the
+ * `PolicyPromptModal — reactive denial surface via synthetic peer_denied
+ * events` entry in `docs/runtime-deviations-from-paper.md`). Tests and
+ * future runtime hooks populate the event from whichever channel is
+ * available (direct enqueue in integration tests; a future
+ * `drain_runtime_events` `peer_denied` kind in production).
+ */
+export interface PeerDeniedEvent {
+  /** Unique id per denial event — used for dedupe and queue membership. */
+  id: string;
+  /** Full 64-hex x-only peer pubkey (used to dispatch set_policy_override). */
+  peer_pubkey: string;
+  /** Optional display label (e.g. "Peer #2"). If absent the modal uses a shortHex of `peer_pubkey`. */
+  peer_label?: string;
+  /** The verb the peer request was denied on. */
+  verb: "sign" | "ecdh" | "ping" | "onboard";
+  /** Wall-clock ms at which the denial was surfaced locally. */
+  denied_at: number;
+  /**
+   * Optional upstream-provided TTL in milliseconds. When absent the
+   * modal applies a client-side 60 s timer that dismisses the prompt
+   * without a state change (VAL-APPROVALS-014). Expose the origin via
+   * `ttl_source` so validators can distinguish event-provided vs
+   * client-synthesized TTLs.
+   */
+  ttl_ms?: number;
+  ttl_source?: "event" | "session";
+  /** Decoded event kind text ("kind:1 Short Text Note"). Sign-denial context. */
+  event_kind?: string;
+  /** Decoded event content preview. May be arbitrarily long — the modal clamps to 10 000 chars. */
+  content?: string;
+  /** Domain / relay-host for the request origin (sign-denial context). */
+  domain?: string;
+  /** Relay the inbound request arrived on (ECDH denial context). */
+  relay?: string;
+  /** Target pubkey for ECDH denial context. */
+  target_pubkey?: string;
+}
+
+/**
+ * Decision returned from the {@link PolicyPromptModal} when the user
+ * actions a queued {@link PeerDeniedEvent}.
+ *
+ *  - `allow-once`   — session-scoped override; dispatched as an `allow`
+ *                     and cleared on the next `lockProfile()`.
+ *  - `allow-always` — persistent allow override.
+ *  - `deny`         — no-op close; queue advances, no policy mutation.
+ *  - `deny-always`  — persistent deny override.
+ */
+export interface PolicyPromptDecision {
+  action: "allow-once" | "allow-always" | "deny" | "deny-always";
+}
+
+/**
  * Nonce-pool telemetry surfaced through the AppState. The WASM runtime
  * does NOT expose `nonce_pool_size` / `nonce_pool_threshold` on its
  * `runtime_status` snapshot directly (see the
@@ -399,6 +458,51 @@ export interface AppStateValue {
    * profiles.
    */
   pendingDispatchIndex: Record<string, PendingDispatchEntry>;
+  /**
+   * FIFO queue of reactive peer-denial prompts that the PolicyPromptModal
+   * renders one-at-a-time. Each entry is a {@link PeerDeniedEvent} derived
+   * from a `peer_denied` lifecycle event the local signer emitted when a
+   * peer request was denied by local policy.
+   *
+   * The queue is populated by {@link AppStateValue.enqueuePeerDenial} and
+   * drained by {@link AppStateValue.resolvePeerDenial}. Resolving the
+   * head entry automatically focuses the next queued prompt (if any) —
+   * the UI treats this as "advance the queue FIFO" (VAL-APPROVALS-015).
+   *
+   * Reset on `lockProfile()` and `clearCredentials()` so stale denials
+   * never bleed across profiles.
+   */
+  peerDenialQueue: PeerDeniedEvent[];
+  /**
+   * Append a new peer-denial request to {@link peerDenialQueue}. If an
+   * entry with the same `id` is already present the call is a no-op so
+   * duplicate drains / re-entrant injection don't balloon the queue
+   * (VAL-APPROVALS-015).
+   */
+  enqueuePeerDenial: (event: PeerDeniedEvent) => void;
+  /**
+   * Resolve the peer-denial entry with `id` by dispatching the appropriate
+   * `set_policy_override` call (or no-op for "deny") and removing the
+   * entry from the queue. Returns the head entry of the queue after
+   * resolution (null when empty) so callers can chain focus management.
+   *
+   *  - `allow-once`  → set_policy_override(peer, respond, verb, allow).
+   *                    The override is treated as session-scoped: on the
+   *                    next `lockProfile()` / `clearCredentials()` all
+   *                    once-overrides are cleared.
+   *  - `allow-always` → set_policy_override(peer, respond, verb, allow).
+   *                     Persisted across the current unlocked session
+   *                     (the runtime retains the override internally).
+   *                     After lock/unlock persistence is a best-effort
+   *                     deviation documented in
+   *                     `docs/runtime-deviations-from-paper.md`.
+   *  - `deny`        → no set_policy_override call; queue advances.
+   *  - `deny-always` → set_policy_override(peer, respond, verb, deny).
+   */
+  resolvePeerDenial: (
+    id: string,
+    decision: PolicyPromptDecision,
+  ) => Promise<void>;
   reloadProfiles: () => Promise<void>;
   createKeyset: (draft: CreateKeysetDraft) => Promise<void>;
   createProfile: (draft: CreateProfileDraft) => Promise<string>;

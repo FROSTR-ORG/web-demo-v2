@@ -93,7 +93,9 @@ import type {
   NoncePoolSnapshot,
   OnboardingPackageStatePatch,
   OnboardSession,
+  PeerDeniedEvent,
   PendingDispatchEntry,
+  PolicyPromptDecision,
   ProfileDraft,
   RecoverSession,
   RecoverSourceSummary,
@@ -136,6 +138,32 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     Record<string, PendingDispatchEntry>
   >({});
   const [lifecycleEvents, setLifecycleEvents] = useState<RuntimeEvent[]>([]);
+  // Reactive peer-denial queue for `PolicyPromptModal`. Populated via
+  // `enqueuePeerDenial` (called from the Dashboard's lifecycleEvents
+  // observer for `peer_denied` kind events), drained FIFO via
+  // `resolvePeerDenial`. See `PeerDeniedEvent` in AppStateTypes for the
+  // shape and the reactive-denial-surface deviation entry in
+  // `docs/runtime-deviations-from-paper.md` for rationale
+  // (VAL-APPROVALS-007 family).
+  const [peerDenialQueue, setPeerDenialQueue] = useState<PeerDeniedEvent[]>([]);
+  // Session-scoped set of override keys ("<peer>:respond.<verb>") set via
+  // "Allow once". On `lockProfile()` / `clearCredentials()` we reverse
+  // each entry with `setPolicyOverride(value: "unset")` so the override
+  // does NOT persist across lock/unlock (VAL-APPROVALS-009). Persistent
+  // variants ("Always allow" / "Always deny") are NOT tracked here and
+  // remain in the runtime.
+  const sessionAllowOnceRef = useRef<Set<string>>(new Set());
+  const peerDenialResolvedRef = useRef<Set<string>>(new Set());
+  // Mirror of `peerDenialQueue` as a ref so `resolvePeerDenial` can
+  // look up the resolving entry by id without re-creating its identity
+  // on every queue mutation.
+  const peerDenialQueueRef = useRef<PeerDeniedEvent[]>([]);
+  // Dev/runtime-only BroadcastChannel used to propagate a resolution to
+  // other tabs that hold a mirror peer-denial queue for the same profile
+  // (VAL-APPROVALS-024). Instantiated lazily on the first enqueue so
+  // non-browser tests (jsdom without BroadcastChannel) don't crash on
+  // mount.
+  const policyResolvedChannelRef = useRef<BroadcastChannel | null>(null);
   const [signDispatchLog, setSignDispatchLog] = useState<
     Record<string, string>
   >({});
@@ -412,10 +440,108 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setSignDispatchLog({});
     setSignLifecycleLog([]);
     setPendingDispatchIndex({});
+    setPeerDenialQueue([]);
     pendingDispatchIndexRef.current = {};
     pendingUnmatchedDispatchesRef.current = [];
     lastDispatchRef.current = null;
+    peerDenialResolvedRef.current = new Set();
+    sessionAllowOnceRef.current = new Set();
   }, []);
+
+  /**
+   * Append a new {@link PeerDeniedEvent} to the FIFO denial queue. No-op
+   * when an entry with the same `id` is already queued or was resolved
+   * in the current session (the resolved id set is reset on lock /
+   * clearCredentials). This keeps rapid-fire duplicate drains from
+   * ballooning the modal queue (VAL-APPROVALS-015).
+   */
+  const enqueuePeerDenial = useCallback((event: PeerDeniedEvent) => {
+    if (!event || typeof event.id !== "string" || event.id.length === 0) {
+      return;
+    }
+    if (peerDenialResolvedRef.current.has(event.id)) return;
+    setPeerDenialQueue((previous) => {
+      if (previous.some((queued) => queued.id === event.id)) return previous;
+      return [...previous, event];
+    });
+  }, []);
+
+  const resolvePeerDenial = useCallback(
+    async (id: string, decision: PolicyPromptDecision) => {
+      peerDenialResolvedRef.current.add(id);
+      setPeerDenialQueue((previous) =>
+        previous.filter((entry) => entry.id !== id),
+      );
+      // Multi-tab: broadcast the resolution so any mirror queue in a
+      // sibling tab drops its matching entry without re-dispatching the
+      // policy override a second time (VAL-APPROVALS-024).
+      try {
+        policyResolvedChannelRef.current?.postMessage({
+          type: "policy-resolved",
+          id,
+        });
+      } catch {
+        // BroadcastChannel is best-effort
+      }
+      const runtime = runtimeRef.current;
+      if (!runtime) return;
+      // Use the full queue snapshot captured via a ref rather than the
+      // closure variable so we always resolve against the entry that was
+      // at `id` at dispatch time.
+      const pending = peerDenialQueueRef.current.find(
+        (entry) => entry.id === id,
+      );
+      if (!pending) return;
+      const peer = pending.peer_pubkey;
+      const verb = pending.verb;
+      const overrideKey = `${peer}:respond.${verb}`;
+      try {
+        switch (decision.action) {
+          case "allow-once":
+            runtime.setPolicyOverride({
+              peer,
+              direction: "respond",
+              method: verb,
+              value: "allow",
+            });
+            sessionAllowOnceRef.current.add(overrideKey);
+            break;
+          case "allow-always":
+            runtime.setPolicyOverride({
+              peer,
+              direction: "respond",
+              method: verb,
+              value: "allow",
+            });
+            // Remove from session-once tracking — the user upgraded the
+            // scope to persistent.
+            sessionAllowOnceRef.current.delete(overrideKey);
+            break;
+          case "deny-always":
+            runtime.setPolicyOverride({
+              peer,
+              direction: "respond",
+              method: verb,
+              value: "deny",
+            });
+            sessionAllowOnceRef.current.delete(overrideKey);
+            break;
+          case "deny":
+            // Deny close is intentionally a no-op at the policy layer
+            // (VAL-APPROVALS-011) — the original deny stands.
+            break;
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error(
+          `set_policy_override dispatch failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    },
+    [],
+  );
 
   /**
    * Apply the dev-only nonce-depletion override to a runtime_status snapshot
@@ -1709,6 +1835,28 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const lockProfile = useCallback(() => {
     abortOnboardHandshake();
+    // VAL-APPROVALS-009: "Allow once" overrides are session-scoped — before
+    // the runtime ref is dropped, roll each one back to `unset` so a
+    // subsequent unlock (new runtime from the stored profile) doesn't
+    // silently re-apply them through the in-memory state.
+    const runtimeForRollback = runtimeRef.current;
+    if (runtimeForRollback && sessionAllowOnceRef.current.size > 0) {
+      for (const key of sessionAllowOnceRef.current) {
+        const [peer, directionMethod] = key.split(":");
+        const [, method] = (directionMethod ?? "").split(".");
+        if (!peer || !method) continue;
+        try {
+          runtimeForRollback.setPolicyOverride({
+            peer,
+            direction: "respond",
+            method: method as "sign" | "ecdh" | "ping" | "onboard",
+            value: "unset",
+          });
+        } catch {
+          // best-effort: the runtime may be already wiped
+        }
+      }
+    }
     runtimeRef.current = null;
     liveRelayUrlsRef.current = [];
     stopRelayPump();
@@ -1836,6 +1984,47 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     pendingDispatchIndexRef.current = pendingDispatchIndex;
   }, [pendingDispatchIndex]);
+
+  // Keep peerDenialQueueRef in lock-step with state so resolvePeerDenial
+  // can look up the resolving entry without re-creating its identity on
+  // every queue mutation.
+  useEffect(() => {
+    peerDenialQueueRef.current = peerDenialQueue;
+  }, [peerDenialQueue]);
+
+  // Install the multi-tab BroadcastChannel for VAL-APPROVALS-024. The
+  // channel is a lightweight hint — each tab still carries its own
+  // queue but propagates "resolved" ids so mirrored modals close when
+  // any tab actions a denial. Gated on BroadcastChannel availability
+  // (Node/jsdom lacks it in some test setups).
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    let channel: BroadcastChannel;
+    try {
+      channel = new BroadcastChannel("igloo-policy-denials");
+    } catch {
+      return;
+    }
+    policyResolvedChannelRef.current = channel;
+    function onMessage(event: MessageEvent) {
+      const data = event.data as { type?: string; id?: string } | null;
+      if (!data || data.type !== "policy-resolved") return;
+      const id = data.id;
+      if (typeof id !== "string") return;
+      peerDenialResolvedRef.current.add(id);
+      setPeerDenialQueue((previous) =>
+        previous.filter((entry) => entry.id !== id),
+      );
+    }
+    channel.addEventListener("message", onMessage);
+    return () => {
+      channel.removeEventListener("message", onMessage);
+      channel.close();
+      if (policyResolvedChannelRef.current === channel) {
+        policyResolvedChannelRef.current = null;
+      }
+    };
+  }, []);
 
   // GC sweep: prune pendingDispatchIndex entries whose `settledAt` is
   // older than {@link PENDING_DISPATCH_RETENTION_MS}. Runs once a second
@@ -2270,6 +2459,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       signDispatchLog,
       signLifecycleLog,
       pendingDispatchIndex,
+      peerDenialQueue,
+      enqueuePeerDenial,
+      resolvePeerDenial,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,
@@ -2326,6 +2518,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       signDispatchLog,
       signLifecycleLog,
       pendingDispatchIndex,
+      peerDenialQueue,
+      enqueuePeerDenial,
+      resolvePeerDenial,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,

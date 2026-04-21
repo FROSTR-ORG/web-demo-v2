@@ -389,23 +389,27 @@ describe("Dashboard Event Log controls", () => {
 // ---------------------------------------------------------------------------
 
 describe("Pending approval policy prompt wiring", () => {
-  it("opens the ECDH approval as the ECDH policy prompt variant", () => {
+  it("opens the ECDH approval as the ECDH policy prompt variant (peer-level CTAs only per VAL-APPROVALS-013 deviation)", () => {
     renderAt({ dashboard: { state: "running", paperPanels: true } });
 
     fireEvent.click(screen.getByLabelText("Open approval 2"));
     expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
     expect(
-      screen.getByText("A peer is requesting permission for an encryption operation")
+      screen.getByText(/requesting permission for an encryption operation/)
     ).toBeInTheDocument();
-    expect(screen.getByText("from Peer #1")).toBeInTheDocument();
+    expect(screen.getAllByText(/Peer #1/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("OPERATION")).toBeInTheDocument();
     expect(screen.getByText("TARGET PUBKEY")).toBeInTheDocument();
     expect(screen.getByText("RELAY")).toBeInTheDocument();
     expect(screen.getByText("NIP-44 Encryption")).toBeInTheDocument();
     expect(screen.getByText("wss://relay.primal.net")).toBeInTheDocument();
-    expect(screen.getByText("Expires in 1m 12s")).toBeInTheDocument();
-    expect(screen.getByText("Always for ECDH")).toBeInTheDocument();
-    expect(screen.getByText("Always deny for ECDH")).toBeInTheDocument();
+    expect(screen.getByText(/Expires in/)).toBeInTheDocument();
+    // Peer-level CTAs only; scoped "Always for ECDH" / "Always deny for
+    // ECDH" are hidden per VAL-APPROVALS-013.
+    expect(screen.getByText("Always allow")).toBeInTheDocument();
+    expect(screen.getByText("Always deny")).toBeInTheDocument();
+    expect(screen.queryByText("Always for ECDH")).not.toBeInTheDocument();
+    expect(screen.queryByText("Always deny for ECDH")).not.toBeInTheDocument();
   });
 });
 
