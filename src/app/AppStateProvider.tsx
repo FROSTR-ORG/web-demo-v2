@@ -10,6 +10,8 @@ import { memberForShare, memberPubkeyXOnly } from "../lib/bifrost/format";
 import {
   BifrostPackageError,
   buildOnboardingRuntimeSnapshot,
+  buildProfileBackupEvent,
+  createEncryptedProfileBackup,
   createKeysetBundle,
   createKeysetBundleFromNsec,
   createOnboardingRequestBundle,
@@ -31,6 +33,10 @@ import type {
   RuntimeStatusSummary,
   StoredProfileSummary,
 } from "../lib/bifrost/types";
+import {
+  RuntimeRelayPump,
+  type RuntimeRelayStatus,
+} from "../lib/relay/runtimeRelayPump";
 import {
   OnboardingRelayError,
   runOnboardingRelayHandshake,
@@ -55,6 +61,7 @@ import {
   createRuntimeFromProfilePayload,
   createRuntimeFromSnapshot,
 } from "./profileRuntime";
+import { exportRuntimePackagesFromSnapshot } from "./runtimeExports";
 import {
   decodeExternalBfshareSources,
   loadSavedProfileSource,
@@ -79,6 +86,7 @@ import type {
   ProfileDraft,
   RecoverSession,
   RecoverSourceSummary,
+  ReplaceShareSession,
   RotateKeysetSession,
 } from "./AppStateTypes";
 
@@ -88,6 +96,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     useState<StoredProfileSummary | null>(null);
   const [runtimeStatus, setRuntimeStatus] =
     useState<RuntimeStatusSummary | null>(null);
+  const [runtimeRelays, setRuntimeRelays] = useState<RuntimeRelayStatus[]>([]);
   const [signerPaused, setSignerPausedState] = useState(false);
   const [createSession, setCreateSession] = useState<CreateSession | null>(
     null,
@@ -100,12 +109,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   );
   const [rotateKeysetSession, setRotateKeysetSession] =
     useState<RotateKeysetSession | null>(null);
+  const [replaceShareSession, setReplaceShareSession] =
+    useState<ReplaceShareSession | null>(null);
   const [recoverSession, setRecoverSession] = useState<RecoverSession | null>(
     null,
   );
   const [bridgeHydrated, setBridgeHydrated] = useState(false);
   const runtimeRef = useRef<RuntimeClient | null>(null);
   const simulatorRef = useRef<LocalRuntimeSimulator | null>(null);
+  const relayPumpRef = useRef<RuntimeRelayPump | null>(null);
+  const liveRelayUrlsRef = useRef<string[]>([]);
   const onboardHandshakeRef = useRef<{
     id: number;
     controller: AbortController;
@@ -133,11 +146,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setProfiles(Array.isArray(snapshot.profiles) ? snapshot.profiles : []);
       setActiveProfile(snapshot.activeProfile ?? null);
       setRuntimeStatus(snapshot.runtimeStatus ?? null);
+      setRuntimeRelays(snapshot.runtimeRelays ?? []);
       setSignerPausedState(Boolean(snapshot.signerPaused));
       setCreateSession(null);
       setImportSession(null);
       setOnboardSession(null);
       setRotateKeysetSession(null);
+      setReplaceShareSession(null);
       setRecoverSession(null);
       setBridgeHydrated(true);
       return true;
@@ -155,14 +170,72 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(BRIDGE_EVENT, onBridgeUpdate);
   }, [reloadProfiles]);
 
+  const stopRelayPump = useCallback((clearStatuses = true) => {
+    relayPumpRef.current?.stop();
+    relayPumpRef.current = null;
+    if (clearStatuses) {
+      setRuntimeRelays([]);
+    }
+  }, []);
+
+  const startLiveRelayPump = useCallback(
+    async (runtime: RuntimeClient, relayUrls: string[]) => {
+      const relays = Array.from(
+        new Set(relayUrls.map((relay) => relay.trim()).filter(Boolean)),
+      );
+      liveRelayUrlsRef.current = relays;
+      stopRelayPump(false);
+      if (relays.length === 0) {
+        setRuntimeRelays([]);
+        return runtime.runtimeStatus();
+      }
+
+      const pump = new RuntimeRelayPump({
+        runtime,
+        relays,
+        onRelayStatusChange: setRuntimeRelays,
+      });
+      relayPumpRef.current = pump;
+      setRuntimeRelays(pump.relayStatuses());
+      const status = await pump.start();
+      if (relayPumpRef.current === pump) {
+        setRuntimeStatus(status);
+      }
+      return status;
+    },
+    [stopRelayPump],
+  );
+
   const setRuntime = useCallback(
-    (runtime: RuntimeClient, simulator?: LocalRuntimeSimulator) => {
+    (
+      runtime: RuntimeClient,
+      simulator?: LocalRuntimeSimulator,
+      relayUrls?: string[],
+    ) => {
       if (simulatorRef.current && simulatorRef.current !== simulator) {
         simulatorRef.current.stop();
+      }
+      if (!relayUrls?.length) {
+        liveRelayUrlsRef.current = [];
+        stopRelayPump();
       }
       runtimeRef.current = runtime;
       simulatorRef.current = simulator ?? null;
       setRuntimeStatus(runtime.runtimeStatus());
+      if (relayUrls?.length && !simulator) {
+        void startLiveRelayPump(runtime, relayUrls).catch((error) => {
+          setRuntimeRelays(
+            relayUrls.map((url) => ({
+              url,
+              state: "offline",
+              lastError:
+                error instanceof Error
+                  ? error.message
+                  : "Unable to start relay runtime.",
+            })),
+          );
+        });
+      }
       // A live RuntimeClient just came online in this SPA session — re-enable the
       // runtime-polling interval by clearing the bridge-hydration flag. Without
       // this reset, `bridgeHydrated` would stay `true` forever after any demo
@@ -170,19 +243,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // runtime is now backing `runtimeRef`.
       setBridgeHydrated(false);
     },
-    [],
+    [startLiveRelayPump, stopRelayPump],
   );
 
   const startRuntimeFromPayload = useCallback(
     async (payload: BfProfilePayload, localShareIdx: number) => {
-      setRuntime(await createRuntimeFromProfilePayload(payload, localShareIdx));
+      setRuntime(
+        await createRuntimeFromProfilePayload(payload, localShareIdx),
+        undefined,
+        payload.device.relays,
+      );
     },
     [setRuntime],
   );
 
   const startRuntimeFromSnapshot = useCallback(
-    async (snapshot: RuntimeSnapshotInput) => {
-      setRuntime(await createRuntimeFromSnapshot(snapshot));
+    async (snapshot: RuntimeSnapshotInput, relayUrls: string[] = []) => {
+      setRuntime(await createRuntimeFromSnapshot(snapshot), undefined, relayUrls);
     },
     [setRuntime],
   );
@@ -242,10 +319,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       threshold: draft.threshold,
       count: draft.count,
     };
-    const keyset = draft.generatedNsec
+    const nsec = draft.generatedNsec ?? draft.existingNsec;
+    const keyset = nsec
       ? await createKeysetBundleFromNsec({
           ...sessionDraft,
-          nsec: draft.generatedNsec,
+          nsec,
         })
       : await createKeysetBundle(sessionDraft);
     const localShare = keyset.shares[0];
@@ -650,7 +728,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         },
       );
       await saveProfile(record);
-      await startRuntimeFromSnapshot(onboardSession.runtimeSnapshot);
+      await startRuntimeFromSnapshot(
+        onboardSession.runtimeSnapshot,
+        onboardSession.payload.relays,
+      );
       setActiveProfile(record.summary);
       setSignerPausedState(false);
       setOnboardSession(null);
@@ -900,6 +981,182 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setRotateKeysetSession(null);
   }, []);
 
+  const decodeReplaceSharePackage = useCallback(
+    async (
+      packageString: string,
+      password: string,
+      profilePassword: string,
+    ) => {
+      if (!activeProfile) {
+        throw new SetupFlowError(
+          "missing_session",
+          "No active profile is available.",
+        );
+      }
+      const trimmed = packageString.trim();
+      if (!trimmed) {
+        throw new SetupFlowError(
+          "invalid_package",
+          "Replace share package is required.",
+        );
+      }
+      if (!trimmed.startsWith("bfonboard1")) {
+        throw new SetupFlowError(
+          "invalid_package",
+          "Replace share package must start with bfonboard1.",
+        );
+      }
+      try {
+        const payload = await decodeBfonboardPackage(trimmed, password);
+        const record = await getProfile(activeProfile.id);
+        if (!record) {
+          throw new SetupFlowError(
+            "missing_session",
+            "Active profile not found in storage.",
+          );
+        }
+        const currentPayload = await decodeProfilePackage(
+          record.encryptedProfilePackage,
+          profilePassword,
+        );
+        const localShareIdx = await resolveShareIndex(
+          currentPayload.group_package,
+          payload.share_secret,
+        );
+        setReplaceShareSession({
+          phase: "decoded",
+          packageString: trimmed,
+          password,
+          profilePassword,
+          decodedPayload: payload,
+          localShareIdx,
+          oldProfileId: activeProfile.id,
+        });
+      } catch (error) {
+        if (error instanceof SetupFlowError) {
+          throw error;
+        }
+        throw setupErrorFromPackage(error, {
+          code: "wrong_password",
+          message:
+            "The package password could not decrypt this onboarding package.",
+        });
+      }
+    },
+    [activeProfile],
+  );
+
+  const applyReplaceShareUpdate = useCallback(async () => {
+    if (
+      !replaceShareSession?.decodedPayload ||
+      !replaceShareSession.profilePassword
+    ) {
+      throw new SetupFlowError(
+        "missing_session",
+        "Decode a replace share package before applying.",
+      );
+    }
+    if (!activeProfile) {
+      throw new SetupFlowError(
+        "missing_session",
+        "No active profile is available.",
+      );
+    }
+
+    setReplaceShareSession((session) =>
+      session ? { ...session, phase: "applying" } : session,
+    );
+
+    try {
+      const record = await getProfile(activeProfile.id);
+      if (!record) {
+        throw new SetupFlowError(
+          "missing_session",
+          "Active profile not found in storage.",
+        );
+      }
+      const currentPayload = await decodeProfilePackage(
+        record.encryptedProfilePackage,
+        replaceShareSession.profilePassword,
+      );
+
+      const newShare = {
+        idx:
+          replaceShareSession.localShareIdx ?? activeProfile.localShareIdx,
+        seckey: replaceShareSession.decodedPayload.share_secret,
+      };
+
+      const newProfileId = await deriveProfileIdFromShareSecret(
+        newShare.seckey,
+      );
+
+      const newPayload = profilePayloadForShare({
+        profileId: newProfileId,
+        deviceName: currentPayload.device.name,
+        share: newShare,
+        group: currentPayload.group_package,
+        relays:
+          replaceShareSession.decodedPayload.relays.length > 0
+            ? replaceShareSession.decodedPayload.relays
+            : currentPayload.device.relays,
+        manualPeerPolicyOverrides:
+          currentPayload.device.manual_peer_policy_overrides ??
+          defaultManualPeerPolicyOverrides(
+            currentPayload.group_package,
+            newShare.idx,
+          ),
+      });
+
+      const summary = await savePayloadAsProfile(
+        newPayload,
+        replaceShareSession.profilePassword,
+        {
+          replaceProfileId: activeProfile.id,
+          createdAt: record.summary.createdAt,
+          label: record.summary.label,
+        },
+      );
+
+      setReplaceShareSession((session) =>
+        session
+          ? {
+              ...session,
+              phase: "updated",
+              newProfileId: summary.id,
+            }
+          : session,
+      );
+    } catch (error) {
+      setReplaceShareSession((session) =>
+        session
+          ? {
+              ...session,
+              phase: "failed",
+              error: {
+                code:
+                  error instanceof SetupFlowError
+                    ? error.code
+                    : "invalid_package",
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : "Unable to apply share update.",
+              },
+            }
+          : session,
+      );
+      throw error;
+    }
+  }, [
+    replaceShareSession,
+    activeProfile,
+    savePayloadAsProfile,
+  ]);
+
+  const clearReplaceShareSession = useCallback(() => {
+    setReplaceShareSession(null);
+  }, []);
+
   const validateRecoverSources = useCallback(
     async (input: {
       profileId: string;
@@ -1026,7 +1283,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         record.summary.localShareIdx,
       );
       await touchProfile(id);
-      setRuntime(runtime);
+      const payloadRelays = payload.device.relays ?? [];
+      setRuntime(
+        runtime,
+        undefined,
+        payloadRelays.length > 0 ? payloadRelays : record.summary.relays,
+      );
       setActiveProfile({ ...record.summary, lastUsedAt: Date.now() });
       setSignerPausedState(false);
       await reloadProfiles();
@@ -1034,9 +1296,42 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [reloadProfiles, setRuntime],
   );
 
+  const changeProfilePassword = useCallback(
+    async (oldPassword: string, newPassword: string) => {
+      if (!activeProfile) {
+        throw new Error("No active profile.");
+      }
+      if (newPassword.length < 8) {
+        throw new Error("New password must be at least 8 characters.");
+      }
+      const record = await getProfile(activeProfile.id);
+      if (!record) {
+        throw new Error("Profile record not found.");
+      }
+      const payload = await decodeProfilePackage(
+        record.encryptedProfilePackage,
+        oldPassword,
+      );
+      const { record: updatedRecord } = await buildStoredProfileRecord(
+        payload,
+        newPassword,
+        {
+          createdAt: record.summary.createdAt,
+          lastUsedAt: Date.now(),
+          label: record.summary.label,
+        },
+      );
+      await saveProfile(updatedRecord);
+      await reloadProfiles();
+    },
+    [activeProfile, reloadProfiles],
+  );
+
   const lockProfile = useCallback(() => {
     abortOnboardHandshake();
     runtimeRef.current = null;
+    liveRelayUrlsRef.current = [];
+    stopRelayPump();
     simulatorRef.current?.stop();
     simulatorRef.current = null;
     setRuntimeStatus(null);
@@ -1046,13 +1341,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setImportSession(null);
     setOnboardSession(null);
     setRotateKeysetSession(null);
+    setReplaceShareSession(null);
     setRecoverSession(null);
-  }, [abortOnboardHandshake]);
+  }, [abortOnboardHandshake, stopRelayPump]);
 
   const clearCredentials = useCallback(async () => {
     abortOnboardHandshake();
     const id = activeProfile?.id;
     runtimeRef.current = null;
+    liveRelayUrlsRef.current = [];
+    stopRelayPump();
     simulatorRef.current?.stop();
     simulatorRef.current = null;
     setRuntimeStatus(null);
@@ -1062,22 +1360,102 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setImportSession(null);
     setOnboardSession(null);
     setRotateKeysetSession(null);
+    setReplaceShareSession(null);
     setRecoverSession(null);
     if (id) {
       await removeProfile(id);
     }
     await reloadProfiles();
-  }, [abortOnboardHandshake, activeProfile, reloadProfiles]);
+  }, [abortOnboardHandshake, activeProfile, reloadProfiles, stopRelayPump]);
+
+  const exportRuntimePackages = useCallback(
+    async (password: string) => {
+      const runtime = runtimeRef.current;
+      const profile = activeProfile;
+      if (!runtime || !profile) {
+        throw new Error("No unlocked runtime is available to export.");
+      }
+      const snapshot = runtime.snapshot();
+      return exportRuntimePackagesFromSnapshot({
+        profile,
+        snapshot,
+        password,
+        peerCount: runtimeStatus?.peers.length ?? snapshot.status.known_peers,
+      });
+    },
+    [activeProfile, runtimeStatus],
+  );
+
+  const createProfileBackup = useCallback(async () => {
+    const runtime = runtimeRef.current;
+    const profile = activeProfile;
+    if (!runtime || !profile) {
+      throw new Error("No unlocked runtime is available to create a backup.");
+    }
+    const snapshot = runtime.snapshot();
+    const payload = profilePayloadForShare({
+      profileId: profile.id,
+      deviceName: profile.deviceName,
+      share: snapshot.bootstrap.share,
+      group: snapshot.bootstrap.group,
+      relays: profile.relays,
+      manualPeerPolicyOverrides: defaultManualPeerPolicyOverrides(
+        snapshot.bootstrap.group,
+        snapshot.bootstrap.share.idx,
+      ),
+    });
+    const backup = await createEncryptedProfileBackup(payload);
+    const event = await buildProfileBackupEvent({
+      shareSecret: snapshot.bootstrap.share.seckey,
+      backup,
+    });
+    return { backup, event };
+  }, [activeProfile]);
+
+  const restartRuntimeConnections = useCallback(async () => {
+    const runtime = runtimeRef.current;
+    if (!runtime) {
+      setRuntimeRelays([]);
+      setRuntimeStatus(null);
+      return;
+    }
+    setSignerPausedState(false);
+    if (simulatorRef.current) {
+      simulatorRef.current.start();
+      simulatorRef.current.refreshAll();
+      setRuntimeStatus(simulatorRef.current.pump(3));
+      return;
+    }
+    const relays = liveRelayUrlsRef.current.length
+      ? liveRelayUrlsRef.current
+      : activeProfile?.relays ?? [];
+    await startLiveRelayPump(runtime, relays);
+    if (relayPumpRef.current) {
+      const status = await relayPumpRef.current.refreshAll();
+      if (runtimeRef.current === runtime) {
+        setRuntimeStatus(status);
+      }
+    }
+  }, [activeProfile, startLiveRelayPump]);
 
   const setSignerPaused = useCallback((paused: boolean) => {
     setSignerPausedState(paused);
     if (paused) {
       simulatorRef.current?.stop();
+      stopRelayPump(false);
+      setRuntimeRelays((relays) =>
+        relays.map((relay) => ({ ...relay, state: "offline" })),
+      );
     } else {
-      simulatorRef.current?.start();
-      simulatorRef.current?.refreshAll();
+      if (simulatorRef.current) {
+        simulatorRef.current.start();
+        simulatorRef.current.refreshAll();
+        setRuntimeStatus(simulatorRef.current.pump(3));
+        return;
+      }
+      void restartRuntimeConnections();
     }
-  }, []);
+  }, [restartRuntimeConnections, stopRelayPump]);
 
   const refreshRuntime = useCallback(() => {
     const runtime = runtimeRef.current;
@@ -1085,8 +1463,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setRuntimeStatus(null);
       return;
     }
+    if (signerPaused) {
+      setRuntimeStatus(runtime.runtimeStatus());
+      return;
+    }
     if (!signerPaused && simulatorRef.current) {
       setRuntimeStatus(simulatorRef.current.pump(3));
+      return;
+    }
+    if (!signerPaused && relayPumpRef.current) {
+      void relayPumpRef.current.refreshAll().then((status) => {
+        if (runtimeRef.current === runtime) {
+          setRuntimeStatus(status);
+        }
+      });
       return;
     }
     runtime.tick(Date.now());
@@ -1113,11 +1503,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       profiles,
       activeProfile,
       runtimeStatus,
+      runtimeRelays,
       signerPaused,
       createSession,
       importSession,
       onboardSession,
       rotateKeysetSession,
+      replaceShareSession,
       recoverSession,
       reloadProfiles,
       createKeyset,
@@ -1139,25 +1531,34 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       updateRotatePackageState,
       finishRotateDistribution,
       clearRotateKeysetSession,
+      decodeReplaceSharePackage,
+      applyReplaceShareUpdate,
+      clearReplaceShareSession,
       validateRecoverSources,
       recoverNsec,
       clearRecoverSession,
       expireRecoveredNsec,
       unlockProfile,
+      changeProfilePassword,
       lockProfile,
       clearCredentials,
+      exportRuntimePackages,
+      createProfileBackup,
       setSignerPaused,
       refreshRuntime,
+      restartRuntimeConnections,
     }),
     [
       profiles,
       activeProfile,
       runtimeStatus,
+      runtimeRelays,
       signerPaused,
       createSession,
       importSession,
       onboardSession,
       rotateKeysetSession,
+      replaceShareSession,
       recoverSession,
       reloadProfiles,
       createKeyset,
@@ -1179,15 +1580,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       updateRotatePackageState,
       finishRotateDistribution,
       clearRotateKeysetSession,
+      decodeReplaceSharePackage,
+      applyReplaceShareUpdate,
+      clearReplaceShareSession,
       validateRecoverSources,
       recoverNsec,
       clearRecoverSession,
       expireRecoveredNsec,
       unlockProfile,
+      changeProfilePassword,
       lockProfile,
       clearCredentials,
+      exportRuntimePackages,
+      createProfileBackup,
       setSignerPaused,
       refreshRuntime,
+      restartRuntimeConnections,
     ],
   );
 

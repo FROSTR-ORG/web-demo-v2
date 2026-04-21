@@ -14,10 +14,15 @@ export function defaultProfileDraft(): ProfileDraft {
   };
 }
 
+export function defaultPeerPermissions(): import("./AppStateTypes").PeerPermissionMap {
+  return { sign: true, ecdh: true, ping: true, onboard: true };
+}
+
 export function defaultCreateProfileDraft(): CreateProfileDraft {
   return {
     ...defaultProfileDraft(),
     distributionPassword: "",
     confirmDistributionPassword: "",
+    peerPermissions: {},
   };
 }

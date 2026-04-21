@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAppState } from "../../../app/AppState";
 import { paperGroupKey } from "../mocks";
 
 interface SettingsSidebarProps {
@@ -14,6 +15,7 @@ interface SettingsSidebarProps {
   onLock: () => void;
   onClearCredentials: () => void;
   onExport: () => void;
+  onExportShare: () => void;
 }
 
 // Paper-parity relay hint appended to the sidebar so that the Settings view
@@ -35,8 +37,10 @@ export function SettingsSidebar({
   onLock,
   onClearCredentials,
   onExport,
+  onExportShare,
 }: SettingsSidebarProps) {
   const navigate = useNavigate();
+  const { changeProfilePassword } = useAppState();
   const [relays, setRelays] = useState(() =>
     initialRelays.includes(PAPER_SIDEBAR_RELAY)
       ? initialRelays
@@ -45,16 +49,35 @@ export function SettingsSidebar({
   const [newRelay, setNewRelay] = useState("");
   const [deviceName, setDeviceName] = useState(profile.deviceName);
   const [editingDeviceName, setEditingDeviceName] = useState(false);
-  const [shareCopied, setShareCopied] = useState(false);
-  const shareCopyTimerRef = useRef<number | undefined>(undefined);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
 
-  useEffect(() => {
-    return () => {
-      if (shareCopyTimerRef.current !== undefined) {
-        window.clearTimeout(shareCopyTimerRef.current);
-      }
-    };
-  }, []);
+  async function handleChangePassword() {
+    setPasswordError("");
+    setPasswordSuccess("");
+    if (newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError("New passwords do not match.");
+      return;
+    }
+    try {
+      await changeProfilePassword(oldPassword, newPassword);
+      setPasswordSuccess("Password changed successfully.");
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+      setTimeout(() => setChangingPassword(false), 1500);
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : "Unable to change password.");
+    }
+  }
 
   function handleRemoveRelay(index: number) {
     setRelays((prev) => prev.filter((_, i) => i !== index));
@@ -66,17 +89,6 @@ export function SettingsSidebar({
       setRelays((prev) => [...prev, trimmed]);
       setNewRelay("");
     }
-  }
-
-  function handleCopyShare() {
-    if (shareCopyTimerRef.current !== undefined) {
-      window.clearTimeout(shareCopyTimerRef.current);
-    }
-    setShareCopied(true);
-    shareCopyTimerRef.current = window.setTimeout(() => {
-      setShareCopied(false);
-      shareCopyTimerRef.current = undefined;
-    }, 1800);
   }
 
   return (
@@ -168,9 +180,41 @@ export function SettingsSidebar({
                 <span className="settings-row-label">Profile Password</span>
                 <div className="settings-row-value">
                   <span>••••••••</span>
-                  <button type="button" className="settings-change-btn">Change</button>
+                  <button type="button" className="settings-change-btn" onClick={() => setChangingPassword((prev) => !prev)}>
+                    {changingPassword ? "Cancel" : "Change"}
+                  </button>
                 </div>
               </div>
+              {changingPassword && (
+                <div className="settings-password-change">
+                  <input
+                    type="password"
+                    className="input"
+                    placeholder="Current password"
+                    value={oldPassword}
+                    onChange={(e) => setOldPassword(e.target.value)}
+                  />
+                  <input
+                    type="password"
+                    className="input"
+                    placeholder="New password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                  <input
+                    type="password"
+                    className="input"
+                    placeholder="Confirm new password"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  />
+                  {passwordError && <span className="field-error-text">{passwordError}</span>}
+                  {passwordSuccess && <span className="import-validation-ok">{passwordSuccess}</span>}
+                  <button type="button" className="button button-primary button-sm" onClick={handleChangePassword}>
+                    Update Password
+                  </button>
+                </div>
+              )}
               {/* Relays */}
               <div className="settings-relays">
                 {relays.map((relay, idx) => (
@@ -248,17 +292,17 @@ export function SettingsSidebar({
           {/* ROTATE SHARE */}
           <div className="settings-section">
             <div className="settings-section-header">
-              <span className="settings-section-label">Rotate Share</span>
+              <span className="settings-section-label">Replace Share</span>
               <span className="settings-section-rule" />
             </div>
             <div className="settings-action-row">
               <div className="settings-action-info">
-                <div className="settings-action-name">Rotate Share</div>
+                <div className="settings-action-name">Replace Share</div>
                 <div className="settings-action-desc">
-                  Replace only this device's local share from Settings while keeping the same group public key and keyset membership.
+                  Import a bfonboard package to replace only this device's local share while keeping the same group public key and profile.
                 </div>
               </div>
-              <button type="button" className="settings-btn-blue" onClick={() => { onClose(); navigate('/rotate-share'); }}>Rotate Share</button>
+              <button type="button" className="settings-btn-blue" onClick={() => { onClose(); navigate('/replace-share'); }}>Replace Share</button>
             </div>
 
           </div>
@@ -283,11 +327,11 @@ export function SettingsSidebar({
                 <div className="settings-action-info">
                   <div className="settings-action-name">Export Share</div>
                   <div className="settings-action-desc">
-                    Unencrypted share key in hex
+                    Password-protected bfshare package
                   </div>
                 </div>
-                <button type="button" className="settings-btn-muted" onClick={handleCopyShare}>
-                  {shareCopied ? "Copied" : "Copy"}
+                <button type="button" className="settings-btn-blue" onClick={onExportShare}>
+                  Export
                 </button>
               </div>
             </div>

@@ -276,7 +276,7 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
   });
 
   describe("VAL-DSH-010 / DSH-011: Settings sidebar", () => {
-    it("renders Settings sidebar with Device Profile, Group Profile, Rotate Share, Export, Security sections", () => {
+    it("renders Settings sidebar with Device Profile, Group Profile, Replace Share, Export, Security sections", () => {
       renderAt({ dashboard: { settingsOpen: true, paperPanels: true } });
       const sidebar = screen.getByTestId("settings-sidebar");
       const labels = Array.from(sidebar.querySelectorAll(".settings-section-label")).map(
@@ -285,7 +285,7 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
       expect(labels).toEqual([
         "Device Profile",
         "Group Profile",
-        "Rotate Share",
+        "Replace Share",
         "Export & Backup",
         "Profile Security",
       ]);
@@ -345,7 +345,7 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
       renderAt({ dashboard: { settingsOpen: true, modal: "export-complete", paperPanels: true } });
       const modal = screen.getByTestId("export-complete-modal");
       expect(modal).toBeInTheDocument();
-      expect(modal.querySelector(".export-complete-title")?.textContent).toBe("Backup Ready");
+      expect(modal.querySelector(".export-complete-title")?.textContent).toBe("Profile Backup Ready");
       const actionBtns = Array.from(modal.querySelectorAll(".export-action-btn")).map(
         (el) => el.textContent
       );

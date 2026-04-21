@@ -1,86 +1,57 @@
 # User Testing
 
-Testing surface, tools, and resource cost classification for this mission.
-
----
+Runtime surface, testing tools, and validator concurrency.
 
 ## Validation Surface
 
-- **Browser UI** at `http://127.0.0.1:5173` (Vite dev server).
-- **DemoGallery entry points** at `http://127.0.0.1:5173/demo/{scenario-id}` — each scenario in `src/demo/scenarios.ts` maps one URL to one Paper screen reference and mounts the component with its mock app state preset. This is the PRIMARY testing surface for every UI fidelity assertion.
-- **Main app routes** at `http://127.0.0.1:5173/*` — used for cross-flow navigation assertions (e.g. VAL-CROSS-005..014).
-- **Tool:** `agent-browser` (Playwright-based headless Chromium) is mandatory per mission rules for web-app surfaces.
-- **Viewport:** 1440×1080 (desktop). For mobile-specific assertions, use 390×844 (Pixel 5).
+**Primary:** web browser via `agent-browser` (mandatory per mission rule: web apps use agent-browser unless user specifies otherwise).
 
-## Validation Setup
+**Routes for validation:**
+- `http://127.0.0.1:5173/` — Welcome / Unlock (entry)
+- `http://127.0.0.1:5173/demo` — Demo gallery index
+- `http://127.0.0.1:5173/demo/:scenarioId` — Individual Paper-reference scenarios (deterministic, seeded via MockAppStateProvider)
+- `http://127.0.0.1:5173/dashboard/:profileId` — Real-profile dashboard (requires prior unlock/create)
+- Flow routes: `/create/*`, `/import/*`, `/onboard/*`, `/rotate-keyset/*`, `/replace-share/*`, `/recover/*`
 
-1. Start the Vite dev server: see `.factory/services.yaml` → `services.web.start`.
-2. Wait for healthcheck: `curl -sf http://127.0.0.1:5173`.
-3. Launch `agent-browser` and navigate to target URL.
+**Test query params:**
+- `?chrome=0` strips demo chrome (toolbar) for clean capture
+
+## Validation Tools
+
+- **agent-browser** — primary. Supports multiple independent sessions. Has Playwright underneath for deep interactions.
+- **Direct curl / ws client** — for protocol-level checks (relay reachability, published event inspection).
+- **DevTools** — network panel for WebSocket frame inspection, Application panel for IndexedDB state, Console panel for error capture.
+
+## Multi-Device Validation Pattern
+
+For sign/ECDH round-trip tests requiring multiple peers, copy the frostr-infra `chrome-pwa-pairing.spec.ts` pattern:
+
+1. Spawn a local `bifrost-devtools` relay on a random port (or use public relays per user preference).
+2. Generate a threshold keyset via WASM `create_keyset_bundle` (use the vendored bridge directly in Node for test setup).
+3. Seed profile A into agent-browser session #1 by driving the Create flow OR by pre-writing IndexedDB.
+4. Deliver bfonboard packages to sessions #2, #3; drive the Onboard flow in each.
+5. Trigger operations on session #1 (sign / ECDH / ping); verify completion on all sessions.
+
+Multiple agent-browser sessions share the same dev server but use isolated storage states (IndexedDB namespaced by browser profile).
 
 ## Validation Concurrency
 
-- **Machine:** 128 GB RAM, 18 CPU cores.
-- **Per-instance footprint:** ~642 MB (Vite dev server ~257 MB shared + Chrome instance ~385 MB per validator).
-- **Usable headroom (70%):** > 75 GB — plenty of room.
-- **Max concurrent validators:** **5** (conservative, matches upper guidance cap).
-- **Shared Vite dev server:** all validators share one dev server on 5173; only Chrome instances multiply.
+**Machine:** 128 GB RAM, 18 cores, ~51 GB free at baseline.
 
-## Testing Approach for This Mission
+**Per-session footprint (measured in dry run):** ~366 MB RSS per agent-browser session; +4 Chromium procs each.
 
-For UI fidelity assertions:
-1. Navigate to the scenario's `/demo/{id}` URL.
-2. Wait for `networkidle`.
-3. Assert expected text (headings, labels, CTAs, help text) is visible in the DOM — quote from the Paper `screen.html` as the source of truth.
-4. For interaction assertions: click/type/press as specified, then assert the expected post-state (URL change, modal appearance, updated copy, etc.).
-5. Capture screenshots + console errors as evidence.
+**Dev server footprint:** negligible (~200 MB).
 
-**SPA content is client-rendered.** Do NOT rely on `curl | grep` to verify in-page text — the raw HTML only returns `<div id="root"></div>` + `<title>Igloo Web</title>`. Always use `agent-browser` with `wait --load networkidle`.
+**Max concurrent validators:**
+- **Multi-device surface** (tests that spin up N>1 browsers simultaneously): **4** (allows 3 device instances + 1 spare within 70% of available RAM headroom)
+- **Single-device surface** (per-scenario functional tests): **5**
 
-## DemoGallery Quick Reference
+CPU (18 cores, ~35% baseline load) is the practical limiter well before RAM. Tests should avoid CPU-intensive parallelism beyond the recommended concurrency.
 
-- Gallery index: `/demo` shows all canonical scenarios grouped by flow.
-- Canonical scenario page: `/demo/{id}` renders the app shell + demo chrome toolbar (All screens, Previous, Next, Raw, Reference).
-- Raw mode: `/demo/{id}?chrome=0` hides the demo chrome (useful for visual parity screenshots against Paper screenshots).
-- Variant scenarios (`canonical: false`, e.g. `import-error-corrupted`, `onboard-failed-rejected`) are reachable only by direct URL — they do NOT appear in the gallery index.
+## Paper Parity Reference
 
-## Scenario-Level Setup
+For every UI surface, reference `/Users/plebdev/Desktop/igloo-web-v2-prototype/igloo-paper/screens/<area>/` for copy, layout, and visual style. Each scenario in `src/demo/scenarios.ts` links to its Paper source. Deviations (e.g., reactive denial surface) documented in `/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/docs/runtime-deviations-from-paper.md`.
 
-Every DemoGallery scenario injects its own mock `AppStateValue` via `MockAppStateProvider` — validators do NOT need to manually create profiles, unlock, or seed fixtures. The scenario's `appState` preset (see `src/demo/fixtures.ts` and `src/demo/scenarios.ts`) is the ground truth for what the user would see for that particular runtime state.
+## Known Pre-Existing Issues (Do Not Fix)
 
-For cross-flow assertions starting from the main app `/`, the initial state is defined by the `AppStateProvider` in `src/app/AppState.tsx`, which loads profiles from IndexedDB. For a clean state, validators may need to clear IndexedDB between tests (`indexedDB.deleteDatabase` or agent-browser storage clear).
-
-## Known Constraints
-
-- WASM loading may add 2–3 seconds to initial page load.
-- IndexedDB state persists between test runs — clear storage if you need a clean main-app flow.
-- Some cross-flow assertions require pre-existing profile state; create it in the same validator session via the Create flow rather than relying on another validator.
-- On some screens, accessible text extraction may concatenate adjacent number+label text (example: `12saved profiles`); for such cases, combine URL/screenshot evidence with robust text checks instead of a single exact-string wait.
-- Some list screens reuse identical button labels (e.g., multiple `Rotate` buttons in welcome variants); prefer row-scoped selectors or snapshot refs to avoid ambiguous clicks.
-- In the create happy path, `Finish Distribution` may remain disabled until remote package handoff actions are completed on `/create/distribute`; complete required Copy/QR actions before asserting completion navigation.
-- In main-app import flow checks (`/import`, `/import/decrypt`), Continue/Decrypt CTAs stay disabled until required inputs are populated (backup text and passwords); provide sample values before asserting navigation.
-- In main-app onboard flow checks (`/onboard`), `Begin Onboarding` remains disabled until both onboarding package and package password are populated; fill both fields before asserting handshake navigation.
-- For dashboard typography checks (VAL-DSH-012), measure computed style on `.settings-title` (the visible "Settings" title text), not the `.settings-header` container.
-- For peer-row icon interaction checks (VAL-DSH-013), use direct role/label click attempts per row and record pointer-interception errors explicitly if sidebar overlay blocks clicks.
-
-## Flow Validator Guidance: browser-ui
-
-- Surface/tool: browser UI via `agent-browser` only.
-- Isolation boundary: each validator must use its own browser session and its own assigned assertion IDs; never use the default session.
-- Shared-state constraint: validators may navigate app routes but must not modify app source, shared service config, or other validators' evidence/report files.
-- Allowed app origin: `http://127.0.0.1:5173` only.
-- Evidence boundary: write screenshots/log artifacts only inside the assigned mission evidence folder.
-- Evidence priority for SPA assertions: URL checks + screenshots + console/page errors are primary; network capture is secondary context.
-
-## Flow Validator Guidance: shell
-
-- Surface/tool: shell validators execute local project commands only (`npx tsc -b`, `npx vitest run --config vitest.config.ts`, `npx playwright test --project=desktop`, `npx playwright test --project=mobile`).
-- Isolation boundary: run commands from repo root `/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2`; do not edit source files or shared config.
-- Shared-state constraint: shell validators must not stop the shared dev server used by browser validators and must not clean/delete test outputs used by other validators.
-- Evidence boundary: capture command, exit code, and key summary lines in the assigned flow report.
-- Failure reporting: include first concrete failing diagnostic (or timeout detail) and whether failure is deterministic on retry.
-
-## Mission Tool Mandates
-
-- **agent-browser is mandatory** for every UI fidelity assertion (mission rule for web-app surfaces).
-- **Shell (bash)** is used only for: TypeScript build (`npx tsc -b`), Vitest (`npx vitest run --config vitest.config.ts`), Playwright (`npx playwright test`) — see VAL-CROSS-016..019.
+(To be populated mid-mission as discovered.)

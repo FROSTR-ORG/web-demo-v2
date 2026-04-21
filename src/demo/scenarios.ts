@@ -11,7 +11,7 @@ import {
   demoRuntimeStatus
 } from "./fixtures";
 
-export type DemoFlow = "welcome" | "import" | "onboard" | "create" | "shared" | "dashboard" | "rotate-keyset" | "rotate-share" | "recover";
+export type DemoFlow = "welcome" | "import" | "onboard" | "create" | "shared" | "dashboard" | "rotate-keyset" | "replace-share" | "recover";
 
 export interface DemoLocation {
   pathname: string;
@@ -165,15 +165,15 @@ export const demoScenarios: DemoScenario[] = [
     { demoUi: { welcome: { variant: "rotate-keyset-first" } } }
   ),
   variantScenario(
-    "welcome-rotate-share-first",
+    "welcome-replace-share-first",
     "welcome-first-time",
     "welcome",
-    "Welcome - Rotate Share First",
+    "Welcome - Replace Share First",
     "screens/welcome/1-welcome",
     "/",
     noProfiles,
     "Replace a Share",
-    { demoUi: { welcome: { variant: "rotate-share-first" } } }
+    { demoUi: { welcome: { variant: "replace-share-first" } } }
   ),
 
   scenario("import-load-backup", "import", "Import - 1. Load Backup", "screens/import/1-load-backup", "/import", noProfiles, "Load Backup", { demoUi: { import: { backupPreset: DEMO_BFPROFILE } } }),
@@ -265,6 +265,8 @@ export const demoScenarios: DemoScenario[] = [
   scenario("dashboard-clear-credentials-modal", "dashboard", "Dashboard - 3b. Clear Credentials (Modal)", "screens/dashboard/3b-clear-credentials-modal", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Clear Credentials", { demoUi: { dashboard: { settingsOpen: true, modal: "clear-credentials", hideMockControls: true, paperPanels: true } } }),
   scenario("dashboard-export-profile", "dashboard", "Dashboard - 4. Export Profile", "screens/dashboard/4-export-profile", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Export Profile", { demoUi: { dashboard: { settingsOpen: true, modal: "export-profile", hideMockControls: true, paperPanels: true } } }),
   scenario("dashboard-export-complete", "dashboard", "Dashboard - 4b. Export Complete", "screens/dashboard/4b-export-complete", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Backup Ready", { demoUi: { dashboard: { settingsOpen: true, modal: "export-complete", hideMockControls: true, paperPanels: true } } }),
+  scenario("dashboard-export-share", "dashboard", "Dashboard - 4c. Export Share", "screens/dashboard/4c-export-share", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Export Share", { demoUi: { dashboard: { settingsOpen: true, modal: "export-profile", exportMode: "share", hideMockControls: true, paperPanels: true } } }),
+  scenario("dashboard-share-export-complete", "dashboard", "Dashboard - 4d. Share Export Complete", "screens/dashboard/4d-share-export-complete", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Share Package Ready", { demoUi: { dashboard: { settingsOpen: true, modal: "export-complete", exportMode: "share", hideMockControls: true, paperPanels: true } } }),
   scenario("dashboard-policy-prompt", "dashboard", "Dashboard - 5. Signer Policy Prompt", "screens/dashboard/5-signer-policy-prompt", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Signer Policy", { demoUi: { dashboard: { modal: "policy-prompt", hideMockControls: true, paperPanels: true } } }),
   scenario("dashboard-signing-failed", "dashboard", "Dashboard - 6. Signing Failed", "screens/dashboard/6-signing-failed", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Signing Failed", { demoUi: { dashboard: { modal: "signing-failed", hideMockControls: true, paperPanels: true } } }),
 
@@ -316,14 +318,14 @@ export const demoScenarios: DemoScenario[] = [
     paperReference: paperReference("shared-distribution-completion")
   },
 
-  scenario("rotate-share-enter-package", "rotate-share", "Rotate Share - 1. Enter Rotate Package", "screens/rotate-share/1-enter-rotate-package", "/rotate-share", dashboardState, "Enter Rotate Package", { demoUi: { rotateShare: { packagePreset: DEMO_BFONBOARD, passwordPreset: DEMO_PASSWORD } } }),
-  scenario("rotate-share-applying", "rotate-share", "Rotate Share - 2. Applying Share Update", "screens/rotate-share/2-applying-share-update", "/rotate-share/applying", dashboardState, "Applying Share Update", { packageString: DEMO_BFONBOARD, password: DEMO_PASSWORD, demoUi: { progress: { frozen: true }, rotateShare: { packagePreset: DEMO_BFONBOARD } } }),
-  scenario("rotate-share-failed", "rotate-share", "Rotate Share - 2b. Share Update Failed", "screens/rotate-share/2b-share-update-failed", "/rotate-share/failed", dashboardState, "Share Update Failed"),
-  scenario("rotate-share-updated", "rotate-share", "Rotate Share - 3. Local Share Updated", "screens/rotate-share/3-local-share-updated", "/rotate-share/updated", dashboardState, "Local Share Updated", { fromApplying: true }),
+  scenario("replace-share-enter-package", "replace-share", "Replace Share - 1. Enter Onboarding Package", "screens/replace-share/1-enter-onboarding-package", "/replace-share", dashboardState, "Enter Onboarding Package", { demoUi: { replaceShare: { packagePreset: DEMO_BFONBOARD, passwordPreset: DEMO_PASSWORD } } }),
+  scenario("replace-share-applying", "replace-share", "Replace Share - 2. Applying Replacement", "screens/replace-share/2-applying-replacement", "/replace-share/applying", dashboardState, "Applying Replacement", { packageString: DEMO_BFONBOARD, password: DEMO_PASSWORD, demoUi: { progress: { frozen: true }, replaceShare: { packagePreset: DEMO_BFONBOARD } } }),
+  scenario("replace-share-failed", "replace-share", "Replace Share - 2b. Replacement Failed", "screens/replace-share/2b-replacement-failed", "/replace-share/failed", dashboardState, "Replacement Failed"),
+  scenario("replace-share-replaced", "replace-share", "Replace Share - 3. Share Replaced", "screens/replace-share/3-share-replaced", "/replace-share/replaced", dashboardState, "Share Replaced", { fromApplying: true }),
 
   scenario("recover-collect-shares", "recover", "Recover - 1. Collect Shares", "screens/recover/1-collect-shares", `/recover/${DEMO_PROFILE_ID}`, dashboardState, "Recover NSEC", { demoUi: { recover: { variant: "incompatible-shares" } } }),
   scenario("recover-success", "recover", "Recover - 1b. Recover Success", "screens/recover/1b-recover-success", `/recover/${DEMO_PROFILE_ID}/success`, dashboardState, "Security Warning", { demoUi: { recover: { variant: "success", copied: true } } })
 ];
 
 export const demoScenarioById = new Map(demoScenarios.map((entry) => [entry.id, entry]));
-export const demoFlows: DemoFlow[] = ["welcome", "import", "onboard", "create", "shared", "dashboard", "rotate-keyset", "rotate-share", "recover"];
+export const demoFlows: DemoFlow[] = ["welcome", "import", "onboard", "create", "shared", "dashboard", "rotate-keyset", "replace-share", "recover"];

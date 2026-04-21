@@ -2,8 +2,9 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react
 import { Check, ChevronLeft, Copy, Eye, EyeOff, Minus, Plus, QrCode } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import QRCode from "qrcode";
+import { Modal } from "./Modal";
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "chip" | "header";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "chip" | "header" | "outline" | "success" | "ghost-blue" | "destructive-outline-compact";
 type ButtonSize = "sm" | "md" | "full" | "icon";
 
 export function Button({
@@ -149,9 +150,9 @@ export function NumberStepper({
 }
 
 export function Stepper({ current, variant = "create" }: { current: 1 | 2 | 3; variant?: "create" | "shared" | "rotate-keyset" }) {
-  const step1Label = variant === "rotate-keyset" ? "Rotate Keyset" : variant === "create" ? "Create" : "Create / Rotate";
-  const step2Label = "Create Profile";
-  const step3Label = "Distribute Shares";
+  const step1Label = variant === "rotate-keyset" ? "Rotate Keyset" : "Create Keyset";
+  const step2Label = "Setup Profile";
+  const step3Label = "Onboard Devices";
   const steps = [
     { n: 1, label: step1Label },
     { n: 2, label: step2Label },
@@ -295,17 +296,13 @@ function QrModal({ value, onClose }: { value: string; onClose: () => void }) {
   }, [value]);
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
-      <div className="modal">
-        <h2 className="modal-title">Package QR</h2>
-        {url ? <img className="qr-img" src={url} alt="QR code for package" /> : <p className="page-copy">Generating QR...</p>}
-        <div className="form-actions">
-          <Button type="button" onClick={onClose}>
-            Done
-          </Button>
-        </div>
-      </div>
-    </div>
+    <Modal open title="Package QR" onClose={onClose} actions={
+      <Button type="button" onClick={onClose}>
+        Done
+      </Button>
+    }>
+      {url ? <img className="qr-img" src={url} alt="QR code for package" /> : <p className="page-copy">Generating QR...</p>}
+    </Modal>
   );
 }
 

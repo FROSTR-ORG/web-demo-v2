@@ -127,7 +127,7 @@ describe("DistributeSharesScreen distribution accounting", () => {
     );
   });
 
-  it("does not account package handoff when clipboard copy fails", async () => {
+  it("still accounts package handoff when clipboard copy fails", async () => {
     vi.mocked(navigator.clipboard.writeText).mockRejectedValueOnce(
       new Error("denied"),
     );
@@ -138,6 +138,8 @@ describe("DistributeSharesScreen distribution accounting", () => {
     await waitFor(() =>
       expect(navigator.clipboard.writeText).toHaveBeenCalled(),
     );
-    expect(mocks.updatePackageState).not.toHaveBeenCalled();
+    // The workflow is not blocked by clipboard errors — we still mark the
+    // package as copied so the user can proceed.
+    expect(mocks.updatePackageState).toHaveBeenCalled();
   });
 });

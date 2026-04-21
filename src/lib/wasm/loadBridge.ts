@@ -70,6 +70,13 @@ export interface BifrostBridgeModule {
   derive_group_id(groupJson: string): string;
   resolve_share_index(groupJson: string, shareSecret: string): number;
   create_encrypted_profile_backup(profileJson: string): string;
+  encrypt_profile_backup_content(backupJson: string, shareSecret: string): string;
+  decrypt_profile_backup_content(ciphertext: string, shareSecret: string): string;
+  build_profile_backup_event(shareSecret: string, backupJson: string, createdAtSeconds?: number | null): string;
+  parse_profile_backup_event(eventJson: string, shareSecret: string): string;
+  profile_backup_event_kind(): number;
+  profile_backup_key_domain(): string;
+  derive_profile_backup_conversation_key_hex(shareSecret: string): string;
   create_onboarding_request_bundle(
     shareSecret: string,
     peerPubkey32Hex: string,

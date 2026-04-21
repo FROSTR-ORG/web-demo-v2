@@ -74,10 +74,10 @@ describe("CreateKeysetScreen", () => {
     expect(screen.getByText("Create New Keyset")).toBeInTheDocument();
     expect(screen.getByText("Keyset Name")).toBeInTheDocument();
     expect(screen.getByText("Private Key (nsec)")).toBeInTheDocument();
-    expect(screen.getByText("Create Keyset")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create Keyset" })).toBeInTheDocument();
   });
 
-  it("blocks existing nsec input because splitting is not supported yet", async () => {
+  it("blocks invalid nsec format and allows valid existing nsec", async () => {
     render(
       <MemoryRouter>
         <CreateKeysetScreen />
@@ -85,18 +85,26 @@ describe("CreateKeysetScreen", () => {
     );
 
     const nsecInput = screen.getByPlaceholderText(
-      "Paste existing nsec (unsupported)",
+      "Paste your existing nsec or generate a new one",
     );
     fireEvent.change(nsecInput, { target: { value: "not-a-valid-key" } });
-    fireEvent.click(screen.getByText("Create Keyset"));
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
 
     await waitFor(() => {
       expect(
-        screen.getByText("Existing nsec splitting is not supported yet."),
+        screen.getByText("Invalid nsec format — must start with nsec1."),
       ).toBeInTheDocument();
     });
 
     expect(nsecInput).toHaveClass("input-error");
+
+    // Valid existing nsec clears the error
+    fireEvent.change(nsecInput, { target: { value: "nsec1validkey123" } });
+    await waitFor(() => {
+      expect(
+        screen.queryByText("Invalid nsec format — must start with nsec1."),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it("navigates to /create/progress on valid submission", async () => {
@@ -108,7 +116,7 @@ describe("CreateKeysetScreen", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByText("Create Keyset"));
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
 
     await waitFor(() => {
       expect(mocks.createKeyset).toHaveBeenCalledWith({
@@ -131,17 +139,17 @@ describe("CreateKeysetScreen", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Generate NSEC" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
 
     await waitFor(() => {
       expect(mocks.generateNsec).toHaveBeenCalled();
       expect(
-        screen.getByPlaceholderText("Paste existing nsec (unsupported)"),
+        screen.getByPlaceholderText("Paste your existing nsec or generate a new one"),
       ).toHaveValue(generated);
     });
 
     const nsecInput = screen.getByPlaceholderText(
-      "Paste existing nsec (unsupported)",
+      "Paste your existing nsec or generate a new one",
     );
     expect(nsecInput).toHaveAttribute("type", "password");
     fireEvent.click(screen.getByRole("button", { name: "Reveal nsec" }));
@@ -158,13 +166,13 @@ describe("CreateKeysetScreen", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Generate NSEC" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
     await waitFor(() =>
       expect(
-        screen.getByPlaceholderText("Paste existing nsec (unsupported)"),
+        screen.getByPlaceholderText("Paste your existing nsec or generate a new one"),
       ).toHaveValue(generated),
     );
-    fireEvent.click(screen.getByText("Create Keyset"));
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
 
     await waitFor(() => {
       expect(mocks.createKeyset).toHaveBeenCalledWith({
@@ -174,6 +182,7 @@ describe("CreateKeysetScreen", () => {
         generatedNsec: generated,
       });
     });
+
     expect(mocks.navigate).toHaveBeenCalledWith("/create/progress");
   });
 
@@ -186,7 +195,7 @@ describe("CreateKeysetScreen", () => {
 
     const nameInput = screen.getByDisplayValue("My Signing Key");
     fireEvent.change(nameInput, { target: { value: "" } });
-    fireEvent.click(screen.getByText("Create Keyset"));
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
 
     await waitFor(() => {
       expect(screen.getByText("Keyset name is required.")).toBeInTheDocument();
@@ -199,11 +208,11 @@ describe("CreateKeysetScreen", () => {
         <CreateKeysetScreen />
       </MemoryRouter>,
     );
-    // Stepper step 1 "Create"; step 2 "Create Profile"; step 3 "Distribute Shares"
-    expect(screen.getByText("Create Profile")).toBeInTheDocument();
-    expect(screen.getByText("Distribute Shares")).toBeInTheDocument();
-    expect(screen.queryByText("Setup Profile")).not.toBeInTheDocument();
-    expect(screen.queryByText("Onboard Devices")).not.toBeInTheDocument();
+    // Stepper step 1 "Create Keyset"; step 2 "Setup Profile"; step 3 "Onboard Devices"
+    expect(screen.getByText("Setup Profile")).toBeInTheDocument();
+    expect(screen.getByText("Onboard Devices")).toBeInTheDocument();
+    expect(screen.queryByText("Create Profile")).not.toBeInTheDocument();
+    expect(screen.queryByText("Distribute Shares")).not.toBeInTheDocument();
   });
 
   it("renders canonical Keyset Name help text including 'peers in the keyset' (VAL-CRT-003)", () => {
@@ -264,7 +273,7 @@ describe("CreateKeysetScreen", () => {
     );
 
     fireEvent.click(screen.getByLabelText("Decrease Total Shares"));
-    fireEvent.click(screen.getByText("Create Keyset"));
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
 
     await waitFor(() => {
       expect(mocks.createKeyset).toHaveBeenCalledWith({

@@ -4,6 +4,7 @@ import { AlertTriangle, Check, HelpCircle, QrCode } from "lucide-react";
 import { useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField } from "../components/ui";
+import { QrScanner } from "../components/QrScanner";
 import { useDemoUi } from "../demo/demoUi";
 
 /* ---------- Label with inline info/help icon (audit gap per VAL-ONB-001/005) ---------- */
@@ -79,6 +80,7 @@ export function EnterPackageScreen() {
     demoUi.onboard?.passwordPreset ?? "",
   );
   const [error, setError] = useState("");
+  const [showQrScanner, setShowQrScanner] = useState(false);
   const validation = validatePackageString(packageString);
   /*
    * CTA gating: Begin Onboarding requires BOTH a valid onboarding package
@@ -143,6 +145,7 @@ export function EnterPackageScreen() {
           <button
             type="button"
             className="button button-chip button-sm onboard-scan-btn"
+            onClick={() => setShowQrScanner(true)}
           >
             <QrCode size={14} />
             Scan QR
@@ -181,6 +184,15 @@ export function EnterPackageScreen() {
           Begin Onboarding
         </Button>
       </div>
+      {showQrScanner && (
+        <QrScanner
+          onScan={(data) => {
+            setPackageString(data);
+            setShowQrScanner(false);
+          }}
+          onClose={() => setShowQrScanner(false)}
+        />
+      )}
     </AppShell>
   );
 }

@@ -1,5 +1,6 @@
 import { Check, X } from "lucide-react";
 import { useState } from "react";
+import type { ExportMode } from "../types";
 
 function getPasswordStrength(pw: string): number {
   if (pw.length === 0) return 0;
@@ -11,6 +12,7 @@ function getPasswordStrength(pw: string): number {
 }
 
 export function ExportProfileModal({
+  mode,
   groupName,
   threshold: _threshold,
   memberCount: _memberCount,
@@ -20,6 +22,7 @@ export function ExportProfileModal({
   onCancel,
   onExport,
 }: {
+  mode: ExportMode;
   groupName: string;
   threshold: number;
   memberCount: number;
@@ -27,22 +30,48 @@ export function ExportProfileModal({
   relayCount: number;
   peerCount: number;
   onCancel: () => void;
-  onExport: () => void;
+  onExport: (password: string) => Promise<void>;
 }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const passwordsMatch = password.length > 0 && password === confirm;
   const strength = getPasswordStrength(password);
 
   const strengthColors = ["#EF4444", "#F59E0B", "#22C55E"];
-  const canExport = passwordsMatch && password.length >= 1;
+  const canExport = passwordsMatch && password.length >= 8 && !exporting;
+  const title = mode === "profile" ? "Export Profile" : "Export Share";
+  const passwordLabel = mode === "profile" ? "Export Password" : "Share Export Password";
+  const description =
+    mode === "profile"
+      ? "Create an encrypted backup of your share and all configuration. You'll need this password to restore on another device."
+      : "Create a password-protected bfshare package for this device's share. Use it as a source package during keyset rotation.";
+
+  async function handleExport() {
+    if (!canExport) {
+      return;
+    }
+    setExporting(true);
+    setError(null);
+    try {
+      await onExport(password);
+    } catch (exportError) {
+      setError(
+        exportError instanceof Error
+          ? exportError.message
+          : "Unable to export this package.",
+      );
+      setExporting(false);
+    }
+  }
 
   return (
     <div className="export-modal-backdrop" role="dialog" aria-modal="true" data-testid="export-profile-modal">
       <div className="export-modal" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="export-modal-header">
-          <div className="export-modal-title">Export Profile</div>
+          <div className="export-modal-title">{title}</div>
           <button
             type="button"
             className="export-modal-close"
@@ -55,7 +84,7 @@ export function ExportProfileModal({
 
         {/* Description */}
         <p className="export-modal-description">
-          Create an encrypted backup of your share and all configuration. You'll need this password to restore on another device.
+          {description}
         </p>
 
         {/* Profile summary */}
@@ -65,7 +94,7 @@ export function ExportProfileModal({
 
         {/* Password fields */}
         <div className="export-field">
-          <label className="export-field-label" htmlFor="export-password">Export Password</label>
+          <label className="export-field-label" htmlFor="export-password">{passwordLabel}</label>
           <div className="export-input-shell">
             <input
               id="export-password"
@@ -110,6 +139,8 @@ export function ExportProfileModal({
           ))}
         </div>
 
+        {error ? <div className="export-error" role="alert">{error}</div> : null}
+
         {/* Actions */}
         <div className="export-modal-actions">
           <button type="button" className="export-btn-cancel" onClick={onCancel}>
@@ -119,9 +150,9 @@ export function ExportProfileModal({
             type="button"
             className="export-btn-submit"
             disabled={!canExport}
-            onClick={onExport}
+            onClick={handleExport}
           >
-            Export
+            {exporting ? "Exporting..." : "Export"}
           </button>
         </div>
       </div>

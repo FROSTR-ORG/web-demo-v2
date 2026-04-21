@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
+import { ProgressBar } from "../components/ProgressBar";
 import { BackLink, Stepper } from "../components/ui";
 import { useDemoUi } from "../demo/demoUi";
 
@@ -96,15 +97,12 @@ function GenerationProgressContent({
           ))}
         </div>
 
-        <div className="progress-bar-section">
-          <div className="progress-bar-header">
-            <span className="progress-bar-title">Overall Progress</span>
-            <span className="progress-bar-count">{doneCount} of {phases.length} phases</span>
-          </div>
-          <div className="progress-bar-track">
-            <div className="progress-bar-fill" style={{ width: `${progressPercent}%` }} />
-          </div>
-        </div>
+        <ProgressBar
+          value={doneCount}
+          max={phases.length}
+          label="Overall Progress"
+          countLabel={`${doneCount} of ${phases.length} phases`}
+        />
       </div>
     </AppShell>
   );

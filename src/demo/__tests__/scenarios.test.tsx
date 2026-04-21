@@ -18,15 +18,15 @@ describe("demo scenarios", () => {
   it("covers every Paper screen state", () => {
     const canonical = demoScenarios.filter((scenario) => scenario.canonical !== false);
     const variants = demoScenarios.filter((scenario) => scenario.canonical === false);
-    expect(canonical).toHaveLength(47);
+    expect(canonical).toHaveLength(49);
     expect(variants.map((scenario) => scenario.id).sort()).toEqual([
       "import-error-corrupted",
       "onboard-failed-rejected",
-      "welcome-rotate-keyset-first",
-      "welcome-rotate-share-first"
+      "welcome-replace-share-first",
+      "welcome-rotate-keyset-first"
     ]);
     expect(new Set(demoScenarios.map((scenario) => scenario.id)).size).toBe(demoScenarios.length);
-    expect(demoFlows).toEqual(["welcome", "import", "onboard", "create", "shared", "dashboard", "rotate-keyset", "rotate-share", "recover"]);
+    expect(demoFlows).toEqual(["welcome", "import", "onboard", "create", "shared", "dashboard", "rotate-keyset", "replace-share", "recover"]);
   });
 
   it("has synced reference screenshots for every scenario", () => {
@@ -92,10 +92,10 @@ describe("demo scenarios", () => {
       );
 
       // Rotate-keyset Stepper variant uses the "Rotate Keyset" step-1 label
-      // and the full label triad "Rotate Keyset / Create Profile / Distribute Shares".
+      // and the full label triad "Rotate Keyset / Setup Profile / Onboard Devices".
       expect(screen.getAllByText("Rotate Keyset").length, `${id} missing Rotate Keyset step label`).toBeGreaterThan(0);
-      expect(screen.getAllByText("Create Profile").length, `${id} missing Create Profile step label`).toBeGreaterThan(0);
-      expect(screen.getAllByText("Distribute Shares").length, `${id} missing Distribute Shares step label`).toBeGreaterThan(0);
+      expect(screen.getAllByText("Setup Profile").length, `${id} missing Setup Profile step label`).toBeGreaterThan(0);
+      expect(screen.getAllByText("Onboard Devices").length, `${id} missing Onboard Devices step label`).toBeGreaterThan(0);
 
       unmount();
     }
@@ -108,7 +108,7 @@ describe("demo scenarios", () => {
       { id: "import-error-corrupted", text: ["Backup Corrupted"] },
       { id: "onboard-failed-rejected", text: ["Onboarding Rejected"] },
       { id: "shared-distribute-shares", text: ["Enter password to unlock"] },
-      { id: "rotate-share-applying", text: ["Rotate package: bfonboard1••••"] },
+      { id: "replace-share-applying", text: ["Onboarding package: bfonboard1••••"] },
       { id: "create-generation-progress", text: ["1 of 3 phases"] },
       { id: "rotate-keyset-generation-progress", text: ["2 of 4 phases"] },
       { id: "welcome-returning-single", text: ["Rotate"] }

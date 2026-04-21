@@ -54,7 +54,7 @@ describe("Cross-area final gate — every canonical scenario", () => {
       "Shared",
       "Dashboard",
       "Rotate Keyset",
-      "Rotate Share",
+      "Replace Share",
       "Recover"
     ];
     const renderedFlowHeadings = screen
@@ -206,7 +206,7 @@ describe("Cross-area final gate — every canonical scenario", () => {
     ["/dashboard"],
     ["/create/bogus"],
     ["/rotate-keyset/not-a-step"],
-    ["/rotate-share/bogus"],
+    ["/replace-share/bogus"],
     ["/recover"]
   ])("unknown route %s redirects to / and renders Welcome (VAL-CROSS-014)", (path) => {
     render(
@@ -235,7 +235,7 @@ describe("Cross-area final gate — every canonical scenario", () => {
       "shared-create-profile",
       "dashboard-running",
       "rotate-keyset-intake",
-      "rotate-share-enter-package",
+      "replace-share-enter-package",
       "recover-collect-shares"
     ];
 
@@ -271,8 +271,8 @@ describe("Cross-area final gate — every canonical scenario", () => {
     expect(variants.map((entry) => entry.id).sort()).toEqual([
       "import-error-corrupted",
       "onboard-failed-rejected",
-      "welcome-rotate-keyset-first",
-      "welcome-rotate-share-first"
+      "welcome-replace-share-first",
+      "welcome-rotate-keyset-first"
     ]);
   });
 });

@@ -11,6 +11,8 @@ import type {
   SharePackageWire,
   StoredProfileSummary,
 } from "../lib/bifrost/types";
+import type { RuntimeRelayStatus } from "../lib/relay/runtimeRelayPump";
+import type { RuntimeExportPackages } from "./runtimeExports";
 
 export interface CreateDraft {
   groupName: string;
@@ -20,6 +22,7 @@ export interface CreateDraft {
 
 export interface CreateKeysetDraft extends CreateDraft {
   generatedNsec?: string;
+  existingNsec?: string;
 }
 
 export interface ProfileDraft {
@@ -29,9 +32,17 @@ export interface ProfileDraft {
   relays: string[];
 }
 
+export interface PeerPermissionMap {
+  sign: boolean;
+  ecdh: boolean;
+  ping: boolean;
+  onboard: boolean;
+}
+
 export interface CreateProfileDraft extends ProfileDraft {
   distributionPassword: string;
   confirmDistributionPassword: string;
+  peerPermissions?: Record<number, PeerPermissionMap>;
 }
 
 export type ImportProfileDraft = Pick<
@@ -94,6 +105,22 @@ export interface RotateKeysetSession {
   createdProfileId?: string;
 }
 
+export interface ReplaceShareSession {
+  phase: "idle" | "decoding" | "decoded" | "applying" | "updated" | "failed";
+  packageString: string;
+  password: string;
+  profilePassword: string;
+  decodedPayload?: BfOnboardPayload;
+  localShareIdx?: number;
+  newProfileId?: string;
+  oldProfileId?: string;
+  error?: {
+    code: SetupFlowError["code"];
+    message: string;
+    details?: Record<string, unknown>;
+  };
+}
+
 export interface RecoverSourceSummary {
   idx: number;
   memberPubkey: string;
@@ -145,11 +172,13 @@ export interface AppStateValue {
   profiles: StoredProfileSummary[];
   activeProfile: StoredProfileSummary | null;
   runtimeStatus: RuntimeStatusSummary | null;
+  runtimeRelays: RuntimeRelayStatus[];
   signerPaused: boolean;
   createSession: CreateSession | null;
   importSession: ImportSession | null;
   onboardSession: OnboardSession | null;
   rotateKeysetSession: RotateKeysetSession | null;
+  replaceShareSession: ReplaceShareSession | null;
   recoverSession: RecoverSession | null;
   reloadProfiles: () => Promise<void>;
   createKeyset: (draft: CreateKeysetDraft) => Promise<void>;
@@ -188,6 +217,13 @@ export interface AppStateValue {
   ) => void;
   finishRotateDistribution: () => Promise<string>;
   clearRotateKeysetSession: () => void;
+  decodeReplaceSharePackage: (
+    packageString: string,
+    password: string,
+    profilePassword: string,
+  ) => Promise<void>;
+  applyReplaceShareUpdate: () => Promise<void>;
+  clearReplaceShareSession: () => void;
   validateRecoverSources: (input: {
     profileId: string;
     profilePassword: string;
@@ -197,8 +233,25 @@ export interface AppStateValue {
   clearRecoverSession: () => void;
   expireRecoveredNsec: () => void;
   unlockProfile: (id: string, password: string) => Promise<void>;
+  changeProfilePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   lockProfile: () => void;
   clearCredentials: () => Promise<void>;
+  exportRuntimePackages: (password: string) => Promise<RuntimeExportPackages>;
+  createProfileBackup: () => Promise<{
+    backup: { ciphertext: string; nonce: string; version: number };
+    event: {
+      id: string;
+      pubkey: string;
+      created_at: number;
+      kind: number;
+      tags: string[][];
+      content: string;
+      sig: string;
+    };
+  }>;
   setSignerPaused: (paused: boolean) => void;
   refreshRuntime: () => void;
+  restartRuntimeConnections: () => Promise<void>;
 }
+
+export type { RuntimeExportPackages, RuntimeExportMetadata } from "./runtimeExports";

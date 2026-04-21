@@ -32,7 +32,7 @@ export function WelcomeScreen() {
   const returning = profiles.length > 0;
   const isMulti = profiles.length >= 2;
   const isMany = profiles.length >= 4;
-  const showRotateShareFirst = !returning && variant === "rotate-share-first";
+  const showRotateShareFirst = !returning && variant === "replace-share-first";
 
   /* --- Scrollable list overflow tracking for 4+ profiles --- */
   const listRef = useRef<HTMLDivElement>(null);
@@ -176,7 +176,7 @@ export function WelcomeScreen() {
     );
   }
 
-  /** Chip-pair entry shown when no profiles yet and the user wants the rotate-share entry path. */
+  /** Chip-pair entry shown when no profiles yet and the user wants the replace-share entry path. */
   function renderRotateShareFirstActions() {
     return (
       <div className="returning-chip-actions">
@@ -191,9 +191,9 @@ export function WelcomeScreen() {
         <button
           type="button"
           className="returning-chip-btn"
-          onClick={() => navigate("/rotate-share")}
+          onClick={() => navigate("/replace-share")}
         >
-          Rotate Share
+          Replace Share
         </button>
       </div>
     );
@@ -269,7 +269,7 @@ export function WelcomeScreen() {
 
         {/* ---- Rotate-share-first entry (no profiles, chip-pair entry) ---- */}
         {showRotateShareFirst && (
-          <div className="panel welcome-card welcome-rotate-share-card">
+          <div className="panel welcome-card welcome-replace-share-card">
             <div className="welcome-card-body">
               <div className="welcome-card-title">
                 <span className="icon-tile">

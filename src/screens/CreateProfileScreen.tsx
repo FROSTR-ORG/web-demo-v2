@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { defaultCreateProfileDraft, useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
-import { BackLink, Button, PasswordField, PermissionBadge, SectionHeader, Stepper, TextField } from "../components/ui";
+import { BackLink, Button, PasswordField, SectionHeader, Stepper, TextField } from "../components/ui";
+import { ToggleSwitch } from "../components/ToggleSwitch";
 import { useDemoUi } from "../demo/demoUi";
 import { shortHex } from "../lib/bifrost/format";
 
@@ -49,6 +50,26 @@ export function CreateProfileScreen() {
   const confirmMatches = draft.password.length > 0 && draft.password === draft.confirmPassword;
   const distributionPasswordMatches =
     draft.distributionPassword.length > 0 && draft.distributionPassword === draft.confirmDistributionPassword;
+
+  function getPeerPermission(idx: number, key: "sign" | "ecdh" | "ping" | "onboard"): boolean {
+    return draft.peerPermissions?.[idx]?.[key] ?? true;
+  }
+
+  function setPeerPermission(idx: number, key: "sign" | "ecdh" | "ping" | "onboard", value: boolean) {
+    setDraft((current) => ({
+      ...current,
+      peerPermissions: {
+        ...current.peerPermissions,
+        [idx]: {
+          sign: getPeerPermission(idx, "sign"),
+          ecdh: getPeerPermission(idx, "ecdh"),
+          ping: getPeerPermission(idx, "ping"),
+          onboard: getPeerPermission(idx, "onboard"),
+          [key]: value,
+        },
+      },
+    }));
+  }
 
   return (
     <AppShell headerMeta={createSession.draft.groupName} mainVariant="flow">
@@ -165,15 +186,35 @@ export function CreateProfileScreen() {
                 <span className="value">Peer #{member.idx}</span>
                 {member.idx === localShare.idx ? null : <span className="help">{shortHex(member.pubkey, 8, 4)}</span>}
               </div>
-              <div className="inline-actions">
+              <div className="inline-actions permission-toggles">
                 {member.idx === localShare.idx ? (
                   <span className="help">Local profile</span>
                 ) : (
                   <>
-                    <PermissionBadge>SIGN</PermissionBadge>
-                    <PermissionBadge tone="info">ECDH</PermissionBadge>
-                    <PermissionBadge tone="ping">PING</PermissionBadge>
-                    <PermissionBadge tone="onboard">ONBOARD</PermissionBadge>
+                    <ToggleSwitch
+                      size="compact"
+                      checked={getPeerPermission(member.idx, "sign")}
+                      onChange={(e) => setPeerPermission(member.idx, "sign", e.target.checked)}
+                      onLabel="SIGN"
+                    />
+                    <ToggleSwitch
+                      size="compact"
+                      checked={getPeerPermission(member.idx, "ecdh")}
+                      onChange={(e) => setPeerPermission(member.idx, "ecdh", e.target.checked)}
+                      onLabel="ECDH"
+                    />
+                    <ToggleSwitch
+                      size="compact"
+                      checked={getPeerPermission(member.idx, "ping")}
+                      onChange={(e) => setPeerPermission(member.idx, "ping", e.target.checked)}
+                      onLabel="PING"
+                    />
+                    <ToggleSwitch
+                      size="compact"
+                      checked={getPeerPermission(member.idx, "onboard")}
+                      onChange={(e) => setPeerPermission(member.idx, "onboard", e.target.checked)}
+                      onLabel="ONBOARD"
+                    />
                   </>
                 )}
               </div>

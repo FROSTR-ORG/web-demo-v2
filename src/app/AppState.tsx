@@ -15,5 +15,6 @@ export type {
   ProfileDraft,
   RecoverSession,
   RecoverSourceSummary,
+  ReplaceShareSession,
   RotateKeysetSession
 } from "./AppStateTypes";

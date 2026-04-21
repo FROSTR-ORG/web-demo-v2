@@ -117,6 +117,38 @@ export type BfOnboardPayload = z.infer<typeof BfOnboardPayloadSchema>;
 export type BfSharePayload = z.infer<typeof BfSharePayloadSchema>;
 export type ProfilePackagePair = z.infer<typeof ProfilePackagePairSchema>;
 
+export interface EncryptedProfileBackup {
+  ciphertext: string;
+  nonce: string;
+  version: number;
+}
+
+export const EncryptedProfileBackupSchema = z.object({
+  ciphertext: z.string(),
+  nonce: z.string(),
+  version: z.number(),
+});
+
+export interface ProfileBackupEvent {
+  id: string;
+  pubkey: string;
+  created_at: number;
+  kind: number;
+  tags: string[][];
+  content: string;
+  sig: string;
+}
+
+export const ProfileBackupEventSchema = z.object({
+  id: z.string(),
+  pubkey: z.string(),
+  created_at: z.number(),
+  kind: z.number(),
+  tags: z.array(z.array(z.string())),
+  content: z.string(),
+  sig: z.string(),
+});
+
 export interface RotateKeysetBundleResult {
   previous_group_id: string;
   next_group_id: string;

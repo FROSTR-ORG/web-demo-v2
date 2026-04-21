@@ -21,11 +21,11 @@ import {
   RotateDistributionCompleteScreen
 } from "../screens/RotateKeysetScreens";
 import {
-  EnterRotatePackageScreen,
-  ApplyingShareUpdateScreen,
-  ShareUpdateFailedScreen,
-  LocalShareUpdatedScreen
-} from "../screens/RotateShareScreens";
+  EnterReplacePackageScreen,
+  ApplyingReplacementScreen,
+  ReplacementFailedScreen,
+  ShareReplacedScreen
+} from "../screens/ReplaceShareScreens";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
 
 type RoutesLocation = Parameters<typeof Routes>[0]["location"];
@@ -61,10 +61,10 @@ export function CoreRoutes({ location, extraRoutes, relative = false }: { locati
       <Route path={pathFor("/rotate-keyset/profile", relative)} element={<RotateCreateProfileScreen />} />
       <Route path={pathFor("/rotate-keyset/distribute", relative)} element={<RotateDistributeSharesScreen />} />
       <Route path={pathFor("/rotate-keyset/complete", relative)} element={<RotateDistributionCompleteScreen />} />
-      <Route path={pathFor("/rotate-share", relative)} element={<EnterRotatePackageScreen />} />
-      <Route path={pathFor("/rotate-share/applying", relative)} element={<ApplyingShareUpdateScreen />} />
-      <Route path={pathFor("/rotate-share/failed", relative)} element={<ShareUpdateFailedScreen />} />
-      <Route path={pathFor("/rotate-share/updated", relative)} element={<LocalShareUpdatedScreen />} />
+      <Route path={pathFor("/replace-share", relative)} element={<EnterReplacePackageScreen />} />
+      <Route path={pathFor("/replace-share/applying", relative)} element={<ApplyingReplacementScreen />} />
+      <Route path={pathFor("/replace-share/failed", relative)} element={<ReplacementFailedScreen />} />
+      <Route path={pathFor("/replace-share/replaced", relative)} element={<ShareReplacedScreen />} />
       <Route path={pathFor("/recover/:profileId", relative)} element={<CollectSharesScreen />} />
       <Route path={pathFor("/recover/:profileId/success", relative)} element={<RecoverSuccessScreen />} />
       <Route path={pathFor("/dashboard/:profileId", relative)} element={<DashboardScreen />} />

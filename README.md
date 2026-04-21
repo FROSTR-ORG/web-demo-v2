@@ -29,8 +29,8 @@ Paste share packages, collect across peers, reveal NSEC with static-label toggle
 ### Rotate Keyset — `/rotate-keyset` → `/rotate-keyset/review` → `/rotate-keyset/progress` → `/rotate-keyset/profile` → `/rotate-keyset/distribute` → `/rotate-keyset/complete`
 Full adaptation flow + 3 error states (wrong password, group mismatch, generation failed).
 
-### Rotate Share — `/rotate-share` → `/rotate-share/applying` → `/rotate-share/failed` → `/rotate-share/updated`
-Enter rotate package, applying progress, failed state, updated success.
+### Replace Share — `/replace-share` → `/replace-share/applying` → `/replace-share/failed` → `/replace-share/replaced`
+Enter onboarding package, applying replacement, failed state, share replaced success.
 
 ### Dashboard — `/dashboard/:profileId`
 Five runtime states (running, stopped, connecting, relays-offline, signing-blocked) with paper-faithful peer rows (online count, ready capacity, per-peer permission badges SIGN/ECDH/PING/ONBOARD), policies view, pending approvals, event log, modals (clear credentials, export profile, export complete, policy prompt, signing failed), and Settings sidebar with Device Profile / Group Profile / Rotate Share + Rotate Keyset / Export & Backup / Profile Security sections. Source is organized under `src/screens/DashboardScreen/` (index, states/, panels/, modals/, sidebar/, mocks.ts, types.ts).

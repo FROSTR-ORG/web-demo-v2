@@ -10,7 +10,7 @@ const flowLabels: Record<string, string> = {
   shared: "Shared",
   dashboard: "Dashboard",
   "rotate-keyset": "Rotate Keyset",
-  "rotate-share": "Rotate Share",
+  "replace-share": "Replace Share",
   recover: "Recover"
 };
 

@@ -2,13 +2,14 @@ import { useLocation } from "react-router-dom";
 
 export type DashboardDemoState = "running" | "connecting" | "stopped" | "relays-offline" | "signing-blocked";
 export type DashboardDemoModal = "policy-prompt" | "signing-failed" | "clear-credentials" | "export-profile" | "export-complete";
+export type DashboardDemoExportMode = "profile" | "share";
 
 export interface DemoUiState {
   welcome?: {
     unlockingProfileId?: string;
     unlockError?: string;
     passwordPreset?: string;
-    variant?: "rotate-keyset-first" | "rotate-share-first";
+    variant?: "rotate-keyset-first" | "replace-share-first";
   };
   create?: {
     validationError?: boolean;
@@ -41,7 +42,7 @@ export interface DemoUiState {
   rotateKeyset?: {
     passwordPreset?: string;
   };
-  rotateShare?: {
+  replaceShare?: {
     packagePreset?: string;
     passwordPreset?: string;
   };
@@ -50,6 +51,7 @@ export interface DemoUiState {
     showPolicies?: boolean;
     modal?: DashboardDemoModal;
     settingsOpen?: boolean;
+    exportMode?: DashboardDemoExportMode;
     hideMockControls?: boolean;
     showMockControls?: boolean;
     paperPanels?: boolean;

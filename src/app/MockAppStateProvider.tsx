@@ -45,12 +45,16 @@ export function MockAppStateProvider({
   const [profiles, setProfiles] = useState(value.profiles);
   const [activeProfile, setActiveProfile] = useState(value.activeProfile);
   const [runtimeStatus, setRuntimeStatus] = useState(value.runtimeStatus);
+  const [runtimeRelays, setRuntimeRelays] = useState(value.runtimeRelays);
   const [signerPaused, setSignerPausedState] = useState(value.signerPaused);
   const [createSession, setCreateSession] = useState(value.createSession);
   const [importSession, setImportSession] = useState(value.importSession);
   const [onboardSession, setOnboardSession] = useState(value.onboardSession);
   const [rotateKeysetSession, setRotateKeysetSession] = useState(
     value.rotateKeysetSession,
+  );
+  const [replaceShareSession, setReplaceShareSession] = useState(
+    value.replaceShareSession,
   );
   const [recoverSession, setRecoverSession] = useState(value.recoverSession);
 
@@ -256,6 +260,28 @@ export function MockAppStateProvider({
     setRotateKeysetSession(null);
   }, [value]);
 
+  const decodeReplaceSharePackage = useCallback(
+    async (packageString: string, password: string, profilePassword: string) => {
+      await value.decodeReplaceSharePackage(packageString, password, profilePassword);
+      if (value.replaceShareSession) {
+        setReplaceShareSession(value.replaceShareSession);
+      }
+    },
+    [value],
+  );
+
+  const applyReplaceShareUpdate = useCallback(async () => {
+    await value.applyReplaceShareUpdate();
+    if (value.replaceShareSession) {
+      setReplaceShareSession(value.replaceShareSession);
+    }
+  }, [value]);
+
+  const clearReplaceShareSession = useCallback(() => {
+    value.clearReplaceShareSession();
+    setReplaceShareSession(null);
+  }, [value]);
+
   const validateRecoverSources: AppStateValue["validateRecoverSources"] =
     useCallback(
       async (input) => {
@@ -301,7 +327,15 @@ export function MockAppStateProvider({
         setActiveProfile(nextActive);
       }
       setRuntimeStatus(value.runtimeStatus);
+      setRuntimeRelays(value.runtimeRelays);
       setSignerPausedState(false);
+    },
+    [value],
+  );
+
+  const changeProfilePassword = useCallback(
+    async (oldPassword: string, newPassword: string) => {
+      await value.changeProfilePassword(oldPassword, newPassword);
     },
     [value],
   );
@@ -310,12 +344,14 @@ export function MockAppStateProvider({
     // Forward to any caller-supplied behaviour first (fixtures may observe).
     value.lockProfile();
     setRuntimeStatus(null);
+    setRuntimeRelays([]);
     setActiveProfile(null);
     setSignerPausedState(false);
     setCreateSession(null);
     setImportSession(null);
     setOnboardSession(null);
     setRotateKeysetSession(null);
+    setReplaceShareSession(null);
     setRecoverSession(null);
   }, [value]);
 
@@ -324,11 +360,13 @@ export function MockAppStateProvider({
     setProfiles([]);
     setActiveProfile(null);
     setRuntimeStatus(null);
+    setRuntimeRelays([]);
     setSignerPausedState(false);
     setCreateSession(null);
     setImportSession(null);
     setOnboardSession(null);
     setRotateKeysetSession(null);
+    setReplaceShareSession(null);
     setRecoverSession(null);
   }, [value]);
 
@@ -340,17 +378,36 @@ export function MockAppStateProvider({
     [value],
   );
 
+  const restartRuntimeConnections = useCallback(async () => {
+    await value.restartRuntimeConnections();
+    setSignerPausedState(false);
+    setRuntimeRelays(value.runtimeRelays);
+    setRuntimeStatus(value.runtimeStatus);
+  }, [value]);
+
+  const exportRuntimePackages = useCallback(
+    (password: string) => value.exportRuntimePackages(password),
+    [value],
+  );
+
+  const createProfileBackup = useCallback(
+    () => value.createProfileBackup(),
+    [value],
+  );
+
   const stateful = useMemo<AppStateValue>(
     () => ({
       ...value,
       profiles,
       activeProfile,
       runtimeStatus,
+      runtimeRelays,
       signerPaused,
       createSession,
       importSession,
       onboardSession,
       rotateKeysetSession,
+      replaceShareSession,
       recoverSession,
       createKeyset,
       createProfile,
@@ -370,25 +427,34 @@ export function MockAppStateProvider({
       updateRotatePackageState,
       finishRotateDistribution,
       clearRotateKeysetSession,
+      decodeReplaceSharePackage,
+      applyReplaceShareUpdate,
+      clearReplaceShareSession,
       validateRecoverSources,
       recoverNsec,
       clearRecoverSession,
       expireRecoveredNsec,
       unlockProfile,
+      changeProfilePassword,
       lockProfile,
       clearCredentials,
+      exportRuntimePackages,
+      createProfileBackup,
       setSignerPaused,
+      restartRuntimeConnections,
     }),
     [
       value,
       profiles,
       activeProfile,
       runtimeStatus,
+      runtimeRelays,
       signerPaused,
       createSession,
       importSession,
       onboardSession,
       rotateKeysetSession,
+      replaceShareSession,
       recoverSession,
       createKeyset,
       createProfile,
@@ -408,14 +474,21 @@ export function MockAppStateProvider({
       updateRotatePackageState,
       finishRotateDistribution,
       clearRotateKeysetSession,
+      decodeReplaceSharePackage,
+      applyReplaceShareUpdate,
+      clearReplaceShareSession,
       validateRecoverSources,
       recoverNsec,
       clearRecoverSession,
       expireRecoveredNsec,
       unlockProfile,
+      changeProfilePassword,
       lockProfile,
       clearCredentials,
+      exportRuntimePackages,
+      createProfileBackup,
       setSignerPaused,
+      restartRuntimeConnections,
     ],
   );
 

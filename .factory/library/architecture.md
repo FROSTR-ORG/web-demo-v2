@@ -1,151 +1,125 @@
-# Architecture
+# Architecture — Web Demo V2 Runtime
+
+High-level system picture for the web-demo-v2 FROST threshold-signing app. Workers should read this before making architectural decisions.
 
 ## System Overview
 
-Igloo Web v2 is a single-page React application for managing FROST (Flexible Round-Optimized Schnorr Threshold) signing keysets. Users create threshold-signature keysets, split them into shares, create an encrypted local profile, and distribute onboarding packages to other participants. An unlocked profile runs a signing runtime that coordinates nonce exchange and co-signing with peers.
+web-demo-v2 is a Vite + React SPA that wraps the `bifrost-bridge-wasm` signer runtime, talks to Nostr relays via real WebSocket NIP-01 frames, and mirrors the `igloo-paper` design reference for UX.
 
-The app is a Vite + React + TypeScript project using React Router for navigation and React Context for global state. All cryptographic operations are delegated to a Rust library compiled to WASM (`bifrost-rs`). Profiles are persisted to IndexedDB via `idb-keyval`.
+Three pillars:
 
-## Component Architecture
+- **Outside-runtime flows** (welcome, unlock, import, create, onboard-requester, rotate-keyset, replace-share, recover) — already complete before this mission.
+- **Runtime lifecycle** (init/restore/tick/snapshot/wipe, runtime_status polling, relay pump) — already complete.
+- **Inside-runtime behavior** (dashboard operations, policies, event log, settings persistence, backups, source onboarding) — THIS MISSION fills the remainder.
 
-### Entry point
-
-`main.tsx` → mounts `<BrowserRouter>` → `<AppStateProvider>` → `<App>`.
-
-### Routing layer
-
-`App.tsx` delegates screen routing to `CoreRoutes` and only injects demo routes:
-
-- `/demo` → `DemoGallery`
-- `/demo/:scenarioId/*` → `DemoScenarioPage`
-
-`CoreRoutes.tsx` defines the full app route table. Major groups:
-
-| Path group | Examples | Purpose |
-|---|---|---|
-| Welcome | `/` | Landing / profile picker |
-| Create | `/create`, `/create/progress`, `/create/profile`, `/create/distribute`, `/create/complete` | Keyset creation + initial distribution |
-| Import / Onboard | `/import/*`, `/onboard/*` | Bring existing profiles/shares onto device |
-| Rotate keyset | `/rotate-keyset`, `/rotate-keyset/review`, `/rotate-keyset/progress`, `/rotate-keyset/profile`, `/rotate-keyset/distribute`, `/rotate-keyset/complete`, error routes | Keyset rotation and adaptation screens |
-| Rotate share | `/rotate-share`, `/rotate-share/applying`, `/rotate-share/failed`, `/rotate-share/updated` | Local share replacement flow |
-| Recover | `/recover/:profileId`, `/recover/:profileId/success` | Recover NSEC from shares |
-| Dashboard | `/dashboard/:profileId` | Runtime status, signing, settings |
-| Catch-all | `*` | Redirect → `/` |
-
-### State management
-
-`AppStateProvider` (React Context) holds all application state and exposes action callbacks:
-
-- **Profiles list** — loaded from IndexedDB on mount via `listProfiles()`.
-- **Active profile** — set after unlock/create; cleared on lock.
-- **Runtime status** — polled every 2.5 s from a `RuntimeClient` instance.
-- **Create session** — transient wizard state (draft → keyset → profile → onboarding packages).
-
-Screens call context actions (`createKeyset`, `createProfile`, `unlockProfile`, etc.) which orchestrate bifrost service calls and update state.
-
-### Screen components
-
-Each screen lives in `src/screens/<Name>Screen.tsx`. Screens consume `useAppState()` for data and actions, wrap content in `<AppShell>`, and use shared UI primitives. Screens that depend on wizard state (e.g. `DistributeSharesScreen` needs `createSession`) should guard with a redirect to the appropriate earlier step.
-
-### Shared UI components
-
-**`shell.tsx`** — Layout chrome:
-- `AppShell` — full-page layout with header, main area (variants: `center`, `flow`, `dashboard`), and footer. Accepts optional `headerMeta`, `headerActions`, `headerSettingsAction` slots.
-- `PageHeading` — screen title + subtitle.
-
-**`ui.tsx`** — Reusable controls:
-- `Button` — variants: `primary`, `secondary`, `ghost`, `danger`, `chip`, `header`; sizes: `sm`, `md`, `full`, `icon`.
-- `BackLink` — chevron + label for in-flow back navigation.
-- `SectionHeader` — title with horizontal rule and optional copy text.
-- `TextField`, `PasswordField` — labeled input fields with help/error slots.
-- `NumberStepper` — increment/decrement control.
-- `Stepper` — 3-step progress indicator for the create wizard.
-- `StatusPill` — colored badge with optional dot/check marker; tones: `default`, `success`, `warning`, `error`, `info`.
-- `PermissionBadge` — role/permission indicator.
-- `SecretDisplay`, `CopyBlock`, `QrButton` — for displaying and sharing secret values.
-
-### Services layer
-
-| Directory | Role |
-|---|---|
-| `lib/bifrost/` | FROST key generation, profile encryption/decryption, package encoding, runtime client. Types validated with Zod schemas. |
-| `lib/relay/` | Nostr relay interaction; includes `LocalRuntimeSimulator` for demo-mode peer simulation. |
-| `lib/storage/` | `profileStore.ts` — CRUD for profiles in IndexedDB via `idb-keyval`. Keys prefixed `igloo.web-demo-v2.profile.*`. |
-| `lib/wasm/` | WASM module loader for the `bifrost-rs` Rust crate. |
-
-## Styling System
-
-### Approach
-
-The project uses **custom CSS classes** defined in `src/styles/global.css`. Components primarily reference semantic class names like `.button-primary`, `.status-pill`, `.app-shell`, etc.
-
-Exception: when validation assertions explicitly require literal tokenized utility-style classes from Paper captures (for example `bg-[#2563EB40]`), those class tokens are intentionally included in JSX for contract parity evidence.
-
-### Design tokens
-
-`src/styles/paper-tokens.css` defines CSS custom properties extracted from the Paper design canvas:
-
-- **Colors** — background (`--color-gray-950`, `--color-gray-900`), blue scale (`--color-blue-100` → `--color-blue-900`), semantic status colors, text tones (`--color-slate-200/400/500`), border/overlay alphas.
-- **Fonts** — `--font-share-tech-mono`, `--font-inter`, `--font-ibm-plex-mono`, `--font-roboto-mono`.
-- **Type scale** — composite tokens per level: `--text-h1-heading-*`, `--text-h2-section-header-*`, `--text-h3-card-title-*`, `--text-body-text-*`, `--text-small-*`, `--text-value-data-*`.
-
-`global.css` defines its own runtime variables (`--ig-*`) that mirror or extend the token set for component use.
-
-### Visual treatment
-
-- **Background**: dark gradient — `linear-gradient(160deg, #030712 0%, #111827 50%, #172554 100%)`.
-- **Panels**: semi-transparent slate (`#0f172a99`) with `backdrop-filter: blur(18px)` and blue-tinted borders.
-- **Typography**: Share Tech Mono for headings, data values, and the brand name; Inter for body text and form labels.
-
-## Routing
-
-- `App.tsx` composes `CoreRoutes` and contributes demo-only routes (`/demo`, `/demo/:scenarioId/*`).
-- `CoreRoutes.tsx` is the source of truth for screen routes; catch-all `*` redirects to `/`.
-- State-dependent screens guard against missing prerequisites (e.g. no `createSession`) by redirecting to a prior step with `<Navigate>`.
-- In-flow back navigation uses `<BackLink>` with an `onClick` handler (typically `navigate(-1)` or explicit path).
-
-## Data Flow
+## Layered Structure
 
 ```
-User interaction
-  → Screen calls AppState action (e.g. createKeyset)
-    → Action calls bifrost service functions
-    → Action updates React state (useState setters)
-      → Screens re-render via useAppState() context
-
-Profile persistence:
-  AppState actions → profileStore (idb-keyval) → IndexedDB
-
-Runtime loop:
-  setInterval(2.5s) → refreshRuntime()
-    → RuntimeClient.tick() / LocalRuntimeSimulator.pump()
-    → setRuntimeStatus() → screens re-render
+UI (React screens + components)
+  ↕
+AppStateProvider (canonical App state, derived + sourced from runtime)
+  ↕
+RuntimeClient (typed wrapper around WasmBridgeRuntime)
+  ↕
+bifrost-bridge-wasm  (vendored at src/vendor/bifrost-bridge-wasm)
+  ↕                  ↕
+RuntimeRelayPump    WASM module runs FROST protocol, state machine, codecs
+  ↕
+BrowserRelayClient (NIP-01 WebSockets to public relays)
+  ↕
+wss://relay.primal.net / relay.damus.io / nos.lol
 ```
 
-## Design Reference
+### Key files (source of truth)
 
-The `igloo-paper` repository is the **design source of truth**. It contains:
+- `src/app/AppStateProvider.tsx` — canonical app state, profile CRUD, runtime bootstrap, relay pump control
+- `src/app/AppStateContext.tsx` — React context + `useAppState()` hook
+- `src/app/MockAppStateProvider.tsx` — demo-only provider, mirrors API shape for gallery scenarios
+- `src/app/appStateBridge.ts` — one-shot sessionStorage handoff between demo and real providers (MUST NOT serialize secrets)
+- `src/app/profileRuntime.ts` — WASM bootstrap helpers (createRuntimeFromProfilePayload, etc.)
+- `src/app/runtimeExports.ts` — `exportRuntimePackagesFromSnapshot` (real bfprofile/bfshare string production)
+- `src/lib/bifrost/runtimeClient.ts` — typed WasmBridgeRuntime wrapper (init/restore/tick/handleCommand/drain*/snapshot/wipeState/setPolicyOverride/clearPolicyOverrides/readConfig/updateConfig)
+- `src/lib/bifrost/packageService.ts` — package codec helpers (encode/decode bfshare/bfonboard/bfprofile, profile backup event builders)
+- `src/lib/bifrost/types.ts` — shared types for runtime read models
+- `src/lib/relay/browserRelayClient.ts` — NIP-01 WebSocket client
+- `src/lib/relay/runtimeRelayPump.ts` — pumps outbound→relay / inbound→runtime on each tick
+- `src/lib/wasm/loadBridge.ts` — vite-aware WASM module loader
+- `src/screens/DashboardScreen/` — Dashboard, organized into `index`, `states/`, `panels/`, `modals/`, `sidebar/`, `mocks.ts`, `types.ts`
+- `src/demo/` — deterministic gallery scenarios at `/demo/:scenarioId`
+- `src/e2e/` — Playwright tests
 
-| Path | Contents |
-|---|---|
-| `screens/` | Per-screen folders with `screen.html` (reference HTML), screenshots, and README files describing layout and behavior. |
-| `design-system/components/` | Component specs — buttons, inputs, pills, cards, etc. |
-| `design-system/foundations/` | Color palette, type scale, spacing definitions. |
-| `design-system/tokens/` | Extracted design token values. |
-| `design-system/patterns/` | Reusable layout patterns (e.g. form groups, card grids). |
+## Data Flow: Operations (sign/ECDH/ping/onboard)
 
-**Workers building new screens should reference the corresponding `igloo-paper/screens/<flow>/<screen>/screen.html`** for layout structure, content, and component usage guidance.
+1. UI invokes `appState.handleRuntimeCommand({type, ...})` (or a wrapper action).
+2. AppStateProvider forwards to `RuntimeClient.handleCommand()` → WASM `handle_command()`.
+3. Next `tick()` (driven every 2500 ms by refreshRuntime interval) drains commands; WASM generates outbound envelope + updates `pending_operations`.
+4. RuntimeRelayPump reads `drainOutboundEvents` and publishes to relays.
+5. Relays forward to peer devices → those devices' WASM `handle_inbound_event()` → response envelope.
+6. Peer responses arrive back via WebSocket → `handleInboundEvent()` on local runtime.
+7. Next tick: `drainCompletions()` yields success entries; `drainFailures()` yields failures; `drainRuntimeEvents()` yields lifecycle edges (status_changed, policy_updated, etc.).
+8. AppStateProvider exposes completions/failures/events via React state → UI updates (EventLogPanel, SigningFailedModal, PendingApprovalsPanel).
 
-> Path nuance: many Paper screen folders are numerically prefixed (for example `igloo-paper/screens/shared/2-create-profile/screen.html`).  
-> If a guessed path does not exist, list the flow directory first and use the numbered folder name.
+No Promise-based correlation — callers correlate by `request_id` in `pending_operations` → completions/failures.
 
-## Key Conventions
+## Data Flow: Policies
 
-- **CSS class naming** — semantic BEM-ish names (`.button-primary`, `.status-pill`, `.app-header`), not Tailwind utilities. New components should follow existing patterns in `global.css`.
-- **Button variants** — use the `variant` prop (`primary | secondary | ghost | danger | chip | header`) and `size` prop (`sm | md | full | icon`). Don't invent ad-hoc button styles.
-- **StatusPill tones** — `default | success | warning | error | info` with optional `dot` or `check` marker.
-- **AppShell layout modes** — `center` (vertically centered, for landing/wizard screens), `flow` (top-aligned scrollable, for forms), `dashboard` (top-aligned, for the dashboard).
-- **Screen file naming** — `src/screens/<PascalName>Screen.tsx`, one component per file, default-ish export via named export.
-- **State access** — always use `useAppState()` hook; never import context directly.
-- **Form validation** — performed inside AppState actions (throw on invalid input); screens display errors via try/catch.
-- **Icons** — sourced from `lucide-react`, not inline SVGs or emoji.
+- Default policy in bifrost is `allow` for every verb (ping/onboard/sign/ecdh) on both `request` and `respond` directions. Match this.
+- UI sets overrides via `RuntimeClient.setPolicyOverride({peer, direction, method, value})`. `value ∈ {unset, allow, deny}`.
+- WASM exposes `runtime_status.peer_permission_states[*].effective_policy` — the merged view (local AND-combined with peer's remote-reported respond policy).
+- UI reads effective_policy for badges and lists; UI writes manual_override for changes.
+
+## Data Flow: Approval Prompts (reactive denial)
+
+bifrost auto-approves/denies based on policy synchronously. There is NO protocol-level "pending request hold" API. When a peer's request is denied by policy, bifrost emits `peer_denied` via `drain_runtime_events()`. The reactive flow:
+
+1. Peer B sends sign request to A.
+2. A's runtime checks `respond.sign` for B. If Deny: emits `peer_denied` envelope to B, emits `peer_denied` runtime event locally.
+3. A's EventLog consumer observes `peer_denied` → AppStateProvider queues it for `PolicyPromptModal`.
+4. Modal shows peer B identity, verb, any decoded event context.
+5. User clicks "Allow once": `setPolicyOverride(B, respond, sign, allow)` — temporary allow; user hint asks B to retry.
+6. User clicks "Always allow": same but override persists via stored profile.
+7. User clicks "Deny": modal dismisses (request already denied).
+
+This deviates from Paper's upfront-blocking-prompt design — documented in `docs/runtime-deviations-from-paper.md`.
+
+## Persistence
+
+- **IndexedDB** (via `idb-keyval`): stores `StoredProfile` records = summary + encrypted `bfprofile` package string. Also stores `manual_peer_policy_overrides` in payload. Read by AppStateProvider on mount.
+- **sessionStorage**: one-shot bridge snapshot (demo → real handoff) with ALL setup sessions null.
+- **In-memory only**: raw share secrets, decoded payloads, recovered nsec, setup-session passwords.
+
+## Security Invariants
+
+- Never write secrets to sessionStorage, localStorage, or IndexedDB (except inside an encrypted bfprofile string).
+- NIP-19 encoding, secp256k1 validation, FROST key material — WASM only, never browser JS.
+- Router state may carry safe retry context (package text, profile ids). NEVER passwords, decoded payloads, share secrets, nsec.
+- Setup session state cleared on cancel/finish/lock/clearCredentials/invalid-direct-navigation.
+- `clearCredentials()` MUST call `runtime.wipe_state()` before dropping the runtime ref.
+- Console, Nostr event content, DOM, and snapshot output must not leak secrets (validated by explicit assertions).
+
+## Dashboard State Derivation
+
+`src/screens/DashboardScreen/dashboardState.ts` computes the high-level state:
+
+- `signerPaused` → `stopped`
+- any relay `connecting` → `connecting`
+- all relays `offline` → `relays-offline`
+- any relay online but `!hasCompletedPeerRefresh` → `connecting`
+- `pendingRuntimeWorkIsBlocked` (readiness mismatch) → `signing-blocked`
+- else → `running`
+
+Demo scenarios override via `demoUi.dashboard?.state`.
+
+## Paper Parity
+
+Every screen must match `igloo-paper` (sibling repo) — same copy, colors, typography, layout. Deviations only where protocol constrains us (reactive denial surface, specific UI labels). Each deviation documented in `docs/runtime-deviations-from-paper.md`.
+
+Design system primitives (shared): `.settings-section`, `.settings-card`, `.settings-btn-blue`, `.settings-btn-red`, `.event-log-list`, `.policies-peer-row`, `.policies-rule-row`, etc. Colors in `src/styles/global.css` follow Paper tokens (`--color-success`, `--color-warn`, `--color-error`, verb-specific tones for SIGN/ECDH/PING/ONBOARD badges).
+
+## Testing Surfaces
+
+- **Unit** (vitest): pure functions, hooks, state reducers
+- **Component** (vitest + Testing Library): panels, modals, screens in isolation
+- **Demo gallery e2e** (Playwright at `src/e2e/demo-gallery.spec.ts`): visits `/demo/:scenarioId` and checks Paper parity + no console errors
+- **Multi-device e2e** (new in this mission): two Playwright pages sharing a spawned local `bifrost-devtools relay`, each seeded with a different share of the same keyset (pattern copied from frostr-infra `chrome-pwa-pairing.spec.ts`)
+- **Manual validation** (agent-browser): 1–3 concurrent sessions, public relays, orchestrated scenarios

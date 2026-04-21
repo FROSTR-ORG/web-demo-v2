@@ -13,29 +13,86 @@ import { SigningFailedModal } from "./modals/SigningFailedModal";
 import { DashboardSummaryBar } from "./panels/DashboardSummaryBar";
 import { MockStateToggle } from "./panels/MockStateToggle";
 import { SettingsSidebar } from "./sidebar/SettingsSidebar";
+import { deriveDashboardState } from "./dashboardState";
 import { ConnectingState } from "./states/ConnectingState";
 import { PoliciesState } from "./states/PoliciesState";
 import { RelaysOfflineState } from "./states/RelaysOfflineState";
 import { RunningState } from "./states/RunningState";
 import { SigningBlockedState } from "./states/SigningBlockedState";
 import { StoppedState } from "./states/StoppedState";
-import { DEFAULT_POLICY_PROMPT_REQUEST, type PolicyPromptRequest } from "./mocks";
-import type { DashboardState, ModalState } from "./types";
+import {
+  DEFAULT_POLICY_PROMPT_REQUEST,
+  MOCK_BACKUP_STRING,
+  MOCK_SHARE_PACKAGE_STRING,
+  type PolicyPromptRequest,
+} from "./mocks";
+import type { DashboardState, ExportMode, ModalState } from "./types";
+import type { RuntimeRelayStatus } from "../../lib/relay/runtimeRelayPump";
 
 export type { DashboardState, ModalState } from "./types";
+
+function mockPackageForMode(mode: ExportMode): string {
+  return mode === "profile" ? MOCK_BACKUP_STRING : MOCK_SHARE_PACKAGE_STRING;
+}
+
+function relayHealthRowsFromRuntime(
+  runtimeRelays: RuntimeRelayStatus[],
+  configuredRelays: string[],
+) {
+  const rows =
+    runtimeRelays.length > 0
+      ? runtimeRelays
+      : configuredRelays.map<RuntimeRelayStatus>((url) => ({
+          url,
+          state: "offline",
+        }));
+  return rows.map((relay) => ({
+    relay: relay.url,
+    status:
+      relay.state === "online"
+        ? ("Online" as const)
+        : relay.state === "connecting"
+          ? ("Degraded" as const)
+          : ("Offline" as const),
+    latency: "--",
+    events: "--",
+    lastSeen:
+      relay.state === "online"
+        ? "now"
+        : relay.lastError
+          ? relay.lastError
+          : "--",
+  }));
+}
 
 export function DashboardScreen() {
   const { profileId } = useParams();
   const navigate = useNavigate();
-  const { activeProfile, runtimeStatus, lockProfile, clearCredentials, refreshRuntime } = useAppState();
+  const {
+    activeProfile,
+    runtimeStatus,
+    runtimeRelays = [],
+    signerPaused = false,
+    lockProfile,
+    clearCredentials,
+    setSignerPaused = () => undefined,
+    refreshRuntime,
+    exportRuntimePackages = async () => {
+      throw new Error("Export is unavailable for this profile.");
+    },
+    restartRuntimeConnections = async () => undefined,
+  } = useAppState();
   const demoUi = useDemoUi();
+  const hasDemoDashboardState = Boolean(demoUi.dashboard?.state || demoUi.dashboard?.showMockControls);
   const [mockState, setMockState] = useState<DashboardState>(demoUi.dashboard?.state ?? "running");
   const [showPolicies, setShowPolicies] = useState(Boolean(demoUi.dashboard?.showPolicies));
   const [activeModal, setActiveModal] = useState<ModalState>(demoUi.dashboard?.modal ?? "none");
+  const [exportMode, setExportMode] = useState<ExportMode>(demoUi.dashboard?.exportMode ?? "profile");
+  const [exportResult, setExportResult] = useState<{ mode: ExportMode; packageText: string } | null>(null);
   const [policyPromptRequest, setPolicyPromptRequest] = useState<PolicyPromptRequest>(DEFAULT_POLICY_PROMPT_REQUEST);
   const [settingsOpen, setSettingsOpen] = useState(Boolean(demoUi.dashboard?.settingsOpen));
   const showMockControls = Boolean(demoUi.dashboard?.showMockControls);
-  const paperPanels = demoUi.dashboard?.paperPanels ?? true;
+  const paperPanels = demoUi.dashboard?.paperPanels ?? Boolean(demoUi.dashboard);
 
   if (!profileId) {
     return <Navigate to="/" replace />;
@@ -46,8 +103,15 @@ export function DashboardScreen() {
 
   const onlineCount = runtimeStatus.peers.filter((peer) => peer.online).length;
   const signReadyLabel = `${runtimeStatus.readiness.signing_peer_count}/${runtimeStatus.readiness.threshold} sign ready`;
+  const dashboardState = hasDemoDashboardState
+    ? mockState
+    : deriveDashboardState({ signerPaused, runtimeStatus, runtimeRelays });
+  const relayRows = relayHealthRowsFromRuntime(runtimeRelays, activeProfile.relays);
+  const completionMode = exportResult?.mode ?? exportMode;
+  const completionPackage = exportResult?.packageText ?? mockPackageForMode(completionMode);
 
   function handleLock() {
+    setExportResult(null);
     lockProfile();
     navigate("/");
   }
@@ -58,8 +122,58 @@ export function DashboardScreen() {
     // stateful, so its bridge-write effect then writes the empty snapshot
     // before the `navigate("/")` reaches the real AppStateProvider — no
     // Dashboard-side workaround required.
+    setExportResult(null);
     await clearCredentials();
     navigate("/");
+  }
+
+  function handleStopSigner() {
+    if (hasDemoDashboardState) {
+      setMockState("stopped");
+      return;
+    }
+    setSignerPaused(true);
+  }
+
+  function handleStartSigner() {
+    if (hasDemoDashboardState) {
+      setMockState("running");
+      return;
+    }
+    setSignerPaused(false);
+  }
+
+  function handleRetryRelays() {
+    if (hasDemoDashboardState) {
+      setMockState("connecting");
+      return;
+    }
+    void restartRuntimeConnections();
+  }
+
+  function handleOpenExport(mode: ExportMode) {
+    setExportMode(mode);
+    setExportResult(null);
+    setActiveModal("export-profile");
+  }
+
+  async function handleExport(password: string) {
+    if (paperPanels) {
+      setExportResult({ mode: exportMode, packageText: mockPackageForMode(exportMode) });
+      setActiveModal("export-complete");
+      return;
+    }
+    const packages = await exportRuntimePackages(password);
+    setExportResult({
+      mode: exportMode,
+      packageText: exportMode === "profile" ? packages.profilePackage : packages.sharePackage,
+    });
+    setActiveModal("export-complete");
+  }
+
+  function closeExportModal() {
+    setExportResult(null);
+    setActiveModal("none");
   }
 
   return (
@@ -71,7 +185,7 @@ export function DashboardScreen() {
             <FileText size={14} />
             Recover
           </Button>
-          <Button type="button" variant="header" onClick={() => setActiveModal("export-profile")}>
+          <Button type="button" variant="header" onClick={() => handleOpenExport("profile")}>
             <Download size={14} />
             Export
           </Button>
@@ -112,10 +226,14 @@ export function DashboardScreen() {
         />
 
         {showPolicies ? (
-          <PoliciesState peers={runtimeStatus.peers} />
+          <PoliciesState
+            peers={runtimeStatus.peers}
+            peerPermissionStates={runtimeStatus.peer_permission_states ?? []}
+            paperPanels={paperPanels}
+          />
         ) : (
           <>
-            {mockState === "running" && (
+            {dashboardState === "running" && (
               <RunningState
                 relays={activeProfile.relays}
                 onlineCount={onlineCount}
@@ -124,7 +242,7 @@ export function DashboardScreen() {
                 pendingOperations={runtimeStatus.pending_operations}
                 paperPanels={paperPanels}
                 sidebarOpen={settingsOpen}
-                onStop={() => setMockState("stopped")}
+                onStop={handleStopSigner}
                 onRefresh={refreshRuntime}
                 onOpenPolicyPrompt={(request) => {
                   setPolicyPromptRequest(request);
@@ -133,24 +251,25 @@ export function DashboardScreen() {
               />
             )}
 
-            {mockState === "connecting" && (
+            {dashboardState === "connecting" && (
               <ConnectingState relays={activeProfile.relays} />
             )}
 
-            {mockState === "stopped" && (
-              <StoppedState onStart={() => setMockState("running")} />
+            {dashboardState === "stopped" && (
+              <StoppedState onStart={handleStartSigner} />
             )}
 
-            {mockState === "relays-offline" && (
+            {dashboardState === "relays-offline" && (
               <RelaysOfflineState
-                onStop={() => setMockState("stopped")}
-                onRetry={() => setMockState("connecting")}
+                onStop={handleStopSigner}
+                onRetry={handleRetryRelays}
+                relays={hasDemoDashboardState ? undefined : relayRows}
               />
             )}
 
-            {mockState === "signing-blocked" && (
+            {dashboardState === "signing-blocked" && (
               <SigningBlockedState
-                onStop={() => setMockState("stopped")}
+                onStop={handleStopSigner}
                 onOpenPolicies={() => setShowPolicies(true)}
                 onReviewApprovals={() => {
                   setPolicyPromptRequest(DEFAULT_POLICY_PROMPT_REQUEST);
@@ -179,18 +298,23 @@ export function DashboardScreen() {
       )}
       {activeModal === "export-profile" && (
         <ExportProfileModal
+          mode={exportMode}
           groupName={activeProfile.groupName}
           threshold={activeProfile.threshold}
           memberCount={activeProfile.memberCount}
           shareIdx={runtimeStatus.metadata.member_idx}
           relayCount={activeProfile.relays.length}
           peerCount={runtimeStatus.peers.length}
-          onCancel={() => setActiveModal("none")}
-          onExport={() => setActiveModal("export-complete")}
+          onCancel={closeExportModal}
+          onExport={handleExport}
         />
       )}
       {activeModal === "export-complete" && (
-        <ExportCompleteModal onDone={() => setActiveModal("none")} />
+        <ExportCompleteModal
+          mode={completionMode}
+          packageText={completionPackage}
+          onDone={closeExportModal}
+        />
       )}
 
       {settingsOpen && (
@@ -210,8 +334,9 @@ export function DashboardScreen() {
             // Backup Ready modal returns the user to the same sidebar rows
             // (VAL-DSH-031 / VAL-CROSS-011). The modals stack above the
             // sidebar via `.export-modal-backdrop { z-index: 200 }`.
-            setActiveModal("export-profile");
+            handleOpenExport("profile");
           }}
+          onExportShare={() => handleOpenExport("share")}
         />
       )}
     </AppShell>

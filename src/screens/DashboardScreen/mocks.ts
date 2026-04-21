@@ -257,6 +257,7 @@ export const MOCK_RELAY_HEALTH_ROWS: DashboardRelayHealthRow[] = [
 
 // Mock encrypted backup string shown in the Export Complete modal
 export const MOCK_BACKUP_STRING = "bfprofile1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4q9xgclkz4f5e0r8p2d7y6m3n0w1x4c5v6b7n8m9k0j";
+export const MOCK_SHARE_PACKAGE_STRING = "bfshare1qvz8k2afcqqszq2v5v5hnq9jxq6z9yx7s6np8pq3hm9n2c0g7m4e6a8ks0r5t";
 
 // Deterministic, paper-faithful formatters used by dashboard panels.
 export function paperGroupKey(value: string) {

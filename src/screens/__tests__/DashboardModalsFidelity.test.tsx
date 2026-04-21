@@ -183,7 +183,7 @@ describe("VAL-DSH-016 — Export Complete modal", () => {
       dashboard: { settingsOpen: true, modal: "export-complete", paperPanels: true },
     });
     const modal = screen.getByTestId("export-complete-modal");
-    expect(modal.querySelector(".export-complete-title")?.textContent).toBe("Backup Ready");
+    expect(modal.querySelector(".export-complete-title")?.textContent).toBe("Profile Backup Ready");
     const actionBtns = Array.from(modal.querySelectorAll(".export-action-btn")).map(
       (el) => el.textContent?.trim()
     );

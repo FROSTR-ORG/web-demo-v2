@@ -115,22 +115,14 @@ function renderWithoutDemoUi() {
 
 describe("Dashboard runtime-state fidelity", () => {
   describe("Default app dashboard", () => {
-    it("uses the Paper running dashboard when /dashboard/:id has no demoUi state", () => {
+    it("uses live runtime panels when /dashboard/:id has no demoUi state", () => {
       renderWithoutDemoUi();
       expect(screen.getByText("Signer Running")).toBeInTheDocument();
-      expect(screen.getByText("~186 ready")).toBeInTheDocument();
-      expect(screen.getByText("Avg: 31ms")).toBeInTheDocument();
-      expect(screen.getByText("Event Log")).toBeInTheDocument();
-      expect(screen.getByText("8 events")).toBeInTheDocument();
-      expect(
-        screen.getByText("Pool sync with peer #0 — 50 received · 50 sent")
-      ).toBeInTheDocument();
-      expect(screen.getByText("Pending Approvals")).toBeInTheDocument();
-      expect(screen.getByText("3 pending")).toBeInTheDocument();
-      expect(screen.getByText("kind:1 Short Text Note")).toBeInTheDocument();
-
-      fireEvent.click(screen.getByLabelText("Open approval 1"));
-      expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
+      expect(screen.getByText("2/2 sign ready")).toBeInTheDocument();
+      expect(screen.getByText("Avg: --")).toBeInTheDocument();
+      expect(screen.queryByText("Event Log")).not.toBeInTheDocument();
+      expect(screen.queryByText("Pending Approvals")).not.toBeInTheDocument();
+      expect(screen.queryByText("Pending Operations")).not.toBeInTheDocument();
     });
 
     it("keeps the explicit raw runtime-panel opt-out available", () => {

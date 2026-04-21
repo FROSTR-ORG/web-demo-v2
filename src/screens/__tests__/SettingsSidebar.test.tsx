@@ -110,7 +110,7 @@ describe("Settings Sidebar", () => {
     const labelTexts = Array.from(sectionLabels).map((el) => el.textContent);
     expect(labelTexts).toContain("Device Profile");
     expect(labelTexts).toContain("Group Profile");
-    expect(labelTexts).toContain("Rotate Share");
+    expect(labelTexts).toContain("Replace Share");
     expect(labelTexts).toContain("Export & Backup");
     expect(labelTexts).toContain("Profile Security");
   });
@@ -198,7 +198,7 @@ describe("Settings Sidebar", () => {
     expect(screen.getByText("wss://nos.lol")).toBeInTheDocument();
   });
 
-  it("edits the profile name inline and shows export-share copy feedback", () => {
+  it("edits the profile name inline and opens the Export Share flow", () => {
     renderDashboard();
     fireEvent.click(screen.getByLabelText("Settings"));
 
@@ -211,9 +211,10 @@ describe("Settings Sidebar", () => {
 
     const exportShareRow = screen.getByText("Export Share").closest(".settings-action-row");
     expect(exportShareRow).not.toBeNull();
-    const copyButton = exportShareRow!.querySelector(".settings-btn-muted") as HTMLElement;
-    fireEvent.click(copyButton);
-    expect(copyButton.textContent).toBe("Copied");
+    const exportButton = exportShareRow!.querySelector(".settings-btn-blue") as HTMLElement;
+    fireEvent.click(exportButton);
+    expect(screen.getByTestId("export-profile-modal")).toBeInTheDocument();
+    expect(screen.getByLabelText("Share Export Password")).toBeInTheDocument();
   });
 });
 

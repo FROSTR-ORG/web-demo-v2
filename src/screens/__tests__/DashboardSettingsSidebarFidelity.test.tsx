@@ -139,7 +139,7 @@ function renderWith(demoUi: DemoUi) {
 
 describe("dashboard-settings-sidebar-fidelity", () => {
   describe("VAL-DSH-010: Sidebar section order + Paper-parity rows", () => {
-    it("renders Device Profile, Group Profile, Rotate Share, Export & Backup, Profile Security sections in order", () => {
+    it("renders Device Profile, Group Profile, Replace Share, Export & Backup, Profile Security sections in order", () => {
       renderWith({ dashboard: { settingsOpen: true, paperPanels: true } });
       const sidebar = screen.getByTestId("settings-sidebar");
       const labels = Array.from(
@@ -148,7 +148,7 @@ describe("dashboard-settings-sidebar-fidelity", () => {
       expect(labels).toEqual([
         "Device Profile",
         "Group Profile",
-        "Rotate Share",
+        "Replace Share",
         "Export & Backup",
         "Profile Security",
       ]);
@@ -183,7 +183,7 @@ describe("dashboard-settings-sidebar-fidelity", () => {
         screen.getByText("Encrypted backup of your share and configuration")
       ).toBeInTheDocument();
       expect(screen.getByText("Export Share")).toBeInTheDocument();
-      expect(screen.getByText("Unencrypted share key in hex")).toBeInTheDocument();
+      expect(screen.getByText("Password-protected bfshare package")).toBeInTheDocument();
     });
 
     it("Profile Security exposes Lock Profile + Clear Credentials rows with Paper copy", () => {

@@ -1,26 +1,41 @@
 import { Check, Copy, Download, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import { MOCK_BACKUP_STRING } from "../mocks";
+import type { ExportMode } from "../types";
 
-export function ExportCompleteModal({ onDone }: { onDone: () => void }) {
+export function ExportCompleteModal({
+  mode,
+  packageText,
+  onDone,
+}: {
+  mode: ExportMode;
+  packageText: string;
+  onDone: () => void;
+}) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const maskedValue = `${MOCK_BACKUP_STRING.slice(0, 10)}${"•".repeat(28)}`;
-  const displayValue = revealed ? MOCK_BACKUP_STRING : maskedValue;
+  const prefix = mode === "profile" ? "bfprofile1" : "bfshare1";
+  const maskedValue = `${prefix}${"•".repeat(28)}`;
+  const displayValue = revealed ? packageText : maskedValue;
+  const title = mode === "profile" ? "Profile Backup Ready" : "Share Package Ready";
+  const filename = mode === "profile" ? "igloo-profile-backup.txt" : "igloo-share-backup.txt";
+  const warning =
+    mode === "profile"
+      ? "Store this backup in a safe place. Anyone with this file and the password can control your share."
+      : "Store this bfshare package safely. Anyone with it and the password can use this share.";
 
   function handleCopy() {
-    navigator.clipboard?.writeText(MOCK_BACKUP_STRING);
+    navigator.clipboard?.writeText(packageText);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2000);
   }
 
   function handleDownload() {
-    const blob = new Blob([MOCK_BACKUP_STRING], { type: "text/plain" });
+    const blob = new Blob([packageText], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "igloo-profile-backup.txt";
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -35,7 +50,7 @@ export function ExportCompleteModal({ onDone }: { onDone: () => void }) {
           <div className="export-complete-icon">
             <Check size={12} strokeWidth={3} />
           </div>
-          <div className="export-complete-title">Backup Ready</div>
+          <div className="export-complete-title">{title}</div>
         </div>
 
         {/* Backup string with reveal toggle */}
@@ -65,7 +80,7 @@ export function ExportCompleteModal({ onDone }: { onDone: () => void }) {
 
         {/* Security warning */}
         <p className="export-security-warning">
-          Store this backup in a safe place. Anyone with this file and the password can control your share.
+          {warning}
         </p>
 
         {/* Done button */}

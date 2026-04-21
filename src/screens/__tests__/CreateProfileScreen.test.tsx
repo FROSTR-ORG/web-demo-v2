@@ -106,10 +106,10 @@ describe("CreateProfileScreen", () => {
 
   it("renders stepper with shared variant labels (VAL-SHR-002)", () => {
     renderScreen();
-    expect(screen.getByText("Create / Rotate")).toBeInTheDocument();
-    // "Create Profile" appears in stepper + page heading
+    expect(screen.getByText("Create Keyset")).toBeInTheDocument();
+    // "Create Profile" appears in page heading (stepper now says "Setup Profile")
     expect(screen.getAllByText("Create Profile").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Distribute Shares")).toBeInTheDocument();
+    expect(screen.getByText("Onboard Devices")).toBeInTheDocument();
     expect(screen.queryByText("Rotate Keyset")).not.toBeInTheDocument();
   });
 

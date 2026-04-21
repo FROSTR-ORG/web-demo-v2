@@ -267,11 +267,13 @@ export function createDemoAppState(
     profiles: [],
     activeProfile: null,
     runtimeStatus: null,
+    runtimeRelays: [],
     signerPaused: false,
     createSession: null,
     importSession: null,
     onboardSession: null,
     rotateKeysetSession: null,
+    replaceShareSession: null,
     recoverSession: null,
     reloadProfiles: async () => undefined,
     createKeyset: async () => undefined,
@@ -293,6 +295,9 @@ export function createDemoAppState(
     updateRotatePackageState: () => undefined,
     finishRotateDistribution: async () => DEMO_PROFILE_ID,
     clearRotateKeysetSession: () => undefined,
+    decodeReplaceSharePackage: async () => undefined,
+    applyReplaceShareUpdate: async () => undefined,
+    clearReplaceShareSession: () => undefined,
     validateRecoverSources: async () => undefined,
     recoverNsec: async () => ({
       nsec: PAPER_RECOVERED_NSEC,
@@ -301,10 +306,28 @@ export function createDemoAppState(
     clearRecoverSession: () => undefined,
     expireRecoveredNsec: () => undefined,
     unlockProfile: async () => undefined,
+    changeProfilePassword: async () => undefined,
     lockProfile: () => undefined,
     clearCredentials: async () => undefined,
+    exportRuntimePackages: async () => ({
+      profilePackage: "bfprofile1demo",
+      sharePackage: "bfshare1demo",
+      metadata: {
+        profileId: DEMO_PROFILE_ID,
+        groupName: "My Signing Key",
+        deviceName: "Igloo Web",
+        shareIdx: 0,
+        relayCount: 2,
+        peerCount: 3,
+      },
+    }),
+    createProfileBackup: async () => ({
+      backup: { ciphertext: "mock", nonce: "mock", version: 1 },
+      event: { id: "mock", pubkey: "mock", created_at: 0, kind: 30078, tags: [], content: "mock", sig: "mock" },
+    }),
     setSignerPaused: () => undefined,
     refreshRuntime: () => undefined,
+    restartRuntimeConnections: async () => undefined,
   };
 
   return { ...state, ...overrides };

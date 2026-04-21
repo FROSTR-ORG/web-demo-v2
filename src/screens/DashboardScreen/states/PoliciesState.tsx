@@ -1,13 +1,70 @@
 import { useState } from "react";
 import { PermissionBadge } from "../../../components/ui";
-import type { PeerStatus } from "../../../lib/bifrost/types";
+import { shortHex } from "../../../lib/bifrost/format";
+import type { PeerPermissionState, PeerStatus } from "../../../lib/bifrost/types";
 import { MOCK_PEER_POLICIES, MOCK_SIGNER_RULES } from "../mocks";
 
-export function PoliciesState({ peers: _peers }: { peers: PeerStatus[] }) {
+function requestPolicyAllows(
+  state: PeerPermissionState,
+  method: "sign" | "ecdh" | "ping" | "onboard",
+): boolean {
+  const effective = state.effective_policy as {
+    request?: Record<string, unknown>;
+  } & Record<string, unknown>;
+  const value = effective.request?.[method] ?? effective[method];
+  return value === true || value === "allow";
+}
+
+function runtimePeerPolicies(
+  peers: PeerStatus[],
+  peerPermissionStates: PeerPermissionState[],
+) {
+  return peerPermissionStates.map((state, fallbackIndex) => {
+    const peer = peers.find((entry) => entry.pubkey === state.pubkey);
+    return {
+      index: peer?.idx ?? fallbackIndex,
+      displayId: shortHex(state.pubkey, 8, 4),
+      permissions: {
+        sign: requestPolicyAllows(state, "sign"),
+        ecdh: requestPolicyAllows(state, "ecdh"),
+        ping: requestPolicyAllows(state, "ping"),
+        onboard: requestPolicyAllows(state, "onboard"),
+      },
+    };
+  });
+}
+
+function fallbackPeerPolicies(peers: PeerStatus[]) {
+  return peers.map((peer) => ({
+    index: peer.idx,
+    displayId: shortHex(peer.pubkey, 8, 4),
+    permissions: {
+      sign: peer.can_sign,
+      ecdh: peer.should_send_nonces,
+      ping: peer.online,
+      onboard: false,
+    },
+  }));
+}
+
+export function PoliciesState({
+  peers,
+  peerPermissionStates,
+  paperPanels,
+}: {
+  peers: PeerStatus[];
+  peerPermissionStates: PeerPermissionState[];
+  paperPanels: boolean;
+}) {
   const [defaultPolicy, setDefaultPolicy] = useState("Ask every time");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [hiddenRules, setHiddenRules] = useState<Set<string>>(() => new Set());
   const visibleRules = MOCK_SIGNER_RULES.filter((rule) => !hiddenRules.has(rule.method));
+  const peerPolicies = paperPanels
+    ? MOCK_PEER_POLICIES
+    : peerPermissionStates.length > 0
+      ? runtimePeerPolicies(peers, peerPermissionStates)
+      : fallbackPeerPolicies(peers);
 
   function removeRule(method: string) {
     setHiddenRules((previous) => {
@@ -94,7 +151,7 @@ export function PoliciesState({ peers: _peers }: { peers: PeerStatus[] }) {
             Review which request types each peer is allowed to make from this signer.
           </p>
           <div className="policies-peer-list">
-            {MOCK_PEER_POLICIES.map((peer) => (
+            {peerPolicies.map((peer) => (
               <div className="policies-peer-row" key={peer.index}>
                 <div className="policies-peer-info">
                   <span className="policies-peer-name">Peer #{peer.index}</span>

@@ -7,10 +7,10 @@ import { AppShell, PageHeading } from "../components/shell";
 import {
   BackLink,
   Button,
-  NumberStepper,
   Stepper,
   TextField,
 } from "../components/ui";
+import { ThresholdSelector } from "../components/ThresholdSelector";
 import { useDemoUi } from "../demo/demoUi";
 import { generateNsec } from "../lib/bifrost/packageService";
 import type { GeneratedNsecResult } from "../lib/bifrost/types";
@@ -74,8 +74,9 @@ export function CreateKeysetScreen() {
       errors.groupName = "Keyset name is required.";
     }
     const generatedValue = generatedNsec?.nsec ?? "";
-    if (nsec.trim() && nsec.trim() !== generatedValue) {
-      errors.nsec = "Existing nsec splitting is not supported yet.";
+    const isExistingNsec = nsec.trim() && nsec.trim() !== generatedValue;
+    if (isExistingNsec && !nsec.trim().startsWith("nsec1")) {
+      errors.nsec = "Invalid nsec format — must start with nsec1.";
     }
 
     if (Object.keys(errors).length > 0) {
@@ -91,6 +92,7 @@ export function CreateKeysetScreen() {
         threshold,
         count,
         generatedNsec: generatedNsec?.nsec,
+        existingNsec: isExistingNsec ? nsec.trim() : undefined,
       });
       clearGeneratedNsec();
       navigate("/create/progress");
@@ -134,72 +136,57 @@ export function CreateKeysetScreen() {
             <span className="input-shell">
               <input
                 className={`input${fieldErrors.nsec ? " input-error" : ""}`}
-                placeholder="Paste existing nsec (unsupported)"
-                type={showNsec ? "text" : "password"}
-                value={nsec}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  setNsec(next);
-                  if (generatedNsec && next !== generatedNsec.nsec)
-                    clearGeneratedNsec();
-                  if (fieldErrors.nsec)
-                    setFieldErrors((prev) => ({ ...prev, nsec: undefined }));
-                }}
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                aria-label={showNsec ? "Hide nsec" : "Reveal nsec"}
-                onClick={() => setShowNsec((shown) => !shown)}
-                disabled={!nsec}
-              >
-                {showNsec ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </span>
-            <Button
+              placeholder="Paste your existing nsec or generate a new one"
+              type={showNsec ? "text" : "password"}
+              value={nsec}
+              onChange={(event) => {
+                const next = event.target.value;
+                setNsec(next);
+                if (generatedNsec && next !== generatedNsec.nsec)
+                  clearGeneratedNsec();
+                if (fieldErrors.nsec)
+                  setFieldErrors((prev) => ({ ...prev, nsec: undefined }));
+              }}
+            />
+            <button
               type="button"
-              variant="secondary"
-              disabled={generatingNsec || busy}
-              onClick={handleGenerateNsec}
+              className="password-toggle"
+              aria-label={showNsec ? "Hide nsec" : "Reveal nsec"}
+              onClick={() => setShowNsec((shown) => !shown)}
+              disabled={!nsec}
             >
-              {generatingNsec ? "Generating..." : "Generate NSEC"}
-            </Button>
+              {showNsec ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </span>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={generatingNsec || busy}
+            onClick={handleGenerateNsec}
+          >
+            {generatingNsec ? "Generating..." : "Generate"}
+          </Button>
           </div>
           {fieldErrors.nsec ? (
             <span className="field-error-text">{fieldErrors.nsec}</span>
           ) : (
             <span className="help">
-              Generate a new nsec here to split that exact key. Manually pasted
-              nsec splitting is not supported yet.
+              Paste your existing nsec or leave blank to generate a new one
             </span>
           )}
         </div>
-        <div className="field-row">
-          <NumberStepper
-            label="Threshold"
-            value={threshold}
-            min={2}
-            max={count}
-            onChange={setThreshold}
-          />
-          <div className="divider-text">/</div>
-          <NumberStepper
-            label="Total Shares"
-            value={count}
-            min={threshold}
-            max={10}
-            onChange={(next) => {
-              setCount(next);
-              if (threshold > next) {
-                setThreshold(next);
-              }
-            }}
-          />
-        </div>
-        <div className="help">
-          Any {threshold} of {count} shares can sign — min threshold is 2, min
-          shares is {threshold}
-        </div>
+        <ThresholdSelector
+          threshold={threshold}
+          total={count}
+          onThresholdChange={setThreshold}
+          onTotalChange={(next) => {
+            setCount(next);
+            if (threshold > next) {
+              setThreshold(next);
+            }
+          }}
+          help={`Any ${threshold} of ${count} shares can sign — min threshold is 2, min shares is ${threshold}`}
+        />
         {error ? <div className="error">{error}</div> : null}
         <Button type="submit" size="full" disabled={busy}>
           {busy ? "Creating..." : "Create Keyset"}
