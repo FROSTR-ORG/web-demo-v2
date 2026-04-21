@@ -173,6 +173,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   // VAL-APPROVALS-017 for behavioral coverage.
   const unlockedPayloadRef = useRef<BfProfilePayload | null>(null);
   const unlockedPasswordRef = useRef<string | null>(null);
+  // Mirror of `activeProfile` as a ref so long-lived callbacks whose
+  // identity must stay stable (e.g. `persistPolicyOverrideToProfile`,
+  // which is read by the `[]`-deps BroadcastChannel receive effect for
+  // VAL-APPROVALS-024) can always read the CURRENT profile summary
+  // without triggering a re-subscribe. Without this mirror, the
+  // BroadcastChannel handler installed at mount would hold a stale
+  // reference to `persistPolicyOverrideToProfile` whose closed-over
+  // `activeProfile` was captured at mount time (often null), causing
+  // cross-tab always-allow / deny-always decisions to silently skip
+  // profile persistence on the receiving tab after that tab unlocked or
+  // changed its active profile (fix-m2-broadcast-receiver-stale-closure).
+  // Kept in lock-step with state via an effect below.
+  const activeProfileRef = useRef<StoredProfileSummary | null>(null);
   const peerDenialResolvedRef = useRef<Set<string>>(new Set());
   // Mirror of `peerDenialQueue` as a ref so `resolvePeerDenial` can
   // look up the resolving entry by id without re-creating its identity
@@ -515,9 +528,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       method: "sign" | "ecdh" | "ping" | "onboard";
       value: "allow" | "deny";
     }): Promise<void> => {
+      // Read the active profile through a ref rather than directly from
+      // the `activeProfile` state so this callback keeps a stable
+      // `useCallback` identity across profile transitions. The
+      // BroadcastChannel receive effect (VAL-APPROVALS-024) installs
+      // with `[]` deps and captures this function once; if its identity
+      // changed with every `activeProfile` update, the handler would
+      // hold a stale reference whose closed-over profile no longer
+      // matches the on-disk record (see
+      // fix-m2-broadcast-receiver-stale-closure).
       const payload = unlockedPayloadRef.current;
       const password = unlockedPasswordRef.current;
-      const profile = activeProfile;
+      const profile = activeProfileRef.current;
       if (!payload || !password || !profile) {
         return;
       }
@@ -543,7 +565,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       unlockedPayloadRef.current = normalizedPayload;
       await saveProfile(record);
     },
-    [activeProfile],
+    [],
   );
 
   const resolvePeerDenial = useCallback(
@@ -2163,6 +2185,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     peerDenialQueueRef.current = peerDenialQueue;
   }, [peerDenialQueue]);
+
+  // Keep activeProfileRef in lock-step with state so long-lived
+  // callbacks (notably `persistPolicyOverrideToProfile`, read by the
+  // `[]`-deps BroadcastChannel receive effect) always see the CURRENT
+  // profile summary without triggering a re-subscribe or holding a
+  // stale closure. See the ref declaration above for the
+  // VAL-APPROVALS-024 / fix-m2-broadcast-receiver-stale-closure
+  // rationale.
+  useEffect(() => {
+    activeProfileRef.current = activeProfile;
+  }, [activeProfile]);
 
   // Install the multi-tab BroadcastChannel for VAL-APPROVALS-024.
   //
