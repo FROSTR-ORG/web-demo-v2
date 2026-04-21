@@ -147,11 +147,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   // (VAL-APPROVALS-007 family).
   const [peerDenialQueue, setPeerDenialQueue] = useState<PeerDeniedEvent[]>([]);
   // Session-scoped set of override keys ("<peer>:respond.<verb>") set via
-  // "Allow once". On `lockProfile()` / `clearCredentials()` we reverse
-  // each entry with `setPolicyOverride(value: "unset")` so the override
-  // does NOT persist across lock/unlock (VAL-APPROVALS-009). Persistent
-  // variants ("Always allow" / "Always deny") are NOT tracked here and
-  // remain in the runtime.
+  // "Allow once". On `lockProfile()` we reverse each entry with
+  // `setPolicyOverride(value: "deny")` so the override does NOT persist
+  // across lock/unlock (VAL-APPROVALS-009). "deny" is chosen over "unset"
+  // because the underlying `MethodPolicy::default()` in bifrost-core is
+  // permissive (every respond method defaults to `true`) — an "unset"
+  // rollback would fall back to the default and silently auto-allow the
+  // next peer request, preventing the fresh `peer_denied` event required
+  // by VAL-APPROVALS-009. See `docs/runtime-deviations-from-paper.md`
+  // for the deviation entry. Persistent variants ("Always allow" /
+  // "Always deny") are NOT tracked here and remain in the runtime.
   const sessionAllowOnceRef = useRef<Set<string>>(new Set());
   const peerDenialResolvedRef = useRef<Set<string>>(new Set());
   // Mirror of `peerDenialQueue` as a ref so `resolvePeerDenial` can
@@ -1860,9 +1865,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const lockProfile = useCallback(() => {
     abortOnboardHandshake();
     // VAL-APPROVALS-009: "Allow once" overrides are session-scoped — before
-    // the runtime ref is dropped, roll each one back to `unset` so a
-    // subsequent unlock (new runtime from the stored profile) doesn't
-    // silently re-apply them through the in-memory state.
+    // the runtime ref is dropped, roll each one back to an explicit `deny`
+    // so a subsequent unlock (new runtime from the stored profile) does
+    // not silently re-apply them, AND re-emitting the same peer request
+    // produces a fresh `peer_denied` event. `unset` cannot satisfy the
+    // latter because `MethodPolicy::default()` in bifrost-core is
+    // permissive (all respond methods default to `true`) — the default
+    // would auto-allow and skip the denial event. Rolling back to `deny`
+    // matches the pre-Allow-once state (the signer had denied the
+    // request before the user chose Allow once). See the deviation entry
+    // in `docs/runtime-deviations-from-paper.md`.
     const runtimeForRollback = runtimeRef.current;
     if (runtimeForRollback && sessionAllowOnceRef.current.size > 0) {
       for (const key of sessionAllowOnceRef.current) {
@@ -1874,7 +1886,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             peer,
             direction: "respond",
             method: method as "sign" | "ecdh" | "ping" | "onboard",
-            value: "unset",
+            value: "deny",
           });
         } catch {
           // best-effort: the runtime may be already wiped

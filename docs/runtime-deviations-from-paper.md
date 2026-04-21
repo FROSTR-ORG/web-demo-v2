@@ -137,6 +137,22 @@ and the validation assertion IDs that cover it.
   the same peer-level write, violating the user's assumption that clicking
   `Always deny for kind:1` only denies kind:1. The `DENIED_VARIANTS` comment block inside
   the modal source links back to this entry.
+- **Allow-once rollback target is `"deny"`, not `"unset"` (VAL-APPROVALS-009)**: the
+  `lockProfile()` rollback loop in `src/app/AppStateProvider.tsx` writes
+  `setPolicyOverride({ ..., value: "deny" })` for every tracked allow-once entry — NOT
+  `value: "unset"`. The reason is that
+  `bifrost_core::types::MethodPolicy::default()`
+  (see `bifrost-rs/crates/bifrost-core/src/types.rs`, `impl Default for MethodPolicy`) is
+  permissive: every method (`echo`, `ping`, `onboard`, `sign`, `ecdh`) defaults to `true`.
+  The signer's `apply_override_value(default, Unset)` in
+  `bifrost-rs/crates/bifrost-signer/src/lib.rs` collapses `Unset` back to that permissive
+  default, so an `"unset"` rollback would silently auto-allow the next peer request on
+  unlock — (a) defeating the user's intent in locking the profile, and (b) preventing
+  the fresh `peer_denied` event that VAL-APPROVALS-009 requires after `lock + unlock +
+  re-emit`. Rolling back to an explicit `"deny"` matches the pre-Allow-once state (the
+  signer had denied the request before the user clicked Allow once) and guarantees the
+  re-emitted request produces a fresh `peer_denied` event. Covered by
+  `src/app/__tests__/allowOnceRollback.test.tsx`.
 - **Assertion IDs covered**: VAL-APPROVALS-013 (peer-level override granularity documented);
   the four peer-level CTAs still satisfy VAL-APPROVALS-010 / VAL-APPROVALS-011 /
   VAL-APPROVALS-016 / VAL-APPROVALS-017 since they map 1:1 to the `{allow-once,
