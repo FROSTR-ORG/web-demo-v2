@@ -10,19 +10,25 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * DashboardPeerRefresh — validates feature `m1-ping-refresh-dispatch` and
- * VAL-OPS-011 specifically:
+ * DashboardPeerRefresh — validates features `m1-ping-refresh-dispatch`
+ * and `fix-m1-non-sign-failure-surface` (VAL-OPS-011 / VAL-OPS-015):
  *
  *  1. Clicking the Peers Refresh affordance dispatches a
  *     `refresh_all_peers` command through `handleRuntimeCommand`.
- *  2. When a `ping` `OperationFailure` subsequently arrives for a peer
- *     that was offline at dispatch time, the corresponding PeerRow
- *     renders an inline "Refresh failed" error indicator (no silent
- *     success).
- *  3. Ping failures for peers who were online at dispatch time do NOT
- *     populate the refresh-error indicator (those surface elsewhere).
+ *  2. When ANY `ping` `OperationFailure` arrives targeting a peer that
+ *     resolves to a visible PeerRow, that row renders an inline
+ *     "Refresh failed" error indicator — regardless of whether the peer
+ *     was online or offline at dispatch time (broadened under
+ *     `fix-m1-non-sign-failure-surface`: every non-sign failure with a
+ *     resolvable peer attaches to that peer's row so VAL-OPS-015's
+ *     non-modal feedback is always observable).
+ *  3. Non-sign failures whose `failed_peer` is null OR not in the
+ *     current peer list surface via the aria-live non-sign failure
+ *     banner stack instead.
  *  4. When a peer subsequently comes back online, its error indicator
  *     clears automatically.
+ *  5. The SigningFailedModal NEVER opens for non-sign failures
+ *     (regression guard for VAL-OPS-015).
  */
 
 type MockAppState = {
@@ -283,7 +289,7 @@ describe("Dashboard peer refresh — error surface (VAL-OPS-011)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("does NOT raise the refresh-failed indicator for a peer that was online at dispatch time", async () => {
+  it("raises the refresh-failed indicator on any peer row a ping failure targets (broadened under fix-m1-non-sign-failure-surface)", async () => {
     const { rerender } = renderDashboard();
     await act(async () => {
       fireEvent.click(screen.getByLabelText("Refresh peers"));
@@ -291,14 +297,18 @@ describe("Dashboard peer refresh — error surface (VAL-OPS-011)", () => {
       await Promise.resolve();
     });
 
-    // Now simulate a ping failure for the ONLINE peer (not in the offline-
-    // at-dispatch set). The dashboard must not raise the refresh indicator
-    // for that peer — those failures surface elsewhere per VAL-OPS-011.
+    // Under the non-sign failure surface refactor, every non-sign failure
+    // whose failed_peer resolves to a PeerRow renders the inline indicator
+    // — there is no "online-at-dispatch" carve-out anymore. The regression
+    // guard that used to assert the indicator stays absent is replaced by
+    // the broader assertion that the indicator is raised so VAL-OPS-015's
+    // "non-modal feedback appears" is observable for every non-sign
+    // failure path with a resolvable peer.
     appStateHolder.current = {
       ...appStateHolder.current,
       runtimeFailures: [
         {
-          request_id: "req-ping-1",
+          request_id: "req-ping-online",
           op_type: "ping",
           code: "timeout",
           message: "peer went offline mid-flight",
@@ -309,12 +319,16 @@ describe("Dashboard peer refresh — error surface (VAL-OPS-011)", () => {
     await act(async () => {
       rerender(routeTree());
     });
+    await act(async () => {
+      await Promise.resolve();
+    });
 
-    // Give effects a microtask to settle and confirm the indicator stays absent.
-    await Promise.resolve();
-    expect(
-      screen.queryByTestId("peer-refresh-error-1"),
-    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("peer-refresh-error-1")).toBeInTheDocument();
+    });
+    const errorEl = screen.getByTestId("peer-refresh-error-1");
+    expect(errorEl.textContent).toMatch(/refresh failed/i);
+    expect(errorEl.getAttribute("title")).toBe("peer went offline mid-flight");
   });
 
   it("clears the refresh error indicator when the peer transitions back to online", async () => {
@@ -369,5 +383,210 @@ describe("Dashboard peer refresh — error surface (VAL-OPS-011)", () => {
         screen.queryByTestId("peer-refresh-error-2"),
       ).not.toBeInTheDocument();
     });
+  });
+});
+
+/* ==========================================================================
+ * fix-m1-non-sign-failure-surface — VAL-OPS-015
+ *
+ * Non-sign OperationFailures (ecdh / ping / onboard) must surface via
+ * non-modal feedback:
+ *   - failed_peer resolves to a visible peer → inline PeerRow indicator;
+ *   - otherwise → aria-live banner in the non-sign failure stack.
+ *
+ * The SigningFailedModal must NEVER open for any of these failures.
+ * Indicators/banners auto-clear after 30 s; banners are manually
+ * dismissible.
+ * ========================================================================== */
+describe("Non-sign failure surface — VAL-OPS-015", () => {
+  function routeTree() {
+    return (
+      <MemoryRouter
+        initialEntries={[
+          { pathname: "/dashboard/test-profile-id", state: null },
+        ]}
+      >
+        <Routes>
+          <Route path="/dashboard/:profileId" element={<DashboardScreen />} />
+          <Route
+            path="/"
+            element={<div data-testid="welcome-screen">Welcome</div>}
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+  }
+
+  it("surfaces an ECDH failure with null failed_peer via the aria-live banner stack (not the PeerRow)", async () => {
+    const { rerender } = renderDashboard();
+    appStateHolder.current = {
+      ...appStateHolder.current,
+      runtimeFailures: [
+        {
+          request_id: "req-ecdh-orphan",
+          op_type: "ecdh",
+          code: "timeout",
+          message: "ecdh round-trip timed out",
+          failed_peer: null,
+        },
+      ],
+    };
+    await act(async () => {
+      rerender(routeTree());
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("non-sign-failure-banner-req-ecdh-orphan"),
+      ).toBeInTheDocument();
+    });
+    const banner = screen.getByTestId(
+      "non-sign-failure-banner-req-ecdh-orphan",
+    );
+    expect(banner.getAttribute("data-op-type")).toBe("ecdh");
+    expect(banner.textContent).toContain("ecdh round-trip timed out");
+    const stack = screen.getByTestId("non-sign-failure-banners");
+    expect(stack.getAttribute("aria-live")).toBe("polite");
+    // No PeerRow indicator raised — the failure is attributed to the banner.
+    expect(
+      screen.queryByTestId("peer-refresh-error-1"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("peer-refresh-error-2"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("surfaces an ECDH failure with a failed_peer not in the current peers list via the banner stack", async () => {
+    const { rerender } = renderDashboard();
+    appStateHolder.current = {
+      ...appStateHolder.current,
+      runtimeFailures: [
+        {
+          request_id: "req-ecdh-unknown",
+          op_type: "ecdh",
+          code: "peer_rejected",
+          message: "unknown peer rejected request",
+          failed_peer: ["unknown-peer-", "00ff00ff00"].join(""),
+        },
+      ],
+    };
+    await act(async () => {
+      rerender(routeTree());
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("non-sign-failure-banner-req-ecdh-unknown"),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByTestId("peer-refresh-error-1"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("banner is manually dismissible", async () => {
+    const { rerender } = renderDashboard();
+    appStateHolder.current = {
+      ...appStateHolder.current,
+      runtimeFailures: [
+        {
+          request_id: "req-onboard-x",
+          op_type: "onboard",
+          code: "timeout",
+          message: "onboarding timed out",
+          failed_peer: null,
+        },
+      ],
+    };
+    await act(async () => {
+      rerender(routeTree());
+    });
+
+    const dismiss = await screen.findByTestId(
+      "non-sign-failure-banner-dismiss-req-onboard-x",
+    );
+    fireEvent.click(dismiss);
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("non-sign-failure-banner-req-onboard-x"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("SigningFailedModal stays closed when only non-sign failures are present (regression guard)", async () => {
+    const { rerender } = renderDashboard();
+    appStateHolder.current = {
+      ...appStateHolder.current,
+      runtimeFailures: [
+        {
+          request_id: "req-ping-offline",
+          op_type: "ping",
+          code: "timeout",
+          message: "peer unreachable",
+          failed_peer: PEER_OFFLINE_PUBKEY,
+        },
+        {
+          request_id: "req-ecdh-orphan-guard",
+          op_type: "ecdh",
+          code: "timeout",
+          message: "ecdh timed out",
+          failed_peer: null,
+        },
+        {
+          request_id: "req-onboard-guard",
+          op_type: "onboard",
+          code: "peer_rejected",
+          message: "onboard rejected",
+          failed_peer: null,
+        },
+      ],
+    };
+    await act(async () => {
+      rerender(routeTree());
+    });
+    // Let effects settle.
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(
+      screen.queryByRole("heading", { name: "Signing Failed" }),
+    ).not.toBeInTheDocument();
+    // And the non-modal feedback IS observable (PeerRow + banner both).
+    await waitFor(() => {
+      expect(screen.getByTestId("peer-refresh-error-2")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByTestId("non-sign-failure-banner-req-ecdh-orphan-guard"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("non-sign-failure-banner-req-onboard-guard"),
+    ).toBeInTheDocument();
+  });
+
+  it("banner text does not include raw secret-like strings", async () => {
+    // The runtime's OperationFailure.message never carries secrets, but
+    // this test documents the invariant the dashboard enforces — whatever
+    // the runtime surfaces is passed through verbatim, and no secret
+    // material should ever appear in the rendered banner text.
+    const { rerender } = renderDashboard();
+    appStateHolder.current = {
+      ...appStateHolder.current,
+      runtimeFailures: [
+        {
+          request_id: "req-ecdh-secret-scan",
+          op_type: "ecdh",
+          code: "timeout",
+          message: "ecdh session timed out",
+          failed_peer: null,
+        },
+      ],
+    };
+    await act(async () => {
+      rerender(routeTree());
+    });
+    const banner = await screen.findByTestId(
+      "non-sign-failure-banner-req-ecdh-secret-scan",
+    );
+    expect(banner.textContent).not.toMatch(/nsec1[0-9a-z]{50,}/i);
+    expect(banner.textContent).not.toMatch(/[0-9a-f]{64}/i);
+    expect(banner.textContent).not.toMatch(/"share"|"secret"|"seed"/i);
   });
 });

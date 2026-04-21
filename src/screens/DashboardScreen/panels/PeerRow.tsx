@@ -1,3 +1,4 @@
+import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PermissionBadge } from "../../../components/ui";
 import { shortHex } from "../../../lib/bifrost/format";
@@ -5,14 +6,28 @@ import type { PeerStatus } from "../../../lib/bifrost/types";
 import { paperLatency, paperPeerKey } from "../mocks";
 
 /**
- * Inline refresh error surface for peers that failed a ping/refresh round
- * (see VAL-OPS-011). Kept minimal so the Paper-parity row visual is
- * preserved; the message is surfaced through `title`/`aria-label` so
- * screen readers and pointer hover both expose the runtime failure cause.
+ * Inline refresh/ping error surface for peers whose most recent
+ * ping / refresh_peer / refresh_all_peers round-trip produced an
+ * `OperationFailure` from the runtime (VAL-OPS-011 / VAL-OPS-015).
+ * Kept minimal so the Paper-parity row visual is preserved; the failure
+ * cause is surfaced through an `AlertTriangle` icon + `title` / `aria-label`
+ * so pointer hover, screen readers, and the visible row state all expose
+ * the runtime failure reason. Secret material is NEVER included in the
+ * message — the runtime's `OperationFailure.message` is surfaced verbatim
+ * and the runtime does not place secrets in that field.
  */
 export interface PeerRefreshErrorInfo {
   code: string;
   message: string;
+  /**
+   * Epoch milliseconds recording when the indicator was raised, used by
+   * the dashboard's 30s auto-clear sweep (see feature
+   * `fix-m1-non-sign-failure-surface`). Optional so legacy callers
+   * / tests that construct an indicator without a timestamp continue to
+   * work; the sweep treats a missing timestamp as "never expires" (the
+   * peer coming back online clears it).
+   */
+  failedAt?: number;
 }
 
 /**
@@ -142,8 +157,14 @@ export function PeerRow({
             role="status"
             aria-label={`Refresh failed for peer #${peer.idx}: ${refreshError.message}`}
             title={refreshError.message}
-            style={{ color: "#f87171" }}
+            style={{
+              color: "#f87171",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+            }}
           >
+            <AlertTriangle size={12} aria-hidden="true" focusable="false" />
             Refresh failed
           </span>
         ) : peer.online ? (
