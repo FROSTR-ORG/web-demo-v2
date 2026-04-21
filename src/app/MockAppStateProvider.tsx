@@ -19,6 +19,7 @@ import type {
   OnboardingPackageStatePatch,
   ProfileDraft,
   RuntimeCommand,
+  SignLifecycleEntry,
 } from "./AppStateTypes";
 
 export function MockAppStateProvider({
@@ -70,6 +71,9 @@ export function MockAppStateProvider({
   const [signDispatchLog, setSignDispatchLog] = useState<Record<string, string>>(
     value.signDispatchLog ?? {},
   );
+  const [signLifecycleLog, setSignLifecycleLog] = useState<
+    SignLifecycleEntry[]
+  >(value.signLifecycleLog ?? []);
 
   const createKeyset = useCallback(
     async (draft: CreateKeysetDraft) => {
@@ -370,6 +374,7 @@ export function MockAppStateProvider({
     setRuntimeFailures([]);
     setLifecycleEvents([]);
     setSignDispatchLog({});
+    setSignLifecycleLog([]);
   }, [value]);
 
   const clearCredentials = useCallback(async () => {
@@ -389,6 +394,7 @@ export function MockAppStateProvider({
     setRuntimeFailures([]);
     setLifecycleEvents([]);
     setSignDispatchLog({});
+    setSignLifecycleLog([]);
   }, [value]);
 
   const setSignerPaused = useCallback(
@@ -441,6 +447,35 @@ export function MockAppStateProvider({
               : { ...prev, [requestId]: messageHex },
           );
         }
+        // Mirror AppStateProvider's lifecycle-log append so validators
+        // and the Sign Activity UI observe the dispatched -> pending step
+        // even under the MockAppStateProvider path used by demo gallery
+        // scenarios and Vitest component tests.
+        if (result.requestId) {
+          const requestId = result.requestId;
+          const opType = lifecycleOpTypeForCmd(cmd);
+          if (opType) {
+            const now = Date.now();
+            const preview = lifecyclePreviewForCmd(cmd);
+            const entry: SignLifecycleEntry = {
+              request_id: requestId,
+              op_type: opType,
+              message_preview: preview,
+              status: "pending",
+              dispatched_at: now,
+              pending_at: now,
+              completed_at: null,
+              failed_at: null,
+              failure_reason: null,
+            };
+            setSignLifecycleLog((prev) => {
+              if (prev.some((existing) => existing.request_id === requestId)) {
+                return prev;
+              }
+              return [...prev, entry];
+            });
+          }
+        }
         return result;
       },
       [value],
@@ -464,6 +499,7 @@ export function MockAppStateProvider({
       runtimeFailures,
       lifecycleEvents,
       signDispatchLog,
+      signLifecycleLog,
       handleRuntimeCommand,
       createKeyset,
       createProfile,
@@ -516,6 +552,7 @@ export function MockAppStateProvider({
       runtimeFailures,
       lifecycleEvents,
       signDispatchLog,
+      signLifecycleLog,
       handleRuntimeCommand,
       createKeyset,
       createProfile,
@@ -563,6 +600,44 @@ export function MockAppStateProvider({
       {children}
     </AppStateContext.Provider>
   );
+}
+
+/**
+ * Map a RuntimeCommand to a lifecycle op_type. Mirrors the helper in
+ * AppStateProvider so the mock path produces identical lifecycle entries
+ * under demo / test usage.
+ */
+function lifecycleOpTypeForCmd(
+  cmd: RuntimeCommand,
+): "sign" | "ecdh" | "ping" | null {
+  switch (cmd.type) {
+    case "sign":
+      return "sign";
+    case "ecdh":
+      return "ecdh";
+    case "ping":
+    case "refresh_peer":
+      return "ping";
+    case "refresh_all_peers":
+    case "onboard":
+      return null;
+  }
+}
+
+/** First 10 hex chars of the sign message or peer pubkey. */
+function lifecyclePreviewForCmd(cmd: RuntimeCommand): string | null {
+  switch (cmd.type) {
+    case "sign":
+      return cmd.message_hex_32.slice(0, 10).toLowerCase();
+    case "ecdh":
+      return cmd.pubkey32_hex.slice(0, 10).toLowerCase();
+    case "ping":
+    case "refresh_peer":
+      return cmd.peer_pubkey32_hex.slice(0, 10).toLowerCase();
+    case "refresh_all_peers":
+    case "onboard":
+      return null;
+  }
 }
 
 

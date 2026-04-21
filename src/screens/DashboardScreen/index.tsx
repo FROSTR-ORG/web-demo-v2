@@ -14,6 +14,7 @@ import { PolicyPromptModal } from "./modals/PolicyPromptModal";
 import { SigningFailedModal } from "./modals/SigningFailedModal";
 import { DashboardSummaryBar } from "./panels/DashboardSummaryBar";
 import { MockStateToggle } from "./panels/MockStateToggle";
+import { SignActivityPanel } from "./panels/SignActivityPanel";
 import { TestEcdhPanel } from "./panels/TestEcdhPanel";
 import { TestSignPanel } from "./panels/TestSignPanel";
 import { SettingsSidebar } from "./sidebar/SettingsSidebar";
@@ -552,6 +553,12 @@ export function DashboardScreen() {
           <>
             <TestSignPanel signingBlocked={signingBlocked} />
             <TestEcdhPanel ecdhBlocked={ecdhBlocked} />
+            {/* Recent Sign Activity — surfaces the runtime lifecycle of
+             * every dispatched sign / ECDH / ping so validators and users
+             * observe the dispatched -> pending -> completed|failed
+             * transition even when the runtime completes faster than the
+             * poll tick (VAL-OPS-002 / VAL-OPS-004 / VAL-OPS-013). */}
+            <SignActivityPanel />
           </>
         ) : null}
       </section>

@@ -173,6 +173,61 @@ export class SetupFlowError extends Error {
 }
 
 /**
+ * Status of a {@link SignLifecycleEntry}. Advances monotonically through
+ * `dispatched -> pending -> completed|failed`. Entries that have reached a
+ * terminal state (`completed` or `failed`) are kept in
+ * `AppStateValue.signLifecycleLog` for at least 30 s after their terminal
+ * timestamp so validators polling between ticks can observe the
+ * transition — the UI row is retained for the same window so users get a
+ * brief confirmation of success / failure.
+ */
+export type SignLifecycleStatus =
+  | "dispatched"
+  | "pending"
+  | "completed"
+  | "failed";
+
+/**
+ * A single dispatched runtime operation tracked end-to-end. One entry is
+ * appended per invocation of {@link AppStateValue.handleRuntimeCommand}
+ * that produces a `request_id` for a sign / ecdh / ping op (refresh_peer
+ * is folded into `ping`). The provider advances the entry through its
+ * lifecycle as pending / completion / failure drains arrive from the
+ * runtime.
+ *
+ * Independent of the on-disk `pending_operations` snapshot — entries are
+ * retained through terminal state, giving validators (and the UI) a
+ * stable view of the transition sequence even when the runtime turns a
+ * sign around faster than the poll loop can observe.
+ */
+export interface SignLifecycleEntry {
+  request_id: string;
+  op_type: "sign" | "ecdh" | "ping";
+  /**
+   * First 10 hex characters of the sign message (for `sign`) or the peer
+   * pubkey (for `ecdh` / `ping`). Null when the source payload is not
+   * surfaced (refresh_peer without an originating key).
+   */
+  message_preview: string | null;
+  status: SignLifecycleStatus;
+  /** ms since epoch. Always set on append. */
+  dispatched_at: number;
+  /**
+   * ms since epoch when the entry was first observed in the pending
+   * state. Set to `dispatched_at` synthetically on append so the
+   * transition is always recorded, even if the runtime completes before
+   * any poll tick can observe the request_id in `pending_operations`.
+   */
+  pending_at: number | null;
+  /** ms since epoch when a matching completion was drained. */
+  completed_at: number | null;
+  /** ms since epoch when a matching failure was drained. */
+  failed_at: number | null;
+  /** Human-readable failure code/message when `status === 'failed'`. */
+  failure_reason: string | null;
+}
+
+/**
  * Return value of {@link AppStateValue.handleRuntimeCommand}. When the
  * dispatched command produces a new entry in `runtime_status.pending_operations`
  * (sign / ecdh / ping / onboard), the correlating `request_id` captured from
@@ -255,6 +310,22 @@ export interface AppStateValue {
    * metadata never bleeds across profiles.
    */
   signDispatchLog: Record<string, string>;
+  /**
+   * Ordered lifecycle log of dispatched runtime operations
+   * (`sign` / `ecdh` / `ping`). Each entry records monotonically-increasing
+   * transition timestamps so validators that inspect
+   * `window.__appState.signLifecycleLog` can always observe the
+   * `dispatched -> pending -> completed|failed` sequence — even when the
+   * on-disk `pending_operations` snapshot has already moved past pending
+   * by the time they poll.
+   *
+   * Reset on `lockProfile()` and `clearCredentials()` together with the
+   * other drain slices so lifecycle metadata never bleeds across profiles.
+   *
+   * See the "fix-m1-sign-completion-ui-feedback-and-pending-trace" feature
+   * description for full behavior (VAL-OPS-002 / VAL-OPS-004 / VAL-OPS-013).
+   */
+  signLifecycleLog: SignLifecycleEntry[];
   reloadProfiles: () => Promise<void>;
   createKeyset: (draft: CreateKeysetDraft) => Promise<void>;
   createProfile: (draft: CreateProfileDraft) => Promise<string>;

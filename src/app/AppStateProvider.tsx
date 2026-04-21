@@ -97,6 +97,7 @@ import type {
   RecoverSourceSummary,
   ReplaceShareSession,
   RotateKeysetSession,
+  SignLifecycleEntry,
 } from "./AppStateTypes";
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
@@ -133,6 +134,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [signDispatchLog, setSignDispatchLog] = useState<
     Record<string, string>
   >({});
+  const [signLifecycleLog, setSignLifecycleLog] = useState<
+    SignLifecycleEntry[]
+  >([]);
   const [bridgeHydrated, setBridgeHydrated] = useState(false);
   const runtimeRef = useRef<RuntimeClient | null>(null);
   const simulatorRef = useRef<LocalRuntimeSimulator | null>(null);
@@ -242,6 +246,35 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         );
         return merged;
       });
+      // Advance any tracked lifecycle entries to `completed`. Keyed by the
+      // completion's `request_id` regardless of the verb variant.
+      const completedIds = new Map<string, number>();
+      const now = Date.now();
+      for (const completion of drains.completions) {
+        const id = completionRequestId(completion);
+        if (id) completedIds.set(id, now);
+      }
+      if (completedIds.size > 0) {
+        setSignLifecycleLog((previous) =>
+          previous.map((entry) => {
+            const at = completedIds.get(entry.request_id);
+            if (at === undefined) return entry;
+            if (entry.status === "completed" || entry.status === "failed") {
+              return entry;
+            }
+            return {
+              ...entry,
+              status: "completed",
+              completed_at: at,
+              // Synthesize a pending_at if we somehow never observed
+              // it — the runtime occasionally completes synchronously
+              // within the same tick, but the lifecycle contract
+              // requires every entry to record a pending transition.
+              pending_at: entry.pending_at ?? entry.dispatched_at,
+            };
+          }),
+        );
+      }
     }
     if (drains.failures.length > 0) {
       setRuntimeFailures((previous) => {
@@ -249,6 +282,32 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         merged.sort((a, b) => a.request_id.localeCompare(b.request_id));
         return merged;
       });
+      const failures = new Map<string, { at: number; reason: string }>();
+      const now = Date.now();
+      for (const failure of drains.failures) {
+        failures.set(failure.request_id, {
+          at: now,
+          reason: `${failure.code}: ${failure.message}`,
+        });
+      }
+      if (failures.size > 0) {
+        setSignLifecycleLog((previous) =>
+          previous.map((entry) => {
+            const match = failures.get(entry.request_id);
+            if (!match) return entry;
+            if (entry.status === "completed" || entry.status === "failed") {
+              return entry;
+            }
+            return {
+              ...entry,
+              status: "failed",
+              failed_at: match.at,
+              failure_reason: match.reason,
+              pending_at: entry.pending_at ?? entry.dispatched_at,
+            };
+          }),
+        );
+      }
     }
     if (drains.events.length > 0) {
       setLifecycleEvents((previous) => [...previous, ...drains.events]);
@@ -260,6 +319,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setRuntimeFailures([]);
     setLifecycleEvents([]);
     setSignDispatchLog({});
+    setSignLifecycleLog([]);
     lastDispatchRef.current = null;
   }, []);
 
@@ -1755,6 +1815,37 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             : { ...prev, [requestId!]: messageHex },
         );
       }
+      // Append a lifecycle entry for every tracked dispatch so validators
+      // (and the Sign Activity UI) can observe the transition sequence
+      // even when the runtime turns a sign around within one tick —
+      // faster than the polling loop can record the pending state from
+      // `pending_operations` alone (VAL-OPS-002 / VAL-OPS-004 /
+      // VAL-OPS-013). The entry is seeded as `pending` with
+      // `pending_at = dispatched_at` so the transition is always present
+      // regardless of how fast the runtime completes.
+      if (requestId) {
+        const lifecycleOpType = lifecycleOpTypeFor(cmd);
+        if (lifecycleOpType) {
+          const preview = lifecycleMessagePreview(cmd);
+          const entry: SignLifecycleEntry = {
+            request_id: requestId,
+            op_type: lifecycleOpType,
+            message_preview: preview,
+            status: "pending",
+            dispatched_at: now,
+            pending_at: now,
+            completed_at: null,
+            failed_at: null,
+            failure_reason: null,
+          };
+          setSignLifecycleLog((prev) => {
+            if (prev.some((existing) => existing.request_id === requestId)) {
+              return prev;
+            }
+            return [...prev, entry];
+          });
+        }
+      }
       return { requestId, debounced: false };
     },
     [],
@@ -1879,6 +1970,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       runtimeFailures,
       lifecycleEvents,
       signDispatchLog,
+      signLifecycleLog,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,
@@ -1933,6 +2025,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       runtimeFailures,
       lifecycleEvents,
       signDispatchLog,
+      signLifecycleLog,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,
@@ -2195,6 +2288,51 @@ function pendingOpTypeFor(cmd: RuntimeCommand): string | null {
 
 const HANDLE_COMMAND_DEBOUNCE_MS = 300;
 export const HANDLE_COMMAND_DEBOUNCE_WINDOW_MS = HANDLE_COMMAND_DEBOUNCE_MS;
+
+/**
+ * Map a RuntimeCommand to the lifecycle op_type recorded in
+ * {@link SignLifecycleEntry}. `refresh_peer` is folded into `ping` because
+ * it dispatches a ping under the hood. Returns `null` for commands that
+ * don't produce a single correlatable request_id (e.g. `refresh_all_peers`
+ * fans out to many).
+ */
+function lifecycleOpTypeFor(
+  cmd: RuntimeCommand,
+): "sign" | "ecdh" | "ping" | null {
+  switch (cmd.type) {
+    case "sign":
+      return "sign";
+    case "ecdh":
+      return "ecdh";
+    case "ping":
+    case "refresh_peer":
+      return "ping";
+    case "refresh_all_peers":
+    case "onboard":
+      return null;
+  }
+}
+
+/**
+ * Extract the first 10 hex characters of a sign command's message or a
+ * peer pubkey (ecdh / ping) so the Sign Activity row has a stable,
+ * non-secret preview for users. Returns `null` when no source payload is
+ * available (e.g. commands the lifecycle log does not track).
+ */
+function lifecycleMessagePreview(cmd: RuntimeCommand): string | null {
+  switch (cmd.type) {
+    case "sign":
+      return cmd.message_hex_32.slice(0, 10).toLowerCase();
+    case "ecdh":
+      return cmd.pubkey32_hex.slice(0, 10).toLowerCase();
+    case "ping":
+    case "refresh_peer":
+      return cmd.peer_pubkey32_hex.slice(0, 10).toLowerCase();
+    case "refresh_all_peers":
+    case "onboard":
+      return null;
+  }
+}
 
 /* -------------------------------------------------------------------------- */
 /* Dev-only test-observability helpers                                        */

@@ -40,6 +40,7 @@ type MockAppState = {
   runtimeCompletions: unknown[];
   lifecycleEvents: unknown[];
   signDispatchLog: Record<string, string>;
+  signLifecycleLog: unknown[];
 };
 
 const mockHandleRuntimeCommand = vi.fn(
@@ -136,6 +137,7 @@ function createDefaultAppState(): MockAppState {
     runtimeCompletions: [],
     lifecycleEvents: [],
     signDispatchLog: {},
+    signLifecycleLog: [],
   };
 }
 
