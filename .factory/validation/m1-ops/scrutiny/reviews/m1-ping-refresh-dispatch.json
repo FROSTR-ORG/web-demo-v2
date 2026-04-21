@@ -1,0 +1,33 @@
+{
+  "featureId": "m1-ping-refresh-dispatch",
+  "reviewedAt": "2026-04-21T14:59:05Z",
+  "commitId": "86dc17c",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature correctly wires the Refresh affordance to `handleRuntimeCommand({ type: \"refresh_all_peers\" })` and adds an inline offline-peer error indicator, but it does not implement the required displayed `last_seen` progression behavior for peer rows.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen/panels/PeerRow.tsx",
+        "line": 85,
+        "severity": "blocking",
+        "description": "VAL-OPS-010/011 require the peer row's displayed `last_seen` to advance after refresh completion for online peers, but this row still renders only `\"Ready\"` (or static `paperLatency(...)`) and never renders `peer.last_seen`. As implemented, users cannot observe `last_seen` progression after `refresh_all_peers`, so the feature's stated expected behavior is not fully met."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The runtime-worker skill requires `demo-gallery` Playwright to pass unconditionally, but mission AGENTS documents a known pre-existing failing gallery case (`dashboard-running` nested button warning) that workers are explicitly told not to fix in unrelated features. This creates contradictory guidance during verification.",
+      "evidence": ".factory/skills/runtime-worker/SKILL.md:42-47 requires gallery pass; mission AGENTS.md:91-95 records the known pre-existing failure; handoff shows `npx playwright test ...demo-gallery...` exitCode 1 (handoff lines 31-34) despite successful feature completion."
+    },
+    {
+      "area": "conventions",
+      "observation": "AGENTS says known pre-existing issues should not be re-reported in handoff `discoveredIssues`, but this handoff still includes the tracked nested-button issue. This suggests the convention is not sufficiently reinforced in worker procedure/checklists.",
+      "evidence": "Mission AGENTS.md:93-95 says 'NOT re-report ... in discoveredIssues'; handoff lines 76-81 re-list the same nested-button issue."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed transcript skeleton, handoff, skill, and commit 86dc17c. Found a blocking requirement gap: peer-row displayed `last_seen` progression is still not implemented. Also noted shared-state guidance conflicts around expected gallery pass behavior and known-issue re-reporting."
+}

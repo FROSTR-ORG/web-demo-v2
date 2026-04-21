@@ -1,0 +1,28 @@
+{
+  "featureId": "m1-ecdh-dispatch",
+  "reviewedAt": "2026-04-21T14:58:42Z",
+  "commitId": "35ea40c",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The Dashboard/TestEcdhPanel wiring is present, but the added multi-device ECDH spec is explicitly a placeholder and does not validate the required ECDH dispatch/completion behavior for VAL-OPS-009/VAL-OPS-020.",
+    "issues": [
+      {
+        "file": "src/e2e/multi-device/ecdh-roundtrip.spec.ts",
+        "line": 41,
+        "severity": "blocking",
+        "description": "The test body explicitly defers the actual ECDH round-trip harness and uses only a placeholder assertion that both pages load the Igloo Web heading. It never dispatches `handleRuntimeCommand({ type: \"ecdh\" })`, never checks pending operations, and never asserts an `Ecdh` completion keyed by `request_id`, so the feature's expected behavior can regress while this spec still passes."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The runtime-worker skill requires manual verification via agent-browser with recorded interactive checks, but this worker session has no agent-browser invocation and the handoff reports no interactive checks.",
+      "evidence": "Transcript skeleton for workerSessionId `73ea5c26-3854-493b-974e-988b9bc51745` shows only Skill calls for `mission-worker-base` and `runtime-worker`; handoff file `.../handoffs/2026-04-21T14-02-52-399Z__m1-ecdh-dispatch__73ea5c26-3854-493b-974e-988b9bc51745.json` has `verification.interactiveChecks: []`."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed feature metadata, handoff, transcript skeleton, runtime-worker skill, shared-state docs, and commit 35ea40c diff. The feature fails scrutiny due to a blocking verification gap: the new ecdh-roundtrip Playwright spec is a placeholder that does not exercise or assert the required ECDH completion flow."
+}
