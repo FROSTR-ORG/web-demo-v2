@@ -1,0 +1,38 @@
+{
+  "milestone": "m1-ops",
+  "round": 3,
+  "status": "fail",
+  "assertionsSummary": {
+    "total": 3,
+    "passed": 2,
+    "failed": 1,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-OPS-024",
+    "VAL-OPS-025"
+  ],
+  "failedAssertions": [
+    {
+      "id": "VAL-OPS-028",
+      "reason": "Pending cleanup semantics were observed, but required clean close-frame evidence (1000/1001) was not met; observed close event was 1006 abnormal closure."
+    }
+  ],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "flowReports": [
+    {
+      "groupId": "r3-g1-ops-overlay-keyboard",
+      "file": ".factory/validation/m1-ops/user-testing/flows/r3-g1-ops-overlay-keyboard.json"
+    },
+    {
+      "groupId": "r3-g2-ops-tab-close",
+      "file": ".factory/validation/m1-ops/user-testing/flows/r3-g2-ops-tab-close.json"
+    }
+  ],
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "dedupedBlockers": [],
+  "previousRound": ".factory/validation/m1-ops/user-testing/synthesis.round2.json"
+}

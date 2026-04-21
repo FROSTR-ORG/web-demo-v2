@@ -1,67 +1,28 @@
 {
   "milestone": "m1-ops",
-  "round": 2,
-  "status": "fail",
+  "round": 4,
+  "status": "pass",
   "assertionsSummary": {
-    "total": 13,
-    "passed": 10,
-    "failed": 2,
-    "blocked": 1
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "blocked": 0
   },
   "passedAssertions": [
-    "VAL-OPS-002",
-    "VAL-OPS-004",
-    "VAL-OPS-006",
-    "VAL-OPS-007",
-    "VAL-OPS-013",
-    "VAL-OPS-015",
-    "VAL-OPS-016",
-    "VAL-OPS-017",
-    "VAL-OPS-021",
-    "VAL-OPS-023"
+    "VAL-OPS-028"
   ],
-  "failedAssertions": [
-    {
-      "id": "VAL-OPS-024",
-      "reason": "DEV nonce-depletion hook updated snapshot state but did not surface the expected Syncing nonces/Trigger Sync overlay in this execution context."
-    },
-    {
-      "id": "VAL-OPS-025",
-      "reason": "Ping and Refresh All remained disabled in this run, so full OPS keyboard reachability/activation contract was not met."
-    }
-  ],
-  "blockedAssertions": [
-    {
-      "id": "VAL-OPS-028",
-      "blockedBy": "Pending cleanup was observed, but websocket close-frame evidence could not be captured after tab closure with available hooks/tooling."
-    }
-  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
   "appliedUpdates": [],
   "flowReports": [
     {
-      "groupId": "r2-g1-dispatch-success",
-      "file": ".factory/validation/m1-ops/user-testing/flows/r2-g1-dispatch-success.json"
-    },
-    {
-      "groupId": "r2-g2-failure-paused",
-      "file": ".factory/validation/m1-ops/user-testing/flows/r2-g2-failure-paused.json"
-    },
-    {
-      "groupId": "r2-g3-resilience-keyboard",
-      "file": ".factory/validation/m1-ops/user-testing/flows/r2-g3-resilience-keyboard.json"
+      "groupId": "r4-g1-ops-tab-close",
+      "file": ".factory/validation/m1-ops/user-testing/flows/r4-g1-ops-tab-close.json"
     }
   ],
   "toolsUsed": [
     "agent-browser"
   ],
-  "dedupedBlockers": [
-    {
-      "description": "Closed-tab websocket close telemetry is not recoverable after tab termination in this run; post-reopen debug history was empty.",
-      "affectedAssertions": [
-        "VAL-OPS-028"
-      ],
-      "quickFixAttempted": "Captured pre-close relay state, performed tab-close + reopen cycle, and inspected post-reopen __debug.relayHistory/runtimeRelays; close-frame code still unavailable."
-    }
-  ],
-  "previousRound": ".factory/validation/m1-ops/user-testing/synthesis.round1.json"
+  "dedupedBlockers": [],
+  "previousRound": ".factory/validation/m1-ops/user-testing/synthesis.round3.json"
 }

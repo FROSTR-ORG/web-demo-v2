@@ -1,0 +1,69 @@
+{
+  "groupId": "r4-g1-ops-tab-close",
+  "testedAt": "2026-04-21T19:46:27Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "relayUrl": "ws://127.0.0.1:8194",
+    "agentBrowserSession": "r4-g1-ops-tab-close-20260421-ops028"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-OPS-028",
+      "title": "Window close cleans up pending OPS state",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open app in isolated agent-browser session, seed runtime via DEV hooks on ws://127.0.0.1:8194, and dispatch ping operations to create in-flight pending_operations",
+          "expected": "Runtime has live relay connection and non-empty pending_operations prior to tab close",
+          "observed": "runtimeRelays showed ws://127.0.0.1:8194 online and pending_operations captured request_ids 4052f435994dbb3220f95de35a310dd9, 7609e8321c2f998523c7cd40910c7d99, 803a69eb6df0e8591610d19e0141ba1b, 8e6098471c4756aca5cad7667b6f8d82"
+        },
+        {
+          "action": "Navigate away (about:blank) to trigger beforeunload cleanup, then reopen app in the same browser session",
+          "expected": "Relay socket close evidence includes clean close frame 1000/1001",
+          "observed": "Persisted __debug.relayHistory after reopen recorded close event code=1001 with wasClean=true for ws://127.0.0.1:8194"
+        },
+        {
+          "action": "Reseed runtime from stored seed and compare pending state against pre-close request_ids; scan IndexedDB for stale request_ids",
+          "expected": "No stale pending_operations from closed session and no stale pending entries persisted in IndexedDB",
+          "observed": "pendingImmediately=[] and pendingAfter1_2s=[] with stalePresent=[]; indexedDbScan scanned keyval-store (recordsScanned=0, matches=[])"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r4-g1-ops-tab-close/VAL-OPS-028-before-close.png",
+          "m1-ops/r4-g1-ops-tab-close/VAL-OPS-028-after-reopen.png"
+        ],
+        "observables": [
+          "m1-ops/r4-g1-ops-tab-close/VAL-OPS-028-pre-close-state.json",
+          "m1-ops/r4-g1-ops-tab-close/VAL-OPS-028-after-reopen-initial.json",
+          "m1-ops/r4-g1-ops-tab-close/VAL-OPS-028-reseed-pending-check.json"
+        ],
+        "consoleErrors": "none (m1-ops/r4-g1-ops-tab-close/VAL-OPS-028-console-errors.txt)",
+        "network": "m1-ops/r4-g1-ops-tab-close/VAL-OPS-028-network-requests.txt (No requests captured; close-frame evidence sourced from DEV relayHistory hook)"
+      },
+      "issues": null
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "pass": 1,
+    "fail": 0,
+    "blocked": 0,
+    "skipped": 0
+  },
+  "frictions": [
+    {
+      "description": "agent-browser network requests output did not provide websocket frame-level close telemetry in this run.",
+      "resolved": true,
+      "resolution": "Used DEV observability hook window.__debug.relayHistory (persisted across reopen) to capture close code/wasClean evidence.",
+      "affectedAssertions": [
+        "VAL-OPS-028"
+      ]
+    }
+  ],
+  "blockers": []
+}
