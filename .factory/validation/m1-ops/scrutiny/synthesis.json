@@ -1,6 +1,6 @@
 {
   "milestone": "m1-ops",
-  "round": 1,
+  "round": 2,
   "status": "fail",
   "validatorsRun": {
     "test": {
@@ -20,95 +20,62 @@
     }
   },
   "reviewsSummary": {
-    "total": 7,
-    "passed": 2,
-    "failed": 5,
+    "total": 4,
+    "passed": 3,
+    "failed": 1,
     "failedFeatures": [
-      "m1-bootstrap-devtools-relay",
-      "m1-ecdh-dispatch",
-      "m1-ping-refresh-dispatch",
-      "m1-signing-blocked-and-nonce-overlay",
-      "m1-signing-failed-modal"
+      "fix-m1-ecdh-roundtrip-spec-real-dispatch"
     ]
   },
   "blockingIssues": [
     {
-      "featureId": "m1-bootstrap-devtools-relay",
+      "featureId": "fix-m1-ecdh-roundtrip-spec-real-dispatch",
       "severity": "blocking",
-      "description": "src/e2e/multi-device/ecdh-roundtrip.spec.ts validates relay REQ/EOSE transport but does not dispatch runtime ECDH and assert completion correlation by request_id."
-    },
-    {
-      "featureId": "m1-bootstrap-devtools-relay",
-      "severity": "blocking",
-      "description": "src/e2e/multi-device/ecdh-roundtrip.spec.ts skips when the devtools binary is missing instead of only when cargo is unavailable, allowing unintended silent skips."
-    },
-    {
-      "featureId": "m1-ecdh-dispatch",
-      "severity": "blocking",
-      "description": "The added multi-device ECDH spec is a placeholder that never dispatches ECDH, never inspects pending operations, and never verifies ECDH completion by request_id."
-    },
-    {
-      "featureId": "m1-ping-refresh-dispatch",
-      "severity": "blocking",
-      "description": "Peer rows do not render last_seen progression after refresh completion; UI still shows static readiness/latency text, so VAL-OPS-010/011 observability is missing."
-    },
-    {
-      "featureId": "m1-signing-blocked-and-nonce-overlay",
-      "severity": "blocking",
-      "description": "dashboardState.ts nonce depletion detection can false-positive when signing is blocked by policy, causing incorrect Syncing nonces/Trigger Sync UI without nonce exhaustion."
-    },
-    {
-      "featureId": "m1-signing-failed-modal",
-      "severity": "blocking",
-      "description": "SigningFailedModal shows synthesized peer-response strings (for example \"no peers responded\") instead of real peer-response data from failure payloads."
+      "description": "src/e2e/multi-device/ecdh-roundtrip.spec.ts still does not assert runtimeCompletions on page B keyed by the same request_id; it substitutes responder evidence (InboundAccepted/last_seen), so the explicit fix contract remains unmet."
     }
   ],
   "appliedUpdates": [],
   "suggestedGuidanceUpdates": [
     {
-      "target": "skills",
-      "suggestion": "Require workers to explicitly mark deviations when agent-browser or Playwright verification steps are skipped, and prevent followedProcedure=true when required checks are absent.",
-      "evidence": "Multiple m1-ops handoffs reported followedProcedure=true while omitting required agent-browser/Playwright verification from runtime-worker and ui-screen-worker procedures.",
-      "isSystemic": true
-    },
-    {
-      "target": "skills",
-      "suggestion": "Adjust runtime-worker and ui-screen-worker verification guidance to account for known baseline failures and scoped DEV-only features so required checks are strict but feasible.",
-      "evidence": "Reviewers repeatedly observed conflicts between mandatory gallery/manual checks and known pre-existing failures or narrowly scoped DEV-gated changes.",
-      "isSystemic": true
-    },
-    {
-      "target": "AGENTS.md",
-      "suggestion": "Add a short handoff checklist item to prevent re-reporting known pre-existing issues in discoveredIssues.",
-      "evidence": "Three m1-ops feature handoffs re-reported the tracked nested-button known issue despite AGENTS guidance saying not to.",
-      "isSystemic": true
-    },
-    {
       "target": "planning",
-      "suggestion": "Normalize relay port guidance to a single source of truth across mission artifacts (features.json and AGENTS.md).",
-      "evidence": "m1-bootstrap-devtools-relay feature text referenced 8787-8799 while AGENTS.md allows only 8194.",
-      "isSystemic": false
+      "suggestion": "Align m1 ECDH validation contract/feature expectations with bifrost protocol behavior (initiator-only ECDH completion), or expose a responder completion signal if both-side completion correlation remains required.",
+      "evidence": "fix-m1-ecdh-roundtrip review found the test cannot satisfy the stated both-pages completion requirement because responder path emits EcdhResponse without CompletedOperation::Ecdh.",
+      "isSystemic": true
     },
     {
-      "target": "planning",
-      "suggestion": "Resolve the contract/model mismatch for SigningFailedModal peer-response ratio (either extend runtime failure payload shape or relax contract wording).",
-      "evidence": "Validation contract expects peer-response ratio, but OperationFailure type currently lacks a peers-responded field.",
+      "target": "skills",
+      "suggestion": "Require explicit deviation records when mandatory agent-browser/manual checks are skipped, and disallow followedProcedure=true in those cases.",
+      "evidence": "Multiple fix feature handoffs reported followedProcedure=true with no interactive checks despite runtime-worker/ui-screen-worker procedure language requiring agent-browser/manual verification.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "Refine runtime-worker/ui-screen-worker verification requirements so pure non-UI/state-derivation fixes can use an explicit command-only path without violating procedure.",
+      "evidence": "fix-m1-nonce-depletion-detection-policy-gated is a non-UI derivation change but was flagged against mandatory agent-browser wording.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "Clarify ui-screen-worker TDD enforcement by requiring explicit RED evidence in handoffs/transcripts when 'write failing tests first' is mandatory.",
+      "evidence": "fix-m1-peer-row-last-seen-progression transcript shows implementation edit before new test creation while handoff still marked followedProcedure=true.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "Reconcile ui-screen-worker Playwright pass requirement with known baseline failures marked do-not-fix in AGENTS.md (allow documented baseline-failure exceptions).",
+      "evidence": "fix-m1-peer-row-last-seen-progression recorded Playwright failure caused by known nested-button issue that AGENTS marks as pre-existing/do-not-fix.",
       "isSystemic": true
     }
   ],
   "rejectedObservations": [
     {
-      "observation": "Repeated reports that known nested-button issue was re-listed in discoveredIssues.",
+      "observation": "ui-screen-worker agent-browser omission noted in fix-m1-signing-failed-modal-real-peer-response.",
       "reason": "duplicate"
     },
     {
-      "observation": "Repeated reports that runtime-worker sessions omitted agent-browser interactive checks.",
-      "reason": "duplicate"
-    },
-    {
-      "observation": "Repeated reports that ui-screen-worker sessions omitted agent-browser/playwright checks.",
+      "observation": "runtime-worker agent-browser ambiguity noted in fix-m1-ecdh-roundtrip and fix-m1-nonce-depletion reviews.",
       "reason": "duplicate"
     }
   ],
-  "previousRound": null
+  "previousRound": ".factory/validation/m1-ops/scrutiny/synthesis.round1.json"
 }

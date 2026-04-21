@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m1-signing-failed-modal-real-peer-response",
+  "reviewedAt": "2026-04-21T16:00:29Z",
+  "commitId": "7bfabcc",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "This fix fully addresses the prior blocking issue: SigningFailedModal no longer synthesizes peer-response text and now renders only runtime-sourced failure fields (Round from request_id, Code, Error, optional Failed peer) with a neutral fallback when no failure payload is present. The original behavior from m1-signing-failed-modal for retry/dismiss wiring and sign-only gating remains intact.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-screen-worker skill requires agent-browser visual/manual verification for changed modals, but this fix session recorded only command-based checks and no interactive verification while still marking followedProcedure=true.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md:23,51,53; /Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/handoffs/2026-04-21T15-56-25-105Z__fix-m1-signing-failed-modal-real-peer-response__c673885d-235b-47da-b469-88dda572ffe7.json (handoff.verification.interactiveChecks is empty; commandsRun lists tsc/vitest/rg/playwright only)."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m1-ops/scrutiny/reviews/m1-signing-failed-modal.json",
+  "summary": "I reviewed the fix transcript skeleton and both diffs (original 0c2e642 and fix 7bfabcc). The previously reported synthesized peer-response bug in SigningFailedModal is removed and replaced with real OperationFailure field rendering plus documented fallback, so the prior failure is resolved."
+}

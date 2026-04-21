@@ -1,0 +1,26 @@
+{
+  "featureId": "fix-m1-peer-row-last-seen-progression",
+  "reviewedAt": "2026-04-21T16:01:06Z",
+  "commitId": "114d5b678c4d6920ee2f21ecbac1e1d90a2fda94",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly closes the prior blocking gap: `PeerRow` now renders runtime `last_seen` relative-time copy (instead of static \"Ready\"), recomputes at 1s cadence, preserves paper-mode latency tokens, and keeps offline refresh-error precedence from `m1-ping-refresh-dispatch`. The new `PeerRow.lastSeen` tests cover formatting boundaries, snapshot update progression, interval-driven progression, and regressions for offline/error/paper paths.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-screen-worker procedure says to write failing tests first, but the reviewed worker implemented `PeerRow.tsx` before creating the new test file while still reporting `followedProcedure: true`. This suggests the skill procedure is not being enforced/measured consistently.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md:33 requires RED-first. Transcript skeleton for session a4cb1a8a-c391-452d-a0c0-83f88225454e shows `Create .../PeerRow.tsx` before `Create .../PeerRow.lastSeen.test.tsx`."
+    },
+    {
+      "area": "skills",
+      "observation": "Verification guidance is contradictory: ui-screen-worker requires demo-gallery Playwright to fully pass, while mission AGENTS documents a known pre-existing `dashboard-running` failure that workers must not fix in unrelated features.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md:50 says `demo-gallery.spec.ts ... all pass`; mission AGENTS.md:91-95 marks the nested `<button>` console-error failure as known pre-existing/do-not-fix; reviewed handoff for this fix records Playwright exitCode 1 due that same known issue."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m1-ops/scrutiny/reviews/m1-ping-refresh-dispatch.json",
+  "summary": "Reviewed the fix transcript skeleton, handoff, prior failed review, and both feature diffs (`86dc17c` and `114d5b678c4d6920ee2f21ecbac1e1d90a2fda94`). The fix adequately addresses the original failure by replacing the static online peer label with live `last_seen` relative-time rendering and adding focused progression tests; no new blocking code issues were found."
+}
