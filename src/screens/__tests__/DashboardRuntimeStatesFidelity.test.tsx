@@ -55,6 +55,9 @@ const fakeRuntimeStatus = {
     degraded_reasons: [],
     signing_peer_count: 2,
     threshold: 2,
+    sign_ready: true,
+    ecdh_ready: true,
+    last_refresh_at: 1,
   },
   peers: [
     makePeer(0, "peer-0"),

@@ -788,6 +788,101 @@ describe("MockAppStateProvider — runtime command API shape", () => {
     expect(latest.lifecycleEvents).toHaveLength(0);
   });
 
+  it("handleRuntimeCommand no-ops without enqueueing an outbound envelope when signerPaused is true (VAL-OPS-017)", async () => {
+    // When the signer is paused, the dashboard must NOT forward any runtime
+    // command to the WASM bridge — no outbound envelope should be enqueued,
+    // no pending operation recorded, and the call must return a shape that
+    // tells the caller nothing was dispatched. Resuming the signer restores
+    // normal dispatch.
+    vi.useRealTimers();
+    const keyset = await createKeysetBundle({
+      groupName: "Paused Signer Key",
+      threshold: 2,
+      count: 2,
+    });
+    const localShare = keyset.shares[0];
+    const payload = profilePayloadForShare({
+      profileId: "prof_paused_live",
+      deviceName: "Igloo Web",
+      share: localShare,
+      group: keyset.group,
+      relays: [],
+      manualPeerPolicyOverrides: defaultManualPeerPolicyOverrides(
+        keyset.group,
+        localShare.idx,
+      ),
+    });
+    let latest!: AppStateValue;
+    render(
+      <AppStateProvider>
+        <Capture onState={(state) => (latest = state)} />
+      </AppStateProvider>,
+    );
+    await waitFor(() => expect(latest).toBeTruthy());
+
+    await act(async () => {
+      await latest.createKeyset({
+        groupName: "Paused Signer Key",
+        threshold: 2,
+        count: 2,
+      });
+    });
+    await waitFor(() => expect(latest.createSession?.keyset).toBeTruthy());
+
+    await act(async () => {
+      await latest.createProfile({
+        deviceName: "Igloo Web",
+        password: "profile-password",
+        confirmPassword: "profile-password",
+        relays: ["wss://relay.local"],
+        distributionPassword: "distro-password",
+        confirmDistributionPassword: "distro-password",
+      });
+    });
+    await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());
+
+    // Pause the signer and record the current pending_operations length so
+    // we can prove nothing was enqueued during the rejected dispatch.
+    const pendingBefore = latest.runtimeStatus!.pending_operations.length;
+    act(() => {
+      latest.setSignerPaused(true);
+    });
+    await waitFor(() => expect(latest.signerPaused).toBe(true));
+
+    let result = { requestId: null as string | null, debounced: false };
+    await act(async () => {
+      result = await latest.handleRuntimeCommand({
+        type: "sign",
+        message_hex_32: "e".repeat(64),
+      });
+    });
+    // No request_id captured (nothing dispatched), not debounced (we want to
+    // distinguish pause from debounce contractually).
+    expect(result.requestId).toBeNull();
+    expect(result.debounced).toBe(false);
+    expect(latest.runtimeStatus!.pending_operations.length).toBe(
+      pendingBefore,
+    );
+
+    // Resume and prove a normal dispatch still works.
+    act(() => {
+      latest.setSignerPaused(false);
+    });
+    await waitFor(() => expect(latest.signerPaused).toBe(false));
+
+    let resumedResult = { requestId: null as string | null, debounced: false };
+    await act(async () => {
+      resumedResult = await latest.handleRuntimeCommand({
+        type: "sign",
+        message_hex_32: "f".repeat(64),
+      });
+    });
+    expect(resumedResult.requestId).toBeTruthy();
+    expect(resumedResult.debounced).toBe(false);
+
+    expect(payload).toBeTruthy();
+  }, 30_000);
+
   it("handleRuntimeCommand({ type: 'refresh_all_peers' }) forwards to the runtime and returns {requestId: null, debounced: false} (VAL-OPS-011 dispatch)", async () => {
     // refresh_all_peers does NOT register a single pending_operations entry
     // (it fans out to per-peer pings internally), so the feature contract

@@ -17,7 +17,7 @@ import { MockStateToggle } from "./panels/MockStateToggle";
 import { TestEcdhPanel } from "./panels/TestEcdhPanel";
 import { TestSignPanel } from "./panels/TestSignPanel";
 import { SettingsSidebar } from "./sidebar/SettingsSidebar";
-import { deriveDashboardState } from "./dashboardState";
+import { deriveDashboardState, isNoncePoolDepleted } from "./dashboardState";
 import { ConnectingState } from "./states/ConnectingState";
 import { PoliciesState } from "./states/PoliciesState";
 import { RelaysOfflineState } from "./states/RelaysOfflineState";
@@ -297,6 +297,34 @@ export function DashboardScreen() {
     refreshRuntime?.();
   }, [handleRuntimeCommand, hasDemoDashboardState, refreshRuntime, runtimeStatus]);
 
+  // Dispatches a runtime nonce-pool refresh/rebalance by fanning out
+  // `refresh_all_peers` (which triggers per-peer pings + nonce replenish
+  // exchanges). Surfaced as the "Trigger Sync" affordance inside the
+  // SigningBlockedState overlay when the dashboard detects the nonce pool
+  // is depleted (see VAL-OPS-024). The banner auto-clears next tick once
+  // readiness reports `sign_ready` again.
+  const handleTriggerSync = useCallback(async () => {
+    if (hasDemoDashboardState) {
+      refreshRuntime?.();
+      return;
+    }
+    if (!handleRuntimeCommand) {
+      refreshRuntime?.();
+      return;
+    }
+    try {
+      await handleRuntimeCommand({ type: "refresh_all_peers" });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `Trigger Sync dispatch failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    refreshRuntime?.();
+  }, [handleRuntimeCommand, hasDemoDashboardState, refreshRuntime]);
+
   const activeSignFailureMessageHex = useMemo(
     () =>
       activeSignFailure
@@ -506,6 +534,11 @@ export function DashboardScreen() {
                   setPolicyPromptRequest(DEFAULT_POLICY_PROMPT_REQUEST);
                   setActiveModal("policy-prompt");
                 }}
+                noncePoolDepleted={
+                  !hasDemoDashboardState &&
+                  isNoncePoolDepleted(runtimeStatus)
+                }
+                onTriggerSync={handleTriggerSync}
               />
             )}
           </>

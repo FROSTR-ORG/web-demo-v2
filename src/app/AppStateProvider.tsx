@@ -140,6 +140,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
    * (e.g. double-clicked buttons) — see VAL-OPS-019 for the contract.
    */
   const lastDispatchRef = useRef<{ key: string; at: number } | null>(null);
+  /**
+   * Mirror of `signerPaused` as a ref so `handleRuntimeCommand` (whose
+   * `useCallback` identity must remain stable) can check the latest value
+   * without re-creating the dispatcher on every state change. When paused,
+   * the dispatcher no-ops without enqueuing an outbound envelope — see
+   * VAL-OPS-017.
+   */
+  const signerPausedRef = useRef(false);
   const onboardHandshakeRef = useRef<{
     id: number;
     controller: AbortController;
@@ -1516,7 +1524,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, [activeProfile, startLiveRelayPump]);
 
+  // Keep the signerPausedRef in lock-step with the signerPaused state so
+  // `handleRuntimeCommand` (which reads the ref to avoid re-creating the
+  // callback on every state change) always sees the latest value — including
+  // transitions driven by `lockProfile`, `clearCredentials`, and the bridge
+  // rehydration path.
+  useEffect(() => {
+    signerPausedRef.current = signerPaused;
+  }, [signerPaused]);
+
   const setSignerPaused = useCallback((paused: boolean) => {
+    signerPausedRef.current = paused;
     setSignerPausedState(paused);
     if (paused) {
       simulatorRef.current?.stop();
@@ -1556,6 +1574,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         throw new Error(
           "Cannot dispatch runtime command: no runtime is active.",
         );
+      }
+      // VAL-OPS-017: while the signer is paused, silently refuse to dispatch
+      // any runtime command. No outbound envelope should be enqueued, no
+      // pending_operation should be registered. Callers observe this state
+      // via the returned `{ requestId: null, debounced: false }` shape.
+      if (signerPausedRef.current) {
+        return { requestId: null, debounced: false };
       }
       const key = commandKey(cmd);
       const now = Date.now();

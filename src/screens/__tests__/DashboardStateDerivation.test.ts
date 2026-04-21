@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeStatusSummary } from "../../lib/bifrost/types";
-import { deriveDashboardState } from "../DashboardScreen/dashboardState";
+import {
+  deriveDashboardState,
+  isNoncePoolDepleted,
+} from "../DashboardScreen/dashboardState";
 
 function runtimeStatus(
   overrides: Partial<RuntimeStatusSummary> = {},
@@ -139,5 +142,204 @@ describe("deriveDashboardState", () => {
         runtimeRelays: [{ url: "wss://relay.test", state: "online" }],
       }),
     ).toBe("running");
+  });
+
+  // m1-signing-blocked-and-nonce-overlay: the dashboard must transition into
+  // `signing-blocked` the moment readiness surfaces `!sign_ready` — even if
+  // no sign is currently queued. Without this, the UI would only react after
+  // the user already dispatched a request that can't complete, and the Paper
+  // "Signing Blocked" state would never appear with 0 online peers.
+  it("shows signing-blocked when readiness is not sign_ready with no pending ops", () => {
+    expect(
+      deriveDashboardState({
+        signerPaused: false,
+        runtimeStatus: runtimeStatus({
+          readiness: {
+            ...runtimeStatus().readiness,
+            sign_ready: false,
+            signing_peer_count: 0,
+            degraded_reasons: ["insufficient_signing_peers"],
+          },
+          peers: [],
+        }),
+        runtimeRelays: [{ url: "wss://relay.test", state: "online" }],
+      }),
+    ).toBe("signing-blocked");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Nonce-pool-depletion heuristic exported for the SigningBlockedState overlay
+// ---------------------------------------------------------------------------
+
+describe("isNoncePoolDepleted", () => {
+  function baseStatus(
+    overrides: Partial<RuntimeStatusSummary> = {},
+  ): RuntimeStatusSummary {
+    return {
+      status: {
+        device_id: "d",
+        pending_ops: 0,
+        last_active: 1,
+        known_peers: 2,
+        request_seq: 0,
+      },
+      metadata: {
+        device_id: "d",
+        member_idx: 0,
+        share_public_key: "local",
+        group_public_key: "group",
+        peers: ["peer-a", "peer-b"],
+      },
+      readiness: {
+        runtime_ready: false,
+        restore_complete: true,
+        sign_ready: false,
+        ecdh_ready: false,
+        threshold: 2,
+        signing_peer_count: 0,
+        ecdh_peer_count: 0,
+        last_refresh_at: 1,
+        degraded_reasons: ["insufficient_signing_peers"],
+      },
+      peers: [
+        {
+          idx: 1,
+          pubkey: "peer-a",
+          known: true,
+          last_seen: 1,
+          online: true,
+          incoming_available: 0,
+          outgoing_available: 0,
+          outgoing_spent: 0,
+          can_sign: false,
+          should_send_nonces: true,
+        },
+        {
+          idx: 2,
+          pubkey: "peer-b",
+          known: true,
+          last_seen: 1,
+          online: true,
+          incoming_available: 0,
+          outgoing_available: 0,
+          outgoing_spent: 0,
+          can_sign: false,
+          should_send_nonces: true,
+        },
+      ],
+      peer_permission_states: [],
+      pending_operations: [],
+      ...overrides,
+    };
+  }
+
+  it("is true when enough peers are online but sign_ready is false", () => {
+    // Nonce pool has drained even though peers are reachable — the runtime's
+    // FROST signing gate (can_sign) requires fresh nonces from each peer.
+    expect(isNoncePoolDepleted(baseStatus())).toBe(true);
+  });
+
+  it("is false when sign_ready is true (ready to sign, pool is healthy)", () => {
+    expect(
+      isNoncePoolDepleted(
+        baseStatus({
+          readiness: {
+            ...baseStatus().readiness,
+            sign_ready: true,
+            signing_peer_count: 2,
+            degraded_reasons: [],
+          },
+          peers: baseStatus().peers.map((peer) => ({
+            ...peer,
+            can_sign: true,
+            incoming_available: 8,
+            outgoing_available: 8,
+          })),
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("is false when insufficient peers are online (bottleneck is peers, not nonces)", () => {
+    expect(
+      isNoncePoolDepleted(
+        baseStatus({
+          peers: baseStatus().peers.map((peer, idx) => ({
+            ...peer,
+            online: idx === 0, // only one online, threshold is 2
+          })),
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("deriveDashboardState — nonce pool depletion", () => {
+  it("transitions to signing-blocked when nonce pool is depleted", () => {
+    // Peers are online and reachable, but nonces are exhausted with all of
+    // them — sign_ready is false. The dashboard must surface this condition
+    // in the SIGNING_BLOCKED overlay, not silently stay in "running".
+    expect(
+      deriveDashboardState({
+        signerPaused: false,
+        runtimeStatus: {
+          status: {
+            device_id: "d",
+            pending_ops: 0,
+            last_active: 1,
+            known_peers: 2,
+            request_seq: 0,
+          },
+          metadata: {
+            device_id: "d",
+            member_idx: 0,
+            share_public_key: "local",
+            group_public_key: "group",
+            peers: ["peer-a", "peer-b"],
+          },
+          readiness: {
+            runtime_ready: false,
+            restore_complete: true,
+            sign_ready: false,
+            ecdh_ready: false,
+            threshold: 2,
+            signing_peer_count: 0,
+            ecdh_peer_count: 0,
+            last_refresh_at: 1,
+            degraded_reasons: ["insufficient_signing_peers"],
+          },
+          peers: [
+            {
+              idx: 1,
+              pubkey: "peer-a",
+              known: true,
+              last_seen: 1,
+              online: true,
+              incoming_available: 0,
+              outgoing_available: 0,
+              outgoing_spent: 0,
+              can_sign: false,
+              should_send_nonces: true,
+            },
+            {
+              idx: 2,
+              pubkey: "peer-b",
+              known: true,
+              last_seen: 1,
+              online: true,
+              incoming_available: 0,
+              outgoing_available: 0,
+              outgoing_spent: 0,
+              can_sign: false,
+              should_send_nonces: true,
+            },
+          ],
+          peer_permission_states: [],
+          pending_operations: [],
+        },
+        runtimeRelays: [{ url: "wss://relay.test", state: "online" }],
+      }),
+    ).toBe("signing-blocked");
   });
 });
