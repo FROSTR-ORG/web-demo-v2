@@ -30,10 +30,12 @@ import { RuntimeClient, type RuntimeCommand } from "../lib/bifrost/runtimeClient
 import type {
   BfProfilePayload,
   CompletedOperation,
+  GroupPackageWire,
   OperationFailure,
   RuntimeEvent,
   RuntimeSnapshotInput,
   RuntimeStatusSummary,
+  SharePackageWire,
   StoredProfileSummary,
 } from "../lib/bifrost/types";
 import {
@@ -1856,6 +1858,81 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       restartRuntimeConnections,
     ],
   );
+
+  // Dev-only multi-device e2e test hook. Gated on `import.meta.env.DEV` so
+  // Vite's dead-code elimination strips this whole effect — and every symbol
+  // it references — from production bundles. The hook exposes:
+  //
+  //   - `window.__appState`: latest `AppStateValue` snapshot (including
+  //      `handleRuntimeCommand`, `runtimeStatus`, `runtimeCompletions`,
+  //      `runtimeFailures`, etc.) so a Playwright spec can dispatch runtime
+  //      commands and poll pending_operations / completions via
+  //      `page.evaluate`.
+  //   - `window.__iglooTestSeedRuntime({group, share, relays})`: minimal
+  //      seeding helper that boots a real `RuntimeClient` with the supplied
+  //      group + share and starts the live relay pump against `relays`.
+  //      Does NOT persist a profile to IndexedDB — the hook's only purpose
+  //      is to stand up a runtime quickly for multi-device specs that
+  //      connect two browser contexts to the bifrost-devtools relay.
+  //   - `window.__iglooTestCreateKeysetBundle(params)`: exposes the WASM
+  //      keyset generator so a single browser can produce a shared 2-of-N
+  //      keyset, then distribute shares across contexts for round-trip
+  //      specs (ECDH / sign / ping).
+  //   - `window.__iglooTestMemberPubkey32(group, shareIdx)`: derives the
+  //      32-byte x-only hex pubkey for a given member, matching the
+  //      `pubkey32_hex` argument shape expected by the ECDH runtime
+  //      command.
+  //
+  // This is infrastructure for `src/e2e/multi-device/*.spec.ts`; production
+  // UI code must never reference these hooks.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    if (typeof window === "undefined") return;
+    const globalWindow = window as typeof window & {
+      __appState?: AppStateValue;
+      __iglooTestSeedRuntime?: (input: {
+        group: GroupPackageWire;
+        share: SharePackageWire;
+        relays: string[];
+        deviceName?: string;
+      }) => Promise<void>;
+      __iglooTestCreateKeysetBundle?: typeof createKeysetBundle;
+      __iglooTestMemberPubkey32?: (
+        group: GroupPackageWire,
+        shareIdx: number,
+      ) => string;
+    };
+    globalWindow.__appState = value;
+    globalWindow.__iglooTestSeedRuntime = async (input) => {
+      const payload: BfProfilePayload = {
+        profile_id: `igloo-test-${input.share.idx}`,
+        version: 1,
+        device: {
+          name: input.deviceName ?? `Test Device ${input.share.idx}`,
+          share_secret: input.share.seckey,
+          manual_peer_policy_overrides: [],
+          relays: input.relays,
+        },
+        group_package: input.group,
+      };
+      await startRuntimeFromPayload(payload, input.share.idx);
+    };
+    globalWindow.__iglooTestCreateKeysetBundle = createKeysetBundle;
+    globalWindow.__iglooTestMemberPubkey32 = (group, shareIdx) => {
+      const member = group.members.find((entry) => entry.idx === shareIdx);
+      if (!member) {
+        throw new Error(
+          `group is missing member for share ${shareIdx}`,
+        );
+      }
+      return memberPubkeyXOnly(member);
+    };
+    return () => {
+      if (globalWindow.__appState === value) {
+        delete globalWindow.__appState;
+      }
+    };
+  }, [value, startRuntimeFromPayload]);
 
   return (
     <AppStateContext.Provider value={value}>
