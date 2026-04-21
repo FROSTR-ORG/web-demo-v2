@@ -1,7 +1,8 @@
 import { Download, FileText, Settings, SlidersHorizontal } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAppState } from "../../app/AppState";
+import type { OperationFailure } from "../../lib/bifrost/types";
 import { AppShell } from "../../components/shell";
 import { Button } from "../../components/ui";
 import { useDemoUi } from "../../demo/demoUi";
@@ -82,6 +83,9 @@ export function DashboardScreen() {
       throw new Error("Export is unavailable for this profile.");
     },
     restartRuntimeConnections = async () => undefined,
+    runtimeFailures = [],
+    signDispatchLog = {},
+    handleRuntimeCommand,
   } = useAppState();
   const demoUi = useDemoUi();
   const hasDemoDashboardState = Boolean(demoUi.dashboard?.state || demoUi.dashboard?.showMockControls);
@@ -92,8 +96,96 @@ export function DashboardScreen() {
   const [exportResult, setExportResult] = useState<{ mode: ExportMode; packageText: string } | null>(null);
   const [policyPromptRequest, setPolicyPromptRequest] = useState<PolicyPromptRequest>(DEFAULT_POLICY_PROMPT_REQUEST);
   const [settingsOpen, setSettingsOpen] = useState(Boolean(demoUi.dashboard?.settingsOpen));
+  // Reactive SigningFailedModal state. `activeSignFailure` is set when a new
+  // sign-type OperationFailure is drained and we want to surface it to the
+  // user. `consumedFailureIds` tracks request_ids we've already shown (or
+  // dismissed) so the same failure payload never re-opens the modal after
+  // Dismiss/Retry — even though it lingers in `runtimeFailures` (VAL-OPS-008).
+  const [activeSignFailure, setActiveSignFailure] = useState<OperationFailure | null>(null);
+  const consumedFailureIdsRef = useRef<Set<string>>(new Set());
   const showMockControls = Boolean(demoUi.dashboard?.showMockControls);
   const paperPanels = demoUi.dashboard?.paperPanels ?? Boolean(demoUi.dashboard);
+
+  // ---------------------------------------------------------------------
+  // Reactive SigningFailedModal effect + handlers.
+  // IMPORTANT: these hook calls must stay BEFORE any early `return` so that
+  // the Rules of Hooks are not violated across renders where `activeProfile`
+  // or `runtimeStatus` transitions from null → non-null.
+  // ---------------------------------------------------------------------
+
+  // VAL-OPS-006 / VAL-OPS-014 / VAL-OPS-015: Observe runtimeFailures for new
+  // sign-type failures and surface them via SigningFailedModal. ECDH/ping/
+  // onboard failures are intentionally ignored here (they surface elsewhere).
+  useEffect(() => {
+    if (!runtimeFailures || runtimeFailures.length === 0) return;
+    for (const failure of runtimeFailures) {
+      if (failure.op_type !== "sign") continue;
+      if (consumedFailureIdsRef.current.has(failure.request_id)) continue;
+      if (
+        activeSignFailure &&
+        activeSignFailure.request_id === failure.request_id
+      )
+        continue;
+      if (activeSignFailure) {
+        // An earlier failure already owns the modal; wait for the user to
+        // resolve it before queueing the next one.
+        break;
+      }
+      setActiveSignFailure(failure);
+      setActiveModal("signing-failed");
+      // Log the failure so VAL-OPS-016's relay-disconnect-timeout console
+      // scan observes messaging matching /relay|websocket|disconnect|timeout/i
+      // (the runtime's failure code or message always includes at least
+      // "timeout" for relay-disconnect scenarios).
+      // eslint-disable-next-line no-console
+      console.error(
+        `Sign request ${failure.request_id} failed (${failure.code}): ${failure.message}`,
+      );
+      break;
+    }
+  }, [runtimeFailures, activeSignFailure]);
+
+  const handleDismissSigningFailed = useCallback(() => {
+    if (activeSignFailure) {
+      consumedFailureIdsRef.current.add(activeSignFailure.request_id);
+    }
+    setActiveSignFailure(null);
+    setActiveModal("none");
+  }, [activeSignFailure]);
+
+  const handleRetrySigningFailed = useCallback(async () => {
+    const failure = activeSignFailure;
+    if (!failure) {
+      setActiveModal("none");
+      return;
+    }
+    const messageHex = signDispatchLog[failure.request_id];
+    // Mark the original failure consumed and close the modal BEFORE the
+    // runtime dispatch: even if the retry throws, the stale failure UI
+    // must not linger (VAL-OPS-007).
+    consumedFailureIdsRef.current.add(failure.request_id);
+    setActiveSignFailure(null);
+    setActiveModal("none");
+    if (!messageHex || !handleRuntimeCommand) return;
+    try {
+      await handleRuntimeCommand({ type: "sign", message_hex_32: messageHex });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `Retry sign dispatch failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }, [activeSignFailure, handleRuntimeCommand, signDispatchLog]);
+
+  const activeSignFailureMessageHex = useMemo(
+    () =>
+      activeSignFailure
+        ? signDispatchLog[activeSignFailure.request_id]
+        : undefined,
+    [activeSignFailure, signDispatchLog],
+  );
 
   if (!profileId) {
     return <Navigate to="/" replace />;
@@ -304,7 +396,13 @@ export function DashboardScreen() {
         <PolicyPromptModal request={policyPromptRequest} onClose={() => setActiveModal("none")} />
       )}
       {activeModal === "signing-failed" && (
-        <SigningFailedModal onClose={() => setActiveModal("none")} />
+        <SigningFailedModal
+          failure={activeSignFailure ?? undefined}
+          messageHex={activeSignFailureMessageHex}
+          onClose={handleDismissSigningFailed}
+          onDismiss={handleDismissSigningFailed}
+          onRetry={activeSignFailure ? handleRetrySigningFailed : undefined}
+        />
       )}
       {activeModal === "clear-credentials" && (
         <ClearCredentialsModal

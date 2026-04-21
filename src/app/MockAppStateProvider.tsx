@@ -67,6 +67,9 @@ export function MockAppStateProvider({
   const [lifecycleEvents, setLifecycleEvents] = useState(
     value.lifecycleEvents ?? [],
   );
+  const [signDispatchLog, setSignDispatchLog] = useState<Record<string, string>>(
+    value.signDispatchLog ?? {},
+  );
 
   const createKeyset = useCallback(
     async (draft: CreateKeysetDraft) => {
@@ -366,6 +369,7 @@ export function MockAppStateProvider({
     setRuntimeCompletions([]);
     setRuntimeFailures([]);
     setLifecycleEvents([]);
+    setSignDispatchLog({});
   }, [value]);
 
   const clearCredentials = useCallback(async () => {
@@ -384,6 +388,7 @@ export function MockAppStateProvider({
     setRuntimeCompletions([]);
     setRuntimeFailures([]);
     setLifecycleEvents([]);
+    setSignDispatchLog({});
   }, [value]);
 
   const setSignerPaused = useCallback(
@@ -417,11 +422,29 @@ export function MockAppStateProvider({
    * `mock-request-N` ids and honours the 300ms debounce contract. Tests
    * that want to intercept the dispatch can override by passing their own
    * function as `value.handleRuntimeCommand`.
+   *
+   * For `sign` commands we mirror the real AppStateProvider and record the
+   * captured `request_id → message_hex_32` mapping into `signDispatchLog`
+   * so the SigningFailedModal can correlate a later `OperationFailure`
+   * back to its originating message (see VAL-OPS-007).
    */
   const handleRuntimeCommand: AppStateValue["handleRuntimeCommand"] =
-    useCallback((cmd: RuntimeCommand) => value.handleRuntimeCommand(cmd), [
-      value,
-    ]);
+    useCallback(
+      async (cmd: RuntimeCommand) => {
+        const result = await value.handleRuntimeCommand(cmd);
+        if (result.requestId && cmd.type === "sign") {
+          const requestId = result.requestId;
+          const messageHex = cmd.message_hex_32;
+          setSignDispatchLog((prev) =>
+            prev[requestId] === messageHex
+              ? prev
+              : { ...prev, [requestId]: messageHex },
+          );
+        }
+        return result;
+      },
+      [value],
+    );
 
   const stateful = useMemo<AppStateValue>(
     () => ({
@@ -440,6 +463,7 @@ export function MockAppStateProvider({
       runtimeCompletions,
       runtimeFailures,
       lifecycleEvents,
+      signDispatchLog,
       handleRuntimeCommand,
       createKeyset,
       createProfile,
@@ -491,6 +515,7 @@ export function MockAppStateProvider({
       runtimeCompletions,
       runtimeFailures,
       lifecycleEvents,
+      signDispatchLog,
       handleRuntimeCommand,
       createKeyset,
       createProfile,

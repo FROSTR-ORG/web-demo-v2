@@ -215,6 +215,20 @@ export interface AppStateValue {
    * (reserved for M4 event log). Order matches drain order (insertion).
    */
   lifecycleEvents: RuntimeEvent[];
+  /**
+   * Mapping of dispatched sign `request_id` → `message_hex_32`.
+   *
+   * Populated by `handleRuntimeCommand` whenever a `sign` command is
+   * successfully forwarded to the runtime and a fresh `request_id` is
+   * captured from the next `pending_operations` snapshot. Callers (e.g. the
+   * `SigningFailedModal`) use this to correlate an `OperationFailure`
+   * back to the original message so Retry can re-dispatch the identical
+   * sign command (VAL-OPS-007).
+   *
+   * Reset to `{}` on `lockProfile()` and `clearCredentials()` so sign
+   * metadata never bleeds across profiles.
+   */
+  signDispatchLog: Record<string, string>;
   reloadProfiles: () => Promise<void>;
   createKeyset: (draft: CreateKeysetDraft) => Promise<void>;
   createProfile: (draft: CreateProfileDraft) => Promise<string>;

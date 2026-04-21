@@ -331,6 +331,7 @@ export function createDemoAppState(
     runtimeCompletions: [],
     runtimeFailures: [],
     lifecycleEvents: [],
+    signDispatchLog: {},
     handleRuntimeCommand: createMockHandleRuntimeCommand(),
   };
 

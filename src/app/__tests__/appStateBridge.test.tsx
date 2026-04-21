@@ -599,6 +599,7 @@ describe("MockAppStateProvider bridge arming", () => {
     runtimeCompletions: [],
     runtimeFailures: [],
     lifecycleEvents: [],
+    signDispatchLog: {},
     handleRuntimeCommand: async () => ({ requestId: null, debounced: false }),
   };
 

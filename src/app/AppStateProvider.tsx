@@ -126,6 +126,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [],
   );
   const [lifecycleEvents, setLifecycleEvents] = useState<RuntimeEvent[]>([]);
+  const [signDispatchLog, setSignDispatchLog] = useState<
+    Record<string, string>
+  >({});
   const [bridgeHydrated, setBridgeHydrated] = useState(false);
   const runtimeRef = useRef<RuntimeClient | null>(null);
   const simulatorRef = useRef<LocalRuntimeSimulator | null>(null);
@@ -232,6 +235,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setRuntimeCompletions([]);
     setRuntimeFailures([]);
     setLifecycleEvents([]);
+    setSignDispatchLog({});
     lastDispatchRef.current = null;
   }, []);
 
@@ -1608,6 +1612,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       } catch {
         requestId = null;
       }
+      // Record sign-command metadata so callers (SigningFailedModal) can
+      // correlate later `OperationFailure`s back to the original
+      // `message_hex_32` and Retry re-dispatches the identical command.
+      if (requestId && cmd.type === "sign") {
+        const messageHex = cmd.message_hex_32;
+        setSignDispatchLog((prev) =>
+          prev[requestId!] === messageHex
+            ? prev
+            : { ...prev, [requestId!]: messageHex },
+        );
+      }
       return { requestId, debounced: false };
     },
     [],
@@ -1722,6 +1737,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       runtimeCompletions,
       runtimeFailures,
       lifecycleEvents,
+      signDispatchLog,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,
@@ -1775,6 +1791,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       runtimeCompletions,
       runtimeFailures,
       lifecycleEvents,
+      signDispatchLog,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,
