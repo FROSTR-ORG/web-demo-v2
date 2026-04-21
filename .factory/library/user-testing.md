@@ -34,6 +34,46 @@ For sign/ECDH round-trip tests requiring multiple peers, copy the frostr-infra `
 
 Multiple agent-browser sessions share the same dev server but use isolated storage states (IndexedDB namespaced by browser profile).
 
+## Local `bifrost-devtools` Relay (multi-device e2e)
+
+Multi-device Playwright specs under `src/e2e/multi-device/` rely on a locally-spawned `bifrost-devtools relay` instead of the public Nostr relays, so that two browser contexts can share inbound/outbound envelopes with zero external dependencies.
+
+### Binary bootstrap
+
+The relay binary lives in the sibling `bifrost-rs` workspace and is NOT produced by `npm install`. It is bootstrapped by `.factory/init.sh` on session start:
+
+- If `/Users/plebdev/Desktop/igloo-web-v2-prototype/bifrost-rs/target/release/bifrost-devtools` already exists, the build step is skipped (idempotent).
+- If `cargo` is not available (e.g. a CI image without the Rust toolchain), `init.sh` prints a warning and continues. Multi-device specs auto-skip with a clear reason in that case.
+- Manual build: `cargo build --release -p bifrost-devtools --manifest-path ../bifrost-rs/Cargo.toml` from the repo root, or run `commands.build_devtools` from `.factory/services.yaml`.
+
+### Service: `local_relay`
+
+`services.local_relay` in `.factory/services.yaml` pins the relay to **port 8194** (the only relay port allocated in AGENTS.md Mission Boundaries — do not change it):
+
+- `start`: `…/bifrost-devtools relay --host 127.0.0.1 --port 8194`
+- `stop`: `lsof -ti :8194 | xargs kill -9` (port-based kill is allowed because the port is declared in the manifest)
+- `healthcheck`: `nc -z 127.0.0.1 8194` (returns 0 once the listener is bound)
+
+### Running the multi-device ECDH spec
+
+```
+# One-time: ensure the binary is built (idempotent; skipped if present)
+bash .factory/init.sh
+
+# Run the spec (auto-skips if cargo / binary missing; otherwise spawns
+# its own relay on port 8194 and tears it down in afterAll)
+npx playwright test src/e2e/multi-device/ecdh-roundtrip.spec.ts \
+  --project=desktop --workers 1
+```
+
+The spec is self-contained: it spawns and tears down the relay itself, so you do NOT need to start `services.local_relay` separately when invoking Playwright. Conversely, if you start `services.local_relay` manually for exploratory work, stop it (via `services.local_relay.stop`) before running the spec to avoid port contention.
+
+### Teardown
+
+- Specs: the Playwright `test.afterAll` hook kills the spawned relay process by PID and waits for `exit`/`close`.
+- Manual: `lsof -ti :8194 | xargs kill -9` (the `stop` command from `services.local_relay`).
+- Always verify the port is free (`nc -z 127.0.0.1 8194` returns non-zero) before exiting the worker session, per the "no orphaned processes" rule in AGENTS.md.
+
 ## Validation Concurrency
 
 **Machine:** 128 GB RAM, 18 cores, ~51 GB free at baseline.

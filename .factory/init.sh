@@ -25,6 +25,27 @@ fi
 # Ensure Playwright browsers are available (quiet no-op if already installed)
 npx playwright install chromium >/dev/null 2>&1 || true
 
+# Ensure the sibling `bifrost-devtools` release binary is built. This is
+# required by `services.local_relay` and by the multi-device e2e specs
+# under `src/e2e/multi-device/`. Idempotent: skip if the binary already
+# exists. Graceful fallback: if `cargo` is unavailable (e.g. CI images
+# without Rust toolchain) emit a clear message and continue — specs that
+# need the binary still auto-skip via `existsSync` checks.
+BIFROST_RS_DIR="/Users/plebdev/Desktop/igloo-web-v2-prototype/bifrost-rs"
+DEVTOOLS_BIN="${BIFROST_RS_DIR}/target/release/bifrost-devtools"
+if [ -x "${DEVTOOLS_BIN}" ]; then
+  echo "[init] bifrost-devtools binary present; skipping build_devtools."
+elif ! command -v cargo >/dev/null 2>&1; then
+  echo "[init] cargo not available; skipping build_devtools. Multi-device e2e specs will auto-skip."
+elif [ ! -f "${BIFROST_RS_DIR}/Cargo.toml" ]; then
+  echo "[init] sibling bifrost-rs not found at ${BIFROST_RS_DIR}; skipping build_devtools."
+else
+  echo "[init] Building bifrost-devtools (cargo build --release -p bifrost-devtools) ..."
+  if ! cargo build --release -p bifrost-devtools --manifest-path "${BIFROST_RS_DIR}/Cargo.toml"; then
+    echo "[init] WARNING: cargo build of bifrost-devtools failed; multi-device e2e specs will auto-skip."
+  fi
+fi
+
 # Ensure docs directory exists (for runtime-deviations-from-paper.md)
 mkdir -p docs
 

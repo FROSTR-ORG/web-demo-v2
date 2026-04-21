@@ -7,6 +7,13 @@ commands:
   test: npx vitest run --config vitest.config.ts --maxConcurrency 4
   test_e2e: npx playwright test --workers 1
   test_e2e_gallery: npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop --workers 1
+  test_e2e_multi_device: npx playwright test src/e2e/multi-device --project=desktop --workers 1
+  # Builds the sibling `bifrost-devtools` release binary used by the
+  # local_relay service and by multi-device e2e specs. Idempotent: cargo
+  # reuses its target cache. Run via `.factory/init.sh` (which also skips
+  # gracefully on hosts without cargo) or manually when the sibling
+  # bifrost-rs tree changes.
+  build_devtools: cargo build --release -p bifrost-devtools --manifest-path /Users/plebdev/Desktop/igloo-web-v2-prototype/bifrost-rs/Cargo.toml
 
 services:
   dev:
@@ -16,6 +23,16 @@ services:
     port: 5173
     depends_on: []
 
+  # Local `bifrost-devtools` relay used exclusively by multi-device e2e
+  # specs (see `src/e2e/multi-device/`) so they do not depend on public
+  # Nostr relays. Port 8194 is the only relay port allocated to this
+  # mission per AGENTS.md — do not change it.
+  #
+  # The `start` command assumes the binary at the hard-coded absolute
+  # path exists; run `commands.build_devtools` (or `.factory/init.sh`)
+  # first. The `healthcheck` confirms the TCP port is open, which is
+  # sufficient because the relay performs the WebSocket upgrade on any
+  # incoming connection; specs still validate WS handshake end-to-end.
   local_relay:
     start: /Users/plebdev/Desktop/igloo-web-v2-prototype/bifrost-rs/target/release/bifrost-devtools relay --host 127.0.0.1 --port 8194
     stop: lsof -ti :8194 | xargs kill -9
