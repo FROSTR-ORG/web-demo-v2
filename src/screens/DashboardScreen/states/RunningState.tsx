@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../../../components/ui";
-import type { PendingOperation, PeerStatus } from "../../../lib/bifrost/types";
+import type {
+  PeerPermissionState,
+  PendingOperation,
+  PeerStatus,
+} from "../../../lib/bifrost/types";
 import { MOCK_PENDING_APPROVAL_ROWS, type PolicyPromptRequest } from "../mocks";
 import { EventLogPanel } from "../panels/EventLogPanel";
 import { PeersPanel } from "../panels/PeersPanel";
@@ -32,6 +36,7 @@ export function RunningState({
   onRefresh,
   onOpenPolicyPrompt,
   peerRefreshErrors,
+  peerPermissionStates,
 }: {
   relays: string[];
   onlineCount: number;
@@ -44,6 +49,13 @@ export function RunningState({
   onRefresh: () => void | Promise<void>;
   onOpenPolicyPrompt?: (request: PolicyPromptRequest) => void;
   peerRefreshErrors?: Record<string, PeerRefreshErrorInfo>;
+  /**
+   * Passed through to PeersPanel so PeerRow inline badges reflect the
+   * live `effective_policy.request.*` grant matrix (VAL-POLICIES-006 /
+   * VAL-POLICIES-020). Undefined in Paper/demo fixture scenarios that
+   * predate runtime_status.peer_permission_states.
+   */
+  peerPermissionStates?: PeerPermissionState[];
 }) {
   // Drive a 1 s clock so the runtime-mode PendingApprovalsPanel's TTL
   // chips and "Nearest: <ttl>" header update live without requiring any
@@ -113,6 +125,7 @@ export function RunningState({
         sidebarOpen={sidebarOpen}
         onRefresh={onRefresh}
         peerRefreshErrors={peerRefreshErrors}
+        peerPermissionStates={peerPermissionStates}
       />
 
       {paperPanels ? <EventLogPanel /> : null}

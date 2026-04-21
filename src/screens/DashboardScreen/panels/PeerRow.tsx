@@ -2,7 +2,11 @@ import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PermissionBadge } from "../../../components/ui";
 import { shortHex } from "../../../lib/bifrost/format";
-import type { PeerStatus } from "../../../lib/bifrost/types";
+import { resolveRequestPolicyAllows } from "../../../lib/bifrost/policy";
+import type {
+  PeerPermissionState,
+  PeerStatus,
+} from "../../../lib/bifrost/types";
 import { paperLatency, paperPeerKey } from "../mocks";
 
 /**
@@ -90,11 +94,24 @@ export function PeerRow({
   paper,
   sidebarOpen,
   refreshError,
+  permissionState,
 }: {
   peer: PeerStatus;
   paper?: boolean;
   sidebarOpen?: boolean;
   refreshError?: PeerRefreshErrorInfo | null;
+  /**
+   * When provided (runtime mode), the inline verb badges are derived
+   * from `effective_policy.request.*` rather than the legacy
+   * `peer.can_sign` / `peer.should_send_nonces` heuristics. This keeps
+   * PeerRow chips consistent with the Peer Policies card chips for the
+   * same (peer, verb) tuple within a single `runtime_status` snapshot
+   * (VAL-POLICIES-005 / VAL-POLICIES-006 / VAL-POLICIES-020). When
+   * undefined (legacy tests / Paper fixtures) PeerRow falls back to the
+   * heuristic behaviour so existing pixel-parity scenarios do not
+   * regress.
+   */
+  permissionState?: PeerPermissionState | null;
 }) {
   const incomingPct = Math.min(100, peer.incoming_available);
   const outgoingPct = Math.min(100, peer.outgoing_available);
@@ -109,6 +126,26 @@ export function PeerRow({
     ? paperLatency(peer.idx)
     : formatLastSeen(peer.last_seen, now);
 
+  // When an effective_policy-backed permissionState is provided, badges
+  // are driven directly by the runtime grant matrix. Otherwise fall back
+  // to the legacy heuristic surface (Paper/demo fixtures + tests that
+  // predate m3-peer-policies-view).
+  const usePolicy = !paper && !!permissionState;
+  const grants = {
+    sign: usePolicy
+      ? resolveRequestPolicyAllows(permissionState, "sign")
+      : peer.can_sign,
+    ecdh: usePolicy
+      ? resolveRequestPolicyAllows(permissionState, "ecdh")
+      : peer.should_send_nonces,
+    ping: usePolicy
+      ? resolveRequestPolicyAllows(permissionState, "ping")
+      : paper || !peer.should_send_nonces,
+    onboard: usePolicy
+      ? resolveRequestPolicyAllows(permissionState, "onboard")
+      : !!paper && peer.idx === 1,
+  };
+
   return (
     <div className={`peer-row ${rowState}`}>
       <div className="peer-orbit">
@@ -122,10 +159,10 @@ export function PeerRow({
         <span className="peer-key">{paper ? paperPeerKey(peer.idx, peer.pubkey) : shortHex(peer.pubkey, 12, 8)}</span>
         {peer.online ? (
           <span className="inline-actions">
-            {peer.can_sign ? <PermissionBadge>SIGN</PermissionBadge> : null}
-            {peer.should_send_nonces ? <PermissionBadge tone="info">ECDH</PermissionBadge> : null}
-            {paper ? <PermissionBadge tone="ping">PING</PermissionBadge> : !peer.should_send_nonces ? <PermissionBadge tone="ping">PING</PermissionBadge> : null}
-            {paper && peer.idx === 1 ? <PermissionBadge tone="onboard">ONBOARD</PermissionBadge> : null}
+            {grants.sign ? <PermissionBadge>SIGN</PermissionBadge> : null}
+            {grants.ecdh ? <PermissionBadge tone="info">ECDH</PermissionBadge> : null}
+            {grants.ping ? <PermissionBadge tone="ping">PING</PermissionBadge> : null}
+            {grants.onboard ? <PermissionBadge tone="onboard">ONBOARD</PermissionBadge> : null}
           </span>
         ) : null}
       </div>

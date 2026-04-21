@@ -3,19 +3,9 @@ import { useAppState } from "../../../app/AppState";
 import type { PolicyOverrideEntry } from "../../../app/AppStateTypes";
 import { PermissionBadge } from "../../../components/ui";
 import { shortHex } from "../../../lib/bifrost/format";
+import { resolveRequestPolicyAllows } from "../../../lib/bifrost/policy";
 import type { PeerPermissionState, PeerStatus } from "../../../lib/bifrost/types";
 import { MOCK_PEER_POLICIES, MOCK_SIGNER_RULES } from "../mocks";
-
-function requestPolicyAllows(
-  state: PeerPermissionState,
-  method: "sign" | "ecdh" | "ping" | "onboard",
-): boolean {
-  const effective = state.effective_policy as {
-    request?: Record<string, unknown>;
-  } & Record<string, unknown>;
-  const value = effective.request?.[method] ?? effective[method];
-  return value === true || value === "allow";
-}
 
 function runtimePeerPolicies(
   peers: PeerStatus[],
@@ -27,10 +17,10 @@ function runtimePeerPolicies(
       index: peer?.idx ?? fallbackIndex,
       displayId: shortHex(state.pubkey, 8, 4),
       permissions: {
-        sign: requestPolicyAllows(state, "sign"),
-        ecdh: requestPolicyAllows(state, "ecdh"),
-        ping: requestPolicyAllows(state, "ping"),
-        onboard: requestPolicyAllows(state, "onboard"),
+        sign: resolveRequestPolicyAllows(state, "sign"),
+        ecdh: resolveRequestPolicyAllows(state, "ecdh"),
+        ping: resolveRequestPolicyAllows(state, "ping"),
+        onboard: resolveRequestPolicyAllows(state, "onboard"),
       },
     };
   });

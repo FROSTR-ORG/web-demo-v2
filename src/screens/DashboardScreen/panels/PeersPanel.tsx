@@ -1,7 +1,11 @@
 import { HelpCircle, RotateCw } from "lucide-react";
+import { useMemo } from "react";
 import { Button, StatusPill } from "../../../components/ui";
 import { Collapsible } from "../../../components/Collapsible";
-import type { PeerStatus } from "../../../lib/bifrost/types";
+import type {
+  PeerPermissionState,
+  PeerStatus,
+} from "../../../lib/bifrost/types";
 import { PeerRow, type PeerRefreshErrorInfo } from "./PeerRow";
 
 export function PeersPanel({
@@ -12,6 +16,7 @@ export function PeersPanel({
   sidebarOpen,
   onRefresh,
   peerRefreshErrors,
+  peerPermissionStates,
 }: {
   peers: PeerStatus[];
   onlineCount: number;
@@ -28,7 +33,28 @@ export function PeersPanel({
    * latency slot.
    */
   peerRefreshErrors?: Record<string, PeerRefreshErrorInfo>;
+  /**
+   * Live `runtime_status.peer_permission_states` snapshot. When present
+   * (runtime mode) PeerRow derives its inline verb badges from each
+   * peer's `effective_policy.request.*` grant matrix so the PeerRow
+   * and Peer Policies card never disagree for the same (peer, verb)
+   * pair within a single snapshot (VAL-POLICIES-005 / VAL-POLICIES-006
+   * / VAL-POLICIES-020).
+   */
+  peerPermissionStates?: PeerPermissionState[];
 }) {
+  // Index permission states by pubkey once per render so each PeerRow
+  // lookup is O(1) rather than O(n) across the peer list.
+  const permissionStateByPubkey = useMemo(() => {
+    if (!peerPermissionStates || peerPermissionStates.length === 0) {
+      return null;
+    }
+    const map = new Map<string, PeerPermissionState>();
+    for (const state of peerPermissionStates) {
+      map.set(state.pubkey, state);
+    }
+    return map;
+  }, [peerPermissionStates]);
   const header = (
     <div className="peers-header">
       <div className="peers-title-group">
@@ -72,6 +98,9 @@ export function PeersPanel({
             paper={paperPanels}
             sidebarOpen={sidebarOpen}
             refreshError={peerRefreshErrors?.[peer.pubkey] ?? null}
+            permissionState={
+              permissionStateByPubkey?.get(peer.pubkey) ?? null
+            }
           />
         ))}
       </div>

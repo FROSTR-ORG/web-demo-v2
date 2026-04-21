@@ -725,6 +725,11 @@ export function DashboardScreen() {
                 onlineCount={onlineCount}
                 signReadyLabel={signReadyLabel}
                 peers={runtimeStatus.peers}
+                peerPermissionStates={
+                  paperPanels
+                    ? undefined
+                    : runtimeStatus.peer_permission_states ?? undefined
+                }
                 pendingOperations={runtimeStatus.pending_operations}
                 paperPanels={paperPanels}
                 sidebarOpen={settingsOpen}
