@@ -69,23 +69,118 @@ function verbPrefix(kind: DashboardApprovalRow["kind"]): string {
 }
 
 /**
+ * Convert a byte array (e.g. a serialized `Bytes32`) into a lowercase
+ * hex string, returning null if any element is not a valid byte. Used
+ * to decode the real runtime `session.hashes[0]` payload, which
+ * bifrost-rs serializes as `[u8; 32]` → array of numbers rather than a
+ * pre-encoded hex string. Returns null for anything that is not a
+ * non-empty array of integers in `[0, 255]`.
+ */
+function byteArrayToHex(value: unknown): string | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  let hex = "";
+  for (const byte of value) {
+    if (typeof byte !== "number" || !Number.isInteger(byte) || byte < 0 || byte > 255) {
+      return null;
+    }
+    hex += byte.toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
+/**
  * Safely pull a 10-hex-char preview of the sign message from a pending
- * operation's opaque `context` field. Returns null if no recognisable
- * message hex is present. Keeps the payload extraction type-narrow so
- * malformed / missing context never surfaces as `[object Object]` or
- * crashes the render.
+ * operation's opaque `context` field. Handles the real runtime nested
+ * `SignSession` shape emitted by bifrost-rs as well as defensive
+ * variants and any legacy flat shape.
+ *
+ * Observed runtime shape (via `__debug.runtimeStatus()` /
+ * bifrost-devtools, see architecture.md → "Runtime `pending_operations`
+ * Context Shapes"):
+ *
+ * ```
+ * context = {
+ *   SignSession: {
+ *     session: {
+ *       hashes: [[u8; 32]],       // array-of-numbers Bytes32
+ *       ...
+ *     },
+ *     partials: [...],
+ *   }
+ * }
+ * ```
+ *
+ * Paths attempted, in order:
+ *   1. `context.SignSession.session.hashes[0]` (real runtime byte array)
+ *   2. `context.SignSession.session.message_hex_32` (defensive)
+ *   3. `context.SignSession.session.message_hex` (defensive)
+ *   4. `context.session.hashes[0]` (defensive byte array)
+ *   5. `context.session.message_hex_32` (defensive)
+ *   6. `context.session.message_hex` (defensive)
+ *   7. `context.message_hex_32` (legacy flat)
+ *   8. `context.message_hex` (legacy flat)
+ *
+ * Returns null if none match or context is malformed/non-object (e.g.
+ * the serialized unit-variant string `"PingRequest"`). Keeps the
+ * payload extraction type-narrow so malformed / missing context never
+ * surfaces as `[object Object]` or crashes the render.
  */
 function extractMessagePreview(ctx: unknown): string | null {
-  if (ctx === null || typeof ctx !== "object") return null;
+  if (ctx === null || typeof ctx !== "object" || Array.isArray(ctx)) return null;
   const record = ctx as Record<string, unknown>;
-  const candidate =
+
+  // Collect candidate `session` objects in priority order: first the
+  // real-runtime nested-under-SignSession path, then the defensive
+  // shallow-nested path.
+  const nestedSignSession =
+    record.SignSession &&
+    typeof record.SignSession === "object" &&
+    !Array.isArray(record.SignSession)
+      ? (record.SignSession as Record<string, unknown>)
+      : null;
+  const nestedSessionFromSignSession =
+    nestedSignSession &&
+    typeof nestedSignSession.session === "object" &&
+    nestedSignSession.session !== null &&
+    !Array.isArray(nestedSignSession.session)
+      ? (nestedSignSession.session as Record<string, unknown>)
+      : null;
+  const shallowNestedSession =
+    typeof record.session === "object" &&
+    record.session !== null &&
+    !Array.isArray(record.session)
+      ? (record.session as Record<string, unknown>)
+      : null;
+
+  const sessionCandidates = [
+    nestedSessionFromSignSession,
+    shallowNestedSession,
+  ].filter((entry): entry is Record<string, unknown> => entry !== null);
+
+  for (const session of sessionCandidates) {
+    const hashes = session.hashes;
+    if (Array.isArray(hashes) && hashes.length > 0) {
+      const hex = byteArrayToHex(hashes[0]);
+      if (hex) return hex.slice(0, 10).toLowerCase();
+    }
+    if (typeof session.message_hex_32 === "string" && session.message_hex_32.length > 0) {
+      return session.message_hex_32.slice(0, 10).toLowerCase();
+    }
+    if (typeof session.message_hex === "string" && session.message_hex.length > 0) {
+      return session.message_hex.slice(0, 10).toLowerCase();
+    }
+  }
+
+  // Legacy flat context shape, kept for back-compat / defensive parsing
+  // so synthetic fixtures and older tests continue to render.
+  const flatCandidate =
     typeof record.message_hex_32 === "string"
       ? record.message_hex_32
       : typeof record.message_hex === "string"
         ? record.message_hex
         : null;
-  if (!candidate) return null;
-  return candidate.slice(0, 10).toLowerCase();
+  if (!flatCandidate) return null;
+  return flatCandidate.slice(0, 10).toLowerCase();
 }
 
 /**

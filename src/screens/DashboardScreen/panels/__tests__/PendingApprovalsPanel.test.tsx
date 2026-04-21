@@ -154,6 +154,111 @@ describe("deriveApprovalRowsFromRuntime", () => {
     const rows = deriveApprovalRowsFromRuntime(pending, [], nowMs);
     expect(rows[0].ttl).toBe("0s");
   });
+
+  it("extracts SIGN message preview from the real nested SignSession byte-array shape emitted by bifrost-rs", () => {
+    // Real runtime shape captured via __debug.runtimeStatus: the
+    // bifrost-rs `PendingOpContext::SignSession { session, partials }` is
+    // externally-tagged, and SignSessionPackage fields serialize Bytes32
+    // as arrays of numbers. The message-to-sign is `session.hashes[0]`,
+    // a byte array (not a pre-encoded hex string). See evidence at
+    // `.factory/missions/<id>/evidence/m1-ops/r2-g2-failure-paused/06-sign-dispatch-state.json`.
+    const hashBytes = [
+      0xde, 0xad, 0xbe, 0xef, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+      0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14,
+      0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
+    ].slice(0, 32);
+    const pending: PendingOperation[] = [
+      makePending({
+        op_type: "Sign",
+        request_id: "req-sign-nested",
+        target_peers: [peerAPubkey],
+        timeout_at: nowSecs + 30,
+        context: {
+          SignSession: {
+            session: {
+              gid: new Array(32).fill(0),
+              sid: new Array(32).fill(0),
+              members: [1, 2],
+              hashes: [hashBytes],
+              content: null,
+              kind: "message",
+              stamp: 1_776_795_386,
+              nonces: [],
+            },
+            partials: [],
+          },
+        },
+      }),
+    ];
+    const rows = deriveApprovalRowsFromRuntime(pending, [], nowMs);
+    expect(rows[0].kind).toBe("SIGN");
+    expect(rows[0].detail.startsWith("Sign: ")).toBe(true);
+    // First 10 hex chars of the byte array = "deadbeef01".
+    expect(rows[0].detail).toContain("deadbeef01");
+  });
+
+  it("extracts SIGN message preview from a nested SignSession shape with a pre-hex-encoded message_hex_32 (defensive)", () => {
+    const pending: PendingOperation[] = [
+      makePending({
+        op_type: "Sign",
+        request_id: "req-sign-nested-hex",
+        target_peers: [peerAPubkey],
+        timeout_at: nowSecs + 30,
+        context: {
+          SignSession: {
+            session: {
+              message_hex_32:
+                "cafebabe11223344556677889900aabbccddeeff1122334455667788aabbccdd",
+            },
+          },
+        },
+      }),
+    ];
+    const rows = deriveApprovalRowsFromRuntime(pending, [], nowMs);
+    expect(rows[0].detail).toContain("cafebabe11");
+  });
+
+  it("extracts SIGN message preview from a shallow nested `context.session.hashes[0]` byte-array shape (defensive)", () => {
+    const hashBytes = new Array(32).fill(0);
+    hashBytes[0] = 0xfa;
+    hashBytes[1] = 0xce;
+    hashBytes[2] = 0xb0;
+    hashBytes[3] = 0x0c;
+    hashBytes[4] = 0x12;
+    const pending: PendingOperation[] = [
+      makePending({
+        op_type: "Sign",
+        request_id: "req-sign-shallow-nested",
+        target_peers: [peerAPubkey],
+        timeout_at: nowSecs + 30,
+        context: {
+          session: {
+            hashes: [hashBytes],
+          },
+        },
+      }),
+    ];
+    const rows = deriveApprovalRowsFromRuntime(pending, [], nowMs);
+    expect(rows[0].detail).toContain("faceb00c12");
+  });
+
+  it("does not crash on non-object SIGN context (e.g. unit-variant string contexts such as `PingRequest`)", () => {
+    const pending: PendingOperation[] = [
+      makePending({
+        op_type: "Sign",
+        request_id: "req-sign-stringy",
+        target_peers: [peerAPubkey],
+        timeout_at: nowSecs + 30,
+        // Emulates `context: "PingRequest"` - a serialized unit-variant
+        // string. Should be handled gracefully with no preview.
+        context: "SomeUnitVariant" as unknown as object,
+      }),
+    ];
+    const rows = deriveApprovalRowsFromRuntime(pending, [], nowMs);
+    expect(rows[0].detail.startsWith("Sign: ")).toBe(true);
+    // No preview hex should appear after the short key.
+    expect(rows[0].detail.split(" ").length).toBeLessThanOrEqual(3);
+  });
 });
 
 describe("PendingApprovalsPanel — rendering", () => {
