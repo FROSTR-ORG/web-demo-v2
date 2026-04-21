@@ -3377,6 +3377,12 @@ a {
 .policy-modal {
   width: 480px;
   max-width: 100%;
+  /* `min-width: 0` lets the modal collapse below its intrinsic content
+   * width so long unbreakable strings in payload rows (EVENT KIND /
+   * CONTENT / DOMAIN) cannot force it wider than the backdrop viewport
+   * (VAL-APPROVALS-022). Containment for the value cells themselves is
+   * applied on `.policy-detail-value` below. */
+  min-width: 0;
   border: 1px solid var(--ig-border);
   border-radius: 16px;
   background: #0f172a;
@@ -3455,6 +3461,8 @@ a {
   padding-bottom: 12px;
   gap: 10px;
   flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .policy-request-badge {
@@ -3497,6 +3505,14 @@ a {
   font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
   font-size: 12px;
   line-height: 16px;
+  /* A malicious or simply long domain string cannot stretch the header
+   * row beyond the modal border-box — truncate with ellipsis and expose
+   * the full value via the `title` attribute on the rendering span. */
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .policy-details-table {
@@ -3506,12 +3522,23 @@ a {
   border: 1px solid rgba(245, 158, 11, 0.1);
   padding: 10px;
   gap: 8px;
+  /* Ensure the table itself can shrink below its intrinsic width so a
+   * row's long value cell does not horizontally overflow the modal
+   * (VAL-APPROVALS-022). */
+  min-width: 0;
+  max-width: 100%;
 }
 
 .policy-detail-row {
   display: flex;
   align-items: baseline;
   gap: 12px;
+  /* Allow the value cell (flex child) to shrink past its intrinsic
+   * content width so `text-overflow: ellipsis` on the value can take
+   * effect — without this the row would force the modal wider
+   * (VAL-APPROVALS-022). */
+  min-width: 0;
+  max-width: 100%;
 }
 
 .policy-detail-label {
@@ -3533,6 +3560,21 @@ a {
   font-family: var(--font-inter, Inter, system-ui, sans-serif);
   font-size: 13px;
   line-height: 18px;
+  /* Containment for long EVENT KIND / CONTENT / DOMAIN payloads
+   * (VAL-APPROVALS-022). The cell takes the remaining row width
+   * (flex: 1 1 0%), is allowed to shrink below its intrinsic content
+   * width (min-width: 0), and clips any overflowing text with an
+   * ellipsis on a single line. The React layer sets a `title` attribute
+   * equal to the un-clipped value so the full text remains accessible
+   * to the user on hover (and to assistive tech via the accessible
+   * name). Paper parity is preserved: short values render identically
+   * to the reference design; only pathologically long values clamp. */
+  flex: 1 1 0%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .policy-detail-value.mono {
