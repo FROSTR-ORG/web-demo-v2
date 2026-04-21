@@ -13,6 +13,7 @@ import { PolicyPromptModal } from "./modals/PolicyPromptModal";
 import { SigningFailedModal } from "./modals/SigningFailedModal";
 import { DashboardSummaryBar } from "./panels/DashboardSummaryBar";
 import { MockStateToggle } from "./panels/MockStateToggle";
+import { TestEcdhPanel } from "./panels/TestEcdhPanel";
 import { TestSignPanel } from "./panels/TestSignPanel";
 import { SettingsSidebar } from "./sidebar/SettingsSidebar";
 import { deriveDashboardState } from "./dashboardState";
@@ -209,6 +210,15 @@ export function DashboardScreen() {
     dashboardState === "signing-blocked" ||
     dashboardState === "stopped" ||
     dashboardState === "relays-offline";
+  // ECDH readiness mirrors the sign-blocked derivation but uses
+  // `readiness.ecdh_ready` (the bridge's ECDH-specific availability flag)
+  // so sign/ECDH can gate independently. Paused / stopped / offline states
+  // disable both verbs — peer round-trips are impossible in those cases.
+  const ecdhBlocked =
+    signerPaused ||
+    !runtimeStatus.readiness.ecdh_ready ||
+    dashboardState === "stopped" ||
+    dashboardState === "relays-offline";
   const relayRows = relayHealthRowsFromRuntime(runtimeRelays, activeProfile.relays);
   const completionMode = exportResult?.mode ?? exportMode;
   const completionPackage = exportResult?.packageText ?? mockPackageForMode(completionMode);
@@ -383,12 +393,15 @@ export function DashboardScreen() {
           </>
         )}
 
-        {/* Dev-only TestSign affordance. Gated on `import.meta.env.DEV` so
-         * `vite build` dead-code-eliminates it from the production bundle.
-         * Also hidden when Paper reference panels are active so pixel-parity
-         * demo scenarios are unaffected. */}
+        {/* Dev-only TestSign + TestEcdh affordances. Gated on
+         * `import.meta.env.DEV` so `vite build` dead-code-eliminates them
+         * from the production bundle. Also hidden when Paper reference
+         * panels are active so pixel-parity demo scenarios are unaffected. */}
         {import.meta.env.DEV && !paperPanels ? (
-          <TestSignPanel signingBlocked={signingBlocked} />
+          <>
+            <TestSignPanel signingBlocked={signingBlocked} />
+            <TestEcdhPanel ecdhBlocked={ecdhBlocked} />
+          </>
         ) : null}
       </section>
 
