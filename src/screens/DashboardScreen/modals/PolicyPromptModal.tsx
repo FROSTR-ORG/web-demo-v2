@@ -40,19 +40,83 @@ function formatRemaining(ms: number): string {
   return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
 }
 
-function lockBodyScroll(): string | null {
-  if (typeof document === "undefined") return null;
-  const previous = document.body.style.overflow;
-  document.body.style.overflow = "hidden";
-  return previous;
+/**
+ * Snapshot of the body inline styles and viewport scroll offset captured
+ * at the moment the scroll lock engages so {@link restoreBodyScroll} can
+ * revert the page exactly to its pre-modal state.
+ */
+interface ScrollLockSnapshot {
+  overflow: string;
+  position: string;
+  top: string;
+  left: string;
+  right: string;
+  width: string;
+  scrollY: number;
 }
 
-function restoreBodyScroll(previous: string | null) {
-  if (typeof document === "undefined") return;
-  if (previous === null) {
-    document.body.style.overflow = "";
-  } else {
-    document.body.style.overflow = previous;
+/**
+ * Engage a robust viewport scroll lock while the modal is mounted.
+ *
+ * Setting `body.overflow = 'hidden'` alone is not sufficient — on many
+ * browsers the viewport's scroll container is `documentElement` (or a
+ * layout ancestor of `body`), so wheel / PageDown / touchmove still
+ * scroll the background behind the modal (the concrete failure mode
+ * VAL-APPROVALS-021 surfaced in user testing).
+ *
+ * The "fixed body offset" pattern below pins the body at its current
+ * scroll offset (`top: -scrollY`) with `position: fixed` + `width: 100%`
+ * which physically removes the body from the viewport's scroll container.
+ * The viewport has nothing left to scroll — wheel / PageDown / touchmove
+ * become no-ops — without having to attach event blockers or listen on
+ * every scroll surface.
+ *
+ * On unmount we revert each mutated inline style to its pre-lock value
+ * and `window.scrollTo(0, savedScrollY)` to snap the page back to where
+ * the user was looking, so re-opening a modal at position 0 doesn't
+ * silently yank them to the top.
+ */
+function lockBodyScroll(): ScrollLockSnapshot | null {
+  if (typeof document === "undefined" || typeof window === "undefined") {
+    return null;
+  }
+  const body = document.body;
+  const scrollY =
+    typeof window.scrollY === "number"
+      ? window.scrollY
+      : typeof window.pageYOffset === "number"
+        ? window.pageYOffset
+        : 0;
+  const snapshot: ScrollLockSnapshot = {
+    overflow: body.style.overflow,
+    position: body.style.position,
+    top: body.style.top,
+    left: body.style.left,
+    right: body.style.right,
+    width: body.style.width,
+    scrollY,
+  };
+  body.style.overflow = "hidden";
+  body.style.position = "fixed";
+  body.style.top = `-${scrollY}px`;
+  body.style.left = "0px";
+  body.style.right = "0px";
+  body.style.width = "100%";
+  return snapshot;
+}
+
+function restoreBodyScroll(previous: ScrollLockSnapshot | null) {
+  if (typeof document === "undefined" || typeof window === "undefined") return;
+  if (previous === null) return;
+  const body = document.body;
+  body.style.overflow = previous.overflow;
+  body.style.position = previous.position;
+  body.style.top = previous.top;
+  body.style.left = previous.left;
+  body.style.right = previous.right;
+  body.style.width = previous.width;
+  if (typeof window.scrollTo === "function") {
+    window.scrollTo(0, previous.scrollY);
   }
 }
 
