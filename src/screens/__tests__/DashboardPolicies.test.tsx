@@ -129,9 +129,9 @@ describe("DashboardScreen — Policies view", () => {
     renderDashboard();
     fireEvent.click(screen.getByText("Policies"));
 
-    fireEvent.click(screen.getByRole("button", { name: /Ask every time/ }));
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "Deny by default" }));
-    expect(screen.getByRole("button", { name: /Deny by default/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("combobox", { name: /default policy/i }));
+    fireEvent.click(screen.getByRole("radio", { name: "Deny by default" }));
+    expect(screen.getByRole("combobox", { name: /default policy/i })).toHaveTextContent("Deny by default");
 
     let removeButtons = screen.getAllByLabelText("Remove rule");
     fireEvent.click(removeButtons[0]);

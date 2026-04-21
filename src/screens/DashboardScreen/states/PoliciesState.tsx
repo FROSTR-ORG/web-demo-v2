@@ -11,6 +11,10 @@ import type {
 } from "../../../lib/bifrost/types";
 import { MOCK_PEER_POLICIES, MOCK_SIGNER_RULES } from "../mocks";
 import {
+  DefaultPolicyDropdown,
+  type DefaultPolicyOption,
+} from "../panels/DefaultPolicyDropdown";
+import {
   PeerPolicyChip,
   resolveManualOverrideValue,
   type PeerPolicyChipMethod,
@@ -119,8 +123,8 @@ export function PoliciesState({
     appState.removePolicyOverride ?? (async () => undefined);
   const setPeerPolicyOverride =
     appState.setPeerPolicyOverride ?? (async () => undefined);
-  const [defaultPolicy, setDefaultPolicy] = useState("Ask every time");
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [defaultPolicy, setDefaultPolicy] =
+    useState<DefaultPolicyOption>("Ask every time");
   const [hiddenRules, setHiddenRules] = useState<Set<string>>(() => new Set());
   const [removalError, setRemovalError] = useState<string | null>(null);
   const visibleRules = MOCK_SIGNER_RULES.filter((rule) => !hiddenRules.has(rule.method));
@@ -176,36 +180,12 @@ export function PoliciesState({
           <div className="policies-panel-title">Signer Policies</div>
           <div className="policies-header-right">
             <span className="policies-default-label">Default policy</span>
-            <div className="policies-dropdown-wrap">
-              <button
-                type="button"
-                className="policies-dropdown"
-                aria-expanded={dropdownOpen}
-                onClick={() => setDropdownOpen((value) => !value)}
-              >
-                <span className="policies-dropdown-text">{defaultPolicy}</span>
-                <span className="policies-dropdown-caret">▾</span>
-              </button>
-              {dropdownOpen ? (
-                <div className="policies-dropdown-menu" role="menu" aria-label="Default policy options">
-                  {["Ask every time", "Allow known peers", "Deny by default"].map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={defaultPolicy === option}
-                      className={defaultPolicy === option ? "active" : undefined}
-                      onClick={() => {
-                        setDefaultPolicy(option);
-                        setDropdownOpen(false);
-                      }}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            <DefaultPolicyDropdown
+              value={defaultPolicy}
+              onChange={setDefaultPolicy}
+              peerPermissionStates={peerPermissionStates}
+              dispatch={setPeerPolicyOverride}
+            />
           </div>
         </div>
         <div className="policies-panel-body">
