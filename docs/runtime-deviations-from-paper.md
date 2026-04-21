@@ -232,3 +232,50 @@ and the validation assertion IDs that cover it.
   diverges in that case — this is the pre-mission baseline).
 - **Assertion IDs covered**: VAL-APPROVALS-024 (cross-tab decision propagation — both
   modal dismissal and runtime peer-override convergence).
+
+### PolicyPromptModal — no proactive open paths in production (VAL-APPROVALS-018)
+
+- **Paper / task source**: `igloo-paper` demo scenarios drive the
+  `Signer Policy` modal from explicit affordances — an **Open** button on each
+  Pending Approvals row, a **Review Approvals** button on the Signing-Blocked
+  hero card, and a **Modals → Policy Prompt** button on the MockStateToggle
+  dev bar. The Paper surface is a scenario demo; there is no concept of a
+  runtime-reactive vs. dev-demo open path in the design reference.
+- **web-demo-v2 implementation**:
+  `src/screens/DashboardScreen/index.tsx` — the three historical proactive
+  open paths (`setActiveModal("policy-prompt")`) are wrapped behind
+  `import.meta.env.DEV` ternaries so `vite build` dead-code-eliminates the
+  call sites from the production bundle:
+    - `RunningState.onOpenPolicyPrompt` (the PendingApprovalsPanel Open
+      button wiring) — prop is passed through only when `import.meta.env.DEV`,
+      else `undefined` (which hides the Open button at the panel level).
+    - `SigningBlockedState.onReviewApprovals` (the Review Approvals button
+      in the Signing-Blocked hero) — prop is `undefined` outside DEV so
+      the button is inert in production.
+    - `MockStateToggle` (the demo-only modal trigger bar) — the entire
+      component is now gated on `import.meta.env.DEV && showMockControls`
+      so every `onOpenModal("policy-prompt")` + `onOpenModal("signing-failed")`
+      button is tree-shaken out of production.
+- **Protocol / runtime constraint**: VAL-APPROVALS-018 requires
+  `PolicyPromptModal` mount in response to **peer_denied** RuntimeEvents
+  ONLY — never from a pending_operations mutation, focus/lock/unlock
+  signal, or any other trigger. The Paper-equivalent proactive open
+  paths are preserved for the demo gallery and vitest component tests
+  (both of which run with `import.meta.env.DEV === true`) while the
+  production runtime build (`npm run build` → `dist/`) has zero
+  `setActiveModal("policy-prompt")` call sites.
+- **Verification**: `rg -o '[a-zA-Z_$][a-zA-Z0-9_$]*\("policy-prompt"\)'
+  dist/assets/*.js` returns zero matches after `npm run build` (the
+  remaining `"policy-prompt"` tokens in the minified bundle are (a) the
+  React-key template prefix inside `PolicyPromptModal.tsx` — e.g.
+  `policy-prompt-title-${event.id}`, (b) the reactive-path
+  `activeModal !== "policy-prompt"` guard inside the `paperPromptEvent`
+  useMemo, which is a read-only comparison not an open call, and
+  (c) demo fixture data in `src/demo/scenarios.ts`).
+  Unit coverage for the reactive-only contract lives at
+  `src/screens/__tests__/DashboardPolicyPromptReactive.test.tsx`
+  (three tests: pending op doesn't open, focus/lock/unlock doesn't open,
+  peer_denied DOES open via enqueuePeerDenial).
+- **Assertion IDs covered**: VAL-APPROVALS-018 (no proactive/upfront
+  prompt); reinforces VAL-APPROVALS-007 (peer_denied → reactive modal
+  via enqueuePeerDenial pipeline as the ONLY runtime open path).

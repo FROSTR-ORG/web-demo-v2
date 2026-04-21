@@ -685,7 +685,16 @@ export function DashboardScreen() {
       }
     >
       <section className="dashboard-column">
-        {showMockControls ? (
+        {/* MockStateToggle exposes "Open Policy Prompt" and
+         * "Open Signing Failed" demo buttons that call `setActiveModal`
+         * directly. These are proactive open paths used only by Paper
+         * demo scenarios — VAL-APPROVALS-018 forbids such paths in
+         * production runtime code. Gated on `import.meta.env.DEV` so
+         * `vite build` tree-shakes the entire component away from the
+         * production bundle. See
+         * `docs/runtime-deviations-from-paper.md` entry
+         * "PolicyPromptModal — no proactive open paths in production". */}
+        {import.meta.env.DEV && showMockControls ? (
           <MockStateToggle
             mockState={mockState}
             onChangeMockState={setMockState}
@@ -721,10 +730,24 @@ export function DashboardScreen() {
                 sidebarOpen={settingsOpen}
                 onStop={handleStopSigner}
                 onRefresh={handleRefreshPeers}
-                onOpenPolicyPrompt={(request) => {
-                  setPolicyPromptRequest(request);
-                  setActiveModal("policy-prompt");
-                }}
+                onOpenPolicyPrompt={
+                  // VAL-APPROVALS-018 / fix-m2-policy-prompt-never-proactive-open:
+                  // The runtime PolicyPromptModal must ONLY open in
+                  // response to a `peer_denied` lifecycle event routed
+                  // through `peerDenialQueue`. This callback serves only
+                  // the Paper/demo "Open" button on PendingApprovalsPanel
+                  // mock rows and is therefore DEV-gated so `vite build`
+                  // dead-code-eliminates the `setActiveModal("policy-prompt")`
+                  // call from the production bundle. See
+                  // `docs/runtime-deviations-from-paper.md` entry
+                  // "PolicyPromptModal — no proactive open paths in production".
+                  import.meta.env.DEV
+                    ? (request) => {
+                        setPolicyPromptRequest(request);
+                        setActiveModal("policy-prompt");
+                      }
+                    : undefined
+                }
                 peerRefreshErrors={peerRefreshErrors}
               />
             )}
@@ -749,10 +772,24 @@ export function DashboardScreen() {
               <SigningBlockedState
                 onStop={handleStopSigner}
                 onOpenPolicies={() => setShowPolicies(true)}
-                onReviewApprovals={() => {
-                  setPolicyPromptRequest(DEFAULT_POLICY_PROMPT_REQUEST);
-                  setActiveModal("policy-prompt");
-                }}
+                onReviewApprovals={
+                  // VAL-APPROVALS-018 / fix-m2-policy-prompt-never-proactive-open:
+                  // "Review Approvals" is a Paper-parity affordance from
+                  // the signing-blocked state. The PolicyPromptModal is
+                  // runtime-reactive (peer_denied only) so opening the
+                  // modal proactively here would violate VAL-APPROVALS-018.
+                  // We keep the legacy Paper demo behaviour under
+                  // `import.meta.env.DEV` so the production bundle has
+                  // zero proactive `setActiveModal("policy-prompt")`
+                  // call sites, while the Paper scenarios + dev builds
+                  // still animate the modal when operators click it.
+                  import.meta.env.DEV
+                    ? () => {
+                        setPolicyPromptRequest(DEFAULT_POLICY_PROMPT_REQUEST);
+                        setActiveModal("policy-prompt");
+                      }
+                    : undefined
+                }
                 noncePoolDepleted={
                   !hasDemoDashboardState &&
                   isNoncePoolDepleted(runtimeStatus)
