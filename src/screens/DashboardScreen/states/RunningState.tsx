@@ -3,6 +3,7 @@ import type { PeerStatus } from "../../../lib/bifrost/types";
 import type { PolicyPromptRequest } from "../mocks";
 import { EventLogPanel } from "../panels/EventLogPanel";
 import { PeersPanel } from "../panels/PeersPanel";
+import type { PeerRefreshErrorInfo } from "../panels/PeerRow";
 import { PendingApprovalsPanel } from "../panels/PendingApprovalsPanel";
 
 export function RunningState({
@@ -16,6 +17,7 @@ export function RunningState({
   onStop,
   onRefresh,
   onOpenPolicyPrompt,
+  peerRefreshErrors,
 }: {
   relays: string[];
   onlineCount: number;
@@ -25,8 +27,9 @@ export function RunningState({
   paperPanels: boolean;
   sidebarOpen?: boolean;
   onStop: () => void;
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<void>;
   onOpenPolicyPrompt?: (request: PolicyPromptRequest) => void;
+  peerRefreshErrors?: Record<string, PeerRefreshErrorInfo>;
 }) {
   return (
     <>
@@ -54,6 +57,7 @@ export function RunningState({
         paperPanels={paperPanels}
         sidebarOpen={sidebarOpen}
         onRefresh={onRefresh}
+        peerRefreshErrors={peerRefreshErrors}
       />
 
       {paperPanels ? (

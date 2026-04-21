@@ -3,7 +3,28 @@ import { shortHex } from "../../../lib/bifrost/format";
 import type { PeerStatus } from "../../../lib/bifrost/types";
 import { paperLatency, paperPeerKey } from "../mocks";
 
-export function PeerRow({ peer, paper, sidebarOpen }: { peer: PeerStatus; paper?: boolean; sidebarOpen?: boolean }) {
+/**
+ * Inline refresh error surface for peers that failed a ping/refresh round
+ * (see VAL-OPS-011). Kept minimal so the Paper-parity row visual is
+ * preserved; the message is surfaced through `title`/`aria-label` so
+ * screen readers and pointer hover both expose the runtime failure cause.
+ */
+export interface PeerRefreshErrorInfo {
+  code: string;
+  message: string;
+}
+
+export function PeerRow({
+  peer,
+  paper,
+  sidebarOpen,
+  refreshError,
+}: {
+  peer: PeerStatus;
+  paper?: boolean;
+  sidebarOpen?: boolean;
+  refreshError?: PeerRefreshErrorInfo | null;
+}) {
   const incomingPct = Math.min(100, peer.incoming_available);
   const outgoingPct = Math.min(100, peer.outgoing_available);
   const lowPool = peer.online && Math.min(peer.incoming_available, peer.outgoing_available) < 25;
@@ -49,7 +70,24 @@ export function PeerRow({ peer, paper, sidebarOpen }: { peer: PeerStatus; paper?
           <span className="help">--</span>
         )}
       </div>
-      <div className="latency-slot">{peer.online ? (paper ? paperLatency(peer.idx) : "Ready") : "Offline"}</div>
+      <div className="latency-slot">
+        {refreshError ? (
+          <span
+            className="peer-refresh-error"
+            data-testid={`peer-refresh-error-${peer.idx}`}
+            role="status"
+            aria-label={`Refresh failed for peer #${peer.idx}: ${refreshError.message}`}
+            title={refreshError.message}
+            style={{ color: "#f87171" }}
+          >
+            Refresh failed
+          </span>
+        ) : peer.online ? (
+          paper ? paperLatency(peer.idx) : "Ready"
+        ) : (
+          "Offline"
+        )}
+      </div>
       {sidebarOpen ? (
         <div
           className="peer-row-trailing"

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAppState } from "../../app/AppState";
 import type { OperationFailure } from "../../lib/bifrost/types";
+import type { PeerRefreshErrorInfo } from "./panels/PeerRow";
 import { AppShell } from "../../components/shell";
 import { Button } from "../../components/ui";
 import { useDemoUi } from "../../demo/demoUi";
@@ -104,6 +105,20 @@ export function DashboardScreen() {
   // Dismiss/Retry — even though it lingers in `runtimeFailures` (VAL-OPS-008).
   const [activeSignFailure, setActiveSignFailure] = useState<OperationFailure | null>(null);
   const consumedFailureIdsRef = useRef<Set<string>>(new Set());
+  // --- Peer refresh error surface (VAL-OPS-011) ------------------------
+  // `refreshOfflineAtDispatchRef` records which peers were offline at the
+  // moment the user clicked Refresh. When a subsequent ping `OperationFailure`
+  // surfaces for one of those pubkeys we mirror the failure into
+  // `peerRefreshErrors` so the PeerRow renders an inline error indicator —
+  // no silent success for offline peers.
+  const refreshOfflineAtDispatchRef = useRef<Set<string>>(new Set());
+  // Ping failures we've already reflected into peerRefreshErrors. Keyed by
+  // `OperationFailure.request_id` so each drained failure is only consumed
+  // once, even though it lingers in `runtimeFailures`.
+  const consumedRefreshFailureIdsRef = useRef<Set<string>>(new Set());
+  const [peerRefreshErrors, setPeerRefreshErrors] = useState<
+    Record<string, PeerRefreshErrorInfo>
+  >({});
   const showMockControls = Boolean(demoUi.dashboard?.showMockControls);
   const paperPanels = demoUi.dashboard?.paperPanels ?? Boolean(demoUi.dashboard);
 
@@ -179,6 +194,108 @@ export function DashboardScreen() {
       );
     }
   }, [activeSignFailure, handleRuntimeCommand, signDispatchLog]);
+
+  // VAL-OPS-011: Watch the drained runtime failures for ping failures that
+  // target a peer who was offline at the last refresh dispatch. Surface the
+  // failure through `peerRefreshErrors` so the PeerRow renders its inline
+  // error indicator. Ignore ping failures for peers that were online at
+  // dispatch (those are surfaced elsewhere) so an expected offline peer
+  // never silently "succeeds" (no error, no updated last_seen).
+  useEffect(() => {
+    if (!runtimeFailures || runtimeFailures.length === 0) return;
+    let nextPatch: Record<string, PeerRefreshErrorInfo> | null = null;
+    for (const failure of runtimeFailures) {
+      if (failure.op_type !== "ping") continue;
+      if (!failure.failed_peer) continue;
+      if (consumedRefreshFailureIdsRef.current.has(failure.request_id)) continue;
+      if (!refreshOfflineAtDispatchRef.current.has(failure.failed_peer)) {
+        // Not a peer we expected to be refreshing right now; mark consumed
+        // so we don't re-evaluate it on every effect run.
+        consumedRefreshFailureIdsRef.current.add(failure.request_id);
+        continue;
+      }
+      consumedRefreshFailureIdsRef.current.add(failure.request_id);
+      if (!nextPatch) nextPatch = {};
+      nextPatch[failure.failed_peer] = {
+        code: failure.code,
+        message: failure.message,
+      };
+    }
+    if (nextPatch) {
+      setPeerRefreshErrors((previous) => ({ ...previous, ...nextPatch }));
+    }
+  }, [runtimeFailures]);
+
+  // Clear a peer's refresh error the moment it transitions back to online —
+  // a successful ping response is the runtime's authoritative signal that
+  // the peer is reachable again.
+  useEffect(() => {
+    if (!runtimeStatus) return;
+    setPeerRefreshErrors((previous) => {
+      let changed = false;
+      const next = { ...previous };
+      for (const peer of runtimeStatus.peers) {
+        if (peer.online && next[peer.pubkey]) {
+          delete next[peer.pubkey];
+          changed = true;
+        }
+      }
+      return changed ? next : previous;
+    });
+  }, [runtimeStatus]);
+
+  const handleRefreshPeers = useCallback(async () => {
+    if (hasDemoDashboardState) {
+      // Demo/fixture scenarios rely on the visual-only refresh animation
+      // and don't have a real runtime to dispatch against.
+      refreshRuntime?.();
+      return;
+    }
+    // Snapshot which peers are offline NOW so subsequent failures can be
+    // correlated back to this dispatch. Also clear stale refresh errors
+    // for peers no longer offline (they'll be re-added only if they fail
+    // this round).
+    const offlineSet = new Set<string>();
+    if (runtimeStatus) {
+      for (const peer of runtimeStatus.peers) {
+        if (!peer.online) offlineSet.add(peer.pubkey);
+      }
+    }
+    refreshOfflineAtDispatchRef.current = offlineSet;
+    setPeerRefreshErrors((previous) => {
+      let changed = false;
+      const next = { ...previous };
+      for (const pubkey of Object.keys(previous)) {
+        if (!offlineSet.has(pubkey)) {
+          delete next[pubkey];
+          changed = true;
+        }
+      }
+      return changed ? next : previous;
+    });
+    if (!handleRuntimeCommand) {
+      refreshRuntime?.();
+      return;
+    }
+    try {
+      await handleRuntimeCommand({ type: "refresh_all_peers" });
+    } catch (error) {
+      // Dispatch failed (e.g. no runtime). Surface via console so the
+      // outer error observer doesn't silently drop it, but don't throw —
+      // the refresh button is a user-visible affordance and must remain
+      // clickable for subsequent retries.
+      // eslint-disable-next-line no-console
+      console.error(
+        `refresh_all_peers dispatch failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    // Kick the relay pump so outbound ping events are flushed to the wire
+    // immediately; without this the next poll tick would delay user-visible
+    // last_seen updates by up to 2.5 s.
+    refreshRuntime?.();
+  }, [handleRuntimeCommand, hasDemoDashboardState, refreshRuntime, runtimeStatus]);
 
   const activeSignFailureMessageHex = useMemo(
     () =>
@@ -356,11 +473,12 @@ export function DashboardScreen() {
                 paperPanels={paperPanels}
                 sidebarOpen={settingsOpen}
                 onStop={handleStopSigner}
-                onRefresh={refreshRuntime}
+                onRefresh={handleRefreshPeers}
                 onOpenPolicyPrompt={(request) => {
                   setPolicyPromptRequest(request);
                   setActiveModal("policy-prompt");
                 }}
+                peerRefreshErrors={peerRefreshErrors}
               />
             )}
 

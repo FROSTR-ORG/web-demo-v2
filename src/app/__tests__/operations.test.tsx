@@ -787,4 +787,87 @@ describe("MockAppStateProvider — runtime command API shape", () => {
     expect(latest.runtimeFailures).toHaveLength(0);
     expect(latest.lifecycleEvents).toHaveLength(0);
   });
+
+  it("handleRuntimeCommand({ type: 'refresh_all_peers' }) forwards to the runtime and returns {requestId: null, debounced: false} (VAL-OPS-011 dispatch)", async () => {
+    // refresh_all_peers does NOT register a single pending_operations entry
+    // (it fans out to per-peer pings internally), so the feature contract
+    // for `handleRuntimeCommand` is to return `requestId: null, debounced:
+    // false` the first time through and to forward the command to the
+    // underlying `RuntimeClient.handleCommand`. This test exercises that
+    // path via the real AppStateProvider + create-session runtime wiring.
+    vi.useRealTimers();
+    const keyset = await createKeysetBundle({
+      groupName: "Refresh Peers Live Key",
+      threshold: 2,
+      count: 2,
+    });
+    const localShare = keyset.shares[0];
+    const payload = profilePayloadForShare({
+      profileId: "prof_refresh_live",
+      deviceName: "Igloo Web",
+      share: localShare,
+      group: keyset.group,
+      relays: [],
+      manualPeerPolicyOverrides: defaultManualPeerPolicyOverrides(
+        keyset.group,
+        localShare.idx,
+      ),
+    });
+    let latest!: AppStateValue;
+    render(
+      <AppStateProvider>
+        <Capture onState={(state) => (latest = state)} />
+      </AppStateProvider>,
+    );
+    await waitFor(() => expect(latest).toBeTruthy());
+
+    await act(async () => {
+      await latest.createKeyset({
+        groupName: "Refresh Peers Live Key",
+        threshold: 2,
+        count: 2,
+      });
+    });
+    await waitFor(() => expect(latest.createSession?.keyset).toBeTruthy());
+
+    await act(async () => {
+      await latest.createProfile({
+        deviceName: "Igloo Web",
+        password: "profile-password",
+        confirmPassword: "profile-password",
+        relays: ["wss://relay.local"],
+        distributionPassword: "distro-password",
+        confirmDistributionPassword: "distro-password",
+      });
+    });
+    await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());
+
+    let result: { requestId: string | null; debounced: boolean } = {
+      requestId: null,
+      debounced: false,
+    };
+    await act(async () => {
+      result = await latest.handleRuntimeCommand({
+        type: "refresh_all_peers",
+      });
+    });
+
+    // refresh_all_peers does not map to a single pending_op, so requestId
+    // must be `null`; it was dispatched (not debounced) on first call.
+    expect(result.debounced).toBe(false);
+    expect(result.requestId).toBeNull();
+
+    // A second identical dispatch within 300ms must be coalesced
+    // (debounce contract — VAL-OPS-019 adjacent).
+    let secondResult = { requestId: null as string | null, debounced: false };
+    await act(async () => {
+      secondResult = await latest.handleRuntimeCommand({
+        type: "refresh_all_peers",
+      });
+    });
+    expect(secondResult.debounced).toBe(true);
+    expect(secondResult.requestId).toBeNull();
+
+    expect(payload).toBeTruthy();
+  }, 30_000);
 });
