@@ -28,6 +28,9 @@ import {
 } from "../lib/bifrost/packageService";
 import { RuntimeClient, type RuntimeCommand } from "../lib/bifrost/runtimeClient";
 import type {
+  BfManualPeerPolicyOverride,
+  BfMethodPolicyOverride,
+  BfPolicyOverrideValue,
   BfProfilePayload,
   CompletedOperation,
   GroupPackageWire,
@@ -158,6 +161,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   // for the deviation entry. Persistent variants ("Always allow" /
   // "Always deny") are NOT tracked here and remain in the runtime.
   const sessionAllowOnceRef = useRef<Set<string>>(new Set());
+  // Cached decrypted profile payload + password for the currently
+  // unlocked profile. Held in memory only (never written to storage or
+  // console) so persistent peer-policy overrides chosen via the reactive
+  // denial surface ("Always allow" / "Always deny") can be serialised
+  // through the existing profile-save path atomically with the runtime
+  // state update. Cleared on `lockProfile()` / `clearCredentials()` so
+  // no stale payload bleeds across profiles. See the
+  // `fix-m2-persist-always-allow-to-profile` feature description for
+  // rationale and VAL-APPROVALS-010 / VAL-APPROVALS-012 /
+  // VAL-APPROVALS-017 for behavioral coverage.
+  const unlockedPayloadRef = useRef<BfProfilePayload | null>(null);
+  const unlockedPasswordRef = useRef<string | null>(null);
   const peerDenialResolvedRef = useRef<Set<string>>(new Set());
   // Mirror of `peerDenialQueue` as a ref so `resolvePeerDenial` can
   // look up the resolving entry by id without re-creating its identity
@@ -471,6 +486,66 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  /**
+   * Serialise the updated peer-policy override for (peer, direction,
+   * method, value) through the existing profile-save path so the
+   * override survives a lock/unlock cycle. No-op when the currently
+   * unlocked profile payload / password / active summary are absent
+   * (e.g. the runtime was seeded via a dev-only test hook without ever
+   * persisting a stored profile).
+   *
+   * Writes happen in this order:
+   *   1. Update the in-memory cached payload (`unlockedPayloadRef`).
+   *   2. Build a new `StoredProfileRecord` by re-encrypting the payload
+   *      with the cached password.
+   *   3. Persist the record to IndexedDB via `saveProfile`.
+   *
+   * The caller is expected to apply the override to the live runtime
+   * AFTER this function resolves. On persistence failure (e.g. the
+   * WASM bridge rejects re-encryption) the function throws and the
+   * caller MUST skip the runtime mutation so we never leave a runtime
+   * state that diverges from the on-disk profile. See the
+   * `fix-m2-persist-always-allow-to-profile` feature description for
+   * atomicity contract.
+   */
+  const persistPolicyOverrideToProfile = useCallback(
+    async (input: {
+      peer: string;
+      direction: "request" | "respond";
+      method: "sign" | "ecdh" | "ping" | "onboard";
+      value: "allow" | "deny";
+    }): Promise<void> => {
+      const payload = unlockedPayloadRef.current;
+      const password = unlockedPasswordRef.current;
+      const profile = activeProfile;
+      if (!payload || !password || !profile) {
+        return;
+      }
+      const nextPayload = applyManualOverrideToPayload(
+        payload,
+        input.peer,
+        input.direction,
+        input.method,
+        input.value,
+      );
+      const { record, normalizedPayload } = await buildStoredProfileRecord(
+        nextPayload,
+        password,
+        {
+          createdAt: profile.createdAt,
+          lastUsedAt: profile.lastUsedAt,
+          label: profile.label,
+        },
+      );
+      // Cache the fully normalised payload (post-Zod parse) so subsequent
+      // reads reflect what Zod would return after decoding the on-disk
+      // blob — prevents divergence between in-memory & on-disk shapes.
+      unlockedPayloadRef.current = normalizedPayload;
+      await saveProfile(record);
+    },
+    [activeProfile],
+  );
+
   const resolvePeerDenial = useCallback(
     async (id: string, decision: PolicyPromptDecision) => {
       peerDenialResolvedRef.current.add(id);
@@ -536,6 +611,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             sessionAllowOnceRef.current.add(overrideKey);
             break;
           case "allow-always":
+            // Persist the override through the profile store BEFORE
+            // applying it to the runtime so there is no window where
+            // the in-memory runtime and the on-disk profile disagree.
+            // On persistence failure we skip the runtime mutation and
+            // rethrow — the caller surfaces the error via the promise
+            // rejection.
+            await persistPolicyOverrideToProfile({
+              peer,
+              direction: "respond",
+              method: verb,
+              value: "allow",
+            });
             runtime.setPolicyOverride({
               peer,
               direction: "respond",
@@ -547,6 +634,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             sessionAllowOnceRef.current.delete(overrideKey);
             break;
           case "deny-always":
+            await persistPolicyOverrideToProfile({
+              peer,
+              direction: "respond",
+              method: verb,
+              value: "deny",
+            });
             runtime.setPolicyOverride({
               peer,
               direction: "respond",
@@ -569,7 +662,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         );
       }
     },
-    [],
+    [persistPolicyOverrideToProfile],
   );
 
   /**
@@ -825,6 +918,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         await removeProfile(options.replaceProfileId);
       }
       await startRuntimeFromPayload(normalizedPayload, localShareIdx);
+      // Cache the just-saved payload + password so any subsequent
+      // "Always allow" / "Always deny" decision from the reactive denial
+      // surface can serialise its override through the profile-save
+      // path without a password re-prompt. See the
+      // `fix-m2-persist-always-allow-to-profile` feature.
+      unlockedPayloadRef.current = normalizedPayload;
+      unlockedPasswordRef.current = password;
       setActiveProfile(record.summary);
       setSignerPausedState(false);
       await reloadProfiles();
@@ -913,16 +1013,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         ),
       });
       const createdAt = Date.now();
-      const { record } = await buildStoredProfileRecord(
-        payload,
-        draft.password,
-        {
+      const { record, normalizedPayload: normalizedCreatePayload } =
+        await buildStoredProfileRecord(payload, draft.password, {
           createdAt,
           lastUsedAt: createdAt,
           label: createSession.draft.groupName,
-        },
-      );
+        });
       await saveProfile(record);
+      // Cache the just-saved payload + password so any subsequent
+      // "Always allow" / "Always deny" decision from the reactive
+      // denial surface can serialise its override through the
+      // profile-save path without a password re-prompt. See the
+      // `fix-m2-persist-always-allow-to-profile` feature.
+      unlockedPayloadRef.current = normalizedCreatePayload;
+      unlockedPasswordRef.current = draft.password;
 
       const remoteShares = createSession.keyset.shares.filter(
         (share) => share.idx !== localShare.idx,
@@ -1253,20 +1357,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         ),
       });
       const createdAt = Date.now();
-      const { record } = await buildStoredProfileRecord(
-        payload,
-        draft.password,
-        {
+      const { record, normalizedPayload: normalizedOnboardPayload } =
+        await buildStoredProfileRecord(payload, draft.password, {
           createdAt,
           lastUsedAt: createdAt,
           label: group.group_name,
-        },
-      );
+        });
       await saveProfile(record);
       await startRuntimeFromSnapshot(
         onboardSession.runtimeSnapshot,
         onboardSession.payload.relays,
       );
+      // Cache the just-saved payload + password so any subsequent
+      // "Always allow" / "Always deny" decision persists without a
+      // password re-prompt. See `fix-m2-persist-always-allow-to-profile`.
+      unlockedPayloadRef.current = normalizedOnboardPayload;
+      unlockedPasswordRef.current = draft.password;
       setActiveProfile(record.summary);
       setSignerPausedState(false);
       setOnboardSession(null);
@@ -1817,6 +1923,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         payload,
         record.summary.localShareIdx,
       );
+      // Re-apply persisted manual_peer_policy_overrides to the freshly
+      // initialised runtime so persistent overrides chosen via
+      // "Always allow" / "Always deny" survive a lock/unlock cycle
+      // (fix-m2-persist-always-allow-to-profile). We issue one
+      // setPolicyOverride call per stored (peer, direction, method)
+      // whose value is explicitly "allow" or "deny" — "unset" entries
+      // are skipped because they represent "use default" semantics in
+      // the persistence layer and re-dispatching them would be a
+      // no-op at best and a surprise at worst. The default-seeded
+      // "allow-all" entries are re-applied here; they are idempotent
+      // with the bifrost-rs default so this is safe.
+      reapplyManualOverridesToRuntime(
+        runtime,
+        payload.device.manual_peer_policy_overrides,
+      );
       await touchProfile(id);
       const payloadRelays = payload.device.relays ?? [];
       setRuntime(
@@ -1824,6 +1945,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         undefined,
         payloadRelays.length > 0 ? payloadRelays : record.summary.relays,
       );
+      // Cache the unlocked payload + password so always-* decisions in
+      // this session can serialise their override through the
+      // profile-save path atomically with the runtime update.
+      unlockedPayloadRef.current = payload;
+      unlockedPasswordRef.current = password;
       setActiveProfile({ ...record.summary, lastUsedAt: Date.now() });
       setSignerPausedState(false);
       await reloadProfiles();
@@ -1847,16 +1973,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         record.encryptedProfilePackage,
         oldPassword,
       );
-      const { record: updatedRecord } = await buildStoredProfileRecord(
-        payload,
-        newPassword,
-        {
+      const { record: updatedRecord, normalizedPayload } =
+        await buildStoredProfileRecord(payload, newPassword, {
           createdAt: record.summary.createdAt,
           lastUsedAt: Date.now(),
           label: record.summary.label,
-        },
-      );
+        });
       await saveProfile(updatedRecord);
+      // Refresh the in-memory cache so subsequent always-* decisions
+      // re-encrypt with the new password (and can observe any change
+      // to the normalised payload shape).
+      unlockedPayloadRef.current = normalizedPayload;
+      unlockedPasswordRef.current = newPassword;
       await reloadProfiles();
     },
     [activeProfile, reloadProfiles],
@@ -1899,6 +2027,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     simulatorRef.current?.stop();
     simulatorRef.current?.setOnDrains(undefined);
     simulatorRef.current = null;
+    // Clear the unlocked-profile cache so a stale payload / password
+    // cannot be reused after the runtime is torn down.
+    unlockedPayloadRef.current = null;
+    unlockedPasswordRef.current = null;
     setRuntimeStatus(null);
     setActiveProfile(null);
     setSignerPausedState(false);
@@ -1920,6 +2052,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     simulatorRef.current?.stop();
     simulatorRef.current?.setOnDrains(undefined);
     simulatorRef.current = null;
+    // Clear the unlocked-profile cache so a stale payload / password
+    // cannot be reused after the profile record is removed.
+    unlockedPayloadRef.current = null;
+    unlockedPasswordRef.current = null;
     setRuntimeStatus(null);
     setActiveProfile(null);
     setSignerPausedState(false);
@@ -2066,7 +2202,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       );
     }
 
-    function applyRemoteDecision(
+    async function applyRemoteDecision(
       peerPubkey: string,
       verb: "sign" | "ecdh" | "ping" | "onboard",
       action: PolicyPromptDecision["action"],
@@ -2086,6 +2222,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             sessionAllowOnceRef.current.add(overrideKey);
             break;
           case "allow-always":
+            // Cross-tab always-* decisions must also persist to the
+            // stored profile so the receiving tab's state matches the
+            // originator's after lock/unlock. Same atomicity contract
+            // as the local resolvePeerDenial path: persist first, then
+            // mutate the runtime.
+            await persistPolicyOverrideToProfile({
+              peer: peerPubkey,
+              direction: "respond",
+              method: verb,
+              value: "allow",
+            });
             runtime.setPolicyOverride({
               peer: peerPubkey,
               direction: "respond",
@@ -2095,6 +2242,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             sessionAllowOnceRef.current.delete(overrideKey);
             break;
           case "deny-always":
+            await persistPolicyOverrideToProfile({
+              peer: peerPubkey,
+              direction: "respond",
+              method: verb,
+              value: "deny",
+            });
             runtime.setPolicyOverride({
               peer: peerPubkey,
               direction: "respond",
@@ -2166,7 +2319,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           validAction &&
           validVerb
         ) {
-          applyRemoteDecision(peerPubkey, verb, action);
+          // The cross-tab apply is async due to profile re-encryption;
+          // fire-and-forget with a catch so unhandled-rejection doesn't
+          // surface in the browser console. Errors are already logged
+          // inside applyRemoteDecision.
+          void applyRemoteDecision(peerPubkey, verb, action).catch(() => {});
         }
         return;
       }
@@ -2883,6 +3040,120 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
  * of which variant it is. All variants (Sign/Ecdh/Ping/Onboard) carry an
  * interior `request_id` string on their single payload key.
  */
+/**
+ * Merge a single peer-policy override into the payload's
+ * `manual_peer_policy_overrides` list. If the peer already has an entry,
+ * its existing policy matrix is preserved and only the targeted
+ * `(direction, method)` cell is flipped. If the peer has no entry yet,
+ * a new entry is synthesised from an "allow-all" default method policy
+ * with the target cell replaced, matching the shape produced by
+ * {@link defaultManualPeerPolicyOverrides}.
+ *
+ * The returned payload is a shallow clone — the `device` field is a
+ * fresh object and `manual_peer_policy_overrides` is a fresh array —
+ * so callers can safely pass the result into downstream reducers
+ * without mutating the original payload.
+ *
+ * Helper for `fix-m2-persist-always-allow-to-profile`: used by
+ * `persistPolicyOverrideToProfile` to build the next payload before
+ * re-encryption.
+ */
+function applyManualOverrideToPayload(
+  payload: BfProfilePayload,
+  peer: string,
+  direction: "request" | "respond",
+  method: "sign" | "ecdh" | "ping" | "onboard",
+  value: "allow" | "deny",
+): BfProfilePayload {
+  const defaultMethods: BfMethodPolicyOverride = {
+    echo: "allow",
+    ping: "allow",
+    onboard: "allow",
+    sign: "allow",
+    ecdh: "allow",
+  };
+  const existing = payload.device.manual_peer_policy_overrides ?? [];
+  const index = existing.findIndex((entry) => entry.pubkey === peer);
+  let nextEntry: BfManualPeerPolicyOverride;
+  if (index >= 0) {
+    const current = existing[index];
+    nextEntry = {
+      pubkey: peer,
+      policy: {
+        request: { ...current.policy.request },
+        respond: { ...current.policy.respond },
+      },
+    };
+  } else {
+    nextEntry = {
+      pubkey: peer,
+      policy: {
+        request: { ...defaultMethods },
+        respond: { ...defaultMethods },
+      },
+    };
+  }
+  nextEntry.policy[direction] = {
+    ...nextEntry.policy[direction],
+    [method]: value,
+  };
+  const nextOverrides =
+    index >= 0
+      ? existing.map((entry, idx) => (idx === index ? nextEntry : entry))
+      : [...existing, nextEntry];
+  return {
+    ...payload,
+    device: {
+      ...payload.device,
+      manual_peer_policy_overrides: nextOverrides,
+    },
+  };
+}
+
+/**
+ * Re-apply the stored `manual_peer_policy_overrides` list to a freshly
+ * initialised {@link RuntimeClient}. Skips `unset` values (which
+ * represent "use default" semantics in the persistence layer) and
+ * swallows individual dispatch errors so one bad entry can't prevent
+ * subsequent entries from being applied. Helper for the `unlockProfile`
+ * re-hydration path — see
+ * `fix-m2-persist-always-allow-to-profile` feature description.
+ */
+function reapplyManualOverridesToRuntime(
+  runtime: RuntimeClient,
+  overrides: BfManualPeerPolicyOverride[] | undefined,
+): void {
+  if (!overrides || overrides.length === 0) return;
+  const directions: Array<"request" | "respond"> = ["request", "respond"];
+  const methods: Array<"sign" | "ecdh" | "ping" | "onboard"> = [
+    "sign",
+    "ecdh",
+    "ping",
+    "onboard",
+  ];
+  for (const entry of overrides) {
+    const peer = entry.pubkey;
+    for (const direction of directions) {
+      const methodPolicy = entry.policy[direction];
+      for (const method of methods) {
+        const value = methodPolicy[method] as BfPolicyOverrideValue | undefined;
+        if (value !== "allow" && value !== "deny") continue;
+        try {
+          runtime.setPolicyOverride({
+            peer,
+            direction,
+            method,
+            value,
+          });
+        } catch {
+          // best-effort: individual overrides must not abort the whole
+          // re-hydration pass.
+        }
+      }
+    }
+  }
+}
+
 function completionRequestId(completion: CompletedOperation): string {
   const payload =
     (completion as { Sign?: { request_id: string } }).Sign ??
