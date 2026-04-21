@@ -185,6 +185,32 @@ export interface HandleRuntimeCommandResult {
   debounced: boolean;
 }
 
+/**
+ * Nonce-pool telemetry surfaced through the AppState. The WASM runtime
+ * does NOT expose `nonce_pool_size` / `nonce_pool_threshold` on its
+ * `runtime_status` snapshot directly (see the
+ * `nonce-pool shim (VAL-OPS-024)` entry in
+ * `docs/runtime-deviations-from-paper.md`), so we derive them at the JS
+ * layer from `RuntimeSnapshotExport.state.nonce_pool` and surface the
+ * result here for validators.
+ */
+export interface NoncePoolSnapshot {
+  /**
+   * Total outgoing-nonce allotment currently available across all peers
+   * (`sum(nonce_pool.peers[*].outgoing_available)`), a proxy for whether
+   * we can still initiate signs. `null` when the runtime has not yet
+   * produced a snapshot.
+   */
+  nonce_pool_size: number;
+  /**
+   * Minimum number of outgoing nonces per peer we want to maintain before
+   * triggering a refill / sync. The shim pegs this to
+   * `readiness.threshold` (one nonce per remaining sign); adjust as the
+   * runtime's refill strategy is firmed up.
+   */
+  nonce_pool_threshold: number;
+}
+
 export interface AppStateValue {
   profiles: StoredProfileSummary[];
   activeProfile: StoredProfileSummary | null;

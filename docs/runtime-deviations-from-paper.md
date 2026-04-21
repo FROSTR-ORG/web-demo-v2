@@ -31,6 +31,48 @@ and the validation assertion IDs that cover it.
   protocol — the responder's participation is an input to, not an output of,
   `CompletedOperation::Ecdh`.
 
+### `nonce_pool_size` / `nonce_pool_threshold` surfaced via JS shim (VAL-OPS-024)
+
+- **Paper / task source**: `fix-m1-ops-test-observability-hooks` feature description
+  (`features.json`) — "nonce_pool_size and nonce_pool_threshold surfaced on
+  runtime_status snapshots (or via window.__debug.noncePoolSnapshot if the WASM
+  bridge cannot expose them directly — in which case document the shim in
+  docs/runtime-deviations-from-paper.md with a VAL-OPS-024 reference)".
+- **web-demo-v2 implementation**:
+  `src/app/AppStateProvider.tsx` (`window.__debug.noncePoolSnapshot` getter
+  installed by the dev-only test-observability effect).
+- **Protocol / data constraint**: Neither
+  `bifrost-rs/crates/bifrost-bridge-wasm/src/lib.rs::RuntimeStatusSummary`
+  nor the `RuntimeReadiness` struct expose a dedicated `nonce_pool_size`
+  or `nonce_pool_threshold` field — nonce accounting is per-peer inside
+  `RuntimeSnapshotExport.state.nonce_pool.peers[*]`
+  (`incoming_available` / `outgoing_available`). bifrost-rs is read-only
+  reference material for this mission and must not be modified to add a
+  runtime-status aggregate.
+- **What the app exposes instead**: a dev-only getter at
+  `window.__debug.noncePoolSnapshot` returns
+  `{ nonce_pool_size, nonce_pool_threshold }` where:
+    - `nonce_pool_size = sum(snapshot.state.nonce_pool.peers[*].outgoing_available)`
+      — the total remaining outgoing-nonce budget across peers, a proxy
+      for whether new signs can be dispatched.
+    - `nonce_pool_threshold = snapshot.status.known_peers` — a conservative
+      refill threshold pegged to one nonce per peer (the minimum needed
+      for a threshold-1 round). The value is guaranteed numeric even if
+      the WASM bridge has not produced a snapshot yet (falls back to
+      `null` for the whole getter when no runtime is attached).
+    - When `__iglooTestSimulateNonceDepletion({nonce_pool_size, nonce_pool_threshold})`
+      is active, the getter returns the overridden numeric pair so
+      validators can drive the "Syncing nonces" overlay to a known state.
+  The shim is stripped from production (`import.meta.env.DEV` gated
+  installer effect; `rg -i '__debug\.noncePoolSnapshot' dist/` → 0 matches).
+- **Assertion IDs covered**: VAL-OPS-024 — the `Syncing nonces` /
+  `Trigger Sync` overlay surfaces during refill. The overlay itself is
+  driven by `isNoncePoolDepleted(status)`, which inspects
+  `readiness.degraded_reasons` for a `/nonce/i` signal; the shim
+  `window.__iglooTestSimulateNonceDepletion()` pushes that signal into a
+  dev-only augmentation layer in the provider so the overlay renders
+  end-to-end without requiring a real depleted pool.
+
 ### SigningFailedModal — no `peers_responded` / `round_id` peer-response ratio
 
 - **Paper / task source**: `igloo-paper/screens/dashboard/.../SigningFailedModal` renders a

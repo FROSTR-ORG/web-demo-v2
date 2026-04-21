@@ -108,3 +108,39 @@ For every UI surface, reference `/Users/plebdev/Desktop/igloo-web-v2-prototype/i
 
 - In headless `agent-browser` runs, `document.visibilityState` transitions may not reliably emit `hidden` during tab-switch simulations.
 - Network capture in this surface did not consistently provide websocket frame-level telemetry (reconnect events and close-frame codes). For assertions that depend on those details, capture app-level request-id observables and explicit WS send hooks as backup evidence.
+
+## Flow Validator Guidance: test-observability hooks (DEV only)
+
+These dev-gated hooks (`import.meta.env.DEV`) surface evidence that agent-browser can't reliably observe through the headless DOM/Network layers alone. All hooks are stripped from production builds (verified via `rg -i '__iglooTest|__debug\.(relayHistory|visibilityHistory|noncePoolSnapshot)' dist/` → 0 matches after `npm run build`). Install the provider (`AppStateProvider`) in the route you're validating; then use the hooks below.
+
+### `window.__debug.relayHistory` — per-relay WS telemetry (VAL-OPS-023, VAL-OPS-028)
+
+- Array of `{ type: "open" | "close" | "error", url, at: ISOString, code?, wasClean? }` entries, one per socket lifecycle transition.
+- Populated by `BrowserRelayClient` via `RuntimeRelayPump`'s `onSocketEvent` hook; capped at ~200 entries (FIFO).
+- Also exposed on `runtimeRelays[*]` via new fields: `reconnectCount`, `lastConnectedAt`, `lastDisconnectedAt`, `lastCloseCode`. Use `window.__appState.runtimeRelays` to read them from a validator session.
+- Evidence pattern: `JSON.stringify((window as any).__debug.relayHistory)` inside `page.evaluate`.
+
+### `window.__debug.visibilityHistory` — tab-hide/show evidence (VAL-OPS-021)
+
+- Array of `{ state: "visible" | "hidden", at: ISOString }` entries, seeded with the initial state on mount and appended on every `document.visibilitychange` event.
+- Use this instead of relying on the headless runtime re-emitting the DOM event: drive the transition with `await page.evaluate(() => Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }))` + `document.dispatchEvent(new Event('visibilitychange'))` and then assert `window.__debug.visibilityHistory.some(e => e.state === 'hidden')`.
+
+### `window.__debug.noncePoolSnapshot` — nonce-pool accounting shim (VAL-OPS-024)
+
+- Getter returning `{ nonce_pool_size, nonce_pool_threshold }` derived from `RuntimeSnapshotExport.state.nonce_pool`, or `null` when no runtime is attached.
+- When `window.__iglooTestSimulateNonceDepletion()` is active, returns the overridden values.
+- See `docs/runtime-deviations-from-paper.md` for the nonce-pool shim rationale (WASM bridge does not expose these fields directly).
+
+### `window.__iglooTestDropRelays(code = 1006)` / `window.__iglooTestRestoreRelays()` — VAL-OPS-016 harness
+
+- `__iglooTestDropRelays(code = 1006)` forcibly closes every live relay socket with the supplied simulated close code. Updates `runtimeRelays[*].lastCloseCode` and `.lastDisconnectedAt`. Does NOT synchronously mutate `sign_ready` — any in-flight pending sign must still transition to failure via the runtime's existing TTL-driven path (drainFailures).
+- `__iglooTestRestoreRelays()` reopens the previously-configured relay set. Each successful reconnect increments that relay's `reconnectCount` by 1.
+- Evidence pattern: dispatch a sign → `window.__iglooTestDropRelays()` → observe `SigningFailedModal` open with an `OperationFailure` (code `timeout`) and `runtimeRelays[*].lastCloseCode === 1006`.
+
+### `window.__iglooTestSimulateNonceDepletion(input?)` / `window.__iglooTestRestoreNonce()` — VAL-OPS-024 harness
+
+- `__iglooTestSimulateNonceDepletion({ nonce_pool_size?, nonce_pool_threshold?, reason? })` pushes a `nonce_pool_depleted` entry into `runtime_status.readiness.degraded_reasons` and flips `sign_ready` to `false`. The existing `isNoncePoolDepleted` heuristic fires and the `Syncing nonces` / `Trigger Sync` overlay renders.
+- `__iglooTestRestoreNonce()` clears the override and forces an immediate `runtimeStatus` refresh so the overlay disappears without waiting for the next 2.5s poll tick.
+- Evidence pattern: call simulate → screenshot the overlay → call restore → screenshot the overlay gone.
+
+All hooks are **DEV-only**. If your validation runs a production build (`vite build` / served from `dist/`), the hooks are absent by design — fall back to capturing app-level state via `window.__appState.runtimeStatus` / `.runtimeRelays` only.

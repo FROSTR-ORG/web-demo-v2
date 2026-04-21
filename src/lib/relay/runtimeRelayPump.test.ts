@@ -163,6 +163,7 @@ describe("RuntimeRelayPump", () => {
         state: "online",
         lastConnectedAt: 123,
         lastError: undefined,
+        reconnectCount: 0,
       },
     ]);
 
@@ -204,12 +205,14 @@ describe("RuntimeRelayPump", () => {
         url: "wss://offline.test",
         state: "offline",
         lastError: "offline",
+        reconnectCount: 0,
       },
       {
         url: "wss://publish.test",
         state: "online",
         lastConnectedAt: 500,
         lastError: undefined,
+        reconnectCount: 0,
       },
     ]);
 
@@ -221,5 +224,142 @@ describe("RuntimeRelayPump", () => {
       lastError: "publish denied",
     });
     expect(statuses.at(-1)).toEqual(pump.relayStatuses());
+  });
+
+  /**
+   * VAL-OPS-016 / VAL-OPS-023 / VAL-OPS-028 — exercise the dev-only
+   * simulateDropAll + simulateRestoreAll test hooks and assert that
+   * `lastCloseCode`, `lastDisconnectedAt`, and `reconnectCount` telemetry
+   * lands on `runtimeRelays[*]` so the flow validator can observe a
+   * disconnect-then-reconnect cycle without inspecting raw WS frames.
+   */
+  it("simulateDropAll + simulateRestoreAll record lastCloseCode and increment reconnectCount", async () => {
+    const runtime = new FakeRuntime();
+    let nowCursor = 100;
+    // Each call to connect/publish creates the same connection instance —
+    // but simulateRestoreAll reconnects via a fresh call to
+    // `relayClient.connect(url)`. Our FakeRelayClient maps by URL so the
+    // SAME FakeRelayConnection is returned on both connects; we just reset
+    // its `closed` flag so the second connect.connect() resolves.
+    const relay = new FakeRelayConnection("wss://relay.test");
+    const statusUpdates: unknown[] = [];
+    const pump = new RuntimeRelayPump({
+      runtime: runtime as never,
+      relays: ["wss://relay.test"],
+      relayClient: new FakeRelayClient([relay]),
+      eventKind: 27000,
+      now: () => {
+        nowCursor += 1;
+        return nowCursor;
+      },
+      onRelayStatusChange: (value) => statusUpdates.push(value),
+    });
+
+    await pump.start();
+    expect(pump.relayStatuses()[0]).toMatchObject({
+      state: "online",
+      reconnectCount: 0,
+    });
+
+    pump.simulateDropAll(1006);
+    const afterDrop = pump.relayStatuses()[0];
+    expect(afterDrop.state).toBe("offline");
+    expect(afterDrop.lastCloseCode).toBe(1006);
+    expect(typeof afterDrop.lastDisconnectedAt).toBe("number");
+    // reconnectCount is NOT incremented by a drop — only by a successful
+    // restore. This keeps the counter monotonic in the "survived a drop"
+    // sense.
+    expect(afterDrop.reconnectCount).toBe(0);
+
+    // Reset the FakeRelayConnection so restore can re-subscribe.
+    relay.closed = false;
+    relay.subscriptions.length = 0;
+
+    await pump.simulateRestoreAll();
+    const afterRestore = pump.relayStatuses()[0];
+    expect(afterRestore.state).toBe("online");
+    expect(afterRestore.reconnectCount).toBe(1);
+    expect(afterRestore.lastConnectedAt).toBe(nowCursor);
+  });
+
+  it("forwards socket lifecycle events to onSocketEvent hook", async () => {
+    // Uses the default BrowserRelayClient path (no custom relayClient) so
+    // the pump wires its own onSocketEvent through. We stub out the socket
+    // factory via the createSocket option.
+    const runtime = new FakeRuntime();
+    const events: unknown[] = [];
+    // A minimal fake socket for the BrowserRelayClient. readyState=1 means
+    // "open" for `send`. Fire open synchronously on addEventListener.
+    class MiniFakeSocket {
+      readyState = 0;
+      private openL: Array<(event: Event | MessageEvent) => void> = [];
+      private closeL: Array<(event: Event | MessageEvent) => void> = [];
+      constructor(readonly url: string) {}
+      send() {
+        /* no-op */
+      }
+      close() {
+        this.readyState = 3;
+        const syntheticClose = {
+          code: 1000,
+          wasClean: true,
+        } as unknown as Event;
+        this.closeL.forEach((listener) => listener(syntheticClose));
+      }
+      addEventListener(
+        type: "open" | "message" | "error" | "close",
+        listener: (event: Event | MessageEvent) => void,
+      ) {
+        if (type === "open") {
+          this.openL.push(listener);
+          // Fire open on next tick so the connect promise can resolve.
+          queueMicrotask(() => {
+            this.readyState = 1;
+            listener(new Event("open"));
+          });
+        }
+        if (type === "close") {
+          this.closeL.push(listener);
+        }
+      }
+      removeEventListener(
+        _type: "open" | "message" | "error" | "close",
+        _listener: (event: Event | MessageEvent) => void,
+      ) {
+        /* no-op for tests */
+      }
+    }
+    const { BrowserRelayClient } = await import("./browserRelayClient");
+    const relayClient = new BrowserRelayClient({
+      createSocket: (url) => new MiniFakeSocket(url),
+      onSocketEvent: (event) => events.push(event),
+    });
+    const pump = new RuntimeRelayPump({
+      runtime: runtime as never,
+      relays: ["wss://relay.test"],
+      relayClient,
+      eventKind: 27000,
+      now: () => 1,
+      onSocketEvent: (event) => events.push(event),
+    });
+    await pump.start();
+    // The pump wires its own handler, and we supplied onSocketEvent, so
+    // we see the "open" event TWICE (once from the client's direct
+    // observer, once via the pump's handleSocketEvent hook).
+    const opens = events.filter(
+      (event) => (event as { type: string }).type === "open",
+    );
+    expect(opens.length).toBeGreaterThan(0);
+    expect((opens[0] as { url: string }).url).toBe("wss://relay.test");
+
+    pump.simulateDropAll(1006);
+    const closes = events.filter(
+      (event) => (event as { type: string }).type === "close",
+    );
+    expect(closes.length).toBeGreaterThan(0);
+    const synthetic = closes.find(
+      (event) => (event as { code: number }).code === 1006,
+    );
+    expect(synthetic).toBeTruthy();
   });
 });

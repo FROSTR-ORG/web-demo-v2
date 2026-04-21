@@ -47,14 +47,58 @@ interface WebSocketLike {
   ): void;
 }
 
+/**
+ * Lightweight observable WS lifecycle event emitted by
+ * {@link BrowserRelayClient} so higher-layer code (the RuntimeRelayPump, the
+ * dev-only `window.__debug.relayHistory` recorder) can observe every
+ * open/close transition without reaching into the socket directly.
+ *
+ * Close events carry a numeric `code` when the browser provided one
+ * (`CloseEvent.code`) or `null` when the event was synthesised by us for a
+ * connection that was never given a chance to report. The
+ * `wasClean` flag mirrors `CloseEvent.wasClean` — `true` for cooperative
+ * shutdown (1000 "normal"), `false` for abnormal terminations (e.g. 1006).
+ */
+export type RelaySocketEvent =
+  | { type: "open"; url: string; at: number }
+  | {
+      type: "close";
+      url: string;
+      at: number;
+      code: number | null;
+      wasClean: boolean;
+    }
+  | { type: "error"; url: string; at: number };
+
+export interface BrowserRelayClientOptions {
+  createSocket?: (url: string) => WebSocketLike;
+  /**
+   * Optional observer invoked on every socket lifecycle event. Used by
+   * `RuntimeRelayPump` to drive per-relay `reconnectCount` / `lastCloseCode`
+   * telemetry and the dev-only relay-history ring buffer.
+   */
+  onSocketEvent?: (event: RelaySocketEvent) => void;
+}
+
 export class BrowserRelayClient implements RelayClient {
+  private readonly createSocket: (url: string) => WebSocketLike;
+  private readonly onSocketEvent?: (event: RelaySocketEvent) => void;
+
   constructor(
-    private readonly createSocket: (url: string) => WebSocketLike = (url) =>
-      new WebSocket(url),
-  ) {}
+    options?:
+      | BrowserRelayClientOptions
+      | ((url: string) => WebSocketLike),
+  ) {
+    if (typeof options === "function") {
+      this.createSocket = options;
+    } else {
+      this.createSocket = options?.createSocket ?? ((url) => new WebSocket(url));
+      this.onSocketEvent = options?.onSocketEvent;
+    }
+  }
 
   connect(url: string): RelayConnection {
-    return new BrowserRelayConnection(url, this.createSocket);
+    return new BrowserRelayConnection(url, this.createSocket, this.onSocketEvent);
   }
 }
 
@@ -65,10 +109,21 @@ class BrowserRelayConnection implements RelayConnection {
   private noticeListeners = new Set<(message: string) => void>();
   private messageListener: ((event: Event | MessageEvent) => void) | null =
     null;
+  private persistentCloseListener:
+    | ((event: Event | MessageEvent) => void)
+    | null = null;
+  /**
+   * When true, the next real close event fired by the underlying socket is
+   * not propagated to `onSocketEvent`. Used by {@link simulateAbnormalClose}
+   * so the caller's synthesised close (with a specific `code` like 1006) is
+   * the authoritative event seen by subscribers.
+   */
+  private suppressNextCloseReport = false;
 
   constructor(
     public readonly url: string,
     private readonly createSocket: (url: string) => WebSocketLike,
+    private readonly onSocketEvent?: (event: RelaySocketEvent) => void,
   ) {}
 
   connect(): Promise<void> {
@@ -89,10 +144,20 @@ class BrowserRelayConnection implements RelayConnection {
       };
       const handleOpen = () => {
         cleanup();
+        // Install the persistent close listener so close events emitted
+        // after a successful open still reach observers (network drops,
+        // relay-side shutdowns, __iglooTestDropRelays).
+        this.attachPersistentCloseListener(socket);
+        this.emitSocketEvent({ type: "open", url: this.url, at: Date.now() });
         resolve();
       };
       const handleError = () => {
         cleanup();
+        this.emitSocketEvent({
+          type: "error",
+          url: this.url,
+          at: Date.now(),
+        });
         reject(new Error(`Relay connection failed: ${this.url}`));
       };
       const handleClose = () => {
@@ -103,6 +168,56 @@ class BrowserRelayConnection implements RelayConnection {
       socket.addEventListener("error", handleError);
       socket.addEventListener("close", handleClose);
     });
+  }
+
+  /**
+   * Emit a synthetic "close" event with a caller-provided code (e.g. 1006
+   * "simulated abnormal close" for `window.__iglooTestDropRelays()`), then
+   * close the underlying socket. The next real close event is suppressed so
+   * observers see exactly one close transition with the simulated code.
+   */
+  simulateAbnormalClose(code: number): void {
+    if (!this.socket) return;
+    this.suppressNextCloseReport = true;
+    this.emitSocketEvent({
+      type: "close",
+      url: this.url,
+      at: Date.now(),
+      code,
+      wasClean: false,
+    });
+    this.close();
+  }
+
+  private attachPersistentCloseListener(socket: WebSocketLike): void {
+    if (this.persistentCloseListener) {
+      socket.removeEventListener("close", this.persistentCloseListener);
+    }
+    const listener = (event: Event | MessageEvent) => {
+      if (this.suppressNextCloseReport) {
+        this.suppressNextCloseReport = false;
+        return;
+      }
+      const closeEvent = event as Event & { code?: number; wasClean?: boolean };
+      this.emitSocketEvent({
+        type: "close",
+        url: this.url,
+        at: Date.now(),
+        code: typeof closeEvent.code === "number" ? closeEvent.code : null,
+        wasClean: Boolean(closeEvent.wasClean),
+      });
+    };
+    this.persistentCloseListener = listener;
+    socket.addEventListener("close", listener);
+  }
+
+  private emitSocketEvent(event: RelaySocketEvent): void {
+    if (!this.onSocketEvent) return;
+    try {
+      this.onSocketEvent(event);
+    } catch {
+      // Observer must not break the connection pipeline.
+    }
   }
 
   publish(event: unknown): Promise<void> {
@@ -141,11 +256,15 @@ class BrowserRelayConnection implements RelayConnection {
     if (this.socket && this.messageListener) {
       this.socket.removeEventListener("message", this.messageListener);
     }
+    if (this.socket && this.persistentCloseListener) {
+      this.socket.removeEventListener("close", this.persistentCloseListener);
+    }
     this.subscriptions.clear();
     this.noticeListeners.clear();
     this.socket?.close();
     this.socket = null;
     this.messageListener = null;
+    this.persistentCloseListener = null;
   }
 
   private requireOpenSocket(): WebSocketLike {

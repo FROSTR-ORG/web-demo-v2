@@ -43,6 +43,7 @@ import {
   type RuntimeDrainBatch,
   type RuntimeRelayStatus,
 } from "../lib/relay/runtimeRelayPump";
+import type { RelaySocketEvent } from "../lib/relay/browserRelayClient";
 import {
   OnboardingRelayError,
   runOnboardingRelayHandshake,
@@ -88,6 +89,7 @@ import type {
   HandleRuntimeCommandResult,
   ImportProfileDraft,
   ImportSession,
+  NoncePoolSnapshot,
   OnboardingPackageStatePatch,
   OnboardSession,
   ProfileDraft,
@@ -150,6 +152,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
    * VAL-OPS-017.
    */
   const signerPausedRef = useRef(false);
+  /**
+   * Dev-only: when non-null, the runtime_status snapshot we surface to React
+   * is augmented with this nonce-depletion override before being committed
+   * to state. Populated by `window.__iglooTestSimulateNonceDepletion()` and
+   * cleared by `window.__iglooTestRestoreNonce()`; stripped from production
+   * builds via `import.meta.env.DEV` gating on the hook installer effect.
+   */
+  const nonceOverrideRef = useRef<{
+    nonce_pool_size: number;
+    nonce_pool_threshold: number;
+    reason: string;
+  } | null>(null);
   const onboardHandshakeRef = useRef<{
     id: number;
     controller: AbortController;
@@ -249,6 +263,67 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     lastDispatchRef.current = null;
   }, []);
 
+  /**
+   * Apply the dev-only nonce-depletion override to a runtime_status snapshot
+   * before it is committed to React state. When the override is active we:
+   *   - push an `insufficient_signing_peers` entry tagged with
+   *     `nonce_pool_depleted` into `readiness.degraded_reasons`, AND
+   *   - set `readiness.sign_ready = false`
+   * so the existing `isNoncePoolDepleted` heuristic (and its
+   * `Syncing nonces` / `Trigger Sync` overlay) activates end-to-end
+   * without the runtime actually entering that state. Stripped from
+   * production by the `import.meta.env.DEV` hook installer effect — in
+   * non-DEV the override ref is never written, so this function is a
+   * no-op for user code paths.
+   */
+  const augmentStatus = useCallback(
+    (
+      status: RuntimeStatusSummary | null,
+    ): RuntimeStatusSummary | null => {
+      if (!status) return status;
+      const override = nonceOverrideRef.current;
+      if (!override) return status;
+      const degraded = Array.isArray(status.readiness.degraded_reasons)
+        ? [...status.readiness.degraded_reasons]
+        : [];
+      // Injected reason name intentionally contains "nonce" so the
+      // `isNoncePoolDepleted` forward-compat string check returns true.
+      const injectedReason =
+        "nonce_pool_depleted" as unknown as (typeof degraded)[number];
+      if (!degraded.includes(injectedReason)) {
+        degraded.push(injectedReason);
+      }
+      return {
+        ...status,
+        readiness: {
+          ...status.readiness,
+          sign_ready: false,
+          degraded_reasons: degraded,
+        },
+      };
+    },
+    [],
+  );
+
+  const applyRuntimeStatus = useCallback(
+    (status: RuntimeStatusSummary | null) => {
+      setRuntimeStatus(augmentStatus(status));
+    },
+    [augmentStatus],
+  );
+
+  /**
+   * Dev-only: forward every socket lifecycle event to
+   * `window.__debug.relayHistory`. In non-DEV builds, the hook installer
+   * effect never populates `window.__debug`, so `appendRelayHistoryEntry`
+   * is a no-op (and is itself tree-shakable because no DEV-only caller
+   * survives `import.meta.env.DEV` gating).
+   */
+  const recordRelaySocketEvent = useCallback((event: RelaySocketEvent) => {
+    if (!import.meta.env.DEV) return;
+    appendRelayHistoryEntry(event);
+  }, []);
+
   const startLiveRelayPump = useCallback(
     async (runtime: RuntimeClient, relayUrls: string[]) => {
       const relays = Array.from(
@@ -267,6 +342,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         relays,
         onRelayStatusChange: setRuntimeRelays,
         onDrains: absorbDrains,
+        onSocketEvent: recordRelaySocketEvent,
       });
       relayPumpRef.current = pump;
       setRuntimeRelays(pump.relayStatuses());
@@ -1662,11 +1738,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (signerPaused) {
-      setRuntimeStatus(runtime.runtimeStatus());
+      applyRuntimeStatus(runtime.runtimeStatus());
       return;
     }
     if (!signerPaused && simulatorRef.current) {
-      setRuntimeStatus(simulatorRef.current.pump(3));
+      applyRuntimeStatus(simulatorRef.current.pump(3));
       return;
     }
     if (!signerPaused && relayPumpRef.current) {
@@ -1675,7 +1751,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // failures will flow into the slices on this tick.
       void relayPumpRef.current.refreshAll().then((status) => {
         if (runtimeRef.current === runtime) {
-          setRuntimeStatus(status);
+          applyRuntimeStatus(status);
         }
       });
       return;
@@ -1690,8 +1766,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       events: runtime.drainRuntimeEvents(),
     };
     absorbDrains(drains);
-    setRuntimeStatus(runtime.runtimeStatus());
-  }, [absorbDrains, signerPaused]);
+    applyRuntimeStatus(runtime.runtimeStatus());
+  }, [absorbDrains, applyRuntimeStatus, signerPaused]);
 
   useEffect(() => {
     // When the provider was hydrated from the demo bridge there is no real
@@ -1713,13 +1789,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     // completions that accumulated while hidden (within 3s of visible). When
     // the browser re-fires visibilitychange with `visible`, force an extra
     // refresh tick so any drained completions immediately populate state.
+    //
+    // Dev-only side effect: append every transition to
+    // `window.__debug.visibilityHistory` so validators can observe
+    // tab-hide/show evidence without relying on the headless runtime
+    // re-emitting the DOM event (VAL-OPS-021).
     function onVisibility() {
       if (typeof document === "undefined") return;
-      if (document.visibilityState === "visible" && runtimeRef.current) {
+      const nextState = document.visibilityState;
+      appendVisibilityEntry(nextState);
+      if (nextState === "visible" && runtimeRef.current) {
         refreshRuntime();
       }
     }
     if (typeof document === "undefined") return;
+    // Seed with the initial state so the first entry is always present.
+    appendVisibilityEntry(document.visibilityState);
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [refreshRuntime]);
@@ -1890,6 +1975,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return;
     const globalWindow = window as typeof window & {
       __appState?: AppStateValue;
+      __debug?: TestObservabilityDebugSurface;
       __iglooTestSeedRuntime?: (input: {
         group: GroupPackageWire;
         share: SharePackageWire;
@@ -1901,8 +1987,52 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         group: GroupPackageWire,
         shareIdx: number,
       ) => string;
+      __iglooTestDropRelays?: (closeCode?: number) => void;
+      __iglooTestRestoreRelays?: () => Promise<void>;
+      __iglooTestSimulateNonceDepletion?: (input?: {
+        nonce_pool_size?: number;
+        nonce_pool_threshold?: number;
+        reason?: string;
+      }) => void;
+      __iglooTestRestoreNonce?: () => void;
     };
     globalWindow.__appState = value;
+    // Initialise the dev-only `__debug` surface once per provider mount.
+    // `relayHistory` / `visibilityHistory` are populated by the appender
+    // helpers (which no-op in non-DEV). `noncePoolSnapshot` uses a live
+    // getter so `window.__debug.noncePoolSnapshot` reflects the current
+    // runtime snapshot on each read (no stale values).
+    const debugSurface: TestObservabilityDebugSurface = {
+      relayHistory: getRelayHistoryArray(),
+      visibilityHistory: getVisibilityHistoryArray(),
+      get noncePoolSnapshot(): NoncePoolSnapshot | null {
+        const override = nonceOverrideRef.current;
+        if (override) {
+          return {
+            nonce_pool_size: override.nonce_pool_size,
+            nonce_pool_threshold: override.nonce_pool_threshold,
+          };
+        }
+        const runtime = runtimeRef.current;
+        if (!runtime) return null;
+        try {
+          const snapshot = runtime.snapshot();
+          const peers = snapshot.state.nonce_pool.peers;
+          const size = peers.reduce(
+            (total, peer) => total + peer.outgoing_available,
+            0,
+          );
+          const threshold = snapshot.status.known_peers;
+          return {
+            nonce_pool_size: size,
+            nonce_pool_threshold: threshold,
+          };
+        } catch {
+          return null;
+        }
+      },
+    };
+    globalWindow.__debug = debugSurface;
     globalWindow.__iglooTestSeedRuntime = async (input) => {
       const payload: BfProfilePayload = {
         profile_id: `igloo-test-${input.share.idx}`,
@@ -1927,12 +2057,46 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       return memberPubkeyXOnly(member);
     };
+    // Forcibly close every live relay socket with a simulated close code
+    // (default 1006 "abnormal closure"). Does NOT synchronously mutate
+    // `sign_ready` — the existing TTL-driven failure path on any in-flight
+    // pending op must still surface as a timeout via drainFailures
+    // (VAL-OPS-016).
+    globalWindow.__iglooTestDropRelays = (closeCode = 1006) => {
+      relayPumpRef.current?.simulateDropAll(closeCode);
+    };
+    // Restore the previously-dropped relays. Each successful reconnect
+    // increments that relay's `reconnectCount`.
+    globalWindow.__iglooTestRestoreRelays = async () => {
+      await relayPumpRef.current?.simulateRestoreAll();
+    };
+    // Push a synthetic nonce-depletion signal so the `Syncing nonces` /
+    // `Trigger Sync` overlay (VAL-OPS-024) renders end-to-end without the
+    // runtime actually reaching that state.
+    globalWindow.__iglooTestSimulateNonceDepletion = (input) => {
+      nonceOverrideRef.current = {
+        nonce_pool_size: input?.nonce_pool_size ?? 0,
+        nonce_pool_threshold: input?.nonce_pool_threshold ?? 2,
+        reason: input?.reason ?? "nonce_pool_depleted",
+      };
+      if (runtimeRef.current) {
+        applyRuntimeStatus(runtimeRef.current.runtimeStatus());
+      }
+    };
+    // Clear the simulated depletion. Forces an immediate refresh so the
+    // overlay disappears without waiting for the next 2.5 s poll tick.
+    globalWindow.__iglooTestRestoreNonce = () => {
+      nonceOverrideRef.current = null;
+      if (runtimeRef.current) {
+        applyRuntimeStatus(runtimeRef.current.runtimeStatus());
+      }
+    };
     return () => {
       if (globalWindow.__appState === value) {
         delete globalWindow.__appState;
       }
     };
-  }, [value, startRuntimeFromPayload]);
+  }, [value, startRuntimeFromPayload, applyRuntimeStatus]);
 
   return (
     <AppStateContext.Provider value={value}>
@@ -2002,3 +2166,110 @@ function pendingOpTypeFor(cmd: RuntimeCommand): string | null {
 
 const HANDLE_COMMAND_DEBOUNCE_MS = 300;
 export const HANDLE_COMMAND_DEBOUNCE_WINDOW_MS = HANDLE_COMMAND_DEBOUNCE_MS;
+
+/* -------------------------------------------------------------------------- */
+/* Dev-only test-observability helpers                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Single entry in `window.__debug.relayHistory` — one per relay-socket
+ * lifecycle event (open/close/error). Intentionally flat/serialisable so
+ * agent-browser can `JSON.stringify` it from a `page.evaluate`.
+ */
+export interface RelayHistoryEntry {
+  type: "open" | "close" | "error";
+  url: string;
+  at: string;
+  /** Close code if known (1000 / 1001 / 1006 / 1011 / …), `null` otherwise. */
+  code?: number | null;
+  wasClean?: boolean;
+}
+
+/**
+ * Single entry in `window.__debug.visibilityHistory` — one per
+ * `visibilitychange` transition. Seeded on mount with the initial state so
+ * validators always see at least one entry.
+ */
+export interface VisibilityHistoryEntry {
+  state: "visible" | "hidden";
+  at: string;
+}
+
+/**
+ * Shape of the dev-only `window.__debug` surface. Not shipped to
+ * production (the installer effect is gated on `import.meta.env.DEV`).
+ */
+export interface TestObservabilityDebugSurface {
+  relayHistory: RelayHistoryEntry[];
+  visibilityHistory: VisibilityHistoryEntry[];
+  readonly noncePoolSnapshot: NoncePoolSnapshot | null;
+}
+
+// Capacity of the ring buffers. Large enough for a multi-minute agent-browser
+// scenario that reconnects a few relays and flips visibility several times;
+// small enough that a misbehaving page can't exhaust memory.
+const RELAY_HISTORY_MAX = 200;
+const VISIBILITY_HISTORY_MAX = 200;
+
+/**
+ * Module-scoped arrays holding the buffers. We export getters (not the
+ * arrays directly) so the dev-only installer effect can hand out a stable
+ * reference — in-place mutation inside the appenders is visible to
+ * consumers who cached `window.__debug.relayHistory`.
+ */
+const relayHistoryBuffer: RelayHistoryEntry[] = [];
+const visibilityHistoryBuffer: VisibilityHistoryEntry[] = [];
+
+function getRelayHistoryArray(): RelayHistoryEntry[] {
+  return relayHistoryBuffer;
+}
+
+function getVisibilityHistoryArray(): VisibilityHistoryEntry[] {
+  return visibilityHistoryBuffer;
+}
+
+function appendRelayHistoryEntry(event: RelaySocketEvent): void {
+  const iso = new Date(event.at).toISOString();
+  let entry: RelayHistoryEntry;
+  if (event.type === "close") {
+    entry = {
+      type: "close",
+      url: event.url,
+      at: iso,
+      code: event.code,
+      wasClean: event.wasClean,
+    };
+  } else {
+    entry = { type: event.type, url: event.url, at: iso };
+  }
+  relayHistoryBuffer.push(entry);
+  if (relayHistoryBuffer.length > RELAY_HISTORY_MAX) {
+    relayHistoryBuffer.splice(0, relayHistoryBuffer.length - RELAY_HISTORY_MAX);
+  }
+}
+
+function appendVisibilityEntry(state: DocumentVisibilityState): void {
+  if (!import.meta.env.DEV) return;
+  // Only `"visible"` and `"hidden"` are first-class states we surface to
+  // validators. `"prerender"` is transient and uninteresting for this
+  // signal — coerce it to `"hidden"` so the array stays homogeneous.
+  const normalised: "visible" | "hidden" =
+    state === "visible" ? "visible" : "hidden";
+  const entry: VisibilityHistoryEntry = {
+    state: normalised,
+    at: new Date().toISOString(),
+  };
+  // De-dupe consecutive identical transitions so idle ticks don't spam the
+  // buffer — validators care about *change* events.
+  const last = visibilityHistoryBuffer[visibilityHistoryBuffer.length - 1];
+  if (last && last.state === normalised) {
+    return;
+  }
+  visibilityHistoryBuffer.push(entry);
+  if (visibilityHistoryBuffer.length > VISIBILITY_HISTORY_MAX) {
+    visibilityHistoryBuffer.splice(
+      0,
+      visibilityHistoryBuffer.length - VISIBILITY_HISTORY_MAX,
+    );
+  }
+}

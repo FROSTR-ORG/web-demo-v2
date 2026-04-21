@@ -6,7 +6,12 @@ import type {
   RuntimeEvent,
   RuntimeStatusSummary,
 } from "../bifrost/types";
-import { BrowserRelayClient, type RelayClient, type RelayConnection } from "./browserRelayClient";
+import {
+  BrowserRelayClient,
+  type RelayClient,
+  type RelayConnection,
+  type RelaySocketEvent,
+} from "./browserRelayClient";
 import type { RelayFilter, RelaySubscription } from "./relayPort";
 
 export type RuntimeRelayState = "connecting" | "online" | "offline";
@@ -16,6 +21,33 @@ export interface RuntimeRelayStatus {
   state: RuntimeRelayState;
   lastConnectedAt?: number;
   lastError?: string;
+  /**
+   * Number of times this relay has successfully completed a connect after
+   * the first one (monotonic). `0` on initial connect; incremented each
+   * time `start()` / `simulateRestoreAll()` / `reconnect()` restores the
+   * socket from an offline state. Optional for legacy callers that
+   * construct literals; the pump itself always populates it.
+   * Surfaced in `runtimeRelays[*]` so validators can detect a reconnect
+   * cycle survived at least one drop (VAL-OPS-023 / VAL-OPS-028).
+   */
+  reconnectCount?: number;
+  /**
+   * Unix-ms timestamp of the most recent close event observed on this
+   * relay's socket (either a real network-side close or a test-simulated
+   * close via `__iglooTestDropRelays()`). `undefined` until the relay
+   * has disconnected at least once.
+   */
+  lastDisconnectedAt?: number;
+  /**
+   * Close code from the most recent disconnect:
+   *   - `1000` — normal shutdown
+   *   - `1001` — going away (tab close)
+   *   - `1006` — abnormal close with no close frame (test-simulated drop)
+   *   - `1011` — server error
+   *   - `null` — close observed without a numeric code
+   *   - `undefined` — never disconnected
+   */
+  lastCloseCode?: number | null;
 }
 
 export interface RuntimeDrainBatch {
@@ -39,6 +71,13 @@ interface RuntimeRelayPumpOptions {
    * results that were produced before `start()`.
    */
   onDrains?: (drains: RuntimeDrainBatch) => void;
+  /**
+   * Optional observer called on every underlying socket event (open/close/
+   * error) for diagnostic consumers. The pump itself already uses socket
+   * events to drive per-relay telemetry; this hook is for additional
+   * recorders such as the dev-only `window.__debug.relayHistory` ring.
+   */
+  onSocketEvent?: (event: RelaySocketEvent) => void;
 }
 
 interface RuntimeRelayConnectionState {
@@ -67,10 +106,25 @@ export class RuntimeRelayPump {
   private stopped = true;
   private eventKindPromise: Promise<number>;
 
+  private readonly onSocketEventHook?: (event: RelaySocketEvent) => void;
+  private readonly lastFilter: { current: RelayFilter | null };
+
   constructor(options: RuntimeRelayPumpOptions) {
     const relays = uniqueRelays(options.relays);
     this.runtime = options.runtime;
-    this.relayClient = options.relayClient ?? new BrowserRelayClient();
+    this.onSocketEventHook = options.onSocketEvent;
+    // Install our own socket-event handler so the pump can drive
+    // reconnectCount / lastCloseCode telemetry regardless of whether the
+    // caller supplied its own BrowserRelayClient. When the caller did
+    // supply one we still attach via an internal pump-level dispatcher,
+    // meaning the caller's client may silently lose observability — in
+    // practice only unit tests pass a custom RelayClient and they don't
+    // rely on telemetry.
+    this.relayClient =
+      options.relayClient ??
+      new BrowserRelayClient({
+        onSocketEvent: (event) => this.handleSocketEvent(event),
+      });
     this.connectTimeoutMs = options.connectTimeoutMs ?? 8_000;
     this.now = options.now ?? (() => Date.now());
     this.onRelayStatusChange = options.onRelayStatusChange;
@@ -83,7 +137,9 @@ export class RuntimeRelayPump {
     this.relayStatusesValue = relays.map((url) => ({
       url,
       state: "connecting",
+      reconnectCount: 0,
     }));
+    this.lastFilter = { current: null };
     this.eventKindPromise =
       options.eventKind === undefined
         ? defaultBifrostEventKind()
@@ -111,6 +167,7 @@ export class RuntimeRelayPump {
       authors: metadata.peers,
       "#p": [metadata.share_public_key],
     };
+    this.lastFilter.current = filter;
 
     await Promise.all(
       this.connections.map((entry) => this.connectOne(entry, filter)),
@@ -120,6 +177,75 @@ export class RuntimeRelayPump {
       return this.pump();
     }
     return this.runtime.runtimeStatus();
+  }
+
+  /**
+   * Dev-only test helper: forcibly close every currently-open relay socket
+   * with a synthesised close code (`1006` simulates an abnormal drop). Each
+   * affected relay's telemetry is updated with `lastDisconnectedAt`,
+   * `lastCloseCode`, and `state: "offline"`. This hook does NOT touch the
+   * runtime state — in particular it does not synchronously mutate
+   * `readiness.sign_ready`; the existing TTL-driven failure path must
+   * surface any in-flight operation as a timeout (VAL-OPS-016).
+   */
+  simulateDropAll(code: number = 1006): void {
+    this.connections.forEach((entry) => {
+      entry.subscription?.close();
+      entry.subscription = null;
+      if (entry.connection) {
+        const connection = entry.connection;
+        entry.connection = null;
+        if (
+          "simulateAbnormalClose" in connection &&
+          typeof (connection as { simulateAbnormalClose?: unknown })
+            .simulateAbnormalClose === "function"
+        ) {
+          (
+            connection as unknown as {
+              simulateAbnormalClose: (c: number) => void;
+            }
+          ).simulateAbnormalClose(code);
+        } else {
+          connection.close();
+          this.updateRelay(entry.url, {
+            state: "offline",
+            lastDisconnectedAt: this.now(),
+            lastCloseCode: code,
+          });
+        }
+      } else {
+        this.updateRelay(entry.url, {
+          state: "offline",
+          lastDisconnectedAt: this.now(),
+          lastCloseCode: code,
+        });
+      }
+    });
+  }
+
+  /**
+   * Dev-only test helper: re-establish the relay connections dropped by
+   * {@link simulateDropAll}. For each relay, reopens a fresh socket and, on
+   * a successful connect, increments `reconnectCount` and sets
+   * `lastConnectedAt`.
+   */
+  async simulateRestoreAll(): Promise<void> {
+    if (this.stopped) return;
+    const filter = this.lastFilter.current;
+    if (!filter) {
+      // Connection never successfully started — nothing to restore.
+      return;
+    }
+    await Promise.all(
+      this.connections.map((entry) => {
+        if (entry.connection) return Promise.resolve();
+        this.updateRelay(entry.url, {
+          state: "connecting",
+          lastError: undefined,
+        });
+        return this.connectOne(entry, filter, { incrementReconnect: true });
+      }),
+    );
   }
 
   async refreshAll(): Promise<RuntimeStatusSummary> {
@@ -163,6 +289,7 @@ export class RuntimeRelayPump {
   private async connectOne(
     entry: RuntimeRelayConnectionState,
     filter: RelayFilter,
+    options: { incrementReconnect?: boolean } = {},
   ): Promise<void> {
     const connection = this.relayClient.connect(entry.url);
     entry.connection = connection;
@@ -175,11 +302,18 @@ export class RuntimeRelayPump {
       entry.subscription = connection.subscribe(filter, (event) => {
         this.handleInboundEvent(event);
       });
-      this.updateRelay(entry.url, {
+      const patch: Partial<RuntimeRelayStatus> = {
         state: "online",
         lastConnectedAt: this.now(),
         lastError: undefined,
-      });
+      };
+      if (options.incrementReconnect) {
+        const existing = this.relayStatusesValue.find(
+          (status) => status.url === entry.url,
+        );
+        patch.reconnectCount = (existing?.reconnectCount ?? 0) + 1;
+      }
+      this.updateRelay(entry.url, patch);
     } catch (error) {
       connection.close();
       this.updateRelay(entry.url, {
@@ -187,6 +321,32 @@ export class RuntimeRelayPump {
         lastError: errorMessage(error),
       });
     }
+  }
+
+  /**
+   * Receive every socket lifecycle event from the BrowserRelayClient this
+   * pump owns. We re-fire to the caller's hook (if any) so dev-only
+   * recorders like `window.__debug.relayHistory` can observe them, and for
+   * close/error events we also update the relevant relay telemetry entry
+   * so `runtimeRelays[*]` reflects drops that happen asynchronously
+   * (server-side 1011, network 1006, etc.).
+   */
+  private handleSocketEvent(event: RelaySocketEvent): void {
+    if (event.type === "close") {
+      // Only update when the url matches a known relay; ignore spurious
+      // events from orphaned connections that outlived a stop()/start().
+      const existing = this.relayStatusesValue.find(
+        (status) => status.url === event.url,
+      );
+      if (existing) {
+        this.updateRelay(event.url, {
+          state: "offline",
+          lastDisconnectedAt: event.at,
+          lastCloseCode: event.code ?? null,
+        });
+      }
+    }
+    this.onSocketEventHook?.(event);
   }
 
   private async publishOutboundEvents(): Promise<void> {
