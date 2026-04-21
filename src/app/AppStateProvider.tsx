@@ -1627,9 +1627,38 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setRuntimeStatus(simulatorRef.current.pump(3));
         return;
       }
+      // VAL-OPS-017: synchronously tick the runtime and re-emit a fresh
+      // `runtime_status` snapshot so the UI's sign/ECDH/ping dispatch gate
+      // sees the refreshed `sign_ready` / `ecdh_ready` state within one
+      // runtime tick of the resume click. Without this, the live-relay
+      // path relies solely on the async `restartRuntimeConnections()`
+      // pipeline (reconnect → refresh_all_peers → pump) before any fresh
+      // status reaches React state, which can take hundreds of
+      // milliseconds or more — well beyond the "within 1 runtime_status
+      // tick" contract. The re-emitted snapshot reflects underlying
+      // readiness inputs (peers online, nonce pool, policy) so sign_ready
+      // recovers naturally; if inputs still block, sign_ready stays
+      // false but for a non-paused degraded_reason (no stale paused
+      // reason leaks into degraded_reasons).
+      const runtime = runtimeRef.current;
+      if (runtime) {
+        try {
+          runtime.tick(Date.now());
+        } catch {
+          // Runtime mid-teardown is handled by the async restart below;
+          // re-emitting whatever snapshot the runtime can produce is
+          // preferable to leaving React state on a paused-side snapshot.
+        }
+        try {
+          applyRuntimeStatus(runtime.runtimeStatus());
+        } catch {
+          // Same as above — tolerate a transient read error here and
+          // let the async restart surface the next snapshot.
+        }
+      }
       void restartRuntimeConnections();
     }
-  }, [restartRuntimeConnections, stopRelayPump]);
+  }, [applyRuntimeStatus, restartRuntimeConnections, stopRelayPump]);
 
   /**
    * Forward a runtime command (sign / ecdh / ping / refresh / onboard) to the
