@@ -1243,6 +1243,59 @@ a {
   border-color: rgba(71, 85, 105, 0.3);
 }
 
+/*
+ * Peer Policies tri-state chip (m3-peer-policy-chip-cycle,
+ * VAL-POLICIES-008 / -021 / -026). Built on top of `.permission-badge`
+ * so it inherits the existing size / font / tone palette — only the
+ * interactive affordances (cursor, focus ring) and the explicit
+ * `deny` visual are chip-specific.
+ */
+button.peer-policy-chip {
+  cursor: pointer;
+  font: inherit;
+  /*
+   * Reset the native <button> background/border so the
+   * `.permission-badge.<tone>` rules above still drive the chip's
+   * colour — without this, browsers paint a grey button chrome on top
+   * of the tone background and the chip looks washed out.
+   */
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+  transition:
+    background-color 80ms ease,
+    border-color 80ms ease,
+    box-shadow 80ms ease;
+}
+button.peer-policy-chip:focus-visible {
+  box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.85);
+}
+/*
+ * Explicit-deny state: keep the muted background cue but add a red
+ * border + strikethrough so the visual is distinct from the neutral
+ * "unset" muted state (which renders when there is no manual override
+ * and the effective policy is not allow).
+ */
+button.peer-policy-chip.deny {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.5);
+  text-decoration: line-through;
+}
+button.peer-policy-chip.deny:focus-visible {
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.85);
+}
+
+.peer-policy-chip-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  color: #f87171;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .package-card {
   display: flex;
   flex-direction: column;

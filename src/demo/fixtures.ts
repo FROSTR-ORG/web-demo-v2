@@ -339,6 +339,7 @@ export function createDemoAppState(
     resolvePeerDenial: async () => undefined,
     policyOverrides: [],
     removePolicyOverride: async () => undefined,
+    setPeerPolicyOverride: async () => undefined,
     handleRuntimeCommand: createMockHandleRuntimeCommand(),
   };
 

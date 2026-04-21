@@ -814,6 +814,39 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   );
 
   /**
+   * Dispatch a single peer-policy override cell change to the live
+   * runtime. One `setPolicyOverride` call per invocation — including
+   * the "unset" transition from the Peer Policies chip cycle, which is
+   * expressed as `value: "unset"` so the scope stays on the targeted
+   * `(peer, direction, method)` triple (the global
+   * `clear_policy_overrides()` bridge call would reset every cell).
+   *
+   * The mutator does NOT manage optimistic UI or persist to the
+   * encrypted profile; the Peer Policies chip component owns the
+   * optimistic state and reconciles with the next
+   * `peer_permission_states` snapshot (VAL-POLICIES-008 /
+   * VAL-POLICIES-026). Rethrows the runtime error so the chip can roll
+   * back its optimistic change and surface an inline error.
+   */
+  const setPeerPolicyOverride = useCallback(
+    async (input: {
+      peer: string;
+      direction: "request" | "respond";
+      method: "sign" | "ecdh" | "ping" | "onboard";
+      value: "unset" | "allow" | "deny";
+    }): Promise<void> => {
+      const runtime = runtimeRef.current;
+      if (!runtime) {
+        throw new Error(
+          "Cannot dispatch policy override: no runtime is active.",
+        );
+      }
+      runtime.setPolicyOverride(input);
+    },
+    [],
+  );
+
+  /**
    * Apply the dev-only nonce-depletion override to a runtime_status snapshot
    * before it is committed to React state. When the override is active we:
    *   - push an `insufficient_signing_peers` entry tagged with
@@ -2944,6 +2977,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       resolvePeerDenial,
       policyOverrides,
       removePolicyOverride,
+      setPeerPolicyOverride,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,
@@ -3005,6 +3039,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       resolvePeerDenial,
       policyOverrides,
       removePolicyOverride,
+      setPeerPolicyOverride,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,

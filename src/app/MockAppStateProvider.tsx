@@ -192,6 +192,25 @@ export function MockAppStateProvider({
     [value],
   );
 
+  /**
+   * Forward Peer Policies chip dispatches to the caller-supplied
+   * implementation (tests seed a spy here). Mirrors the
+   * removePolicyOverride pattern: the parent observes the exact
+   * (peer, direction, method, value) args so component tests can
+   * assert one call per chip click (VAL-POLICIES-008).
+   */
+  const setPeerPolicyOverride = useCallback(
+    async (input: {
+      peer: string;
+      direction: "request" | "respond";
+      method: "sign" | "ecdh" | "ping" | "onboard";
+      value: "unset" | "allow" | "deny";
+    }) => {
+      await value.setPeerPolicyOverride(input);
+    },
+    [value],
+  );
+
   const createKeyset = useCallback(
     async (draft: CreateKeysetDraft) => {
       await value.createKeyset(draft);
@@ -625,6 +644,7 @@ export function MockAppStateProvider({
       resolvePeerDenial,
       policyOverrides,
       removePolicyOverride,
+      setPeerPolicyOverride,
       handleRuntimeCommand,
       createKeyset,
       createProfile,
@@ -684,6 +704,7 @@ export function MockAppStateProvider({
       resolvePeerDenial,
       policyOverrides,
       removePolicyOverride,
+      setPeerPolicyOverride,
       handleRuntimeCommand,
       createKeyset,
       createProfile,

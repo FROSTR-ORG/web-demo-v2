@@ -569,6 +569,33 @@ export interface AppStateValue {
     direction: "request" | "respond";
     method: "sign" | "ecdh" | "ping" | "onboard";
   }) => Promise<void>;
+  /**
+   * Set (or clear) a single cell of a peer's manual policy override —
+   * one dispatch per invocation. Powers the Peer Policies card's
+   * tri-state chip cycle (unset → allow → deny → unset). Contract:
+   *
+   *   - `value: "allow" | "deny"` → the runtime's
+   *      `set_policy_override({peer, direction, method, value})` is
+   *      dispatched exactly once.
+   *   - `value: "unset"`          → the runtime's
+   *      `set_policy_override({peer, direction, method, value: "unset"})`
+   *      is dispatched exactly once, clearing just this cell (the
+   *      runtime's `clear_policy_overrides()` would reset every cell,
+   *      so we scope the "clear" to the targeted (peer, direction,
+   *      method) triple by using `value: "unset"`). Surfaces the same
+   *      "clear this override" semantic described by VAL-POLICIES-008.
+   *
+   * Rejects if the runtime dispatch throws so the caller can roll back
+   * optimistic UI state (VAL-POLICIES-026). No optimistic mirroring
+   * happens inside the mutator — the chip owns its optimistic state and
+   * reconciles with the next `peer_permission_states` snapshot.
+   */
+  setPeerPolicyOverride: (input: {
+    peer: string;
+    direction: "request" | "respond";
+    method: "sign" | "ecdh" | "ping" | "onboard";
+    value: "unset" | "allow" | "deny";
+  }) => Promise<void>;
   reloadProfiles: () => Promise<void>;
   createKeyset: (draft: CreateKeysetDraft) => Promise<void>;
   createProfile: (draft: CreateProfileDraft) => Promise<string>;
