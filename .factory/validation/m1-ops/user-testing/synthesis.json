@@ -1,109 +1,54 @@
 {
   "milestone": "m1-ops",
-  "round": 1,
+  "round": 2,
   "status": "fail",
   "assertionsSummary": {
-    "total": 28,
-    "passed": 15,
-    "failed": 9,
-    "blocked": 4
+    "total": 13,
+    "passed": 10,
+    "failed": 2,
+    "blocked": 1
   },
   "passedAssertions": [
-    "VAL-OPS-001",
-    "VAL-OPS-003",
-    "VAL-OPS-005",
-    "VAL-OPS-008",
-    "VAL-OPS-009",
-    "VAL-OPS-010",
-    "VAL-OPS-011",
-    "VAL-OPS-012",
-    "VAL-OPS-014",
-    "VAL-OPS-018",
-    "VAL-OPS-019",
-    "VAL-OPS-020",
-    "VAL-OPS-022",
-    "VAL-OPS-026",
-    "VAL-OPS-027"
+    "VAL-OPS-002",
+    "VAL-OPS-004",
+    "VAL-OPS-006",
+    "VAL-OPS-007",
+    "VAL-OPS-013",
+    "VAL-OPS-015",
+    "VAL-OPS-016",
+    "VAL-OPS-017",
+    "VAL-OPS-021",
+    "VAL-OPS-023"
   ],
   "failedAssertions": [
     {
-      "id": "VAL-OPS-002",
-      "reason": "Sign command dispatch succeeds but a Sign row was not observable in runtime_status.pending_operations."
-    },
-    {
-      "id": "VAL-OPS-004",
-      "reason": "Completion is in AppState but required explicit sign-success UI feedback was not observed."
-    },
-    {
-      "id": "VAL-OPS-006",
-      "reason": "Peer-response ratio was not rendered in the modal for the observed real failure payload."
-    },
-    {
-      "id": "VAL-OPS-007",
-      "reason": "Retry path could not dispatch because failure request_id had no correlated message in signDispatchLog; Retry stayed disabled."
-    },
-    {
-      "id": "VAL-OPS-013",
-      "reason": "AppState completion slice updated, but completion-driven success UI feedback was not observable."
-    },
-    {
-      "id": "VAL-OPS-015",
-      "reason": "Non-sign failures were present and modal stayed closed, but no visible toast/row error indicator was found for those failures."
-    },
-    {
-      "id": "VAL-OPS-016",
-      "reason": "Unable to observe disconnect/timeout sign-failure transition for the offline-mid-sign path in this run."
-    },
-    {
-      "id": "VAL-OPS-017",
-      "reason": "Paused behavior correctly returned requestId=null for sign/ecdh/ping, but after resume controls stayed disabled (sign_ready=false) and sign command did not produce a dispatchable requestId."
+      "id": "VAL-OPS-024",
+      "reason": "DEV nonce-depletion hook updated snapshot state but did not surface the expected Syncing nonces/Trigger Sync overlay in this execution context."
     },
     {
       "id": "VAL-OPS-025",
-      "reason": "Tab order reached Refresh peers, Test Sign, and Test ECDH, but no dedicated Ping trigger was reachable and Enter activation did not create a pending op in this run."
+      "reason": "Ping and Refresh All remained disabled in this run, so full OPS keyboard reachability/activation contract was not met."
     }
   ],
   "blockedAssertions": [
     {
-      "id": "VAL-OPS-021",
-      "blockedBy": "Could not observe document.visibilityState hidden transition in headless agent-browser tab switching, so VAL-OPS-021 visibility evidence could not be conclusively collected."
-    },
-    {
-      "id": "VAL-OPS-023",
-      "blockedBy": "Reconnect + post-reconnect completion correlation could not be conclusively validated due missing websocket reconnect/frame observability in agent-browser and timeout outcome during reconnect attempt."
-    },
-    {
-      "id": "VAL-OPS-024",
-      "blockedBy": "Could not reproduce nonce-refill overlay state in this isolated single-session run; runtime snapshot did not expose nonce_pool_size for trend verification."
-    },
-    {
       "id": "VAL-OPS-028",
-      "blockedBy": "Pending-state cleanup behavior verified, but required WS close frame code evidence could not be observed with available tooling."
+      "blockedBy": "Pending cleanup was observed, but websocket close-frame evidence could not be captured after tab closure with available hooks/tooling."
     }
   ],
-  "appliedUpdates": [
-    {
-      "target": "user-testing.md",
-      "description": "Added Flow Validator Guidance for agent-browser isolation/evidence rules and recorded m1-ops tooling limitations for visibility and websocket frame capture.",
-      "source": "setup"
-    }
-  ],
+  "appliedUpdates": [],
   "flowReports": [
     {
-      "groupId": "g1-ui-gating",
-      "file": ".factory/validation/m1-ops/user-testing/flows/g1-ui-gating.json"
+      "groupId": "r2-g1-dispatch-success",
+      "file": ".factory/validation/m1-ops/user-testing/flows/r2-g1-dispatch-success.json"
     },
     {
-      "groupId": "g2-sign-lifecycle",
-      "file": ".factory/validation/m1-ops/user-testing/flows/g2-sign-lifecycle.json"
+      "groupId": "r2-g2-failure-paused",
+      "file": ".factory/validation/m1-ops/user-testing/flows/r2-g2-failure-paused.json"
     },
     {
-      "groupId": "g3-sign-failure-modal",
-      "file": ".factory/validation/m1-ops/user-testing/flows/g3-sign-failure-modal.json"
-    },
-    {
-      "groupId": "g4-ecdh-ping-resilience",
-      "file": ".factory/validation/m1-ops/user-testing/flows/g4-ecdh-ping-resilience.json"
+      "groupId": "r2-g3-resilience-keyboard",
+      "file": ".factory/validation/m1-ops/user-testing/flows/r2-g3-resilience-keyboard.json"
     }
   ],
   "toolsUsed": [
@@ -111,27 +56,12 @@
   ],
   "dedupedBlockers": [
     {
-      "description": "VAL-OPS-024 precondition (nonce-pool refill phase with observable pool trend) could not be reproduced in this single-session isolation run.",
+      "description": "Closed-tab websocket close telemetry is not recoverable after tab termination in this run; post-reopen debug history was empty.",
       "affectedAssertions": [
-        "VAL-OPS-024"
-      ],
-      "quickFixAttempted": "Seeded runtime via __iglooTestSeedRuntime and exercised degraded/connecting states; overlay and nonce_pool_size signal were still unavailable."
-    },
-    {
-      "description": "Could not collect required visibilityState hidden->visible evidence in this headless agent-browser execution.",
-      "affectedAssertions": [
-        "VAL-OPS-021"
-      ],
-      "quickFixAttempted": "Installed visibilitychange logger, backgrounded tab for >20s, and rechecked log; only 'visible' was recorded."
-    },
-    {
-      "description": "Could not obtain websocket reconnect/close frame-level telemetry (request/frame/close-code) from agent-browser network output.",
-      "affectedAssertions": [
-        "VAL-OPS-023",
         "VAL-OPS-028"
       ],
-      "quickFixAttempted": "Used set offline on/off, runtime relay state checks, network request capture, and post-reopen pending-state validation; frame-level evidence still unavailable."
+      "quickFixAttempted": "Captured pre-close relay state, performed tab-close + reopen cycle, and inspected post-reopen __debug.relayHistory/runtimeRelays; close-frame code still unavailable."
     }
   ],
-  "previousRound": null
+  "previousRound": ".factory/validation/m1-ops/user-testing/synthesis.round1.json"
 }

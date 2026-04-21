@@ -1,0 +1,150 @@
+{
+  "groupId": "r2-g2-failure-paused",
+  "testedAt": "2026-04-21T13:23:00Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "relayUrl": "ws://127.0.0.1:8194",
+    "agentBrowserSession": "r2-g2-failure-paused",
+    "tabsUsed": 2
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-OPS-006",
+      "title": "Multi-device sign failure drives SigningFailedModal with real data",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Seeded paired runtimes via DEV hooks (tab A share[1], tab B share[2]), dispatched sign from tab A with tab B non-responding",
+          "expected": "SigningFailedModal opens from real OperationFailure with round id, peer-response line, and error; no hard-coded placeholders",
+          "observed": "Modal opened with failure request_id 978a4a3e57f85eaeee9b884d0550c957; text rendered Round r-978a4a3e, Code timeout, Error locked peer response timeout, Peer responses: not reported by runtime; placeholders r-0x4f2a / 1/2 / insufficient partial signatures were absent"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r2-g2-failure-paused/VAL-OPS-006-007-modal-before-retry.png"
+        ],
+        "observables": [
+          "m1-ops/r2-g2-failure-paused/VAL-OPS-006-before-retry-observable.json",
+          "m1-ops/r2-g2-failure-paused/06-sign-dispatch-state.json"
+        ],
+        "consoleErrors": "m1-ops/r2-g2-failure-paused/VAL-OPS-006-console-errors.txt",
+        "network": "m1-ops/r2-g2-failure-paused/VAL-OPS-006-network.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-007",
+      "title": "Retry in SigningFailedModal re-dispatches the sign",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Clicked Retry on the opened SigningFailedModal",
+          "expected": "Retry dispatches sign with same message_hex_32, creates fresh request_id/pending sign, and closes stale modal",
+          "observed": "Modal closed; old failure request_id remained 978a4a3e57f85eaeee9b884d0550c957; new sign request_id 0a5bdfa924f50d5707d59e7bbbb33991 appeared in pending_operations and pendingDispatchIndex with the same message_hex_32"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r2-g2-failure-paused/VAL-OPS-006-007-modal-before-retry.png",
+          "m1-ops/r2-g2-failure-paused/VAL-OPS-007-after-retry.png"
+        ],
+        "observables": [
+          "m1-ops/r2-g2-failure-paused/VAL-OPS-007-after-retry-observable.json"
+        ],
+        "consoleErrors": "m1-ops/r2-g2-failure-paused/VAL-OPS-007-console-errors.txt",
+        "network": "m1-ops/r2-g2-failure-paused/VAL-OPS-007-network.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-015",
+      "title": "Non-sign failures do NOT open the SigningFailedModal",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Observed runtime ping timeout failures after retry flow",
+          "expected": "Non-sign failures surface as non-modal feedback and do not mount SigningFailedModal",
+          "observed": "runtimeFailures contained ping timeout entries (op_type=ping); SigningFailedModal remained unmounted; non-sign failure banner stack rendered visible ping failure notices"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r2-g2-failure-paused/VAL-OPS-015-non-modal-feedback.png"
+        ],
+        "observables": [
+          "m1-ops/r2-g2-failure-paused/VAL-OPS-015-observable.json"
+        ],
+        "consoleErrors": "m1-ops/r2-g2-failure-paused/VAL-OPS-015-console-errors.txt",
+        "network": "m1-ops/r2-g2-failure-paused/VAL-OPS-015-network.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-017",
+      "title": "Signer-paused state rejects operation dispatch",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Paused signer from dashboard (Stop Signer / Start Signer state) and inspected dev controls",
+          "expected": "signerPaused=true blocks sign/ECDH/ping dispatch from dev surface",
+          "observed": "Paused UI showed Start Signer with Test Sign/Test ECDH/Ping disabled; paused dispatch attempts for sign/ecdh/ping returned requestId null with zero pending delta and zero sign pending entries"
+        },
+        {
+          "action": "Resumed signer and dispatched Test Sign",
+          "expected": "After resume, dispatch capability returns",
+          "observed": "After resume signerPaused=false; Test Sign produced request_id d54949c1cb18f0bfc04094f7b032f608 and a fresh pending Sign operation"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r2-g2-failure-paused/VAL-OPS-017-paused-ui.png",
+          "m1-ops/r2-g2-failure-paused/VAL-OPS-017-resumed-ui.png"
+        ],
+        "observables": [
+          "m1-ops/r2-g2-failure-paused/VAL-OPS-017-paused-observable.json",
+          "m1-ops/r2-g2-failure-paused/VAL-OPS-017-paused-dispatch-attempts.json",
+          "m1-ops/r2-g2-failure-paused/VAL-OPS-017-resume-dispatch-observable.json"
+        ],
+        "consoleErrors": "m1-ops/r2-g2-failure-paused/VAL-OPS-017-console-errors.txt",
+        "network": "m1-ops/r2-g2-failure-paused/VAL-OPS-017-network.txt"
+      },
+      "issues": null
+    }
+  ],
+  "summary": {
+    "total": 4,
+    "pass": 4,
+    "fail": 0,
+    "blocked": 0,
+    "skipped": 0
+  },
+  "frictions": [
+    {
+      "description": "Single-tab seeded runtime did not produce sign request_id (requestId null with only Ping pending entries), preventing direct failure/retry validation.",
+      "resolved": true,
+      "resolution": "Used DEV hooks to seed a paired second tab in the same isolated session with a shared keyset bundle; assertions were then validated from tab A.",
+      "affectedAssertions": [
+        "VAL-OPS-006",
+        "VAL-OPS-007",
+        "VAL-OPS-015",
+        "VAL-OPS-017"
+      ]
+    },
+    {
+      "description": "agent-browser network capture returned 'No requests captured' for this surface.",
+      "resolved": true,
+      "resolution": "Captured app-state observables (runtimeFailures, pendingDispatchIndex, pending_operations) and screenshots as primary evidence.",
+      "affectedAssertions": [
+        "VAL-OPS-006",
+        "VAL-OPS-007",
+        "VAL-OPS-015",
+        "VAL-OPS-017"
+      ]
+    }
+  ],
+  "blockers": []
+}

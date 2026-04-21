@@ -436,13 +436,38 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (!degraded.includes(injectedReason)) {
         degraded.push(injectedReason);
       }
+      // Nonce depletion is, by definition, a post-peer-refresh condition:
+      // the runtime can't deplete a nonce pool it has never exchanged.
+      // `deriveDashboardState` returns `"connecting"` (NOT
+      // `"signing-blocked"`) whenever no peer refresh has completed yet —
+      // driven by `hasCompletedPeerRefresh`, which inspects
+      // `readiness.last_refresh_at` and per-peer `last_seen`. Without this
+      // augmentation the dev-only simulate hook would render the overlay
+      // only when the caller's runtime had already completed a peer
+      // refresh, which is not observable in most single-device validator
+      // scenarios. Synthesise a `last_refresh_at` and backfill at least
+      // one peer's `last_seen` so the check passes and the dashboard
+      // transitions through to `"signing-blocked"` and renders the
+      // `SigningBlockedState` overlay (VAL-OPS-024).
+      const refreshTs =
+        status.readiness.last_refresh_at ?? Math.floor(Date.now() / 1000);
+      const peers =
+        Array.isArray(status.peers) && status.peers.length > 0
+          ? status.peers.map((peer, idx) =>
+              idx === 0 && peer.last_seen == null
+                ? { ...peer, last_seen: refreshTs }
+                : peer,
+            )
+          : status.peers;
       return {
         ...status,
         readiness: {
           ...status.readiness,
           sign_ready: false,
           degraded_reasons: degraded,
+          last_refresh_at: refreshTs,
         },
+        peers,
       };
     },
     [],
@@ -531,11 +556,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setRuntimeRelays(pump.relayStatuses());
       const status = await pump.start();
       if (relayPumpRef.current === pump) {
-        setRuntimeStatus(status);
+        // Route through `augmentStatus` so any active dev-only nonce-depletion
+        // override (VAL-OPS-024) survives the initial pump.start() snapshot.
+        // In non-DEV or when the override ref is null, `augmentStatus` is
+        // an identity function, so this wrap is zero-cost in production.
+        setRuntimeStatus(augmentStatus(status));
       }
       return status;
     },
-    [absorbDrains, resetDrainSlices, stopRelayPump],
+    [absorbDrains, augmentStatus, resetDrainSlices, stopRelayPump],
   );
 
   const setRuntime = useCallback(
@@ -558,7 +587,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         simulator.setOnDrains(absorbDrains);
       }
       resetDrainSlices();
-      setRuntimeStatus(runtime.runtimeStatus());
+      // Route through `augmentStatus` so any active dev-only nonce-depletion
+      // override is preserved across re-attachments (VAL-OPS-024).
+      setRuntimeStatus(augmentStatus(runtime.runtimeStatus()));
       if (relayUrls?.length && !simulator) {
         void startLiveRelayPump(runtime, relayUrls).catch((error) => {
           setRuntimeRelays(
@@ -580,7 +611,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // runtime is now backing `runtimeRef`.
       setBridgeHydrated(false);
     },
-    [absorbDrains, resetDrainSlices, startLiveRelayPump, stopRelayPump],
+    [absorbDrains, augmentStatus, resetDrainSlices, startLiveRelayPump, stopRelayPump],
   );
 
   const startRuntimeFromPayload = useCallback(
@@ -747,7 +778,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       simulator.start();
       simulator.refreshAll();
       setRuntime(runtime, simulator);
-      setRuntimeStatus(simulator.pump(4));
+      // Preserve any active dev-only nonce-depletion override (VAL-OPS-024).
+      setRuntimeStatus(augmentStatus(simulator.pump(4)));
       setActiveProfile(record.summary);
       setSignerPausedState(false);
       setCreateSession({
@@ -759,7 +791,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
       return profileId;
     },
-    [createSession, reloadProfiles, setRuntime],
+    [augmentStatus, createSession, reloadProfiles, setRuntime],
   );
 
   const updatePackageState = useCallback(
@@ -1770,7 +1802,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (simulatorRef.current) {
       simulatorRef.current.start();
       simulatorRef.current.refreshAll();
-      setRuntimeStatus(simulatorRef.current.pump(3));
+      // Preserve any active dev-only nonce-depletion override (VAL-OPS-024).
+      setRuntimeStatus(augmentStatus(simulatorRef.current.pump(3)));
       return;
     }
     const relays = liveRelayUrlsRef.current.length
@@ -1780,10 +1813,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (relayPumpRef.current) {
       const status = await relayPumpRef.current.refreshAll();
       if (runtimeRef.current === runtime) {
-        setRuntimeStatus(status);
+        // Preserve any active dev-only nonce-depletion override (VAL-OPS-024).
+        setRuntimeStatus(augmentStatus(status));
       }
     }
-  }, [activeProfile, startLiveRelayPump]);
+  }, [activeProfile, augmentStatus, startLiveRelayPump]);
 
   // Keep pendingDispatchIndexRef in lock-step with state so callbacks
   // that read the latest index (absorbDrains, correlation helper) can do
@@ -1848,7 +1882,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (simulatorRef.current) {
         simulatorRef.current.start();
         simulatorRef.current.refreshAll();
-        setRuntimeStatus(simulatorRef.current.pump(3));
+        // Preserve any active dev-only nonce-depletion override (VAL-OPS-024).
+        setRuntimeStatus(augmentStatus(simulatorRef.current.pump(3)));
         return;
       }
       // VAL-OPS-017: synchronously tick the runtime and re-emit a fresh
@@ -1882,7 +1917,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       void restartRuntimeConnections();
     }
-  }, [applyRuntimeStatus, restartRuntimeConnections, stopRelayPump]);
+  }, [applyRuntimeStatus, augmentStatus, restartRuntimeConnections, stopRelayPump]);
 
   /**
    * Forward a runtime command (sign / ecdh / ping / refresh / onboard) to the
@@ -1981,7 +2016,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             break;
           }
         }
-        setRuntimeStatus(statusAfter);
+        // Preserve any active dev-only nonce-depletion override so the
+        // `Syncing nonces` / `Trigger Sync` overlay does not get wiped
+        // by a command dispatched between simulate() and restore()
+        // (VAL-OPS-024). `augmentStatus` is identity when the override
+        // ref is null, so production paths are unaffected.
+        setRuntimeStatus(augmentStatus(statusAfter));
       } catch {
         requestId = null;
       }
@@ -2072,7 +2112,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       return { requestId, debounced: false };
     },
-    [correlatePendingOperations],
+    [augmentStatus, correlatePendingOperations],
   );
 
   const refreshRuntime = useCallback(() => {
