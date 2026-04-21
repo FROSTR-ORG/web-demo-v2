@@ -124,7 +124,12 @@ describe("Dashboard runtime-state fidelity", () => {
       expect(screen.getByText("2/2 sign ready")).toBeInTheDocument();
       expect(screen.getByText("Avg: --")).toBeInTheDocument();
       expect(screen.queryByText("Event Log")).not.toBeInTheDocument();
-      expect(screen.queryByText("Pending Approvals")).not.toBeInTheDocument();
+      // Pending Approvals panel is always rendered in runtime mode
+      // (m2-pending-approvals-panel); with no pending_operations it
+      // renders the empty state. The legacy "Pending Operations"
+      // fallback block has been removed.
+      expect(screen.getByText("Pending Approvals")).toBeInTheDocument();
+      expect(screen.getByText("0 pending")).toBeInTheDocument();
       expect(screen.queryByText("Pending Operations")).not.toBeInTheDocument();
     });
 
@@ -134,7 +139,11 @@ describe("Dashboard runtime-state fidelity", () => {
       expect(screen.getByText("2/2 sign ready")).toBeInTheDocument();
       expect(screen.getByText("Avg: --")).toBeInTheDocument();
       expect(screen.queryByText("Event Log")).not.toBeInTheDocument();
-      expect(screen.queryByText("Pending Approvals")).not.toBeInTheDocument();
+      // Pending Approvals panel is rendered from runtime_status.pending_operations
+      // even when paperPanels=false — the empty state message is visible
+      // with zero pending ops.
+      expect(screen.getByText("Pending Approvals")).toBeInTheDocument();
+      expect(screen.getByText("0 pending")).toBeInTheDocument();
       expect(screen.queryByText("Pending Operations")).not.toBeInTheDocument();
     });
   });

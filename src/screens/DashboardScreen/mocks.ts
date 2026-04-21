@@ -24,13 +24,25 @@ export interface PolicyPromptRequest {
 
 export interface DashboardApprovalRow {
   id: string;
-  kind: "SIGN" | "ECDH";
+  kind: "SIGN" | "ECDH" | "PING" | "ONBOARD";
   peer: string;
   key: string;
   detail: string;
   ttl: string;
-  domain: string;
-  request: PolicyPromptRequest;
+  /**
+   * Optional: domain context for policy-prompt display. Populated in the
+   * Paper mock fixtures; absent for runtime-derived rows sourced from
+   * `runtime_status.pending_operations`.
+   */
+  domain?: string;
+  /**
+   * Optional: the policy-prompt payload to open when the row's Open
+   * button is clicked. Present only in Paper-mode fixtures. Runtime-
+   * derived rows never carry a request payload — per VAL-APPROVALS-018
+   * the policy prompt is a reactive denial surface, not opened from
+   * pending_operations additions.
+   */
+  request?: PolicyPromptRequest;
 }
 
 export interface DashboardRelayHealthRow {
@@ -229,7 +241,13 @@ export const MOCK_PENDING_APPROVAL_ROWS: DashboardApprovalRow[] = [
   },
 ];
 
-export const DEFAULT_POLICY_PROMPT_REQUEST = MOCK_PENDING_APPROVAL_ROWS[0].request;
+// The Paper fixture's first row always carries a `request` payload — the
+// non-null assertion is safe (the type is optional on
+// `DashboardApprovalRow` to allow runtime-derived rows to omit it) and
+// keeps downstream `DEFAULT_POLICY_PROMPT_REQUEST` consumers typed as
+// `PolicyPromptRequest` rather than `PolicyPromptRequest | undefined`.
+export const DEFAULT_POLICY_PROMPT_REQUEST: PolicyPromptRequest =
+  MOCK_PENDING_APPROVAL_ROWS[0].request!;
 
 export const MOCK_RELAY_HEALTH_ROWS: DashboardRelayHealthRow[] = [
   {
