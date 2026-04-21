@@ -44,25 +44,36 @@ afterEach(() => {
  * Unit tests — SigningFailedModal in isolation
  * ========================================================================= */
 describe("SigningFailedModal — unit", () => {
-  it("renders Paper-fidelity copy when no failure prop is supplied", () => {
+  it("renders a neutral fallback when no failure prop is supplied — no synthesized peer-response copy", () => {
     render(<SigningFailedModal onClose={() => undefined} />);
     expect(
       screen.getByRole("heading", { name: "Signing Failed" }),
     ).toBeInTheDocument();
-    // Paper copy visible as the safe demo fallback.
+    const codeText = screen.getByTestId("signing-failed-code-text");
+    // Neutral fallback must NOT fabricate a peer-response ratio or reuse
+    // any of the old Paper placeholders.
+    expect(codeText.textContent).not.toContain("no peers responded");
+    expect(codeText.textContent).not.toContain("Peers responded");
+    expect(codeText.textContent).not.toContain("1/2");
+    expect(codeText.textContent).not.toContain("r-0x4f2a");
+    expect(codeText.textContent).not.toContain(
+      "insufficient partial signatures",
+    );
+    // Description must not reference the hard-coded "3 retry attempts"
+    // string from the old Paper fallback either.
     expect(
-      screen.getByText(
+      screen.queryByText(
         "Unable to complete signature for event kind:1. All 3 retry attempts exhausted.",
       ),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
+    // Description and summary both signal the neutral data-gap copy.
     expect(
-      screen.getByText(
-        "Round: r-0x4f2a · Peers responded: 1/2 · Error: insufficient partial signatures",
-      ),
+      screen.getByText(/failure details are unavailable/i),
     ).toBeInTheDocument();
+    expect(codeText.textContent).toMatch(/failure details unavailable/i);
   });
 
-  it("renders the real failure payload — round id, peers, and error — not the Paper placeholders", () => {
+  it("renders the real failure payload fields verbatim — request_id, code, message — without any synthesized peer-response ratio", () => {
     const failure: OperationFailure = {
       request_id: "d4f2a7be-91c3-4f5b",
       op_type: "sign",
@@ -78,19 +89,59 @@ describe("SigningFailedModal — unit", () => {
       />,
     );
     const codeText = screen.getByTestId("signing-failed-code-text");
+    // Round = first 8 chars of the runtime's real request_id.
     expect(codeText.textContent).toContain("Round: r-d4f2a7be");
-    expect(codeText.textContent).toContain("no peers responded");
-    // Must not render any of the hard-coded Paper placeholders.
+    // Runtime-provided code surfaced verbatim.
+    expect(codeText.textContent).toContain("Code: timeout");
+    // Runtime-provided message surfaced verbatim.
+    expect(codeText.textContent).toContain(
+      "Error: relay disconnect: websocket closed before threshold signatures arrived",
+    );
+    // Payload has no failed_peer, so the row must be omitted entirely —
+    // no fabricated "no peers responded" or "0/N" ratio of any kind.
+    expect(codeText.textContent).not.toContain("Peers responded");
+    expect(codeText.textContent).not.toContain("no peers responded");
+    expect(codeText.textContent).not.toContain("Failed peer");
+    // And none of the hard-coded Paper placeholders.
     expect(codeText.textContent).not.toContain("r-0x4f2a");
     expect(codeText.textContent).not.toContain("1/2");
     expect(codeText.textContent).not.toContain(
       "insufficient partial signatures",
     );
-    // And the error substring must include the runtime's timeout cause so
-    // VAL-OPS-016's relay-disconnect regex matches.
+    // The error substring still carries enough runtime context to satisfy
+    // VAL-OPS-016's relay-disconnect regex.
     expect(codeText.textContent).toMatch(
       /relay|websocket|disconnect|timeout/i,
     );
+  });
+
+  it("renders the real failed_peer short identifier when present — no synthesized ratio", () => {
+    const failure: OperationFailure = {
+      request_id: "abcdef12-9999-0000",
+      op_type: "sign",
+      code: "peer_rejected",
+      message: "peer rejected the sign request",
+      failed_peer: "b".repeat(64),
+    };
+    render(
+      <SigningFailedModal
+        failure={failure}
+        messageHex={"a".repeat(64)}
+        onClose={() => undefined}
+      />,
+    );
+    const codeText = screen.getByTestId("signing-failed-code-text");
+    expect(codeText.textContent).toContain("Round: r-abcdef12");
+    expect(codeText.textContent).toContain("Code: peer_rejected");
+    expect(codeText.textContent).toContain(
+      "Error: peer rejected the sign request",
+    );
+    // Short hex of failed_peer surfaced verbatim, no invented ratio.
+    expect(codeText.textContent).toContain("Failed peer:");
+    expect(codeText.textContent).toContain("bbbbbb...bbbb");
+    expect(codeText.textContent).not.toContain("no peers responded");
+    expect(codeText.textContent).not.toContain("Peers responded");
+    expect(codeText.textContent).not.toContain("1/2");
   });
 
   it("Retry button invokes onRetry when supplied and does NOT call onDismiss", () => {

@@ -199,10 +199,18 @@ describe("DashboardScreen — Signing Failed Modal", () => {
     // Title — modal title h2 should exist
     const titleEl = screen.getByRole("heading", { name: "Signing Failed" });
     expect(titleEl).toBeInTheDocument();
-    // Description
-    expect(screen.getByText("Unable to complete signature for event kind:1. All 3 retry attempts exhausted.")).toBeInTheDocument();
-    // Code box
-    expect(screen.getByText("Round: r-0x4f2a · Peers responded: 1/2 · Error: insufficient partial signatures")).toBeInTheDocument();
+    // Description — neutral fallback when no real runtime failure payload
+    // is supplied (see `fix-m1-signing-failed-modal-real-peer-response`).
+    expect(
+      screen.getByText(/failure details are unavailable/i),
+    ).toBeInTheDocument();
+    // Code box — neutral fallback, no synthesized peer-response ratio.
+    const codeBox = screen.getByTestId("signing-failed-code-text");
+    expect(codeBox.textContent).toMatch(/failure details unavailable/i);
+    expect(codeBox.textContent).not.toContain("no peers responded");
+    expect(codeBox.textContent).not.toContain("Peers responded");
+    expect(codeBox.textContent).not.toContain("1/2");
+    expect(codeBox.textContent).not.toContain("r-0x4f2a");
     // Buttons
     expect(screen.getByText("Dismiss")).toBeInTheDocument();
     expect(screen.getByText("Retry")).toBeInTheDocument();

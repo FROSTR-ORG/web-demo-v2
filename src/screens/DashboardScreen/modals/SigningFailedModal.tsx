@@ -11,9 +11,11 @@ export interface SigningFailedModalProps {
   /**
    * Real runtime failure payload captured from `runtimeFailures`. When
    * provided the modal renders the runtime's real `request_id` (surfaced as
-   * the "Round" field), the failed peer short-identifier, and the runtime's
-   * `code` + `message` (surfaced as the "Error" field). Required for
-   * real-failure mode (VAL-OPS-006).
+   * the "Round" field), the failed peer short-identifier when present, and
+   * the runtime's `code` + `message`. No peer-response ratio is
+   * synthesized: the runtime does not emit a `peers_responded` /
+   * `round_id` pair (see `docs/runtime-deviations-from-paper.md`).
+   * Required for real-failure mode (VAL-OPS-006).
    */
   failure?: OperationFailure;
   /**
@@ -40,29 +42,39 @@ export interface SigningFailedModalProps {
 function formatRoundId(requestId: string): string {
   const trimmed = requestId.trim();
   if (!trimmed) return "—";
-  // Match Paper "r-0x<8>" visual shape so the field is scannable.
+  // Match Paper "r-<8 chars>" visual shape so the field is scannable.
   const slice = trimmed.replace(/^r-/, "").slice(0, 8);
   return `r-${slice}`;
 }
 
-function formatPeerResponses(failure: OperationFailure): string {
+/**
+ * Builds the stacked "Round / Code / Error / Failed peer" summary from a
+ * real {@link OperationFailure} payload. Only fields the runtime actually
+ * emits are rendered; missing fields render a neutral em-dash placeholder
+ * rather than inventing a peer-response ratio. See VAL-OPS-006 and
+ * `docs/runtime-deviations-from-paper.md` for the contract gap rationale.
+ */
+function buildFailureSummary(
+  failure: OperationFailure,
+): Array<{ label: string; value: string }> {
+  const rows: Array<{ label: string; value: string }> = [
+    { label: "Round", value: formatRoundId(failure.request_id) },
+    { label: "Code", value: failure.code },
+    {
+      label: "Error",
+      value: failure.message?.trim() ? failure.message.trim() : "—",
+    },
+  ];
+  // Failed peer is the only peer-response metadata the runtime emits. If
+  // absent we omit the row entirely rather than render an invented
+  // ratio or denominator (see VAL-OPS-006 deviation doc entry).
   if (failure.failed_peer) {
-    return `failed peer ${shortHex(failure.failed_peer, 6, 4)}`;
+    rows.push({
+      label: "Failed peer",
+      value: shortHex(failure.failed_peer, 6, 4),
+    });
   }
-  if (failure.code === "timeout") {
-    return "no peers responded";
-  }
-  return "unknown";
-}
-
-function formatErrorSummary(failure: OperationFailure): string {
-  const base = failure.message?.trim()
-    ? failure.message.trim()
-    : failure.code;
-  // Surface both the machine-readable code and the human message so
-  // VAL-OPS-016's /relay|websocket|disconnect|timeout/i regex always sees
-  // the code substring ("timeout", "peer_rejected", etc.).
-  return `${failure.code} — ${base}`;
+  return rows;
 }
 
 export function SigningFailedModal({
@@ -75,10 +87,10 @@ export function SigningFailedModal({
   const hasFailure = Boolean(failure);
   const description = hasFailure
     ? `Unable to complete signing request ${formatRoundId(failure!.request_id)}. The runtime reported ${failure!.code} before the signature could be aggregated.`
-    : "Unable to complete signature for event kind:1. All 3 retry attempts exhausted.";
-  const codeText = hasFailure
-    ? `Round: ${formatRoundId(failure!.request_id)} · Peers responded: ${formatPeerResponses(failure!)} · Error: ${formatErrorSummary(failure!)}`
-    : "Round: r-0x4f2a · Peers responded: 1/2 · Error: insufficient partial signatures";
+    : "Unable to complete the signing request. Failure details are unavailable.";
+  const summaryRows = hasFailure
+    ? buildFailureSummary(failure!)
+    : null;
 
   const handleDismiss = onDismiss ?? onClose;
   const retryDisabled = hasFailure && !messageHex;
@@ -134,7 +146,11 @@ export function SigningFailedModal({
               className="signing-failed-code-text"
               data-testid="signing-failed-code-text"
             >
-              {codeText}
+              {summaryRows
+                ? summaryRows
+                    .map((row) => `${row.label}: ${row.value}`)
+                    .join(" · ")
+                : "Failure details unavailable."}
             </span>
           </div>
         </div>

@@ -150,22 +150,28 @@ describe("DashboardRefactorRegression — audit-gap details preserved after refa
     }
   });
 
-  it("VAL-DSH-018 — Signing Failed modal renders exact paper copy (summary + detail + Dismiss/Retry)", () => {
+  it("VAL-DSH-018 — Signing Failed modal renders neutral fallback copy (no synthesized peer-response ratio) + Dismiss/Retry", () => {
     renderScenario("dashboard-signing-failed");
     expect(screen.getByRole("heading", { name: "Signing Failed" })).toBeInTheDocument();
-    // Summary body — character-for-character match with Paper reference.
+    // `fix-m1-signing-failed-modal-real-peer-response` (VAL-OPS-006):
+    // when the modal is opened without a real OperationFailure payload
+    // (Paper-only demo entry, no runtimeFailures correlation), the summary
+    // renders a neutral fallback that does NOT fabricate a peer-response
+    // ratio, denominator, or the old hard-coded "insufficient partial
+    // signatures" copy.
     expect(
-      screen.getByText(
-        "Unable to complete signature for event kind:1. All 3 retry attempts exhausted."
-      )
+      screen.getByText(/failure details are unavailable/i),
     ).toBeInTheDocument();
-    // Detail line — including round hash and partial-signature error copy.
-    expect(
-      screen.getByText(
-        "Round: r-0x4f2a · Peers responded: 1/2 · Error: insufficient partial signatures"
-      )
-    ).toBeInTheDocument();
-    // Dual action CTAs.
+    const codeBox = screen.getByTestId("signing-failed-code-text");
+    expect(codeBox.textContent).toMatch(/failure details unavailable/i);
+    expect(codeBox.textContent).not.toContain("Peers responded");
+    expect(codeBox.textContent).not.toContain("no peers responded");
+    expect(codeBox.textContent).not.toContain("1/2");
+    expect(codeBox.textContent).not.toContain("r-0x4f2a");
+    expect(codeBox.textContent).not.toContain(
+      "insufficient partial signatures",
+    );
+    // Dual action CTAs preserved unchanged.
     expect(screen.getByText("Dismiss")).toBeInTheDocument();
     expect(screen.getByText("Retry")).toBeInTheDocument();
   });

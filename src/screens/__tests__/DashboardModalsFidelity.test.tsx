@@ -247,16 +247,18 @@ describe("VAL-DSH-018 / VAL-DSH-023 — Signing Failed modal", () => {
   it("renders title, summary, detail line, and Dismiss + Retry CTAs", () => {
     renderAt({ dashboard: { modal: "signing-failed", paperPanels: true } });
     expect(screen.getByRole("heading", { name: "Signing Failed" })).toBeInTheDocument();
+    // With no real OperationFailure payload (Paper-only demo entry), the
+    // modal renders a neutral fallback rather than the old hard-coded
+    // "Peers responded: 1/2 · insufficient partial signatures" ratio. See
+    // `fix-m1-signing-failed-modal-real-peer-response` and VAL-OPS-006.
     expect(
-      screen.getByText(
-        "Unable to complete signature for event kind:1. All 3 retry attempts exhausted."
-      )
+      screen.getByText(/failure details are unavailable/i),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Round: r-0x4f2a · Peers responded: 1/2 · Error: insufficient partial signatures"
-      )
-    ).toBeInTheDocument();
+    const codeBox = screen.getByTestId("signing-failed-code-text");
+    expect(codeBox.textContent).toMatch(/failure details unavailable/i);
+    expect(codeBox.textContent).not.toContain("Peers responded");
+    expect(codeBox.textContent).not.toContain("1/2");
+    expect(codeBox.textContent).not.toContain("r-0x4f2a");
     expect(screen.getByText("Dismiss")).toBeInTheDocument();
     expect(screen.getByText("Retry")).toBeInTheDocument();
   });

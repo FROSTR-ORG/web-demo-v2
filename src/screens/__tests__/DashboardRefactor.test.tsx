@@ -384,14 +384,16 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
     it("renders error detail with Dismiss + Retry CTAs", () => {
       renderAt({ dashboard: { modal: "signing-failed", paperPanels: true } });
       expect(screen.getByRole("heading", { name: "Signing Failed" })).toBeInTheDocument();
+      // Neutral fallback when the modal is opened without a real
+      // OperationFailure payload (see VAL-OPS-006 deviation doc entry).
       expect(
-        screen.getByText("Unable to complete signature for event kind:1. All 3 retry attempts exhausted.")
+        screen.getByText(/failure details are unavailable/i),
       ).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          "Round: r-0x4f2a · Peers responded: 1/2 · Error: insufficient partial signatures"
-        )
-      ).toBeInTheDocument();
+      const codeBox = screen.getByTestId("signing-failed-code-text");
+      expect(codeBox.textContent).toMatch(/failure details unavailable/i);
+      expect(codeBox.textContent).not.toContain("Peers responded");
+      expect(codeBox.textContent).not.toContain("1/2");
+      expect(codeBox.textContent).not.toContain("r-0x4f2a");
       expect(screen.getByText("Dismiss")).toBeInTheDocument();
       expect(screen.getByText("Retry")).toBeInTheDocument();
     });
