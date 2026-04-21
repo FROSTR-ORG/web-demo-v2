@@ -212,6 +212,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setProfiles(await listProfiles());
   }, []);
 
+  // VAL-OPS-028 (dev-only): rehydrate `window.__debug.relayHistory` from
+  // sessionStorage on mount so a validator reopening the app after a tab
+  // close still sees the prior tab's WS close frames (1000/1001 clean,
+  // 1006 abnormal). Must run BEFORE any appendRelayHistoryEntry call so
+  // the stable reference handed to `window.__debug.relayHistory` already
+  // reflects the restored state. Helper is DEV-gated so this is
+  // tree-shaken from production bundles.
+  useEffect(() => {
+    hydrateRelayHistoryFromSessionStorage();
+  }, []);
+
   // On mount — and whenever a demo MockAppStateProvider announces a new snapshot
   // via BRIDGE_EVENT — consume the sessionStorage bridge if present. When no
   // bridge exists on initial mount, fall back to the original IndexedDB reload.
@@ -2200,6 +2211,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     // relay sockets are closed cleanly (code 1000/1001). On next mount the
     // runtime is re-initialised from the stored encrypted profile with an
     // empty pending_operations set, regardless of what was in-flight here.
+    //
+    // Dev-only: flush the relayHistory ring buffer into sessionStorage as
+    // a final-state checkpoint so validators reopening the tab can read
+    // the WS close frames (1000/1001 clean, 1006 abnormal) that the
+    // closed tab emitted. The helper is DEV-gated so this flush is a
+    // no-op in production bundles.
     function onBeforeUnload() {
       try {
         relayPumpRef.current?.stop();
@@ -2208,6 +2225,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       try {
         simulatorRef.current?.stop();
+      } catch {
+        // best-effort cleanup during teardown
+      }
+      try {
+        persistRelayHistoryToSessionStorage();
       } catch {
         // best-effort cleanup during teardown
       }
@@ -2680,6 +2702,14 @@ const RELAY_HISTORY_MAX = 200;
 const VISIBILITY_HISTORY_MAX = 200;
 
 /**
+ * sessionStorage key under which the dev-only relayHistory ring buffer is
+ * persisted between tab mounts (VAL-OPS-028). The literal is referenced
+ * only from DEV-gated code paths so Vite/Terser dead-code elimination
+ * strips every occurrence from the production bundle.
+ */
+const RELAY_HISTORY_SESSION_KEY = "__debug.relayHistory";
+
+/**
  * Module-scoped arrays holding the buffers. We export getters (not the
  * arrays directly) so the dev-only installer effect can hand out a stable
  * reference — in-place mutation inside the appenders is visible to
@@ -2694,6 +2724,106 @@ function getRelayHistoryArray(): RelayHistoryEntry[] {
 
 function getVisibilityHistoryArray(): VisibilityHistoryEntry[] {
   return visibilityHistoryBuffer;
+}
+
+/**
+ * Narrow an arbitrary JSON value into a {@link RelayHistoryEntry}. Defends
+ * against malformed sessionStorage payloads (tampered JSON, stale schemas
+ * from an older build) so rehydration is strictly opt-in per entry.
+ */
+function isValidRelayHistoryEntry(value: unknown): value is RelayHistoryEntry {
+  if (!value || typeof value !== "object") return false;
+  const entry = value as Record<string, unknown>;
+  if (
+    entry.type !== "open" &&
+    entry.type !== "close" &&
+    entry.type !== "error"
+  ) {
+    return false;
+  }
+  if (typeof entry.url !== "string") return false;
+  if (typeof entry.at !== "string") return false;
+  if (entry.type === "close") {
+    if (
+      entry.code !== null &&
+      entry.code !== undefined &&
+      typeof entry.code !== "number"
+    ) {
+      return false;
+    }
+    if (
+      entry.wasClean !== undefined &&
+      typeof entry.wasClean !== "boolean"
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Dev-only: persist the current relayHistory ring buffer to sessionStorage
+ * so that a validator reopening the app after a tab close can observe the
+ * prior session's WS close-frame telemetry (VAL-OPS-028). No-op in
+ * production (tree-shaken via the DEV gate) and on any sessionStorage
+ * failure (quota exceeded, security exception, unavailable).
+ */
+function persistRelayHistoryToSessionStorage(): void {
+  if (!import.meta.env.DEV) return;
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(
+      RELAY_HISTORY_SESSION_KEY,
+      JSON.stringify(relayHistoryBuffer),
+    );
+  } catch {
+    // sessionStorage may be unavailable (Safari private mode) or at its
+    // quota limit; we lose the persistence signal but never the in-memory
+    // ring buffer, so validators still see live events within the tab.
+  }
+}
+
+/**
+ * Dev-only: rehydrate the in-memory relayHistory ring buffer from
+ * sessionStorage if a prior tab persisted one (VAL-OPS-028). Must run
+ * before the first appendRelayHistoryEntry call so the reference handed
+ * to `window.__debug.relayHistory` already reflects the restored state.
+ * Defensive against malformed payloads and over-size buffers.
+ */
+function hydrateRelayHistoryFromSessionStorage(): void {
+  if (!import.meta.env.DEV) return;
+  if (typeof window === "undefined") return;
+  let raw: string | null;
+  try {
+    raw = window.sessionStorage.getItem(RELAY_HISTORY_SESSION_KEY);
+  } catch {
+    return;
+  }
+  if (!raw) return;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (!Array.isArray(parsed)) return;
+  const valid: RelayHistoryEntry[] = [];
+  for (const candidate of parsed) {
+    if (isValidRelayHistoryEntry(candidate)) {
+      valid.push(candidate);
+    }
+  }
+  // Defensive capacity enforcement: if a stored buffer is somehow larger
+  // than RELAY_HISTORY_MAX (shouldn't happen given the append-side cap),
+  // keep the newest entries only.
+  const trimmed =
+    valid.length > RELAY_HISTORY_MAX
+      ? valid.slice(valid.length - RELAY_HISTORY_MAX)
+      : valid;
+  relayHistoryBuffer.length = 0;
+  for (const entry of trimmed) {
+    relayHistoryBuffer.push(entry);
+  }
 }
 
 function appendRelayHistoryEntry(event: RelaySocketEvent): void {
@@ -2714,6 +2844,11 @@ function appendRelayHistoryEntry(event: RelaySocketEvent): void {
   if (relayHistoryBuffer.length > RELAY_HISTORY_MAX) {
     relayHistoryBuffer.splice(0, relayHistoryBuffer.length - RELAY_HISTORY_MAX);
   }
+  // Dev-only persistence: mirror every append into sessionStorage so a
+  // tab close followed by reopen leaves WS close-frame evidence visible
+  // to validators (VAL-OPS-028). The helper itself is DEV-gated, so this
+  // call is tree-shaken out of production builds.
+  persistRelayHistoryToSessionStorage();
 }
 
 function appendVisibilityEntry(state: DocumentVisibilityState): void {
