@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m2-allow-once-rollback-reconcile-doc-and-code",
+  "reviewedAt": "2026-04-21T21:35:22Z",
+  "commitId": "b501b3ee04d73c651997d6d5948ff9e469d3b329",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Comparing the original failed feature diff (6c69d3fc...) and this fix diff (b501b3ee...) shows the rollback inconsistency is explicitly reconciled: `lockProfile()` now rolls session-scoped allow-once entries back to `value: \"deny\"` instead of `\"unset\"`, docs now state the same behavior with protocol rationale, and a focused vitest (`allowOnceRollback.test.tsx`) verifies the rollback dispatch shape. This directly addresses the allow-once reconcile gap tied to VAL-APPROVALS-009 without introducing regressions in the touched surface.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "runtime-worker procedure and handoff reporting are slightly misaligned for non-UI fixes: the worker skipped agent-browser and did not run demo-gallery Playwright, but still reported `followedProcedure: true`.",
+      "evidence": "Skill requires `npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop --workers 1` in Verify step 5 (`.factory/skills/runtime-worker/SKILL.md`), and uses conditional skip criteria for agent-browser; handoff verification for this feature lists vitest + tsc commands only and no Playwright run (`/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/handoffs/2026-04-21T21-15-30-405Z__fix-m2-allow-once-rollback-reconcile-doc-and-code__e1ca071f-2fa8-43b5-8db3-30af8a102b7a.json`)."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m2-approvals/scrutiny/reviews/m2-reactive-policy-prompt-modal.json",
+  "summary": "PASS — The fix adequately resolves the allow-once rollback reconcile issue from the original failed feature context by making implementation and docs consistent (`deny`, not `unset`) and adding direct test coverage for the lock rollback dispatch path."
+}

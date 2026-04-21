@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m2-sign-message-preview-from-nested-context",
+  "reviewedAt": "2026-04-21T21:33:57Z",
+  "commitId": "a077a2a33c43a9965b015c861b2bf46d258a7a9c",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly addresses the prior failure: SIGN preview extraction now supports the real nested runtime context shape (`context.SignSession.session.hashes[0]`) while preserving legacy flat fallback paths, and tests now include the observed nested payload form rather than only synthetic flat fixtures.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Mission policy and skill guidance remain inconsistent on whether agent-browser is mandatory for UI changes, which continues to produce `followedProcedure: false` even for justified test-covered data-wiring fixes.",
+      "evidence": "Mission policy marks agent-browser mandatory (`/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/AGENTS.md`, Testing & Validation Guidance), while `ui-screen-worker` explicitly allows skipping it for pure copy/data-wiring fixes with full Vitest coverage (`.factory/skills/ui-screen-worker/SKILL.md`, Required Skills)."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m2-approvals/scrutiny/reviews/m2-pending-approvals-panel.json",
+  "summary": "PASS: Reviewed fix feature transcript skeleton and both relevant diffs (`50ac56d6...` original and `a077a2a...` fix). The previous blocking defect (missing SIGN preview for nested runtime context) is resolved by nested SignSession extraction plus defensive/legacy compatibility and runtime-shape test coverage."
+}

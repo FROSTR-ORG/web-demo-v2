@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m2-policy-prompt-modal-ttl-reset",
+  "reviewedAt": "2026-04-21T21:33:57Z",
+  "commitId": "5fc704f38d61a00997e926177c8ee83c70ff0f4b",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly addresses the prior blocking TTL carry-over bug: `PolicyPromptModal` now resets countdown state when the active queued prompt id changes and performs auto-dismiss from the same effect, preventing stale `remainingMs=0` from immediately dismissing the next FIFO prompt. Added fake-timer tests cover head-expiry queue advance and mid-countdown queue advance reset behavior.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "There is an execution gap between required agent-browser verification for modal changes and the ability to drive the demo queue state for this specific flow.",
+      "evidence": "`ui-screen-worker` requires manual agent-browser verification for changed modals (`.factory/skills/ui-screen-worker/SKILL.md`, Work Procedure steps 6-7), but `MockAppStateProvider` exposes no `window.__appState`/debug handle (`src/app/MockAppStateProvider.tsx` has no `__appState` references) while only `AppStateProvider` publishes `window.__appState` (`src/app/AppStateProvider.tsx:2881-2930`). The worker therefore reported a justified deviation in handoff (`/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/handoffs/2026-04-21T20-57-41-991Z__fix-m2-policy-prompt-modal-ttl-reset__440c57a5-f0d7-414a-9cb3-fcd8196e290a.json`)."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m2-approvals/scrutiny/reviews/m2-reactive-policy-prompt-modal.json",
+  "summary": "PASS — This fix adequately resolves the original TTL-reset failure from `m2-reactive-policy-prompt-modal` by re-arming countdown state on FIFO prompt advancement and preventing premature auto-dismiss of newly active prompts."
+}

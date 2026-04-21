@@ -1,7 +1,7 @@
 {
   "milestone": "m2-approvals",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -20,57 +20,40 @@
     }
   },
   "reviewsSummary": {
-    "total": 2,
-    "passed": 0,
-    "failed": 2,
-    "failedFeatures": [
-      "m2-pending-approvals-panel",
-      "m2-reactive-policy-prompt-modal"
-    ]
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "failedFeatures": []
   },
-  "blockingIssues": [
-    {
-      "featureId": "m2-pending-approvals-panel",
-      "severity": "blocking",
-      "description": "PendingApprovalsPanel SIGN preview extraction reads only context.message_hex_32/message_hex, but real runtime pending SIGN context is nested SignSession data, so contract-required message previews are omitted for real pending operations."
-    },
-    {
-      "featureId": "m2-reactive-policy-prompt-modal",
-      "severity": "blocking",
-      "description": "PolicyPromptModal remainingMs state is not reset per queued prompt, so FIFO queue advancement can inherit stale/zero TTL and auto-dismiss subsequent prompts incorrectly."
-    },
-    {
-      "featureId": "m2-reactive-policy-prompt-modal",
-      "severity": "blocking",
-      "description": "Multi-tab sync broadcasts only prompt dismissal by id; policy decisions are not propagated to other tabs, so cross-tab policy state does not converge as expected."
-    },
-    {
-      "featureId": "m2-reactive-policy-prompt-modal",
-      "severity": "blocking",
-      "description": "\"Always allow\" overrides are applied only to in-memory runtime state and are lost across lock/unlock because updated overrides are not persisted before runtime teardown."
-    }
-  ],
+  "blockingIssues": [],
   "appliedUpdates": [],
   "suggestedGuidanceUpdates": [
     {
       "target": "skills",
-      "suggestion": "Align ui-screen-worker procedure with mission AGENTS policy for agent-browser usage on UI changes, and require explicit deviations when browser verification is skipped.",
-      "evidence": "m2 review reports observed AGENTS mandates agent-browser for UI validation while ui-screen-worker allows skipping for data-wiring cases, resulting in inconsistent followedProcedure reporting.",
+      "suggestion": "Align ui-screen-worker/runtime-worker guidance with mission AGENTS policy for agent-browser usage and known baseline validator failures, and add explicit allowed fallbacks when UI state cannot be driven through agent-browser (e.g., demo-only queue-state without debug hooks).",
+      "evidence": "Multiple m2 fix reviews flagged inconsistent procedure outcomes: AGENTS marks agent-browser mandatory, while skills currently allow/condition skips differently, causing conflicting followedProcedure reporting across fix-m2-sign-message-preview-from-nested-context, fix-m2-policy-prompt-modal-ttl-reset, and fix-m2-persist-always-allow-to-profile.",
       "isSystemic": true
     },
     {
-      "target": "library",
-      "suggestion": "Add shared factual documentation for runtime pending_operations context shapes (especially SIGN SignSession payload paths) so UI parsing/tests align with real runtime data.",
-      "evidence": "m2-pending-approvals-panel review found implementation/tests assumed top-level message_hex fields, but captured runtime evidence used nested SignSession context.",
+      "target": "skills",
+      "suggestion": "Require explicit RED-first evidence and accurate skillFeedback deviation reporting in worker handoffs for scrutiny traceability.",
+      "evidence": "fix-m2-broadcast-policy-decision-payload and fix-m2-allow-once-rollback-reconcile-doc-and-code reviews observed procedure/reporting mismatch around test-first sequencing and omitted deviation disclosure, despite no blocking code defects.",
       "isSystemic": true
-    },
-    {
-      "target": "docs/runtime-deviations-from-paper.md",
-      "suggestion": "Update the allow-once rollback note to match implementation semantics (unset rollback) or update implementation to match documented deny rollback; keep doc and behavior consistent.",
-      "evidence": "m2-reactive-policy-prompt-modal review found docs claim deny rollback while AppStateProvider currently rolls back to unset on lock.",
-      "isSystemic": false
     }
   ],
-  "rejectedObservations": [],
-  "previousRound": null
+  "rejectedObservations": [
+    {
+      "observation": "Add new MockAppStateProvider debug hook solely for queue manipulation during modal verification.",
+      "reason": "ambiguous"
+    },
+    {
+      "observation": "Agent-browser policy mismatch observation variants repeated across multiple reports.",
+      "reason": "duplicate"
+    },
+    {
+      "observation": "Runtime-worker followedProcedure wording variants repeated across multiple reports.",
+      "reason": "duplicate"
+    }
+  ],
+  "previousRound": ".factory/validation/m2-approvals/scrutiny/synthesis.round1.json"
 }
