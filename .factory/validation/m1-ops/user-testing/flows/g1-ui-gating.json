@@ -1,0 +1,241 @@
+{
+  "groupId": "g1-ui-gating",
+  "testedAt": "2026-04-21T16:23:37Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "relayUrl": "ws://127.0.0.1:8194",
+    "agentBrowserSession": "g1-ui-gating"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-OPS-001",
+      "title": "Test-sign surface exists on the dashboard",
+      "status": "pass",
+      "reason": "On /dashboard/demo-profile with sign readiness true, Test Sign surface was visible and became enabled with valid 64-hex input.",
+      "steps": [
+        {
+          "action": "Open dashboard route and inspect dev panels",
+          "expected": "Test Sign control is present/visible",
+          "observed": "Test Sign panel present with labeled input + button"
+        },
+        {
+          "action": "Enter valid 64-hex message",
+          "expected": "Button enabled when signing is not blocked",
+          "observed": "Test Sign button enabled"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g1-ui-gating/VAL-OPS-001-test-sign-surface.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No relevant API calls captured; UI-only observation"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-003",
+      "title": "Sign input is validated before dispatch",
+      "status": "pass",
+      "reason": "Invalid input ('zz') showed inline validation and did not enqueue a sign operation.",
+      "steps": [
+        {
+          "action": "Record pending_operations length",
+          "expected": "Baseline retained unless dispatch occurs",
+          "observed": "pending_operations=0"
+        },
+        {
+          "action": "Enter invalid sign message",
+          "expected": "Inline validation shown, no dispatch",
+          "observed": "Validation text visible; button disabled"
+        },
+        {
+          "action": "Re-check runtime state",
+          "expected": "No new pending sign",
+          "observed": "pending_operations remained 0; signDispatchLog entries remained 0"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g1-ui-gating/VAL-OPS-003-sign-validation.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No relevant API calls captured"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-012",
+      "title": "Sign blocked state surfaces when no peers are online",
+      "status": "pass",
+      "reason": "After seeding runtime with zero online peers and sign_ready=false, Test Sign remained disabled with explicit unavailable hint and no UI sign dispatch occurred.",
+      "steps": [
+        {
+          "action": "Seed runtime and inspect readiness",
+          "expected": "Blocked signing when peers unavailable",
+          "observed": "sign_ready=false, signing_peer_count=0, peersOnline=0"
+        },
+        {
+          "action": "Attempt sign via UI",
+          "expected": "Command blocked at UI",
+          "observed": "Button disabled with 'Signing unavailable' hint; click attempt not interactable"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g1-ui-gating/VAL-OPS-012-sign-blocked-state.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Runtime relay observed at ws://127.0.0.1:8194 during seeded run"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-017",
+      "title": "Signer-paused state rejects operation dispatch",
+      "status": "fail",
+      "reason": "Paused behavior correctly returned requestId=null for sign/ecdh/ping, but after resume controls stayed disabled (sign_ready=false) and sign command did not produce a dispatchable requestId.",
+      "steps": [
+        {
+          "action": "Pause signer from dashboard",
+          "expected": "Paused UI + no dispatch while paused",
+          "observed": "Signer Stopped shown; Test Sign/Test ECDH disabled"
+        },
+        {
+          "action": "Invoke sign/ecdh/ping while paused",
+          "expected": "No pending ops while paused",
+          "observed": "All returned requestId=null; pending unchanged"
+        },
+        {
+          "action": "Resume signer and retry",
+          "expected": "Triggers re-enable and dispatch normally",
+          "observed": "signerPaused=false but controls remained disabled; sign attempt returned requestId=null"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g1-ui-gating/VAL-OPS-017-signer-paused.png",
+          "m1-ops/g1-ui-gating/VAL-OPS-017-signer-resumed.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Seeded runtime connected to ws://127.0.0.1:8194"
+      },
+      "issues": "Resume path did not return to dispatch-capable controls in this run."
+    },
+    {
+      "id": "VAL-OPS-018",
+      "title": "Low-nonce-pool edge surfaces a degraded reason, not a silent failure",
+      "status": "pass",
+      "reason": "Nonce-related sign failure surfaced to the user (runtime failure message 'nonce unavailable' with SigningFailed modal), so failure was not silent.",
+      "steps": [
+        {
+          "action": "Trigger sign attempt under degraded readiness",
+          "expected": "Nonce condition must be surfaced (blocked reason or failure modal)",
+          "observed": "SigningFailed modal appeared; latest runtime failure message was 'nonce unavailable'"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g1-ui-gating/VAL-OPS-018-no-nonce-indicator.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Seeded runtime relay traffic over ws://127.0.0.1:8194"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-024",
+      "title": "Nonce-pool 'Trigger Sync' overlay surfaces during refill",
+      "status": "blocked",
+      "reason": "Could not reproduce nonce-refill overlay state in this isolated single-session run; runtime snapshot did not expose nonce_pool_size for trend verification.",
+      "steps": [
+        {
+          "action": "Exercise degraded/connecting states and inspect runtime snapshot",
+          "expected": "Syncing nonces overlay appears during refill and clears after recovery",
+          "observed": "No Syncing nonces overlay observed; no nonce_pool_size field available"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g1-ui-gating/VAL-OPS-024-no-sync-overlay.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Seeded runtime relay link available, but nonce-refill precondition not reproducible"
+      },
+      "issues": "Precondition for nonce refill transition could not be established in assigned isolation context."
+    },
+    {
+      "id": "VAL-OPS-025",
+      "title": "All OPS surfaces are keyboard reachable",
+      "status": "fail",
+      "reason": "Tab order reached Refresh peers, Test Sign, and Test ECDH, but no dedicated Ping trigger was reachable and Enter activation did not create a pending op in this run.",
+      "steps": [
+        {
+          "action": "Tab from dashboard header through OPS controls",
+          "expected": "Ping/Refresh/Refresh All/Test Sign/Test ECDH reachable",
+          "observed": "Reached Refresh peers, Message input, Test Sign, Pubkey input, Test ECDH; no separate Ping trigger found"
+        },
+        {
+          "action": "Press Enter on focused Test Sign",
+          "expected": "Same dispatch effect as click",
+          "observed": "Error shown ('no runtime is active'); pending_operations stayed 0"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g1-ui-gating/VAL-OPS-025-focus-refresh.png",
+          "m1-ops/g1-ui-gating/VAL-OPS-025-focus-test-sign.png",
+          "m1-ops/g1-ui-gating/VAL-OPS-025-enter-activation.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No relevant API calls captured for keyboard flow"
+      },
+      "issues": "Keyboard parity with full OPS trigger set could not be confirmed."
+    }
+  ],
+  "summary": {
+    "total": 7,
+    "pass": 4,
+    "fail": 2,
+    "blocked": 1,
+    "skipped": 0
+  },
+  "frictions": [
+    {
+      "description": "Reaching a dispatch-capable dashboard required entering via /demo/welcome-unlock-modal to hydrate profile state before landing on /dashboard/demo-profile.",
+      "resolved": true,
+      "resolution": "Used demo unlock modal path to bootstrap dashboard route consistently.",
+      "affectedAssertions": [
+        "VAL-OPS-001",
+        "VAL-OPS-003",
+        "VAL-OPS-012",
+        "VAL-OPS-017",
+        "VAL-OPS-018",
+        "VAL-OPS-024",
+        "VAL-OPS-025"
+      ]
+    },
+    {
+      "description": "When controls are disabled, agent-browser click attempts time out instead of emitting a semantic 'disabled click' event.",
+      "resolved": true,
+      "resolution": "Used disabled state + unchanged state counters/signDispatchLog to confirm blocked dispatch behavior.",
+      "affectedAssertions": [
+        "VAL-OPS-012",
+        "VAL-OPS-017"
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "description": "VAL-OPS-024 precondition (nonce-pool refill phase with observable pool trend) could not be reproduced in this single-session isolation run.",
+      "affectedAssertions": [
+        "VAL-OPS-024"
+      ],
+      "quickFixAttempted": "Seeded runtime via __iglooTestSeedRuntime and exercised degraded/connecting states; overlay and nonce_pool_size signal were still unavailable."
+    }
+  ]
+}

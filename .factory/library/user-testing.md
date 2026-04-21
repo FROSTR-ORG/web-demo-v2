@@ -95,3 +95,16 @@ For every UI surface, reference `/Users/plebdev/Desktop/igloo-web-v2-prototype/i
 ## Known Pre-Existing Issues (Do Not Fix)
 
 (To be populated mid-mission as discovered.)
+
+## Flow Validator Guidance: agent-browser
+
+- Isolation boundary: each subagent must use its own `agent-browser` session id and must not reuse another subagent's session.
+- Shared service boundary: all subagents may use the same app server `http://127.0.0.1:5173` and local relay `ws://127.0.0.1:8194`, but must keep storage isolated per browser session.
+- State safety: do not clear global data (Clear Credentials / full DB wipe) unless the assigned assertion explicitly requires it.
+- Evidence minimum: include screenshots and observable snapshots for every assigned assertion, plus console error summary.
+- Teardown: close every `agent-browser` session opened by the subagent before it exits.
+
+## Observed Tooling Notes (m1-ops)
+
+- In headless `agent-browser` runs, `document.visibilityState` transitions may not reliably emit `hidden` during tab-switch simulations.
+- Network capture in this surface did not consistently provide websocket frame-level telemetry (reconnect events and close-frame codes). For assertions that depend on those details, capture app-level request-id observables and explicit WS send hooks as backup evidence.
