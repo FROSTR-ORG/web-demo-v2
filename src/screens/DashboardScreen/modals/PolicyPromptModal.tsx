@@ -131,16 +131,45 @@ export function PolicyPromptModal({
       return event.ttl_ms;
     }
     return CLIENT_TTL_MS;
-  }, [event]);
+  }, [event.ttl_ms]);
   const ttlSource: "event" | "session" =
     typeof event.ttl_ms === "number" && event.ttl_ms > 0
       ? "event"
       : "session";
   const [remainingMs, setRemainingMs] = useState<number>(initialRemaining);
 
-  // Countdown tick — recomputes every 500 ms so the rendered string lands
-  // within VAL-APPROVALS-014's ±200 ms tolerance per second.
+  // Keep the latest `onDismiss` identity in a ref so the countdown effect
+  // doesn't re-run every time the parent recreates its callback (which it
+  // does whenever the active peer-denial advances — see DashboardScreen's
+  // `handleDismissPolicyPrompt` closure over `activePeerDenial`).
+  const onDismissRef = useRef(onDismiss);
   useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
+
+  // Countdown + reset, keyed on the active prompt id (fix-m2-policy-prompt
+  // -modal-ttl-reset). When the FIFO peerDenialQueue advances and the
+  // modal is rendered with a new `event.id`, we must reset `remainingMs`
+  // back to the newly-active prompt's fresh TTL so the advanced prompt is
+  // not inheriting the terminal `0` state of the previous prompt — which
+  // would previously cause the separate auto-dismiss effect to fire
+  // synchronously and immediately dismiss the second prompt before the
+  // user could act on it.
+  //
+  // Auto-dismiss on TTL expiry is fired from inside the interval tick
+  // against the fresh `initialRemaining` captured by this effect (not
+  // from a separate `[remainingMs, onDismiss]` effect) so an outgoing
+  // prompt's terminal state cannot bleed into the newly-active prompt's
+  // render cycle.
+  //
+  // Recomputes every 500 ms so the rendered string lands within
+  // VAL-APPROVALS-014's ±200 ms tolerance per second.
+  useEffect(() => {
+    setRemainingMs(initialRemaining);
+    if (initialRemaining <= 0) {
+      onDismissRef.current();
+      return;
+    }
     const startedAt = Date.now();
     const timer = window.setInterval(() => {
       const elapsed = Date.now() - startedAt;
@@ -148,16 +177,11 @@ export function PolicyPromptModal({
       setRemainingMs(next);
       if (next === 0) {
         window.clearInterval(timer);
+        onDismissRef.current();
       }
     }, 500);
     return () => window.clearInterval(timer);
-  }, [initialRemaining]);
-
-  // Auto-dismiss when TTL reaches zero without an explicit user decision.
-  useEffect(() => {
-    if (remainingMs > 0) return;
-    onDismiss();
-  }, [remainingMs, onDismiss]);
+  }, [event.id, initialRemaining]);
 
   // Capture the previously-focused element and lock body scroll on mount.
   // useLayoutEffect so the body overflow restore happens in the same
