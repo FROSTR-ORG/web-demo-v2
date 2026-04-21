@@ -1,0 +1,45 @@
+{
+  "featureId": "m2-reactive-policy-prompt-modal",
+  "reviewedAt": "2026-04-21T20:31:37Z",
+  "commitId": "6c69d3fc0776a90bae227bfb6f0be1ff6bda3b09",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The reactive modal wiring, ARIA surface, and FIFO queue scaffolding are substantial, but key contract behaviors are not fully met: per-prompt TTL handling breaks across queued prompts, multi-tab policy sync is only dismissal sync, and \"Always allow\" is not persisted across lock/unlock.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen/modals/PolicyPromptModal.tsx",
+        "line": 139,
+        "severity": "blocking",
+        "description": "`remainingMs` is initialized once from `initialRemaining` and never reset when `event.id` changes. Because `DashboardScreen` reuses the same modal instance for FIFO queue advancement (`src/screens/DashboardScreen/index.tsx:814` has no key), the next queued prompt inherits stale/zero TTL from the previous prompt and can auto-dismiss immediately via the `remainingMs <= 0` effect (`PolicyPromptModal.tsx:157-160`), violating per-prompt TTL/FIFO behavior."
+      },
+      {
+        "file": "src/app/AppStateProvider.tsx",
+        "line": 479,
+        "severity": "blocking",
+        "description": "Multi-tab propagation only broadcasts `{ type: 'policy-resolved', id }` and remote tabs only remove the queue item (`AppStateProvider.tsx:2009-2017`); no policy decision or peer/method payload is propagated, and remote tabs do not call `setPolicyOverride`. This does not satisfy the expected behavior that an \"Always allow\" action in tab A is reflected in tab B within a runtime-status tick."
+      },
+      {
+        "file": "src/app/AppStateProvider.tsx",
+        "line": 509,
+        "severity": "blocking",
+        "description": "\"Always allow\" is applied only to the current in-memory runtime via `setPolicyOverride`, but lock/unlock recreates runtime state from the stored encrypted profile (`unlockProfile` decodes persisted package at `AppStateProvider.tsx:1783-1796`) while `lockProfile` discards the runtime (`AppStateProvider.tsx:1836-1861`) without persisting updated overrides. This fails the expected behavior that \"Always allow\" persists across lock/unlock."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Skill-procedure adherence appears over-reported for this UI-changing feature.",
+      "evidence": "`ui-screen-worker` marks agent-browser verification as required for changed screens/modals and says omissions must set `followedProcedure: false` with deviations (`.factory/skills/ui-screen-worker/SKILL.md:23,51-53`), but the handoff reports `followedProcedure: true` with empty deviations and only CLI verification commands (`.../handoffs/2026-04-21T20-24-40-911Z__m2-reactive-policy-prompt-modal__79012a27-1aee-42bb-a253-58973bb56c17.json:14-53`)."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Runtime-deviation documentation has drifted from implementation details for allow-once rollback semantics.",
+      "evidence": "The deviation doc says lock rollback uses `setPolicyOverride(peer, \"deny\")` (`docs/runtime-deviations-from-paper.md:134`), while implementation rolls back with `value: \"unset\"` (`src/app/AppStateProvider.tsx:1849-1853`)."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review result: FAIL. The feature contains substantial implementation work, but blocking contract gaps remain around per-prompt TTL queue behavior, true multi-tab policy synchronization, and lock/unlock persistence for \"Always allow\" overrides."
+}
