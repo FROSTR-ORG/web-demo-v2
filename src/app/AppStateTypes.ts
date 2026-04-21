@@ -343,6 +343,39 @@ export interface PolicyPromptDecision {
 }
 
 /**
+ * A single peer-policy override currently in effect for the unlocked
+ * profile — surfaced to the Peer Policies view so it can render a row
+ * with peer label, verb, effect (Allow/Deny), a persistence indicator
+ * (Persistent vs Session), and a Remove control. Populated by
+ * {@link AppStateValue.resolvePeerDenial} when the user commits to an
+ * "Allow once" / "Always allow" / "Always deny" decision from the
+ * reactive {@link AppStateValue.peerDenialQueue} prompt.
+ *
+ * Contract:
+ *  - `allow-once`  → `{source: "session", value: "allow"}`
+ *  - `allow-always` → `{source: "persistent", value: "allow"}`
+ *  - `deny-always`  → `{source: "persistent", value: "deny"}`
+ *
+ * Entries are keyed on `(peer, direction, method)`; a subsequent
+ * decision for the same triple REPLACES the prior entry so the view
+ * never shows two rows for the same override slot. Persistent entries
+ * are also serialised through the existing profile-save path so they
+ * survive a lock/unlock cycle (see
+ * `fix-m2-persist-always-allow-to-profile`). Session entries are
+ * cleared on `lockProfile()` / `clearCredentials()`.
+ *
+ * Removed atomically via {@link AppStateValue.removePolicyOverride}.
+ */
+export interface PolicyOverrideEntry {
+  peer: string;
+  direction: "request" | "respond";
+  method: "sign" | "ecdh" | "ping" | "onboard";
+  value: "allow" | "deny";
+  source: "persistent" | "session";
+  createdAt: number;
+}
+
+/**
  * Nonce-pool telemetry surfaced through the AppState. The WASM runtime
  * does NOT expose `nonce_pool_size` / `nonce_pool_threshold` on its
  * `runtime_status` snapshot directly (see the
@@ -503,6 +536,39 @@ export interface AppStateValue {
     id: string,
     decision: PolicyPromptDecision,
   ) => Promise<void>;
+  /**
+   * Active peer-policy overrides driven by the user's decisions on the
+   * reactive `PolicyPromptModal` (allow-once / allow-always / deny-always).
+   * The Peer Policies view (`PoliciesState`) renders one row per entry
+   * with the peer label, verb, effect (Allow/Deny), a persistence chip
+   * ("Persistent" vs "Session"), and a Remove action that calls
+   * {@link AppStateValue.removePolicyOverride}.
+   *
+   * See `fix-m2-peer-policies-view-persistence-and-remove` for full
+   * behavior (VAL-APPROVALS-017). Entries are keyed on
+   * `(peer, direction, method)` and cleared on
+   * `lockProfile()` / `clearCredentials()`.
+   */
+  policyOverrides: PolicyOverrideEntry[];
+  /**
+   * Remove a peer-policy override previously set via the reactive
+   * denial surface. Atomically:
+   *   1. Drops the in-memory entry from {@link policyOverrides}.
+   *   2. For persistent entries, re-serialises the stored profile's
+   *      `manual_peer_policy_overrides` with the targeted cell set to
+   *      `"unset"` (same persistence path as
+   *      `fix-m2-persist-always-allow-to-profile`).
+   *   3. Dispatches `setPolicyOverride({..., value: "unset"})` against
+   *      the live runtime so the next matching inbound peer request
+   *      produces a fresh `peer_denied` event.
+   *
+   * No-op when no entry exists for the triple.
+   */
+  removePolicyOverride: (input: {
+    peer: string;
+    direction: "request" | "respond";
+    method: "sign" | "ecdh" | "ping" | "onboard";
+  }) => Promise<void>;
   reloadProfiles: () => Promise<void>;
   createKeyset: (draft: CreateKeysetDraft) => Promise<void>;
   createProfile: (draft: CreateProfileDraft) => Promise<string>;

@@ -4,7 +4,9 @@ import {
   useMemo,
   useRef,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from "react";
 import { memberForShare, memberPubkeyXOnly } from "../lib/bifrost/format";
 import {
@@ -98,6 +100,7 @@ import type {
   OnboardSession,
   PeerDeniedEvent,
   PendingDispatchEntry,
+  PolicyOverrideEntry,
   PolicyPromptDecision,
   ProfileDraft,
   RecoverSession,
@@ -149,6 +152,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   // `docs/runtime-deviations-from-paper.md` for rationale
   // (VAL-APPROVALS-007 family).
   const [peerDenialQueue, setPeerDenialQueue] = useState<PeerDeniedEvent[]>([]);
+  // Active peer-policy overrides surfaced to the Peer Policies view —
+  // populated by `resolvePeerDenial` when the user acts on a reactive
+  // `peer_denied` prompt (allow-once / allow-always / deny-always).
+  // Keyed on `(peer, direction, method)`; subsequent decisions for the
+  // same triple replace the prior entry. See
+  // `fix-m2-peer-policies-view-persistence-and-remove` (VAL-APPROVALS-017).
+  const [policyOverrides, setPolicyOverrides] = useState<
+    PolicyOverrideEntry[]
+  >([]);
+  // Mirror of `policyOverrides` as a ref so stable callbacks
+  // (notably `removePolicyOverride`) can find the target entry
+  // without re-creating their identity on every list mutation.
+  // Kept in lock-step with state via an effect below.
+  const policyOverridesRef = useRef<PolicyOverrideEntry[]>([]);
   // Session-scoped set of override keys ("<peer>:respond.<verb>") set via
   // "Allow once". On `lockProfile()` we reverse each entry with
   // `setPolicyOverride(value: "deny")` so the override does NOT persist
@@ -474,6 +491,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setSignLifecycleLog([]);
     setPendingDispatchIndex({});
     setPeerDenialQueue([]);
+    setPolicyOverrides([]);
     pendingDispatchIndexRef.current = {};
     pendingUnmatchedDispatchesRef.current = [];
     lastDispatchRef.current = null;
@@ -526,7 +544,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       peer: string;
       direction: "request" | "respond";
       method: "sign" | "ecdh" | "ping" | "onboard";
-      value: "allow" | "deny";
+      value: "allow" | "deny" | "unset";
     }): Promise<void> => {
       // Read the active profile through a ref rather than directly from
       // the `activeProfile` state so this callback keeps a stable
@@ -631,6 +649,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               value: "allow",
             });
             sessionAllowOnceRef.current.add(overrideKey);
+            upsertPolicyOverrideEntry(setPolicyOverrides, {
+              peer,
+              direction: "respond",
+              method: verb,
+              value: "allow",
+              source: "session",
+              createdAt: Date.now(),
+            });
             break;
           case "allow-always":
             // Persist the override through the profile store BEFORE
@@ -654,6 +680,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             // Remove from session-once tracking — the user upgraded the
             // scope to persistent.
             sessionAllowOnceRef.current.delete(overrideKey);
+            upsertPolicyOverrideEntry(setPolicyOverrides, {
+              peer,
+              direction: "respond",
+              method: verb,
+              value: "allow",
+              source: "persistent",
+              createdAt: Date.now(),
+            });
             break;
           case "deny-always":
             await persistPolicyOverrideToProfile({
@@ -669,6 +703,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               value: "deny",
             });
             sessionAllowOnceRef.current.delete(overrideKey);
+            upsertPolicyOverrideEntry(setPolicyOverrides, {
+              peer,
+              direction: "respond",
+              method: verb,
+              value: "deny",
+              source: "persistent",
+              createdAt: Date.now(),
+            });
             break;
           case "deny":
             // Deny close is intentionally a no-op at the policy layer
@@ -682,6 +724,90 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             error instanceof Error ? error.message : String(error)
           }`,
         );
+      }
+    },
+    [persistPolicyOverrideToProfile],
+  );
+
+  /**
+   * Remove an active peer-policy override previously set via the
+   * reactive denial surface. Three-step flow kept atomic within the
+   * bounds of a single React commit:
+   *
+   *   1. Drop the entry from the in-memory {@link policyOverrides}
+   *      slice so the Peer Policies view hides the row on the next
+   *      render.
+   *   2. For `source: "persistent"` entries, re-serialise the stored
+   *      profile with the targeted cell set to `"unset"` via
+   *      {@link persistPolicyOverrideToProfile}. This guarantees the
+   *      override does not re-appear after a lock/unlock cycle (the
+   *      `reapplyManualOverridesToRuntime` unlock path skips `unset`
+   *      cells).
+   *   3. Dispatch `setPolicyOverride({..., value: "unset"})` against
+   *      the live runtime so the next matching inbound peer request
+   *      produces a fresh `peer_denied` event (VAL-APPROVALS-017).
+   *
+   * Session-scoped entries skip the profile write (they were never
+   * persisted) but still clear `sessionAllowOnceRef` so the
+   * `lockProfile` rollback loop doesn't re-dispatch a stale key.
+   * Unknown triples are a no-op — callers may invoke this eagerly.
+   */
+  const removePolicyOverride = useCallback(
+    async (input: {
+      peer: string;
+      direction: "request" | "respond";
+      method: "sign" | "ecdh" | "ping" | "onboard";
+    }): Promise<void> => {
+      const existing = policyOverridesRef.current.find(
+        (entry) =>
+          entry.peer === input.peer &&
+          entry.direction === input.direction &&
+          entry.method === input.method,
+      );
+      if (!existing) return;
+
+      // 1. Drop the in-memory entry.
+      setPolicyOverrides((previous) =>
+        previous.filter(
+          (entry) =>
+            !(
+              entry.peer === input.peer &&
+              entry.direction === input.direction &&
+              entry.method === input.method
+            ),
+        ),
+      );
+      // Also clear session-once tracking so the lock-rollback loop
+      // does not re-dispatch a now-stale allow against the runtime.
+      const overrideKey = `${input.peer}:${input.direction}.${input.method}`;
+      sessionAllowOnceRef.current.delete(overrideKey);
+
+      // 2. For persistent entries, serialise the "unset" reset
+      // through the profile-save path. Rethrows on failure so the
+      // caller can react to persistence errors; the in-memory entry
+      // remains removed (optimistic UI) but the runtime mutation is
+      // skipped on persistence failure so the on-disk and runtime
+      // states do not silently diverge.
+      if (existing.source === "persistent") {
+        await persistPolicyOverrideToProfile({
+          peer: input.peer,
+          direction: input.direction,
+          method: input.method,
+          value: "unset",
+        });
+      }
+
+      // 3. Reset the live runtime's override cell. Any runtime error
+      // surfaces as a thrown promise rejection — same contract as the
+      // set path in `resolvePeerDenial`.
+      const runtime = runtimeRef.current;
+      if (runtime) {
+        runtime.setPolicyOverride({
+          peer: input.peer,
+          direction: input.direction,
+          method: input.method,
+          value: "unset",
+        });
       }
     },
     [persistPolicyOverrideToProfile],
@@ -2197,6 +2323,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     activeProfileRef.current = activeProfile;
   }, [activeProfile]);
 
+  // Mirror `policyOverrides` to a ref so `removePolicyOverride`
+  // (stable-identity callback consumed by the Peer Policies view)
+  // can look up the target entry by (peer, direction, method) without
+  // re-creating on every list mutation.
+  useEffect(() => {
+    policyOverridesRef.current = policyOverrides;
+  }, [policyOverrides]);
+
   // Install the multi-tab BroadcastChannel for VAL-APPROVALS-024.
   //
   // Each tab carries its own denial queue and runtime. The channel
@@ -2808,6 +2942,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       peerDenialQueue,
       enqueuePeerDenial,
       resolvePeerDenial,
+      policyOverrides,
+      removePolicyOverride,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,
@@ -2867,6 +3003,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       peerDenialQueue,
       enqueuePeerDenial,
       resolvePeerDenial,
+      policyOverrides,
+      removePolicyOverride,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,
@@ -3091,12 +3229,40 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
  * `persistPolicyOverrideToProfile` to build the next payload before
  * re-encryption.
  */
+/**
+ * Insert-or-replace an entry in the {@link PolicyOverrideEntry} list,
+ * keyed on `(peer, direction, method)`. If an entry for the triple
+ * already exists its `value` / `source` / `createdAt` are overwritten;
+ * otherwise the new entry is appended. Used by `resolvePeerDenial` to
+ * reflect the user's latest decision in the Peer Policies view without
+ * ever showing two rows for the same override slot.
+ */
+function upsertPolicyOverrideEntry(
+  setPolicyOverrides: Dispatch<SetStateAction<PolicyOverrideEntry[]>>,
+  entry: PolicyOverrideEntry,
+): void {
+  setPolicyOverrides((previous) => {
+    const index = previous.findIndex(
+      (candidate) =>
+        candidate.peer === entry.peer &&
+        candidate.direction === entry.direction &&
+        candidate.method === entry.method,
+    );
+    if (index === -1) {
+      return [...previous, entry];
+    }
+    const next = previous.slice();
+    next[index] = entry;
+    return next;
+  });
+}
+
 function applyManualOverrideToPayload(
   payload: BfProfilePayload,
   peer: string,
   direction: "request" | "respond",
   method: "sign" | "ecdh" | "ping" | "onboard",
-  value: "allow" | "deny",
+  value: "allow" | "deny" | "unset",
 ): BfProfilePayload {
   const defaultMethods: BfMethodPolicyOverride = {
     echo: "allow",

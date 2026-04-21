@@ -3217,6 +3217,149 @@ a {
 }
 
 /* ============================================
+   Active peer-policy overrides subsection
+   (fix-m2-peer-policies-view-persistence-and-remove)
+   ============================================ */
+
+.policies-override-section {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 10px;
+  padding-top: 14px;
+  margin-top: 14px;
+  border-top: 1px solid var(--ig-border-faint);
+}
+
+.policies-override-heading {
+  color: var(--ig-muted);
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.policies-override-list {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  gap: 8px;
+  width: 100%;
+}
+
+.policies-override-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #0f172a;
+  border: 1px solid var(--ig-border-soft);
+}
+
+.policies-override-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.policies-override-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.policies-override-verb {
+  color: #c7d2fe;
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+}
+
+.policies-override-effect {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+}
+
+.policies-override-effect.allow {
+  color: var(--ig-green);
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.policies-override-effect.deny {
+  color: var(--ig-red);
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.policies-override-persistence {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 10px;
+  line-height: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.policies-override-persistence.persistent {
+  color: var(--ig-blue-soft);
+  background: rgba(37, 99, 235, 0.15);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.policies-override-persistence.session {
+  color: var(--ig-yellow);
+  background: rgba(202, 138, 4, 0.15);
+  border: 1px solid rgba(202, 138, 4, 0.3);
+}
+
+.policies-override-remove {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--ig-border-soft);
+  background: transparent;
+  color: var(--ig-muted);
+  font-family: var(--font-inter, Inter, system-ui, sans-serif);
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.policies-override-remove:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--ig-red);
+}
+
+.policies-override-error {
+  padding: 8px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--ig-red);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* ============================================
    Signer Policy Prompt Modal
    ============================================ */
 

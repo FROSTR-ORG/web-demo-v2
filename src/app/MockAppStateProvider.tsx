@@ -81,6 +81,9 @@ export function MockAppStateProvider({
   const [peerDenialQueue, setPeerDenialQueue] = useState<
     import("./AppStateTypes").PeerDeniedEvent[]
   >(value.peerDenialQueue ?? []);
+  const [policyOverrides, setPolicyOverrides] = useState<
+    import("./AppStateTypes").PolicyOverrideEntry[]
+  >(value.policyOverrides ?? []);
   const resolvedDenialIdsRef = useRef<Set<string>>(new Set());
 
   const enqueuePeerDenial = useCallback(
@@ -101,14 +104,92 @@ export function MockAppStateProvider({
   const resolvePeerDenial = useCallback(
     async (
       id: string,
-      _decision: import("./AppStateTypes").PolicyPromptDecision,
+      decision: import("./AppStateTypes").PolicyPromptDecision,
     ) => {
       resolvedDenialIdsRef.current.add(id);
+      const pending = peerDenialQueue.find((entry) => entry.id === id);
       setPeerDenialQueue((previous) =>
         previous.filter((entry) => entry.id !== id),
       );
+      if (!pending) return;
+      const peer = pending.peer_pubkey;
+      const verb = pending.verb;
+      const addEntry = (
+        entry: import("./AppStateTypes").PolicyOverrideEntry,
+      ) =>
+        setPolicyOverrides((previous) => {
+          const index = previous.findIndex(
+            (candidate) =>
+              candidate.peer === entry.peer &&
+              candidate.direction === entry.direction &&
+              candidate.method === entry.method,
+          );
+          if (index === -1) return [...previous, entry];
+          const next = previous.slice();
+          next[index] = entry;
+          return next;
+        });
+      const now = Date.now();
+      switch (decision.action) {
+        case "allow-once":
+          addEntry({
+            peer,
+            direction: "respond",
+            method: verb,
+            value: "allow",
+            source: "session",
+            createdAt: now,
+          });
+          break;
+        case "allow-always":
+          addEntry({
+            peer,
+            direction: "respond",
+            method: verb,
+            value: "allow",
+            source: "persistent",
+            createdAt: now,
+          });
+          break;
+        case "deny-always":
+          addEntry({
+            peer,
+            direction: "respond",
+            method: verb,
+            value: "deny",
+            source: "persistent",
+            createdAt: now,
+          });
+          break;
+        case "deny":
+          break;
+      }
     },
-    [],
+    [peerDenialQueue],
+  );
+
+  const removePolicyOverride = useCallback(
+    async (input: {
+      peer: string;
+      direction: "request" | "respond";
+      method: "sign" | "ecdh" | "ping" | "onboard";
+    }) => {
+      // Forward to the caller-supplied implementation first (tests seed
+      // a spy here) before pruning the mock's own state copy so the
+      // parent can observe the exact (peer, direction, method) args.
+      await value.removePolicyOverride(input);
+      setPolicyOverrides((previous) =>
+        previous.filter(
+          (entry) =>
+            !(
+              entry.peer === input.peer &&
+              entry.direction === input.direction &&
+              entry.method === input.method
+            ),
+        ),
+      );
+    },
+    [value],
   );
 
   const createKeyset = useCallback(
@@ -542,6 +623,8 @@ export function MockAppStateProvider({
       peerDenialQueue,
       enqueuePeerDenial,
       resolvePeerDenial,
+      policyOverrides,
+      removePolicyOverride,
       handleRuntimeCommand,
       createKeyset,
       createProfile,
@@ -599,6 +682,8 @@ export function MockAppStateProvider({
       peerDenialQueue,
       enqueuePeerDenial,
       resolvePeerDenial,
+      policyOverrides,
+      removePolicyOverride,
       handleRuntimeCommand,
       createKeyset,
       createProfile,

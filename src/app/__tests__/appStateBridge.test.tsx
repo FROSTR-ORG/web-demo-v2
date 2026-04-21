@@ -605,6 +605,8 @@ describe("MockAppStateProvider bridge arming", () => {
     peerDenialQueue: [],
     enqueuePeerDenial: () => undefined,
     resolvePeerDenial: async () => undefined,
+    policyOverrides: [],
+    removePolicyOverride: async () => undefined,
     handleRuntimeCommand: async () => ({ requestId: null, debounced: false }),
   };
 

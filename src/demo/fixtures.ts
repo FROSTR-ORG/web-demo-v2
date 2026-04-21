@@ -337,6 +337,8 @@ export function createDemoAppState(
     peerDenialQueue: [],
     enqueuePeerDenial: () => undefined,
     resolvePeerDenial: async () => undefined,
+    policyOverrides: [],
+    removePolicyOverride: async () => undefined,
     handleRuntimeCommand: createMockHandleRuntimeCommand(),
   };
 
