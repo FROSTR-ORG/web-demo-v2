@@ -1,0 +1,183 @@
+{
+  "groupId": "group-3-queue-a11y",
+  "testedAt": "2026-04-21T16:57:30Z",
+  "milestone": "m2-approvals",
+  "isolation": {
+    "surface": "agent-browser web UI",
+    "appUrl": "http://127.0.0.1:5173",
+    "sessionId": "m2a_g3"
+  },
+  "toolsUsed": [
+    "agent-browser",
+    "grep",
+    "npm run build",
+    "rg"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-APPROVALS-015",
+      "status": "pass",
+      "reason": "Three rapid peer_denied events queued FIFO with exactly one modal backdrop; resolving first prompt advanced to next queued payload without overlap.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-3-queue-a11y/VAL-APPROVALS-015-queue-first-modal.png",
+          "m2-approvals/group-3-queue-a11y/VAL-APPROVALS-015-queue-advanced-second-modal.png"
+        ],
+        "dom": {
+          "initial": {
+            "backdropCount": 1,
+            "activeId": "val-approvals-015-a-1776808236374",
+            "queueLength": 3
+          },
+          "afterAllowOnce": {
+            "backdropCount": 1,
+            "activeId": "val-approvals-015-b-1776808236374",
+            "queueLength": 2
+          }
+        },
+        "consoleErrors": "none observed"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-016",
+      "status": "pass",
+      "reason": "Backdrop dismiss and X dismiss advanced queued prompts one-by-one; final dismiss left no modal mounted, queue length 0, and manual overrides unchanged.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-3-queue-a11y/VAL-APPROVALS-016-after-backdrop-second-modal.png",
+          "m2-approvals/group-3-queue-a11y/VAL-APPROVALS-016-queue-drained-no-modal.png"
+        ],
+        "dom": {
+          "afterBackdrop": {
+            "activeId": "val-approvals-016-b-1776808286200",
+            "queueLength": 2
+          },
+          "afterFinalDismiss": {
+            "modalCount": 0,
+            "queueLength": 0,
+            "manualOverrides": [null, null, null]
+          }
+        },
+        "consoleErrors": "none observed"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-017",
+      "status": "fail",
+      "reason": "Always allow did set runtime manual_override.respond.sign=allow, but Peer Policies view did not expose persistence metadata/removal control; removing override from Peer Policies and re-prompt verification could not be completed because that affordance is absent.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-3-queue-a11y/VAL-APPROVALS-017-peer-policies-after-always-allow.png"
+        ],
+        "dom": {
+          "runtimeManualOverride": "respond.sign=allow on one peer",
+          "peerPolicyPanelRemoveButtons": 0
+        },
+        "consoleErrors": "none observed"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-018",
+      "status": "fail",
+      "reason": "PolicyPromptModal was not observed during refresh_all_peers/pending-operation churn, but source inspection shows non-peer_denied proactive open paths via setActiveModal(\"policy-prompt\") in Dashboard running/signing-blocked callbacks.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-3-queue-a11y/VAL-APPROVALS-018-no-proactive-modal-during-pending-ops.png"
+        ],
+        "codeInspection": {
+          "dashboardMatches": [
+            "src/screens/DashboardScreen/index.tsx:726",
+            "src/screens/DashboardScreen/index.tsx:754"
+          ],
+          "distScan": "rg -n 'mockOpenPolicyPrompt|__DEV__.*PolicyPrompt' dist -> no matches"
+        },
+        "consoleErrors": "none observed"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-019",
+      "status": "pass",
+      "reason": "Modal rendered with role=dialog and aria-modal=true, focus moved to first actionable control, Tab/Shift+Tab stayed inside modal, and dismiss returned focus to pre-open control.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-3-queue-a11y/VAL-APPROVALS-019-modal-aria-focus-trap.png"
+        ],
+        "dom": {
+          "role": "dialog",
+          "ariaModal": "true",
+          "ariaLabelledby": "policy-prompt-title-val-approvals-019-1776808460634",
+          "ariaDescribedby": "policy-prompt-desc-val-approvals-019-1776808460634"
+        },
+        "focusTrace": {
+          "preOpen": "Recover",
+          "initialModalFocus": "Allow once",
+          "tabSequence": ["Always allow", "Always deny", "Close modal", "Deny", "Allow once"],
+          "shiftTab": "Deny",
+          "postClose": "Recover"
+        },
+        "consoleErrors": "none observed"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-020",
+      "status": "pass",
+      "reason": "Escape dismissed current prompt without policy mutation; next queued prompt appeared and target peer respond.sign remained unchanged.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-3-queue-a11y/VAL-APPROVALS-020-escape-advances-queue.png"
+        ],
+        "dom": {
+          "beforeEscape": "queue had 2 prompt IDs with first active",
+          "afterEscape": "second prompt active, queue length 1, respond.sign remained unset"
+        },
+        "consoleErrors": "none observed"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-021",
+      "status": "fail",
+      "reason": "Modal open set body overflow to hidden, but wheel/PageDown still changed window.scrollY (0 -> 600), so background scroll lock was not effective.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-3-queue-a11y/VAL-APPROVALS-021-scroll-lock-open-modal.png"
+        ],
+        "dom": {
+          "beforeOpen": {
+            "overflow": "visible",
+            "scrollY": 400
+          },
+          "open": {
+            "overflow": "hidden",
+            "scrollY": 0
+          },
+          "afterScrollAttempt": {
+            "overflow": "hidden",
+            "scrollY": 600
+          },
+          "afterClose": {
+            "overflow": "visible"
+          }
+        },
+        "consoleErrors": "none observed"
+      }
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Direct deep-link to /dashboard/demo-profile redirects to / before bridge-hydrated state is available during fresh navigations.",
+      "resolved": true,
+      "resolution": "Seeded state via /demo dashboard route and used in-session navigation/test hooks for stable dashboard context.",
+      "affectedAssertions": [
+        "VAL-APPROVALS-015",
+        "VAL-APPROVALS-016",
+        "VAL-APPROVALS-017",
+        "VAL-APPROVALS-018",
+        "VAL-APPROVALS-019",
+        "VAL-APPROVALS-020",
+        "VAL-APPROVALS-021"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Validated 7 assertions: 4 passed (015,016,019,020), 3 failed (017,018,021)."
+}

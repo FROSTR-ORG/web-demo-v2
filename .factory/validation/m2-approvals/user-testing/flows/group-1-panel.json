@@ -1,0 +1,134 @@
+{
+  "groupId": "group-1-panel",
+  "testedAt": "2026-04-21T22:00:11Z",
+  "isolation": {
+    "surface": "agent-browser web UI",
+    "appUrl": "http://127.0.0.1:5173",
+    "sessionId": "m2a_g1",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4"
+  },
+  "toolsUsed": ["agent-browser", "rg"],
+  "assertionResults": [
+    {
+      "id": "VAL-APPROVALS-001",
+      "status": "pass",
+      "reason": "Panel reflected runtime pending_operations in real time: empty at baseline, one SIGN row after dispatch, then empty again after settle; source grep confirmed no MOCK_PENDING_APPROVAL_ROWS reference in PendingApprovalsPanel.tsx.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-1-panel/VAL-APPROVALS-001-rerun-after-dispatch.png",
+          "m2-approvals/group-1-panel/VAL-APPROVALS-001-rerun-after-clear.png"
+        ],
+        "observableSnapshots": [
+          "m2-approvals/group-1-panel/VAL-APPROVALS-001-rerun-empty-observable.json",
+          "m2-approvals/group-1-panel/VAL-APPROVALS-001-rerun-after-dispatch-observable.json",
+          "m2-approvals/group-1-panel/VAL-APPROVALS-001-rerun-after-clear-observable.json",
+          "m2-approvals/group-1-panel/VAL-APPROVALS-001-grep-panel-mock-import.txt"
+        ],
+        "consoleErrors": "none (m2-approvals/group-1-panel/VAL-APPROVALS-001-rerun-console-errors.txt)",
+        "network": "not applicable (local runtime simulator path)"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-002",
+      "status": "pass",
+      "reason": "Injected SIGN/ECDH/PING/ONBOARD pending ops rendered one row per op with correct kind pills, peer identity labels, verb-prefixed descriptions, and SIGN message first-10-hex preview; TTL countdown was observed decreasing over a 2s sample.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-1-panel/VAL-APPROVALS-002-rerun-rows.png"
+        ],
+        "observableSnapshots": [
+          "m2-approvals/group-1-panel/VAL-APPROVALS-002-rerun-observable.json",
+          "m2-approvals/group-1-panel/VAL-APPROVALS-002-rerun-ttl-decrease-observable.json"
+        ],
+        "consoleErrors": "none (m2-approvals/group-1-panel/VAL-APPROVALS-002-rerun-console-errors.txt)",
+        "network": "not applicable (local runtime simulator path)"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-003",
+      "status": "pass",
+      "reason": "Invalid sign input showed inline validation text and pending_operations count stayed unchanged.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-1-panel/VAL-APPROVALS-003-invalid-input.png"
+        ],
+        "observableSnapshots": [
+          "m2-approvals/group-1-panel/VAL-APPROVALS-003-before-observable.json",
+          "m2-approvals/group-1-panel/VAL-APPROVALS-003-after-observable.json"
+        ],
+        "consoleErrors": "none (m2-approvals/group-1-panel/VAL-APPROVALS-003-console-errors.txt)",
+        "network": "not applicable"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-004",
+      "status": "pass",
+      "reason": "Nearest SLA matched the smallest row TTL, updated over time and after churn (nearest transitioned with row set changes), and became hidden/null when panel returned to empty.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-1-panel/VAL-APPROVALS-004-rerun-initial.png",
+          "m2-approvals/group-1-panel/VAL-APPROVALS-004-rerun-final.png"
+        ],
+        "observableSnapshots": [
+          "m2-approvals/group-1-panel/VAL-APPROVALS-004-rerun-transition-observable.json",
+          "m2-approvals/group-1-panel/VAL-APPROVALS-004-rerun-transition-late-observable.json",
+          "m2-approvals/group-1-panel/VAL-APPROVALS-004-rerun-empty-observable.json"
+        ],
+        "consoleErrors": "none (m2-approvals/group-1-panel/VAL-APPROVALS-004-rerun-console-errors.txt)",
+        "network": "not applicable"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-005",
+      "status": "pass",
+      "reason": "Header toggle collapsed/expanded the panel, remained collapsed after Settings sidebar round-trip, and reset to expanded after full reload path.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-1-panel/VAL-APPROVALS-005-collapsed.png",
+          "m2-approvals/group-1-panel/VAL-APPROVALS-005-expanded.png",
+          "m2-approvals/group-1-panel/VAL-APPROVALS-005-after-settings.png",
+          "m2-approvals/group-1-panel/VAL-APPROVALS-005-after-reload-sim.png"
+        ],
+        "observableSnapshots": [
+          "m2-approvals/group-1-panel/VAL-APPROVALS-005-collapsed-observable.json",
+          "m2-approvals/group-1-panel/VAL-APPROVALS-005-expanded-observable.json",
+          "m2-approvals/group-1-panel/VAL-APPROVALS-005-after-settings-observable.json",
+          "m2-approvals/group-1-panel/VAL-APPROVALS-005-after-reload-sim-observable.json"
+        ],
+        "consoleErrors": "none (m2-approvals/group-1-panel/VAL-APPROVALS-005-console-errors.txt)",
+        "network": "not applicable"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-006",
+      "status": "pass",
+      "reason": "With pending_operations empty, panel showed 0 pending + empty-state copy, no rows, and no nearest label.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-1-panel/VAL-APPROVALS-006-empty-state.png"
+        ],
+        "observableSnapshots": [
+          "m2-approvals/group-1-panel/VAL-APPROVALS-006-observable.json"
+        ],
+        "consoleErrors": "none (m2-approvals/group-1-panel/VAL-APPROVALS-006-console-errors.txt)",
+        "network": "not applicable"
+      }
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Immediate post-dispatch reads can race React state propagation and under-report pending rows.",
+      "resolved": true,
+      "resolution": "Used short post-dispatch waits (250-350ms) before collecting observability snapshots.",
+      "affectedAssertions": ["VAL-APPROVALS-001", "VAL-APPROVALS-002", "VAL-APPROVALS-004"]
+    },
+    {
+      "description": "Periodic runtime refresh can settle pending ops quickly, making TTL sampling flaky.",
+      "resolved": true,
+      "resolution": "Captured tighter timed snapshots and added a dedicated 2s TTL-decrement sample file for SIGN row evidence.",
+      "affectedAssertions": ["VAL-APPROVALS-002", "VAL-APPROVALS-004"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Validated 6/6 assigned PendingApprovalsPanel assertions: all passed with screenshot + observability evidence and clean console checks."
+}

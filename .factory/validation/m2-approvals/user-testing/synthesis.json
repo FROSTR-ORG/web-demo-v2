@@ -1,0 +1,158 @@
+{
+  "milestone": "m2-approvals",
+  "round": 1,
+  "status": "fail",
+  "assertionsSummary": {
+    "total": 25,
+    "passed": 21,
+    "failed": 4,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-APPROVALS-001",
+    "VAL-APPROVALS-002",
+    "VAL-APPROVALS-003",
+    "VAL-APPROVALS-004",
+    "VAL-APPROVALS-005",
+    "VAL-APPROVALS-006",
+    "VAL-APPROVALS-007",
+    "VAL-APPROVALS-008",
+    "VAL-APPROVALS-009",
+    "VAL-APPROVALS-010",
+    "VAL-APPROVALS-011",
+    "VAL-APPROVALS-012",
+    "VAL-APPROVALS-013",
+    "VAL-APPROVALS-014",
+    "VAL-APPROVALS-015",
+    "VAL-APPROVALS-016",
+    "VAL-APPROVALS-019",
+    "VAL-APPROVALS-020",
+    "VAL-APPROVALS-023",
+    "VAL-APPROVALS-024",
+    "VAL-APPROVALS-025"
+  ],
+  "failedAssertions": [
+    {
+      "id": "VAL-APPROVALS-017",
+      "reason": "Always allow did set runtime manual_override.respond.sign=allow, but Peer Policies view did not expose persistence metadata/removal control; removing override from Peer Policies and re-prompt verification could not be completed because that affordance is absent."
+    },
+    {
+      "id": "VAL-APPROVALS-018",
+      "reason": "PolicyPromptModal was not observed during refresh_all_peers/pending-operation churn, but source inspection shows non-peer_denied proactive open paths via setActiveModal(\"policy-prompt\") in Dashboard running/signing-blocked callbacks."
+    },
+    {
+      "id": "VAL-APPROVALS-021",
+      "reason": "Modal open set body overflow to hidden, but wheel/PageDown still changed window.scrollY (0 -> 600), so background scroll lock was not effective."
+    },
+    {
+      "id": "VAL-APPROVALS-022",
+      "reason": "Long content was not truncated/clamped in the CONTENT row; modal width expanded to content width causing horizontal overflow."
+    }
+  ],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Added m2-approvals validator notes: use ~250-350ms post-enqueue wait for policy prompt queue sampling and seed dashboard via /demo before in-session navigation to avoid pre-hydration deep-link redirects.",
+      "source": "flow-report"
+    }
+  ],
+  "flowReports": [
+    "validation/m2-approvals/user-testing/flows/group-1-panel.json",
+    "validation/m2-approvals/user-testing/flows/group-2-prompt-core.json",
+    "validation/m2-approvals/user-testing/flows/group-3-queue-a11y.json",
+    "validation/m2-approvals/user-testing/flows/group-4-safety-multitab.json"
+  ],
+  "toolsUsed": [
+    "Grep",
+    "Read",
+    "agent-browser",
+    "grep",
+    "npm run build",
+    "rg"
+  ],
+  "frictions": [
+    {
+      "description": "Immediate post-dispatch reads can race React state propagation and under-report pending rows.",
+      "resolved": true,
+      "resolution": "Used short post-dispatch waits (250-350ms) before collecting observability snapshots.",
+      "affectedAssertions": [
+        "VAL-APPROVALS-001",
+        "VAL-APPROVALS-002",
+        "VAL-APPROVALS-004"
+      ]
+    },
+    {
+      "description": "Periodic runtime refresh can settle pending ops quickly, making TTL sampling flaky.",
+      "resolved": true,
+      "resolution": "Captured tighter timed snapshots and added a dedicated 2s TTL-decrement sample file for SIGN row evidence.",
+      "affectedAssertions": [
+        "VAL-APPROVALS-002",
+        "VAL-APPROVALS-004"
+      ]
+    },
+    {
+      "description": "Immediate post-enqueue reads can report stale queue/dialog state before React commit; a short wait (~300ms) was needed before sampling observables.",
+      "resolved": true,
+      "resolution": "Added deterministic wait steps before each modal-state capture.",
+      "affectedAssertions": [
+        "VAL-APPROVALS-007",
+        "VAL-APPROVALS-008",
+        "VAL-APPROVALS-009",
+        "VAL-APPROVALS-011",
+        "VAL-APPROVALS-014"
+      ]
+    },
+    {
+      "description": "Console contained one relay warning (`wss://relay.damus.io` WebSocket closed before established) while running locally with offline peers.",
+      "resolved": true,
+      "resolution": "Continued with local synthetic denial-event validation; warning did not block modal/policy assertions.",
+      "affectedAssertions": [
+        "VAL-APPROVALS-007",
+        "VAL-APPROVALS-008",
+        "VAL-APPROVALS-009",
+        "VAL-APPROVALS-010",
+        "VAL-APPROVALS-011",
+        "VAL-APPROVALS-012",
+        "VAL-APPROVALS-013",
+        "VAL-APPROVALS-014"
+      ]
+    },
+    {
+      "description": "Direct deep-link to /dashboard/demo-profile redirects to / before bridge-hydrated state is available during fresh navigations.",
+      "resolved": true,
+      "resolution": "Seeded state via /demo dashboard route and used in-session navigation/test hooks for stable dashboard context.",
+      "affectedAssertions": [
+        "VAL-APPROVALS-015",
+        "VAL-APPROVALS-016",
+        "VAL-APPROVALS-017",
+        "VAL-APPROVALS-018",
+        "VAL-APPROVALS-019",
+        "VAL-APPROVALS-020",
+        "VAL-APPROVALS-021"
+      ]
+    },
+    {
+      "description": "agent-browser command chaining after heredoc eval failed with shell parsing when appending '&&'; I split eval and follow-up commands into separate calls.",
+      "resolved": true,
+      "resolution": "Executed eval, wait, and screenshot as separate commands.",
+      "affectedAssertions": [
+        "VAL-APPROVALS-022",
+        "VAL-APPROVALS-024"
+      ]
+    },
+    {
+      "description": "Dashboard showed multiple pre-existing 'Dismiss ping failure notice' controls during modal tests, adding noise to interactive snapshots.",
+      "resolved": true,
+      "resolution": "Targeted modal controls by label and validated by queue/modal DOM state rather than relying on element index alone.",
+      "affectedAssertions": [
+        "VAL-APPROVALS-022",
+        "VAL-APPROVALS-023",
+        "VAL-APPROVALS-024",
+        "VAL-APPROVALS-025"
+      ]
+    }
+  ],
+  "dedupedBlockers": [],
+  "previousRound": null
+}

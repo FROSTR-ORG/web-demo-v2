@@ -144,3 +144,8 @@ These dev-gated hooks (`import.meta.env.DEV`) surface evidence that agent-browse
 - Evidence pattern: call simulate → screenshot the overlay → call restore → screenshot the overlay gone.
 
 All hooks are **DEV-only**. If your validation runs a production build (`vite build` / served from `dist/`), the hooks are absent by design — fall back to capturing app-level state via `window.__appState.runtimeStatus` / `.runtimeRelays` only.
+
+## Observed Tooling Notes (m2-approvals)
+
+- For policy-prompt queue assertions, sample modal/queue DOM state after a short post-enqueue wait (~250-350ms) to avoid React commit race conditions.
+- Fresh deep-links to `/dashboard/:profileId` can redirect to `/` before bridge hydration in headless runs; seed dashboard context from `/demo` first, then navigate in-session for stable approvals validation.
