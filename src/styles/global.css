@@ -329,6 +329,27 @@ a {
   letter-spacing: 0;
 }
 
+/*
+ * Visible focus ring for every `.button` (and the raw submit buttons inside
+ * the dev-only TestSign / TestEcdh / TestPing / TestRefreshAll panels).
+ *
+ * `:focus-visible` only paints the outline when the focus move came from the
+ * keyboard (or from another "focus-visible" signal like a screen reader)
+ * so pointer users never see a spurious outline on click. Required by
+ * feature `fix-m1-keyboard-ping-trigger-and-enter-activation` / VAL-OPS-025:
+ * "Each trigger shows a :focus-visible outline; no trigger requires pointer
+ * to operate."
+ */
+.button:focus-visible,
+.test-sign-panel button[type="submit"]:focus-visible,
+.test-ecdh-panel button[type="submit"]:focus-visible,
+.test-ping-panel button[type="submit"]:focus-visible,
+.test-refresh-all-panel button[type="submit"]:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.25);
+}
+
 .button-md {
   min-height: 40px;
   padding: 9px 16px;

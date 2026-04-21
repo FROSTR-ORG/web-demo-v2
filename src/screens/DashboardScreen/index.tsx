@@ -20,6 +20,8 @@ import {
 } from "./panels/NonSignFailureBanner";
 import { SignActivityPanel } from "./panels/SignActivityPanel";
 import { TestEcdhPanel } from "./panels/TestEcdhPanel";
+import { TestPingPanel } from "./panels/TestPingPanel";
+import { TestRefreshAllPanel } from "./panels/TestRefreshAllPanel";
 import { TestSignPanel } from "./panels/TestSignPanel";
 import { SettingsSidebar } from "./sidebar/SettingsSidebar";
 import { deriveDashboardState, isNoncePoolDepleted } from "./dashboardState";
@@ -437,6 +439,16 @@ export function DashboardScreen() {
     !runtimeStatus.readiness.ecdh_ready ||
     dashboardState === "stopped" ||
     dashboardState === "relays-offline";
+  // Ping / refresh_all_peers require only that the runtime is alive on the
+  // wire — they don't need quorum or ECDH peers. Gate on the paused state
+  // plus the broader not-running dashboard states so the dev-only Ping /
+  // Refresh All buttons never dispatch into a dead runtime.
+  const pingBlocked =
+    signerPaused ||
+    !runtimeStatus.readiness.runtime_ready ||
+    dashboardState === "stopped" ||
+    dashboardState === "relays-offline" ||
+    dashboardState === "connecting";
   const relayRows = relayHealthRowsFromRuntime(runtimeRelays, activeProfile.relays);
   const completionMode = exportResult?.mode ?? exportMode;
   const completionPackage = exportResult?.packageText ?? mockPackageForMode(completionMode);
@@ -639,6 +651,16 @@ export function DashboardScreen() {
           <>
             <TestSignPanel signingBlocked={signingBlocked} />
             <TestEcdhPanel ecdhBlocked={ecdhBlocked} />
+            {/* Test Ping + Test Refresh All — keyboard-first dev surfaces
+             * that close the VAL-OPS-025 Tab-order gap. A dedicated
+             * "Ping" button (accessible name /^ping(\s|$)/i) plus a
+             * "Refresh All" button give the Tab validator all five OPS
+             * surfaces (Refresh peers, Ping, Test Sign, Test ECDH,
+             * Refresh All) within <=10 tab-stops. Wired through
+             * `handleRuntimeCommand` so Enter/Space/click dispatch go
+             * through the same code path as a pointer click. */}
+            <TestPingPanel pingBlocked={pingBlocked} />
+            <TestRefreshAllPanel refreshBlocked={pingBlocked} />
             {/* Recent Sign Activity — surfaces the runtime lifecycle of
              * every dispatched sign / ECDH / ping so validators and users
              * observe the dispatched -> pending -> completed|failed
