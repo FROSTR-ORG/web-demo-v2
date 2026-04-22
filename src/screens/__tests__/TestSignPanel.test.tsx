@@ -188,7 +188,14 @@ describe("VAL-OPS-001 — TestSignPanel presence + accessible name", () => {
 
     const index = candidates.indexOf(submit);
     expect(index).toBeGreaterThanOrEqual(0);
-    expect(index).toBeLessThanOrEqual(10);
+    // Headline VAL-OPS-025 requirement is "keyboard reachable"; the
+    // concrete tab-stop budget allows for the 5 OPS surfaces
+    // (Refresh peers, Ping, Test Sign, Test ECDH, Refresh All) plus
+    // the collapsible-panel headers and Event Log filter/Clear that
+    // sit between them in the DOM tree (m4-event-log-panel adds
+    // two more focusable controls in runtime mode). 13 keeps the
+    // budget tight while accommodating the live runtime layout.
+    expect(index).toBeLessThanOrEqual(13);
   });
 });
 

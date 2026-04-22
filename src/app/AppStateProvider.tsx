@@ -981,6 +981,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * Empty the runtime event-log ring buffer and reset the monotonic seq
+   * counter. Backs the Event Log panel's Clear button — display and
+   * underlying buffer are flushed together so the Paper contract
+   * "Clear empties buffer AND display" is honoured (VAL-EVENTLOG-012).
+   * Other unlocked-profile state is left untouched.
+   */
+  const clearRuntimeEventLog = useCallback(() => {
+    setRuntimeEventLog([]);
+    runtimeEventLogRef.current = [];
+    runtimeEventLogSeqRef.current = 0;
+  }, []);
+
+  /**
    * Apply the dev-only nonce-depletion override to a runtime_status snapshot
    * before it is committed to React state. When the override is active we:
    *   - push an `insufficient_signing_peers` entry tagged with
@@ -3122,6 +3135,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       removePolicyOverride,
       setPeerPolicyOverride,
       clearPolicyOverrides,
+      clearRuntimeEventLog,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,
@@ -3186,6 +3200,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       removePolicyOverride,
       setPeerPolicyOverride,
       clearPolicyOverrides,
+      clearRuntimeEventLog,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,

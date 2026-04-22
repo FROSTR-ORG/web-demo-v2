@@ -123,7 +123,13 @@ describe("Dashboard runtime-state fidelity", () => {
       expect(screen.getByText("Signer Running")).toBeInTheDocument();
       expect(screen.getByText("2/2 sign ready")).toBeInTheDocument();
       expect(screen.getByText("Avg: --")).toBeInTheDocument();
-      expect(screen.queryByText("Event Log")).not.toBeInTheDocument();
+      // Event Log panel is now wired to the real RuntimeEventLog buffer
+      // (feature m4-event-log-panel) and renders in both Paper and
+      // runtime modes. With an empty buffer the panel shows
+      // "No events yet" / "0 events".
+      expect(screen.getByText("Event Log")).toBeInTheDocument();
+      expect(screen.getByText("0 events")).toBeInTheDocument();
+      expect(screen.getByText("No events yet")).toBeInTheDocument();
       // Pending Approvals panel is always rendered in runtime mode
       // (m2-pending-approvals-panel); with no pending_operations it
       // renders the empty state. The legacy "Pending Operations"
@@ -138,7 +144,10 @@ describe("Dashboard runtime-state fidelity", () => {
       expect(screen.getByText("Signer Running")).toBeInTheDocument();
       expect(screen.getByText("2/2 sign ready")).toBeInTheDocument();
       expect(screen.getByText("Avg: --")).toBeInTheDocument();
-      expect(screen.queryByText("Event Log")).not.toBeInTheDocument();
+      // Event Log panel renders in the raw-runtime opt-out too — it's
+      // always mounted; only the data source differs between modes.
+      expect(screen.getByText("Event Log")).toBeInTheDocument();
+      expect(screen.getByText("0 events")).toBeInTheDocument();
       // Pending Approvals panel is rendered from runtime_status.pending_operations
       // even when paperPanels=false — the empty state message is visible
       // with zero pending ops.

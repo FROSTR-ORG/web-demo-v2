@@ -72,11 +72,9 @@ export function MockAppStateProvider({
   const [runtimeEventLog, setRuntimeEventLog] = useState<
     import("./AppStateTypes").RuntimeEventLogEntry[]
   >(value.runtimeEventLog ?? []);
-  // Consumed via the state setter (mock surface only appends when a demo
-  // scenario explicitly updates the `value` prop below). The setter keeps
-  // the mock shape-compatible with the real provider so consumers that
-  // reset state (e.g. Lock/ClearCredentials) can do so.
-  void setRuntimeEventLog;
+  const clearRuntimeEventLog = useCallback(() => {
+    setRuntimeEventLog([]);
+  }, []);
   const [signDispatchLog, setSignDispatchLog] = useState<Record<string, string>>(
     value.signDispatchLog ?? {},
   );
@@ -666,6 +664,7 @@ export function MockAppStateProvider({
       removePolicyOverride,
       setPeerPolicyOverride,
       clearPolicyOverrides,
+      clearRuntimeEventLog,
       handleRuntimeCommand,
       createKeyset,
       createProfile,
@@ -728,6 +727,7 @@ export function MockAppStateProvider({
       removePolicyOverride,
       setPeerPolicyOverride,
       clearPolicyOverrides,
+      clearRuntimeEventLog,
       handleRuntimeCommand,
       createKeyset,
       createProfile,

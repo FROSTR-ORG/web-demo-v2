@@ -5,7 +5,11 @@ import type {
   PendingOperation,
   PeerStatus,
 } from "../../../lib/bifrost/types";
-import { MOCK_PENDING_APPROVAL_ROWS, type PolicyPromptRequest } from "../mocks";
+import {
+  MOCK_EVENT_LOG_ROWS,
+  MOCK_PENDING_APPROVAL_ROWS,
+  type PolicyPromptRequest,
+} from "../mocks";
 import { EventLogPanel } from "../panels/EventLogPanel";
 import { PeersPanel } from "../panels/PeersPanel";
 import type { PeerRefreshErrorInfo } from "../panels/PeerRow";
@@ -128,7 +132,14 @@ export function RunningState({
         peerPermissionStates={peerPermissionStates}
       />
 
-      {paperPanels ? <EventLogPanel /> : null}
+      {/*
+        Paper mode: render the Paper-fixture rows so visual-fidelity
+        tests continue to match the canonical reference. Runtime mode:
+        render the panel with no `rows` prop so it consumes the real
+        {@link AppStateValue.runtimeEventLog} buffer driven by
+        AppStateProvider's drain pipeline.
+      */}
+      {paperPanels ? <EventLogPanel rows={MOCK_EVENT_LOG_ROWS} /> : <EventLogPanel />}
       <PendingApprovalsPanel
         rows={runtimeRows}
         onOpenPolicyPrompt={paperPanels ? onOpenPolicyPrompt : undefined}

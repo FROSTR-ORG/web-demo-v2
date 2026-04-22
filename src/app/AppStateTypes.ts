@@ -715,6 +715,19 @@ export interface AppStateValue {
    * Surface assertion: VAL-POLICIES-009.
    */
   clearPolicyOverrides: () => Promise<void>;
+  /**
+   * Empty the {@link runtimeEventLog} buffer without touching any other
+   * unlocked-profile state. Backs the Event Log panel's Clear button
+   * (VAL-EVENTLOG-012) — display and underlying buffer are flushed
+   * together so navigating away and back does not resurrect cleared
+   * rows, while the rest of the AppState (active profile, pending ops,
+   * signLifecycleLog, policy overrides, …) is unaffected.
+   *
+   * Also resets the internal seq counter so the next ingested entry
+   * starts at seq 1. Idempotent — calling it on an already-empty buffer
+   * is a no-op.
+   */
+  clearRuntimeEventLog: () => void;
   reloadProfiles: () => Promise<void>;
   createKeyset: (draft: CreateKeysetDraft) => Promise<void>;
   createProfile: (draft: CreateProfileDraft) => Promise<string>;
