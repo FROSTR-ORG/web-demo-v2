@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m3-peer-policy-chips-scenario-paper-reference",
+  "reviewedAt": "2026-04-22T01:32:45Z",
+  "commitId": "b879dc53cdc0403c8676a028ef7e51b2ff282c67",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix correctly reclassifies `dashboard-peer-policy-chips` as a non-canonical variant of `dashboard-policies`, which removes the requirement for a dedicated `dashboard-peer-policy-chips.png` asset while preserving the scenario route and behavior. The updated variant lock-in assertions in both gate tests match the new scenario classification and satisfy the feature's expected outcomes (canonical count parity and no missing paper-reference failure).",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Mission policy and skill policy disagree on agent-browser requirements for UI-related changes, creating ambiguity for workers on lightweight data-wiring fixes like this one.",
+      "evidence": "Mission AGENTS.md states 'The `agent-browser` skill is mandatory for UI validation', while `.factory/skills/ui-screen-worker/SKILL.md` explicitly allows skipping agent-browser for pure data-wiring/copy fixes if Vitest coverage is sufficient. This handoff used the skip path (`skillFeedback.followedProcedure: false` with an agent-browser omission)."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "PASS: Reviewed feature metadata, worker transcript skeleton, and commit `b879dc5`. The implementation fully addresses the missing paper-reference regression by making `dashboard-peer-policy-chips` a `variantOf: 'dashboard-policies'` scenario and updating variant identity guards in both scenario gate tests, with no code-level defects found in scope."
+}
