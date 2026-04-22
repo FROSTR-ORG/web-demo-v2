@@ -117,16 +117,50 @@ export type BfOnboardPayload = z.infer<typeof BfOnboardPayloadSchema>;
 export type BfSharePayload = z.infer<typeof BfSharePayloadSchema>;
 export type ProfilePackagePair = z.infer<typeof ProfilePackagePairSchema>;
 
+/**
+ * Decrypted profile-backup payload as returned by the WASM bridge
+ * helper `create_encrypted_profile_backup` (and as consumed by
+ * `build_profile_backup_event` / `encrypt_profile_backup_content` /
+ * `parse_profile_backup_event`). This is the plaintext shape of the
+ * backup — the WASM bridge internally encrypts it and wraps it in a
+ * signed kind-10000 Nostr event, so this type is never transmitted
+ * over the wire in plaintext. Fields are `snake_case` to match the
+ * bifrost-bridge-wasm serde serialization (no `rename_all`).
+ */
 export interface EncryptedProfileBackup {
-  ciphertext: string;
-  nonce: string;
   version: number;
+  device: {
+    name: string;
+    share_public_key: string;
+    manual_peer_policy_overrides: BfManualPeerPolicyOverride[];
+    relays: string[];
+  };
+  group_package: {
+    group_name: string;
+    group_pk: string;
+    threshold: number;
+    members: { idx: number; pubkey: string }[];
+  };
 }
 
 export const EncryptedProfileBackupSchema = z.object({
-  ciphertext: z.string(),
-  nonce: z.string(),
   version: z.number(),
+  device: z.object({
+    name: z.string(),
+    share_public_key: z.string(),
+    manual_peer_policy_overrides: z
+      .array(BfManualPeerPolicyOverrideSchema)
+      .default([]),
+    relays: z.array(z.string()),
+  }),
+  group_package: z.object({
+    group_name: z.string(),
+    group_pk: z.string(),
+    threshold: z.number(),
+    members: z.array(
+      z.object({ idx: z.number(), pubkey: z.string() }),
+    ),
+  }),
 });
 
 export interface ProfileBackupEvent {

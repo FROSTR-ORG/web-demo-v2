@@ -592,8 +592,26 @@ describe("MockAppStateProvider bridge arming", () => {
       },
     }),
     createProfileBackup: async () => ({
-      backup: { ciphertext: "mock", nonce: "mock", version: 1 },
+      backup: {
+        version: 1,
+        device: {
+          name: "mock-device",
+          share_public_key: "mock-pub",
+          manual_peer_policy_overrides: [],
+          relays: [],
+        },
+        group_package: {
+          group_name: "mock-group",
+          group_pk: "mock-gpk",
+          threshold: 2,
+          members: [],
+        },
+      },
       event: { id: "mock", pubkey: "mock", created_at: 0, kind: 30078, tags: [], content: "mock", sig: "mock" },
+    }),
+    publishProfileBackup: async () => ({
+      event: { id: "mock", pubkey: "mock", created_at: 0, kind: 10000, tags: [], content: "mock", sig: "mock" },
+      reached: [],
     }),
     setSignerPaused: () => undefined,
     refreshRuntime: () => undefined,

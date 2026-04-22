@@ -119,6 +119,14 @@ interface SettingsSidebarProps {
   onClearCredentials: () => void;
   onExport: () => void;
   onExportShare: () => void;
+  /**
+   * m6-backup-publish — opens the PublishBackupModal which drives the
+   * encrypted kind-10000 publish flow (VAL-BACKUP-001 through
+   * VAL-BACKUP-007). Optional so existing demo/test callers that
+   * predate the feature continue to render without providing the
+   * handler; callers that OMIT it will hide the action row.
+   */
+  onPublishBackup?: () => void;
 }
 
 export function SettingsSidebar({
@@ -133,6 +141,7 @@ export function SettingsSidebar({
   onClearCredentials,
   onExport,
   onExportShare,
+  onPublishBackup,
 }: SettingsSidebarProps) {
   const navigate = useNavigate();
   const {
@@ -1010,6 +1019,35 @@ export function SettingsSidebar({
                   Export
                 </button>
               </div>
+              {/*
+                m6-backup-publish — "Publish Backup to Relay" action row
+                (VAL-BACKUP-001). Clicking opens the PublishBackupModal
+                which collects a password + confirm, validates strength,
+                and dispatches publishProfileBackup. Rendered only when
+                the parent supplies the handler so demo/test callers
+                that predate the feature keep working unchanged.
+              */}
+              {onPublishBackup && (
+                <div className="settings-action-row">
+                  <div className="settings-action-info">
+                    <div className="settings-action-name">
+                      Publish Backup to Relay
+                    </div>
+                    <div className="settings-action-desc">
+                      Publish an encrypted kind-10000 backup to every
+                      configured relay
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="settings-btn-blue"
+                    onClick={onPublishBackup}
+                    data-testid="settings-publish-backup-btn"
+                  >
+                    Publish
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

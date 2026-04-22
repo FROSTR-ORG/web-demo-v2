@@ -706,6 +706,55 @@ export class RuntimeRelayPump {
     this.onSocketEventHook?.(event);
   }
 
+  /**
+   * m6-backup-publish — publish a single prepared Nostr event to every
+   * relay that is currently `online`. Each relay is dialed in parallel
+   * with independent error handling so one relay failing does not
+   * short-circuit the others. Returns the list of relay URLs that
+   * accepted the publish (`reached`) and the list that rejected or
+   * threw (`failed`). A pump that is stopped, has no online relays, or
+   * was never started resolves to empty arrays. The caller is
+   * responsible for treating "no relays reached" as a user-visible
+   * error state (VAL-BACKUP-007).
+   *
+   * This helper does NOT route through `runtime.drainOutboundEvents()`
+   * because the backup event is constructed in userspace (via
+   * `build_profile_backup_event`) and signed with the share-secret-
+   * derived keypair — it never enters the runtime's outbound queue.
+   */
+  async publishEvent(
+    event: unknown,
+  ): Promise<{ reached: string[]; failed: string[] }> {
+    if (this.stopped) {
+      return { reached: [], failed: [] };
+    }
+    const onlineEntries = this.connections.filter(
+      (entry) =>
+        entry.connection &&
+        this.relayStatusesValue.find((status) => status.url === entry.url)
+          ?.state === "online",
+    );
+    if (onlineEntries.length === 0) {
+      return { reached: [], failed: [] };
+    }
+    const settled = await Promise.allSettled(
+      onlineEntries.map(async (entry) => {
+        await entry.connection!.publish(event);
+        return entry.url;
+      }),
+    );
+    const reached: string[] = [];
+    const failed: string[] = [];
+    settled.forEach((outcome, index) => {
+      if (outcome.status === "fulfilled") {
+        reached.push(outcome.value);
+      } else {
+        failed.push(onlineEntries[index].url);
+      }
+    });
+    return { reached, failed };
+  }
+
   private async publishOutboundEvents(): Promise<void> {
     const events = this.runtime.drainOutboundEvents();
     const online = this.connections.filter(

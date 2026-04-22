@@ -651,6 +651,11 @@ export function MockAppStateProvider({
     [value],
   );
 
+  const publishProfileBackup = useCallback(
+    (password: string) => value.publishProfileBackup(password),
+    [value],
+  );
+
   /**
    * Delegates to the seed's `handleRuntimeCommand`. The default fixture
    * (`createDemoAppState`) supplies a stateful mock that generates fresh
@@ -773,6 +778,7 @@ export function MockAppStateProvider({
       clearCredentials,
       exportRuntimePackages,
       createProfileBackup,
+      publishProfileBackup,
       setSignerPaused,
       restartRuntimeConnections,
     }),
@@ -838,6 +844,7 @@ export function MockAppStateProvider({
       clearCredentials,
       exportRuntimePackages,
       createProfileBackup,
+      publishProfileBackup,
       setSignerPaused,
       restartRuntimeConnections,
     ],

@@ -2,6 +2,7 @@ import type {
   BfOnboardPayload,
   BfProfilePayload,
   CompletedOperation,
+  EncryptedProfileBackup,
   KeysetBundle,
   OnboardingPackageView,
   OnboardingResponse,
@@ -866,7 +867,7 @@ export interface AppStateValue {
   clearCredentials: () => Promise<void>;
   exportRuntimePackages: (password: string) => Promise<RuntimeExportPackages>;
   createProfileBackup: () => Promise<{
-    backup: { ciphertext: string; nonce: string; version: number };
+    backup: EncryptedProfileBackup;
     event: {
       id: string;
       pubkey: string;
@@ -876,6 +877,47 @@ export interface AppStateValue {
       content: string;
       sig: string;
     };
+  }>;
+  /**
+   * m6-backup-publish — build an encrypted profile-backup event and
+   * publish it to every configured relay.
+   *
+   * The event is built via `create_encrypted_profile_backup` +
+   * `build_profile_backup_event` using the active share's secret key so
+   * the author `pubkey` is deterministic per share
+   * (VAL-BACKUP-004). Kind is `profile_backup_event_kind()` (10000),
+   * a NIP-16/33 replaceable event: duplicate publishes from the same
+   * share replace the prior backup on each relay (VAL-BACKUP-006 /
+   * VAL-BACKUP-031).
+   *
+   * The `password` argument is a UI-level gate enforced upstream (the
+   * modal requires `password.length >= 8` with a matching confirm —
+   * VAL-BACKUP-002 / VAL-BACKUP-024 / VAL-BACKUP-025). The password
+   * itself is NOT sent to relays, persisted, or logged
+   * (VAL-BACKUP-003 forbids plaintext in `content`). The mutator
+   * mirrors the modal's policy for defense-in-depth and throws
+   * synchronously when the invariant is violated.
+   *
+   * Throws when:
+   *   - `password.length < 8` (policy threshold mirrored from the modal)
+   *   - No active runtime / profile (locked or wiped)
+   *   - No relays are configured or reachable (VAL-BACKUP-007)
+   *
+   * Returns `{ event, reached }` — the signed event and the list of
+   * relay URLs that accepted the publish. `reached.length === 0` is
+   * treated as an error state inside the mutator.
+   */
+  publishProfileBackup: (password: string) => Promise<{
+    event: {
+      id: string;
+      pubkey: string;
+      created_at: number;
+      kind: number;
+      tags: string[][];
+      content: string;
+      sig: string;
+    };
+    reached: string[];
   }>;
   setSignerPaused: (paused: boolean) => void;
   refreshRuntime: () => void;

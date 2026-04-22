@@ -641,4 +641,100 @@ describe("RuntimeRelayPump", () => {
       });
     },
   );
+
+  /**
+   * m6-backup-publish — `publishEvent` is the direct-publish API used
+   * by `AppStateProvider.publishProfileBackup`. It publishes a prepared
+   * Nostr event to every online relay in parallel with independent
+   * error handling so one relay failing does not short-circuit the
+   * others (VAL-BACKUP-002 / VAL-BACKUP-006 / VAL-BACKUP-007).
+   */
+  describe("publishEvent (m6-backup-publish)", () => {
+    it("publishes a prepared event to every online relay and returns `reached`", async () => {
+      const runtime = new FakeRuntime();
+      const relayA = new FakeRelayConnection("wss://relay-a.test");
+      const relayB = new FakeRelayConnection("wss://relay-b.test");
+      const pump = new RuntimeRelayPump({
+        runtime: runtime as never,
+        relays: ["wss://relay-a.test", "wss://relay-b.test"],
+        relayClient: new FakeRelayClient([relayA, relayB]),
+        eventKind: 27000,
+      });
+      await pump.start();
+
+      const backupEvent = {
+        id: "event-id",
+        pubkey: "share-pubkey",
+        kind: 10000,
+        content: "ciphertext",
+        tags: [],
+        sig: "sig",
+        created_at: 1_700_000_000,
+      };
+      const outcome = await pump.publishEvent(backupEvent);
+      expect(outcome.reached.sort()).toEqual([
+        "wss://relay-a.test",
+        "wss://relay-b.test",
+      ]);
+      expect(outcome.failed).toEqual([]);
+      expect(relayA.publishes).toEqual([backupEvent]);
+      expect(relayB.publishes).toEqual([backupEvent]);
+    });
+
+    it("returns `failed` for relays whose publish rejected without failing the whole call", async () => {
+      const runtime = new FakeRuntime();
+      const good = new FakeRelayConnection("wss://good.test");
+      const bad = new FakeRelayConnection("wss://bad.test", {
+        publishError: new Error("publish denied"),
+      });
+      const pump = new RuntimeRelayPump({
+        runtime: runtime as never,
+        relays: ["wss://good.test", "wss://bad.test"],
+        relayClient: new FakeRelayClient([good, bad]),
+        eventKind: 27000,
+      });
+      await pump.start();
+
+      const outcome = await pump.publishEvent({ id: "event-id" });
+      expect(outcome.reached).toEqual(["wss://good.test"]);
+      expect(outcome.failed).toEqual(["wss://bad.test"]);
+      expect(good.publishes).toEqual([{ id: "event-id" }]);
+      expect(bad.publishes).toEqual([]);
+    });
+
+    it("returns empty arrays when no relays are online (VAL-BACKUP-007)", async () => {
+      const runtime = new FakeRuntime();
+      const offline = new FakeRelayConnection("wss://offline.test", {
+        connectError: new Error("offline"),
+      });
+      const pump = new RuntimeRelayPump({
+        runtime: runtime as never,
+        relays: ["wss://offline.test"],
+        relayClient: new FakeRelayClient([offline]),
+        eventKind: 27000,
+      });
+      await pump.start();
+
+      const outcome = await pump.publishEvent({ id: "never-reaches" });
+      expect(outcome.reached).toEqual([]);
+      expect(outcome.failed).toEqual([]);
+      expect(offline.publishes).toEqual([]);
+    });
+
+    it("returns empty arrays when the pump is stopped", async () => {
+      const runtime = new FakeRuntime();
+      const relay = new FakeRelayConnection("wss://relay.test");
+      const pump = new RuntimeRelayPump({
+        runtime: runtime as never,
+        relays: ["wss://relay.test"],
+        relayClient: new FakeRelayClient([relay]),
+        eventKind: 27000,
+      });
+      await pump.start();
+      pump.stop();
+      const outcome = await pump.publishEvent({ id: "never" });
+      expect(outcome.reached).toEqual([]);
+      expect(outcome.failed).toEqual([]);
+    });
+  });
 });

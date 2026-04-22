@@ -255,6 +255,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const relayPumpRef = useRef<RuntimeRelayPump | null>(null);
   const liveRelayUrlsRef = useRef<string[]>([]);
   /**
+   * m6-backup-publish — most-recent `created_at` (seconds) emitted by
+   * {@link publishProfileBackup} in this session. Used to bump the
+   * next publish's timestamp monotonically so two rapid-fire publishes
+   * always produce strictly newer replaceable events (VAL-BACKUP-031).
+   * `null` until the first publish.
+   */
+  const lastBackupPublishSecondsRef = useRef<number | null>(null);
+  /**
    * Serialised shape of the most-recent command dispatched via
    * `handleRuntimeCommand`. Used to debounce rapid-fire identical dispatches
    * (e.g. double-clicked buttons) — see VAL-OPS-019 for the contract.
@@ -2704,6 +2712,77 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return { backup, event };
   }, [activeProfile]);
 
+  /**
+   * m6-backup-publish — build + publish an encrypted profile backup as
+   * a signed kind-10000 Nostr event to every configured relay. See
+   * `AppStateValue.publishProfileBackup` JSDoc for the full contract.
+   *
+   * Password is validated here for defense-in-depth even though the
+   * PublishBackupModal gates the CTA upstream (VAL-BACKUP-024 /
+   * VAL-BACKUP-025). We throw the same user-facing copy as the modal
+   * so a direct call from a test or a future alternative surface
+   * surfaces the same message.
+   *
+   * Monotonic `created_at`: if this device has already published a
+   * backup in the current session, the next publish is bumped by at
+   * least one second so relays (and the user's own "last publish"
+   * timestamp) see a strictly newer replaceable event — even if two
+   * calls race within the same wall-clock second (VAL-BACKUP-031).
+   */
+  const publishProfileBackup = useCallback(
+    async (password: string) => {
+      if (typeof password !== "string" || password.length < 8) {
+        throw new Error("Password must be at least 8 characters.");
+      }
+      const runtime = runtimeRef.current;
+      const profile = activeProfileRef.current ?? activeProfile;
+      if (!runtime || !profile) {
+        throw new Error(
+          "No unlocked runtime is available to publish a backup.",
+        );
+      }
+      const pump = relayPumpRef.current;
+      const configuredRelays = profile.relays ?? [];
+      if (configuredRelays.length === 0 || !pump) {
+        throw new Error("No relays available to publish to.");
+      }
+      const snapshot = runtime.snapshot();
+      const payload = profilePayloadForShare({
+        profileId: profile.id,
+        deviceName: profile.deviceName,
+        share: snapshot.bootstrap.share,
+        group: snapshot.bootstrap.group,
+        relays: profile.relays,
+        manualPeerPolicyOverrides: defaultManualPeerPolicyOverrides(
+          snapshot.bootstrap.group,
+          snapshot.bootstrap.share.idx,
+        ),
+      });
+      const backup = await createEncryptedProfileBackup(payload);
+      // Bump created_at monotonically vs the most recent publish from
+      // this session so rapid duplicates surface as strictly newer
+      // replaceable events (VAL-BACKUP-031).
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const lastSeconds = lastBackupPublishSecondsRef.current;
+      const createdAtSeconds =
+        typeof lastSeconds === "number" && nowSeconds <= lastSeconds
+          ? lastSeconds + 1
+          : nowSeconds;
+      lastBackupPublishSecondsRef.current = createdAtSeconds;
+      const event = await buildProfileBackupEvent({
+        shareSecret: snapshot.bootstrap.share.seckey,
+        backup,
+        createdAtSeconds,
+      });
+      const result = await pump.publishEvent(event);
+      if (result.reached.length === 0) {
+        throw new Error("No relays available to publish to.");
+      }
+      return { event, reached: result.reached };
+    },
+    [activeProfile],
+  );
+
   const restartRuntimeConnections = useCallback(async () => {
     const runtime = runtimeRef.current;
     if (!runtime) {
@@ -3426,6 +3505,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       clearCredentials,
       exportRuntimePackages,
       createProfileBackup,
+      publishProfileBackup,
       setSignerPaused,
       refreshRuntime,
       restartRuntimeConnections,
@@ -3493,6 +3573,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       clearCredentials,
       exportRuntimePackages,
       createProfileBackup,
+      publishProfileBackup,
       setSignerPaused,
       refreshRuntime,
       restartRuntimeConnections,
@@ -3540,6 +3621,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           peer: string;
           nonces: DerivedPublicNonceWire[];
         }>;
+        // Multi-device e2e specs that exercise profile-bound mutators
+        // (e.g. publishProfileBackup, updateRelays) need an
+        // `activeProfile` record alongside the live runtime. Supplying
+        // `persistProfile: { password }` drives the normal
+        // `savePayloadAsProfile` path so IndexedDB contains an
+        // encrypted profile and `setActiveProfile` is called. Without
+        // it, the seed hook stays in its original no-persist mode.
+        persistProfile?: {
+          password: string;
+          label?: string;
+        };
       }) => Promise<void>;
       __iglooTestCreateKeysetBundle?: typeof createKeysetBundle;
       __iglooTestMemberPubkey32?: (
@@ -3674,8 +3766,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // When `persistProfile` is set we need the `profile_id` to match
+      // the value the WASM bridge derives from the share secret
+      // (otherwise `createProfilePackagePair` throws
+      // "Invalid profile id"). Leaving it empty lets
+      // `profileRuntime.buildStoredProfileRecord` derive the correct
+      // id via `deriveProfileIdFromShareSecret`.
+      const profileId = input.persistProfile
+        ? ""
+        : `igloo-test-${input.share.idx}`;
       const payload: BfProfilePayload = {
-        profile_id: `igloo-test-${input.share.idx}`,
+        profile_id: profileId,
         version: 1,
         device: {
           name: input.deviceName ?? `Test Device ${input.share.idx}`,
@@ -3685,6 +3786,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         },
         group_package: input.group,
       };
+      if (input.persistProfile) {
+        // Drive the real save-and-activate path so `activeProfile` is
+        // populated alongside the runtime — required for mutators
+        // like `publishProfileBackup` and `updateRelays`.
+        await savePayloadAsProfile(payload, input.persistProfile.password, {
+          label: input.persistProfile.label,
+        });
+        return;
+      }
       await startRuntimeFromPayload(payload, input.share.idx);
     };
     globalWindow.__iglooTestCreateKeysetBundle = createKeysetBundle;
@@ -3833,7 +3943,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         delete globalWindow.__appState;
       }
     };
-  }, [value, startRuntimeFromPayload, applyRuntimeStatus, setRuntime]);
+  }, [
+    value,
+    startRuntimeFromPayload,
+    applyRuntimeStatus,
+    setRuntime,
+    savePayloadAsProfile,
+  ]);
 
   return (
     <AppStateContext.Provider value={value}>

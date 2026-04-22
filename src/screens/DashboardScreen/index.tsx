@@ -15,6 +15,10 @@ import { ClearCredentialsModal } from "./modals/ClearCredentialsModal";
 import { ExportCompleteModal } from "./modals/ExportCompleteModal";
 import { ExportProfileModal } from "./modals/ExportProfileModal";
 import { PolicyPromptModal } from "./modals/PolicyPromptModal";
+import {
+  PublishBackupModal,
+  type PublishBackupResult,
+} from "./modals/PublishBackupModal";
 import { SigningFailedModal } from "./modals/SigningFailedModal";
 import { DashboardSummaryBar } from "./panels/DashboardSummaryBar";
 import { MockStateToggle } from "./panels/MockStateToggle";
@@ -150,6 +154,11 @@ export function DashboardScreen() {
     refreshRuntime,
     exportRuntimePackages = async () => {
       throw new Error("Export is unavailable for this profile.");
+    },
+    publishProfileBackup = async () => {
+      throw new Error(
+        "Publish Backup is unavailable for this profile.",
+      );
     },
     restartRuntimeConnections = async () => undefined,
     runtimeFailures = [],
@@ -702,6 +711,27 @@ export function DashboardScreen() {
     setActiveModal("export-profile");
   }
 
+  /**
+   * m6-backup-publish — open the PublishBackupModal. Dev/demo surfaces
+   * render the modal in the standard mock flow but the runtime publish
+   * path below short-circuits the actual pump publish for mocks (see
+   * `handlePublishBackup`). VAL-BACKUP-001.
+   */
+  function handleOpenPublishBackup() {
+    setActiveModal("publish-backup");
+  }
+
+  async function handlePublishBackup(
+    password: string,
+  ): Promise<PublishBackupResult> {
+    const outcome = await publishProfileBackup(password);
+    return {
+      reached: outcome.reached,
+      eventId: outcome.event.id,
+      createdAt: outcome.event.created_at,
+    };
+  }
+
   async function handleExport(password: string) {
     if (paperPanels) {
       setExportResult({ mode: exportMode, packageText: mockPackageForMode(exportMode) });
@@ -968,6 +998,15 @@ export function DashboardScreen() {
           onDone={closeExportModal}
         />
       )}
+      {activeModal === "publish-backup" && (
+        <PublishBackupModal
+          groupName={activeProfile.groupName}
+          shareIdx={runtimeStatus.metadata.member_idx}
+          relayCount={activeProfile.relays.length}
+          onCancel={() => setActiveModal("none")}
+          onPublish={handlePublishBackup}
+        />
+      )}
 
       {settingsOpen && (
         <SettingsSidebar
@@ -989,6 +1028,7 @@ export function DashboardScreen() {
             handleOpenExport("profile");
           }}
           onExportShare={() => handleOpenExport("share")}
+          onPublishBackup={handleOpenPublishBackup}
         />
       )}
     </AppShell>
