@@ -1,0 +1,53 @@
+{
+  "groupId": "g7-backup-028-rerun",
+  "testedAt": "2026-04-22T23:10:42Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "assignedAssertions": [
+      "VAL-BACKUP-028"
+    ]
+  },
+  "toolsUsed": [
+    "vitest"
+  ],
+  "commandsRun": [
+    {
+      "command": "npx vitest run src/screens/__tests__/CreateFlow.test.tsx -t \"VAL-BACKUP-028\"",
+      "exitCode": 0,
+      "status": "pass",
+      "evidence": {
+        "commandFile": "m6-backup/g7-backup-028-rerun/command.txt",
+        "transcript": "m6-backup/g7-backup-028-rerun/transcript.txt",
+        "exitCodeFile": "m6-backup/g7-backup-028-rerun/exit_code.txt",
+        "snippet": "Tests 2 passed | 24 skipped (26)"
+      }
+    }
+  ],
+  "assertions": [
+    {
+      "id": "VAL-BACKUP-028",
+      "title": "Pasted nsec whitespace is trimmed without losing material",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run exact rerun command from repo root",
+          "expected": "VAL-BACKUP-028 targeted test(s) execute and pass (not skipped)",
+          "observed": "Vitest ran src/screens/__tests__/CreateFlow.test.tsx with 2 passed and 24 skipped, confirming targeted VAL-BACKUP-028 tests executed and passed."
+        }
+      ],
+      "evidence": {
+        "command": "npx vitest run src/screens/__tests__/CreateFlow.test.tsx -t \"VAL-BACKUP-028\"",
+        "commandFile": "m6-backup/g7-backup-028-rerun/command.txt",
+        "transcript": "m6-backup/g7-backup-028-rerun/transcript.txt",
+        "exitCode": 0,
+        "exitCodeFile": "m6-backup/g7-backup-028-rerun/exit_code.txt",
+        "consoleSummary": "N/A (CLI vitest rerun)"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Executed the exact required Vitest command once from repo root; targeted VAL-BACKUP-028 tests executed and passed (2 passed, not skipped), so assertion status is pass."
+}

@@ -151,6 +151,13 @@ These dev-gated hooks (`import.meta.env.DEV`) surface evidence that agent-browse
 
 All hooks are **DEV-only**. If your validation runs a production build (`vite build` / served from `dist/`), the hooks are absent by design — fall back to capturing app-level state via `window.__appState.runtimeStatus` / `.runtimeRelays` only.
 
+## Flow Validator Guidance: playwright-cli
+
+- Isolation boundary: each validator subagent must run Playwright commands from the repo root and write artifacts only under `.factory/validation/<milestone>/user-testing/flows/` plus `{missionDir}/evidence/<milestone>/...`.
+- Port safety: `backup-publish.spec.ts` and `backup-publish-restore-live.spec.ts` both use relay port `8194`; **do not run them concurrently**.
+- Authoritative harness rule: for `VAL-BACKUP-006/010/013/030/031`, treat a passing `src/e2e/multi-device/backup-publish-restore-live.spec.ts` run as canonical evidence.
+- Command shape: use `npx playwright test <spec> --project=desktop --workers 1` to avoid cross-test state bleed.
+
 ## Observed Tooling Notes (m2-approvals)
 
 - For policy-prompt queue assertions, sample modal/queue DOM state after a short post-enqueue wait (~250-350ms) to avoid React commit race conditions.
@@ -201,3 +208,5 @@ The spec self-hosts an isolated `bifrost-devtools` relay on `ws://127.0.0.1:8194
 - Console errors inside each page are forwarded to stdout so validators can inspect them in-line if the spec ever regresses.
 
 **Related deviation**: `docs/runtime-deviations-from-paper.md > Local bifrost-devtools relay does NOT enforce NIP-16/33 replaceable semantics (VAL-BACKUP-006 / VAL-BACKUP-031)` covers the NIP-16/33 gap and the rationale for treating the spec as the canonical evidence.
+
+- For `VAL-BACKUP-028` targeted reruns, use `-t "VAL-BACKUP-028"` (not the full literal test title with parentheses). Vitest `-t` is a regex; unescaped parentheses in the full literal title can produce a no-match all-skipped run.

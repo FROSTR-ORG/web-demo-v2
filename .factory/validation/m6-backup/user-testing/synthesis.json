@@ -1,92 +1,46 @@
 {
   "milestone": "m6-backup",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "assertionsSummary": {
-    "total": 33,
-    "passed": 26,
-    "failed": 2,
-    "blocked": 5
+    "total": 7,
+    "passed": 7,
+    "failed": 0,
+    "blocked": 0
   },
   "passedAssertions": [
-    "VAL-BACKUP-001",
-    "VAL-BACKUP-002",
-    "VAL-BACKUP-003",
-    "VAL-BACKUP-004",
-    "VAL-BACKUP-005",
-    "VAL-BACKUP-008",
-    "VAL-BACKUP-009",
-    "VAL-BACKUP-011",
-    "VAL-BACKUP-012",
-    "VAL-BACKUP-014",
-    "VAL-BACKUP-015",
-    "VAL-BACKUP-016",
-    "VAL-BACKUP-017",
-    "VAL-BACKUP-018",
-    "VAL-BACKUP-019",
-    "VAL-BACKUP-020",
-    "VAL-BACKUP-021",
-    "VAL-BACKUP-022",
-    "VAL-BACKUP-023",
-    "VAL-BACKUP-024",
-    "VAL-BACKUP-025",
-    "VAL-BACKUP-026",
-    "VAL-BACKUP-027",
-    "VAL-BACKUP-029",
-    "VAL-BACKUP-032",
-    "VAL-CROSS-007"
+    "VAL-BACKUP-006",
+    "VAL-BACKUP-007",
+    "VAL-BACKUP-010",
+    "VAL-BACKUP-013",
+    "VAL-BACKUP-028",
+    "VAL-BACKUP-030",
+    "VAL-BACKUP-031"
   ],
-  "failedAssertions": [
-    {
-      "id": "VAL-BACKUP-007",
-      "reason": "Publish showed inline no-relay error but no corresponding runtime event-log failure entry was recorded."
-    },
-    {
-      "id": "VAL-BACKUP-028",
-      "reason": "Whitespace-wrapped nsec validated on submit, but input value remained untrimmed before submit (strict in-field trim requirement not met)."
-    }
-  ],
-  "blockedAssertions": [
-    {
-      "id": "VAL-BACKUP-006",
-      "blockedBy": "Local bifrost-devtools relay query returned multiple kind=10000 events for same author after duplicate publish, preventing strict replaceable single-winner verification."
-    },
-    {
-      "id": "VAL-BACKUP-010",
-      "blockedBy": "Restore emitted expected kind=10000 author-filter subscription, but no matching backup event was retrievable from queried relays in this run."
-    },
-    {
-      "id": "VAL-BACKUP-013",
-      "blockedBy": "Blocked by restore success-path retrieval issue (VAL-BACKUP-010), so restored-profile unlock/runtime bootstrap could not be exercised."
-    },
-    {
-      "id": "VAL-BACKUP-030",
-      "blockedBy": "Blocked by restore success-path retrieval issue (VAL-BACKUP-010), so duplicate-restore idempotence could not be exercised."
-    },
-    {
-      "id": "VAL-BACKUP-031",
-      "blockedBy": "Local bifrost-devtools relay returned multiple events after rapid same-author publishes, blocking replaceable-event race winner verification."
-    }
-  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
   "appliedUpdates": [
     {
       "target": "user-testing.md",
-      "description": "Added m6-backup tooling notes documenting local relay replaceable-query behavior, relay-restore retrieval blocker, and nsec whitespace-trim contract mismatch observed in flow reports.",
-      "source": "flow-report"
+      "description": "Added Flow Validator Guidance: playwright-cli section with serial port-8194 rule and authoritative harness rule for VAL-BACKUP-006/010/013/030/031.",
+      "source": "setup"
     }
   ],
   "flowReports": [
-    ".factory/validation/m6-backup/user-testing/flows/g1-backup-publish-core.json",
-    ".factory/validation/m6-backup/user-testing/flows/g2-backup-publish-relay.json",
-    ".factory/validation/m6-backup/user-testing/flows/g3-backup-restore.json",
-    ".factory/validation/m6-backup/user-testing/flows/g4-backup-qr-camera.json",
-    ".factory/validation/m6-backup/user-testing/flows/g5-backup-nsec-create.json"
+    {
+      "groupId": "g6-backup-rerun-fixes",
+      "file": ".factory/validation/m6-backup/user-testing/flows/g6-backup-rerun-fixes.json"
+    },
+    {
+      "groupId": "g7-backup-028-rerun",
+      "file": ".factory/validation/m6-backup/user-testing/flows/g7-backup-028-rerun.json"
+    }
   ],
-  "previousRound": null,
   "toolsUsed": [
-    "agent-browser",
-    "python3",
-    "node"
+    "playwright-cli",
+    "vitest"
   ],
-  "generatedAt": "2026-04-22T22:35:00Z"
+  "dedupedBlockers": [],
+  "previousRound": ".factory/validation/m6-backup/user-testing/synthesis.round1.json",
+  "generatedAt": "2026-04-22T23:12:17Z"
 }
