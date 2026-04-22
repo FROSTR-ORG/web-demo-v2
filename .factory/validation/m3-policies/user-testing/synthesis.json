@@ -1,69 +1,29 @@
 {
   "milestone": "m3-policies",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "assertionsSummary": {
-    "total": 27,
-    "passed": 23,
+    "total": 4,
+    "passed": 4,
     "failed": 0,
-    "blocked": 4
+    "blocked": 0
   },
   "passedAssertions": [
-    "VAL-POLICIES-001",
-    "VAL-POLICIES-002",
-    "VAL-POLICIES-003",
-    "VAL-POLICIES-004",
-    "VAL-POLICIES-005",
-    "VAL-POLICIES-006",
-    "VAL-POLICIES-008",
-    "VAL-POLICIES-010",
-    "VAL-POLICIES-011",
-    "VAL-POLICIES-012",
-    "VAL-POLICIES-013",
-    "VAL-POLICIES-014",
-    "VAL-POLICIES-015",
-    "VAL-POLICIES-016",
-    "VAL-POLICIES-017",
-    "VAL-POLICIES-018",
-    "VAL-POLICIES-019",
-    "VAL-POLICIES-020",
-    "VAL-POLICIES-021",
-    "VAL-POLICIES-022",
-    "VAL-POLICIES-024",
-    "VAL-POLICIES-025",
-    "VAL-POLICIES-026"
+    "VAL-POLICIES-007",
+    "VAL-POLICIES-009",
+    "VAL-POLICIES-023",
+    "VAL-CROSS-003"
   ],
   "failedAssertions": [],
-  "blockedAssertions": [
-    {
-      "id": "VAL-CROSS-003",
-      "blockedBy": "Available existing tests run for this assignment do not fully cover the contract's allow-once retry-success multi-device sequence."
-    },
-    {
-      "id": "VAL-POLICIES-007",
-      "blockedBy": "Direct contract timing requirement (\u2264500ms UI propagation) is not asserted by available existing tests run in this assignment."
-    },
-    {
-      "id": "VAL-POLICIES-009",
-      "blockedBy": "Assigned test command did not include a direct clear_policy_overrides validation for VAL-POLICIES-009, so this assertion could not be conclusively validated from available evidence."
-    },
-    {
-      "id": "VAL-POLICIES-023",
-      "blockedBy": "No existing test run here directly validates VAL-POLICIES-023 last-writer-wins + both-tab convergence within 2s."
-    }
-  ],
+  "blockedAssertions": [],
   "appliedUpdates": [],
-  "previousRound": null,
+  "previousRound": ".factory/validation/m3-policies/user-testing/synthesis.round1.json",
   "flowReports": [
-    ".factory/validation/m3-policies/user-testing/flows/group-default-signer-policies.json",
-    ".factory/validation/m3-policies/user-testing/flows/group-denial-roundtrip.json",
-    ".factory/validation/m3-policies/user-testing/flows/group-peer-policies-view.json",
-    ".factory/validation/m3-policies/user-testing/flows/group-persistence-cleanup.json",
-    ".factory/validation/m3-policies/user-testing/flows/group-policy-chip-cycle.json"
+    ".factory/validation/m3-policies/user-testing/flows/group-rerun-policy-gaps.json"
   ],
   "toolsUsed": [
     "playwright",
     "vitest"
   ],
-  "generatedAt": "2026-04-22T13:29:05Z"
+  "generatedAt": "2026-04-22T14:51:48Z"
 }

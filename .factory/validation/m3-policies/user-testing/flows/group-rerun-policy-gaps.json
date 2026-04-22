@@ -1,0 +1,101 @@
+{
+  "groupId": "group-rerun-policy-gaps",
+  "testedAt": "2026-04-22T14:49:55Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "relayUrl": "ws://127.0.0.1:8194",
+    "flowValidatorGuidance": "Flow Validator Guidance: test-observability hooks (DEV only)",
+    "singleValidator": true
+  },
+  "toolsUsed": [
+    "playwright",
+    "vitest"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-POLICIES-007",
+      "title": "Setting a manual override propagates to the UI in under 500 ms",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `npx playwright test src/e2e/multi-device/policy-propagation-timing.spec.ts --project=desktop --workers 1 --repeat-each=3`",
+          "expected": "Exit code 0 and propagation timings remain <=500 ms across repeats.",
+          "observed": "EXIT_CODE:0; 3/3 passed; logged propagation elapsed samples (ms): 29.90, 26.60, 26.50 / 29.60, 27.10, 27.30 / 29.90, 27.20, 26.30."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m3-policies/group-rerun-policy-gaps/VAL-POLICIES-007-playwright.log"
+        ],
+        "consoleErrors": "N/A (CLI rerun command output only)",
+        "network": "N/A (covered by Playwright spec internals)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-POLICIES-009",
+      "title": "clear_policy_overrides resets the entire matrix",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `npx vitest run src/app/__tests__/clearPolicyOverrides.test.tsx --config vitest.config.ts`",
+          "expected": "Exit code 0 with matrix-clear behavior tests passing.",
+          "observed": "EXIT_CODE:0; test file passed; 3/3 tests passed including matrix-wide reset and RuntimeClient.clearPolicyOverrides wrapper delegation."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m3-policies/group-rerun-policy-gaps/VAL-POLICIES-009-vitest.log"
+        ],
+        "consoleErrors": "N/A (CLI unit test run)",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-POLICIES-023",
+      "title": "Concurrent multi-tab policy writes converge without loss",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `npx playwright test src/e2e/multi-tab/policy-lww-convergence.spec.ts --project=desktop --workers 1 --repeat-each=3`",
+          "expected": "Exit code 0 and LWW convergence in <=2s without row loss.",
+          "observed": "EXIT_CODE:0; 3/3 passed; logged convergence elapsed samples: A=113/B=113 ms, A=112/B=112 ms, A=113/B=166 ms."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m3-policies/group-rerun-policy-gaps/VAL-POLICIES-023-playwright.log"
+        ],
+        "consoleErrors": "N/A (CLI rerun command output only)",
+        "network": "N/A (covered by Playwright spec internals)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-003",
+      "title": "Policy denial round-trip with runtime Allow-Once (M2 + M3)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `npx playwright test src/e2e/multi-device/policy-denial-allow-once-retry.spec.ts --project=desktop --workers 1 --repeat-each=3`",
+          "expected": "Exit code 0 and full denial -> allow-once -> retry-success flow passes repeatedly.",
+          "observed": "EXIT_CODE:0; 3/3 passed; each run validated deny then allow-once retry success and confirmed allow-once did not persist."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m3-policies/group-rerun-policy-gaps/VAL-CROSS-003-playwright.log"
+        ],
+        "consoleErrors": "N/A (CLI rerun command output only)",
+        "network": "N/A (covered by Playwright spec internals)"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 4 assertions in rerun scope via required commands: 4 passed, 0 failed, 0 blocked."
+}
