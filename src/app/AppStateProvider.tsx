@@ -2291,6 +2291,31 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [reloadProfiles, setRuntime],
   );
 
+  /**
+   * m5-change-password — rotate the stored profile's encryption
+   * passphrase. The existing decrypt → re-encrypt round-trip through
+   * `decodeProfilePackage` + `buildStoredProfileRecord` is already
+   * wired; this mutator additionally enforces:
+   *
+   *   - Minimum length of 8 characters on the new password
+   *     (VAL-SETTINGS-028) — the UI enforces this live for Save-button
+   *     gating but we repeat the guard here so direct provider callers
+   *     (tests, programmatic callers) cannot bypass it.
+   *   - New password ≠ current password (VAL-SETTINGS-026). Rotating
+   *     to the same passphrase is a no-op that would still rewrite the
+   *     stored record; we reject it pre-flight so the caller sees a
+   *     stable, testable error.
+   *   - Wrong-current normalization (VAL-SETTINGS-019): a
+   *     `BifrostPackageError` with `code === "wrong_password"` from
+   *     the decrypt path is re-thrown with the canonical
+   *     `"Current password is incorrect."` message so every consumer
+   *     (SettingsSidebar and any future caller) can detect and render
+   *     the same string without re-hardcoding it.
+   *
+   * On success, the in-memory `unlockedPayloadRef` / `unlockedPasswordRef`
+   * are refreshed so subsequent always-* overrides re-encrypt against
+   * the new password.
+   */
   const changeProfilePassword = useCallback(
     async (oldPassword: string, newPassword: string) => {
       if (!activeProfile) {
@@ -2299,14 +2324,28 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (newPassword.length < 8) {
         throw new Error("New password must be at least 8 characters.");
       }
+      if (newPassword === oldPassword) {
+        throw new Error("New password must differ from current.");
+      }
       const record = await getProfile(activeProfile.id);
       if (!record) {
         throw new Error("Profile record not found.");
       }
-      const payload = await decodeProfilePackage(
-        record.encryptedProfilePackage,
-        oldPassword,
-      );
+      let payload;
+      try {
+        payload = await decodeProfilePackage(
+          record.encryptedProfilePackage,
+          oldPassword,
+        );
+      } catch (error) {
+        if (
+          error instanceof BifrostPackageError &&
+          error.code === "wrong_password"
+        ) {
+          throw new Error("Current password is incorrect.");
+        }
+        throw error;
+      }
       const { record: updatedRecord, normalizedPayload } =
         await buildStoredProfileRecord(payload, newPassword, {
           createdAt: record.summary.createdAt,

@@ -29,6 +29,35 @@ export { PROFILE_NAME_MAX_LENGTH };
 export { RELAY_DUPLICATE_ERROR, RELAY_INVALID_URL_ERROR };
 
 /**
+ * Minimum length enforced on the Change Password flow. Matches the
+ * length enforced in `AppStateProvider.changeProfilePassword` so the
+ * UI can reject sub-minimum inputs before dispatch (VAL-SETTINGS-028).
+ */
+export const CHANGE_PASSWORD_MIN_LENGTH = 8;
+
+/**
+ * Inline-validation copy surfaced by the Change Password flow. Exported
+ * so component tests can assert on the exact strings (and so the UI /
+ * provider error normaliser share a single canonical message).
+ *
+ * - `*_TOO_SHORT`: new password fails `length >= CHANGE_PASSWORD_MIN_LENGTH`
+ *   (VAL-SETTINGS-028).
+ * - `*_MISMATCH`:  confirm-new-password differs from new password
+ *   (VAL-SETTINGS-027).
+ * - `*_SAME_AS_CURRENT`: new password equals current password
+ *   (VAL-SETTINGS-026).
+ * - `*_WRONG_CURRENT`: current password did not decrypt the stored
+ *   profile (VAL-SETTINGS-019).
+ */
+export const CHANGE_PASSWORD_TOO_SHORT_ERROR =
+  `New password must be at least ${CHANGE_PASSWORD_MIN_LENGTH} characters.`;
+export const CHANGE_PASSWORD_MISMATCH_ERROR = "Passwords do not match.";
+export const CHANGE_PASSWORD_SAME_AS_CURRENT_ERROR =
+  "New password must differ from current.";
+export const CHANGE_PASSWORD_WRONG_CURRENT_ERROR =
+  "Current password is incorrect.";
+
+/**
  * Placeholder shown in the Group Profile "Created" / "Updated" cells
  * when the active profile lacks a timestamp entirely (e.g. pre-bridge
  * demo fixtures). Keeps the row layout stable without rendering a
@@ -219,15 +248,102 @@ export function SettingsSidebar({
     }
   }
 
+  // Live-validation state for the Change Password flow. Each error
+  // message is canonical (exported from this module) so component tests
+  // and VAL-SETTINGS-018 / 019 / 026 / 027 / 028 evidence can pin on
+  // identical strings.
+  //
+  // The submit button is disabled when the form is definitely not
+  // dispatchable (empty current, short new, confirm mismatch, new ===
+  // current). Inline errors surface regardless of disabled state so the
+  // user understands why the action is blocked. The "wrong current"
+  // message is set only after a dispatched change fails with a
+  // `wrong_password` error so it never appears before any submit.
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const newPasswordTooShort =
+    newPassword.length > 0 && newPassword.length < CHANGE_PASSWORD_MIN_LENGTH;
+  const confirmMismatch =
+    confirmNewPassword.length > 0 && confirmNewPassword !== newPassword;
+  const newSameAsCurrent =
+    oldPassword.length > 0 &&
+    newPassword.length > 0 &&
+    newPassword === oldPassword;
+  // Hide "same as current" error until the user has actually typed a
+  // full new password (>= min length and matching confirm) — otherwise
+  // the message flashes while the user is mid-typing which is noise
+  // rather than signal. The dispatch-time guard still enforces the
+  // invariant on a click-through (see `handleChangePassword`).
+  const showSameAsCurrent =
+    newSameAsCurrent &&
+    newPassword.length >= CHANGE_PASSWORD_MIN_LENGTH &&
+    confirmNewPassword === newPassword;
+  const changePasswordDisabled =
+    oldPassword.length === 0 ||
+    newPassword.length === 0 ||
+    confirmNewPassword.length === 0 ||
+    newPasswordTooShort ||
+    confirmMismatch ||
+    newSameAsCurrent;
+  const liveValidationError: string = newPasswordTooShort
+    ? CHANGE_PASSWORD_TOO_SHORT_ERROR
+    : confirmMismatch
+    ? CHANGE_PASSWORD_MISMATCH_ERROR
+    : showSameAsCurrent
+    ? CHANGE_PASSWORD_SAME_AS_CURRENT_ERROR
+    : "";
+  const inlinePasswordError = passwordError || liveValidationError;
+
+  /**
+   * Normalise a thrown error into the canonical "Current password is
+   * incorrect." copy when the backend rejects with `wrong_password`
+   * (from `decodeProfilePackage`), or when an upstream surface has
+   * already mapped to that copy. This lets the UI display a stable,
+   * user-facing message regardless of whether the mutator throws a
+   * `BifrostPackageError` directly or a generic Error.
+   */
+  function mapChangePasswordError(err: unknown): string {
+    // BifrostPackageError carries a structured `code` field.
+    if (
+      err &&
+      typeof err === "object" &&
+      "code" in err &&
+      (err as { code?: string }).code === "wrong_password"
+    ) {
+      return CHANGE_PASSWORD_WRONG_CURRENT_ERROR;
+    }
+    const message =
+      err instanceof Error ? err.message : "Unable to change password.";
+    // The backend also normalises its own wrong-current error to this
+    // canonical message; keep it stable.
+    if (message === CHANGE_PASSWORD_WRONG_CURRENT_ERROR) {
+      return message;
+    }
+    // Heuristic fallback: any message containing "wrong password" or
+    // "incorrect" near "password" → canonical copy.
+    if (/wrong\s*password|incorrect.*password|password.*incorrect/i.test(message)) {
+      return CHANGE_PASSWORD_WRONG_CURRENT_ERROR;
+    }
+    return message;
+  }
+
   async function handleChangePassword() {
+    setSubmitAttempted(true);
     setPasswordError("");
     setPasswordSuccess("");
-    if (newPassword.length < 8) {
-      setPasswordError("New password must be at least 8 characters.");
+
+    if (oldPassword.length === 0) {
+      return;
+    }
+    if (newPassword.length < CHANGE_PASSWORD_MIN_LENGTH) {
+      setPasswordError(CHANGE_PASSWORD_TOO_SHORT_ERROR);
       return;
     }
     if (newPassword !== confirmNewPassword) {
-      setPasswordError("New passwords do not match.");
+      setPasswordError(CHANGE_PASSWORD_MISMATCH_ERROR);
+      return;
+    }
+    if (newPassword === oldPassword) {
+      setPasswordError(CHANGE_PASSWORD_SAME_AS_CURRENT_ERROR);
       return;
     }
     try {
@@ -236,9 +352,10 @@ export function SettingsSidebar({
       setOldPassword("");
       setNewPassword("");
       setConfirmNewPassword("");
+      setSubmitAttempted(false);
       setTimeout(() => setChangingPassword(false), 1500);
     } catch (err) {
-      setPasswordError(err instanceof Error ? err.message : "Unable to change password.");
+      setPasswordError(mapChangePasswordError(err));
     }
   }
 
@@ -472,7 +589,26 @@ export function SettingsSidebar({
                 <span className="settings-row-label">Profile Password</span>
                 <div className="settings-row-value">
                   <span>••••••••</span>
-                  <button type="button" className="settings-change-btn" onClick={() => setChangingPassword((prev) => !prev)}>
+                  <button
+                    type="button"
+                    className="settings-change-btn"
+                    aria-label={
+                      changingPassword
+                        ? "Cancel change password"
+                        : "Change password"
+                    }
+                    onClick={() => {
+                      setChangingPassword((prev) => !prev);
+                      // Reset transient state so toggling Change → Cancel → Change
+                      // never leaves stale errors or partially typed material.
+                      setPasswordError("");
+                      setPasswordSuccess("");
+                      setSubmitAttempted(false);
+                      setOldPassword("");
+                      setNewPassword("");
+                      setConfirmNewPassword("");
+                    }}
+                  >
                     {changingPassword ? "Cancel" : "Change"}
                   </button>
                 </div>
@@ -483,26 +619,56 @@ export function SettingsSidebar({
                     type="password"
                     className="input"
                     placeholder="Current password"
+                    aria-label="Current password"
                     value={oldPassword}
-                    onChange={(e) => setOldPassword(e.target.value)}
+                    onChange={(e) => {
+                      setOldPassword(e.target.value);
+                      if (passwordError) setPasswordError("");
+                    }}
                   />
                   <input
                     type="password"
                     className="input"
                     placeholder="New password"
+                    aria-label="New password"
                     value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      if (passwordError) setPasswordError("");
+                    }}
                   />
                   <input
                     type="password"
                     className="input"
                     placeholder="Confirm new password"
+                    aria-label="Confirm new password"
                     value={confirmNewPassword}
-                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    onChange={(e) => {
+                      setConfirmNewPassword(e.target.value);
+                      if (passwordError) setPasswordError("");
+                    }}
                   />
-                  {passwordError && <span className="field-error-text">{passwordError}</span>}
-                  {passwordSuccess && <span className="import-validation-ok">{passwordSuccess}</span>}
-                  <button type="button" className="button button-primary button-sm" onClick={handleChangePassword}>
+                  {inlinePasswordError && (
+                    <span
+                      className="field-error-text"
+                      role="alert"
+                      data-testid="settings-change-password-error"
+                    >
+                      {inlinePasswordError}
+                    </span>
+                  )}
+                  {passwordSuccess && (
+                    <span className="import-validation-ok" role="status">
+                      {passwordSuccess}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="button button-primary button-sm"
+                    aria-label="Update password"
+                    onClick={handleChangePassword}
+                    disabled={changePasswordDisabled}
+                  >
                     Update Password
                   </button>
                 </div>
