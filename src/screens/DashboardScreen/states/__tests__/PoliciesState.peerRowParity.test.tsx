@@ -74,6 +74,23 @@ describe("PoliciesState ↔ PeerRow parity (VAL-POLICIES-005 / VAL-POLICIES-006)
         can_sign: false,
         should_send_nonces: false,
       },
+      // Offline peer — regression coverage for
+      // `fix-m3-peerrow-badges-render-for-offline-peers`. PeerRow must
+      // still render the four verb badges from `effective_policy.request.*`
+      // so the Peer Policies card and the Peers panel never disagree
+      // for the same (peer, verb) tuple regardless of online state.
+      {
+        idx: 3,
+        pubkey: ["parity-peer-", "dddd3333"].join(""),
+        known: true,
+        last_seen: null,
+        online: false,
+        incoming_available: 0,
+        outgoing_available: 0,
+        outgoing_spent: 0,
+        can_sign: false,
+        should_send_nonces: false,
+      },
     ];
 
     const permissionStates: PeerPermissionState[] = [
@@ -104,6 +121,23 @@ describe("PoliciesState ↔ PeerRow parity (VAL-POLICIES-005 / VAL-POLICIES-006)
           ecdh: "ask",
           ping: "allow",
           onboard: "deny",
+        },
+      },
+      // Offline peer grant matrix — exercised so PeerRow is forced to
+      // surface badges for an offline peer whenever a runtime
+      // permissionState is wired in, matching PoliciesState.
+      {
+        pubkey: peers[3].pubkey,
+        manual_override: null,
+        remote_observation: null,
+        effective_policy: {
+          request: {
+            sign: "allow",
+            ecdh: "deny",
+            ping: "allow",
+            onboard: "allow",
+          },
+          respond: {},
         },
       },
     ];

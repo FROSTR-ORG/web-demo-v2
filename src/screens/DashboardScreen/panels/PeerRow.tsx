@@ -157,7 +157,24 @@ export function PeerRow({
         <span className="peer-index">#{peer.idx}</span>
         <span className="help">·</span>
         <span className="peer-key">{paper ? paperPeerKey(peer.idx, peer.pubkey) : shortHex(peer.pubkey, 12, 8)}</span>
-        {peer.online ? (
+        {/*
+         * Badge rendering rules (VAL-POLICIES-001 cross-surface parity):
+         *   - Runtime mode (`usePolicy === true`, i.e. a live
+         *     `peer_permission_states` snapshot is present): render all
+         *     four verb badges sourced from `effective_policy.request.*`
+         *     regardless of `peer.online`. The PoliciesState card always
+         *     renders one row per peer with its four chips; PeerRow must
+         *     match so the two surfaces never disagree for the same
+         *     (peer, verb) tuple. The offline visual treatment is
+         *     conveyed via the enclosing `.peer-row.offline` container
+         *     (greyed opacity + red online dot) rather than by hiding
+         *     the badges.
+         *   - Legacy / Paper fixture path (`usePolicy === false`): keep
+         *     the historical behaviour of suppressing badges for offline
+         *     peers so the demo-gallery + dashboard-running pixel-parity
+         *     regression specs remain green.
+         */}
+        {peer.online || usePolicy ? (
           <span className="inline-actions">
             {grants.sign ? <PermissionBadge>SIGN</PermissionBadge> : null}
             {grants.ecdh ? <PermissionBadge tone="info">ECDH</PermissionBadge> : null}
