@@ -5,7 +5,12 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -75,6 +80,43 @@ function renderSidebar(override?: Parameters<typeof defaultProps>[0]) {
   return render(
     <MemoryRouter>
       <SettingsSidebar {...defaultProps(override)} />
+    </MemoryRouter>,
+  );
+}
+
+/**
+ * Tiny location probe used by the Replace Share navigation tests.
+ * Renders the current `pathname` into a stable `data-testid` node so
+ * the tests can assert that a guarded navigation actually lands on
+ * `/replace-share` (Discard path) or stays on `/` (Keep-editing path).
+ */
+function LocationProbe() {
+  const location = useLocation();
+  return <span data-testid="location-pathname">{location.pathname}</span>;
+}
+
+function renderSidebarWithRouter(
+  override?: Parameters<typeof defaultProps>[0],
+) {
+  return render(
+    <MemoryRouter initialEntries={["/"]}>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <>
+              <SettingsSidebar {...defaultProps(override)} />
+              <LocationProbe />
+            </>
+          }
+        />
+        <Route
+          path="/replace-share"
+          element={
+            <span data-testid="replace-share-route">replace-share</span>
+          }
+        />
+      </Routes>
     </MemoryRouter>,
   );
 }
@@ -226,6 +268,86 @@ describe("SettingsSidebar — confirm unsaved changes (VAL-SETTINGS-029)", () =>
     fireEvent.click(screen.getByLabelText("Close settings"));
     expect(screen.getByTestId("settings-unsaved-confirm")).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("Replace Share while dirty surfaces confirm dialog and blocks navigation", () => {
+    const onClose = vi.fn();
+    renderSidebarWithRouter({ onClose });
+
+    startEditingName("Alice Laptop");
+
+    const replaceShareBtn = screen
+      .getAllByText("Replace Share")
+      .find((el) => el.tagName === "BUTTON")!;
+    fireEvent.click(replaceShareBtn);
+
+    expect(screen.getByTestId("settings-unsaved-confirm")).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    // Navigation did NOT occur — still on the initial route.
+    expect(screen.getByTestId("location-pathname").textContent).toBe("/");
+    expect(
+      screen.queryByTestId("replace-share-route"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Replace Share → Discard proceeds to /replace-share and calls onClose", () => {
+    const onClose = vi.fn();
+    renderSidebarWithRouter({ onClose });
+
+    startEditingName("Alice Laptop");
+
+    const replaceShareBtn = screen
+      .getAllByText("Replace Share")
+      .find((el) => el.tagName === "BUTTON")!;
+    fireEvent.click(replaceShareBtn);
+
+    fireEvent.click(screen.getByTestId("settings-unsaved-discard"));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(mockUpdateProfileName).not.toHaveBeenCalled();
+    expect(screen.getByTestId("replace-share-route")).toBeInTheDocument();
+  });
+
+  it("Replace Share → Keep-editing dismisses dialog and does NOT navigate", () => {
+    const onClose = vi.fn();
+    renderSidebarWithRouter({ onClose });
+
+    startEditingName("Alice Laptop");
+
+    const replaceShareBtn = screen
+      .getAllByText("Replace Share")
+      .find((el) => el.tagName === "BUTTON")!;
+    fireEvent.click(replaceShareBtn);
+
+    fireEvent.click(screen.getByTestId("settings-unsaved-keep-editing"));
+
+    expect(
+      screen.queryByTestId("settings-unsaved-confirm"),
+    ).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId("location-pathname").textContent).toBe("/");
+    expect(
+      screen.queryByTestId("replace-share-route"),
+    ).not.toBeInTheDocument();
+    // Draft survives — input still shows the typed value.
+    const input = screen.getByLabelText("Profile Name") as HTMLInputElement;
+    expect(input.value).toBe("Alice Laptop");
+  });
+
+  it("Replace Share with no unsaved edits proceeds immediately (no modal)", () => {
+    const onClose = vi.fn();
+    renderSidebarWithRouter({ onClose });
+
+    const replaceShareBtn = screen
+      .getAllByText("Replace Share")
+      .find((el) => el.tagName === "BUTTON")!;
+    fireEvent.click(replaceShareBtn);
+
+    expect(
+      screen.queryByTestId("settings-unsaved-confirm"),
+    ).not.toBeInTheDocument();
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("replace-share-route")).toBeInTheDocument();
   });
 
   it("saving the name clears the dirty flag so subsequent close is unguarded", async () => {

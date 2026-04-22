@@ -203,7 +203,9 @@ export function SettingsSidebar({
    * leaves the sidebar open.
    */
   const [pendingNavAction, setPendingNavAction] =
-    useState<null | "close" | "lock" | "clearCredentials">(null);
+    useState<null | "close" | "lock" | "clearCredentials" | "replaceShare">(
+      null,
+    );
 
   // Keep the draft in sync with the persisted name whenever the user is
   // NOT actively editing. Without this, a rename persisted from another
@@ -508,7 +510,7 @@ export function SettingsSidebar({
    * the happy path.
    */
   function guardNav(
-    action: "close" | "lock" | "clearCredentials",
+    action: "close" | "lock" | "clearCredentials" | "replaceShare",
     run: () => void,
   ): void {
     if (!hasUnsavedChanges()) {
@@ -543,6 +545,12 @@ export function SettingsSidebar({
       onLock();
     } else if (action === "clearCredentials") {
       onClearCredentials();
+    } else if (action === "replaceShare") {
+      // Mirrors the zero-dirty Replace Share onClick: dismiss the
+      // sidebar first so the route transition unmounts cleanly, then
+      // navigate to the Replace Share flow.
+      onClose();
+      navigate("/replace-share");
     }
   }
 
@@ -959,7 +967,18 @@ export function SettingsSidebar({
                   Import a bfonboard package to replace only this device's local share while keeping the same group public key and profile.
                 </div>
               </div>
-              <button type="button" className="settings-btn-blue" onClick={() => { onClose(); navigate('/replace-share'); }}>Replace Share</button>
+              <button
+                type="button"
+                className="settings-btn-blue"
+                onClick={() =>
+                  guardNav("replaceShare", () => {
+                    onClose();
+                    navigate("/replace-share");
+                  })
+                }
+              >
+                Replace Share
+              </button>
             </div>
 
           </div>
