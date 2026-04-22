@@ -446,6 +446,17 @@ test.describe("multi-device publish-backup (local bifrost-devtools relay)", () =
           await w.__observerReady;
         });
 
+        // Derive the active profile id BEFORE any publish so we can
+        // navigate to `/dashboard/:profileId` after each publish and
+        // assert the rendered "Last published" indicator.
+        const profileId = await page.evaluate(() => {
+          const w = window as unknown as {
+            __appState?: { activeProfile?: { id?: string } };
+          };
+          return w.__appState?.activeProfile?.id ?? null;
+        });
+        expect(profileId).toMatch(/^[0-9a-f-]+$/);
+
         // ----- First publish -------------------------------------------------
         const firstOutcome = await page.evaluate(async () => {
           const w = window as unknown as {
@@ -466,6 +477,62 @@ test.describe("multi-device publish-backup (local bifrost-devtools relay)", () =
         expect(firstOutcome.event.pubkey).toBe(authorPubkey32);
         expect(firstOutcome.event.content).not.toMatch(/^\s*\{/);
         expect(firstOutcome.event.content).not.toContain(share.seckey);
+
+        // fix-m6-publish-backup-metadata / VAL-BACKUP-005 —
+        // publishProfileBackup must persist `lastBackupPublishedAt`
+        // (unix seconds, equal to event.created_at) and
+        // `lastBackupReachedRelayCount` (== reached.length) on the
+        // active profile record so the SettingsSidebar can render a
+        // "Last published" indicator that survives lock/unlock.
+        const firstMeta = await page.evaluate(() => {
+          const w = window as unknown as {
+            __appState?: {
+              activeProfile?: {
+                lastBackupPublishedAt?: number;
+                lastBackupReachedRelayCount?: number;
+              };
+            };
+          };
+          return {
+            publishedAt:
+              w.__appState?.activeProfile?.lastBackupPublishedAt ?? null,
+            reachedCount:
+              w.__appState?.activeProfile?.lastBackupReachedRelayCount ??
+              null,
+          };
+        });
+        expect(firstMeta.publishedAt).toBe(firstOutcome.event.created_at);
+        expect(firstMeta.reachedCount).toBe(firstOutcome.reached.length);
+
+        // Render the rendered "Last published" row. Navigate the
+        // client-side router (NOT page.goto — that triggers a full
+        // reload and wipes the in-memory `activeProfile` + runtime
+        // state we just seeded), open Settings, and assert the row's
+        // text contains the relative-time copy + "reached N/M relays"
+        // suffix.
+        await page.evaluate((id: string) => {
+          window.history.pushState({}, "", `/dashboard/${id}`);
+          window.dispatchEvent(new PopStateEvent("popstate"));
+        }, profileId!);
+        // Wait for the dashboard to mount — its Settings icon button is
+        // the cheapest selector that only exists on the dashboard.
+        const settingsButton = page.getByRole("button", {
+          name: "Settings",
+        });
+        await settingsButton.waitFor({
+          state: "visible",
+          timeout: 15_000,
+        });
+        await settingsButton.first().click();
+        const firstRow = page.getByTestId(
+          "settings-publish-backup-last-published",
+        );
+        await expect(firstRow).toBeVisible({ timeout: 10_000 });
+        await expect(firstRow).toContainText(/Last published:/i);
+        await expect(firstRow).toContainText(/reached 1\/1 relays/);
+        // Capture the rendered copy so the post-second-publish
+        // comparison can assert the monotonic refresh.
+        const firstRenderedText = (await firstRow.textContent()) ?? "";
 
         // VAL-BACKUP-002: the independent observer must see an EVENT
         // matching the published id within the timeout.
@@ -520,6 +587,62 @@ test.describe("multi-device publish-backup (local bifrost-devtools relay)", () =
         );
         expect(secondOutcome.event.id).not.toBe(firstOutcome.event.id);
         expect(secondOutcome.reached).toEqual([RELAY_URL]);
+
+        // fix-m6-publish-backup-metadata / VAL-BACKUP-031 — the
+        // persisted `lastBackupPublishedAt` must advance monotonically
+        // with the published event, and the rendered "Last published"
+        // row must reflect the new value. Firstly, inspect the
+        // activeProfile snapshot:
+        const secondMeta = await page.evaluate(() => {
+          const w = window as unknown as {
+            __appState?: {
+              activeProfile?: {
+                lastBackupPublishedAt?: number;
+                lastBackupReachedRelayCount?: number;
+              };
+            };
+          };
+          return {
+            publishedAt:
+              w.__appState?.activeProfile?.lastBackupPublishedAt ?? null,
+            reachedCount:
+              w.__appState?.activeProfile?.lastBackupReachedRelayCount ??
+              null,
+          };
+        });
+        expect(secondMeta.publishedAt).toBe(secondOutcome.event.created_at);
+        expect(secondMeta.publishedAt).toBeGreaterThan(
+          firstMeta.publishedAt ?? 0,
+        );
+        expect(secondMeta.reachedCount).toBe(secondOutcome.reached.length);
+
+        // Now force the sidebar to re-render so the "Last published"
+        // row picks up the refreshed activeProfile. Close + reopen the
+        // settings sidebar to ensure the new timestamp is used by the
+        // relative-time formatter.
+        await page
+          .getByRole("button", { name: "Close settings" })
+          .click();
+        await page
+          .getByRole("button", { name: "Settings" })
+          .first()
+          .click();
+        // Wait for the sidebar to re-mount after the reopen click.
+        await page.getByTestId("settings-sidebar").waitFor({
+          state: "visible",
+          timeout: 10_000,
+        });
+        const secondRow = page.getByTestId(
+          "settings-publish-backup-last-published",
+        );
+        await expect(secondRow).toBeVisible();
+        await expect(secondRow).toContainText(/Last published:/i);
+        await expect(secondRow).toContainText(/reached 1\/1 relays/);
+        // The rendered copy differs in the timestamp portion —
+        // we assert monotonicity via the persisted `activeProfile`
+        // metadata above, and that the visible row still includes
+        // the indicator labels after the second publish.
+        expect(firstRenderedText.length).toBeGreaterThan(0);
 
         // VAL-BACKUP-006: observer must receive the newer event too.
         // Replaceable semantics are the relay's job — this spec only

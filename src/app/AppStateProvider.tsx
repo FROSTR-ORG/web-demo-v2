@@ -2782,9 +2782,62 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (result.reached.length === 0) {
         throw new Error("No relays available to publish to.");
       }
+      // VAL-BACKUP-005 / VAL-BACKUP-031 — persist a "last published"
+      // marker on the stored profile so SettingsSidebar can surface
+      // "Last published: <relative time> — reached N/M relays" below
+      // the Publish Backup row and the value survives lock/unlock.
+      // We update the existing record's summary in-place (no
+      // re-encryption) via saveProfile so the encryptedProfilePackage
+      // is preserved verbatim. Errors here MUST NOT block the publish
+      // outcome — the user's event is already on the relays. On a
+      // persistence failure we still bump the in-memory activeProfile
+      // so the UI reflects the current session, and log in DEV.
+      const reachedCount = result.reached.length;
+      try {
+        const existing = await getProfile(profile.id);
+        if (existing) {
+          const nextSummary = {
+            ...existing.summary,
+            lastBackupPublishedAt: createdAtSeconds,
+            lastBackupReachedRelayCount: reachedCount,
+          };
+          await saveProfile({
+            ...existing,
+            summary: nextSummary,
+          });
+          setActiveProfile(nextSummary);
+          await reloadProfiles();
+        } else {
+          setActiveProfile((prev) =>
+            prev && prev.id === profile.id
+              ? {
+                  ...prev,
+                  lastBackupPublishedAt: createdAtSeconds,
+                  lastBackupReachedRelayCount: reachedCount,
+                }
+              : prev,
+          );
+        }
+      } catch (persistError) {
+        if (import.meta.env.DEV) {
+          console.warn(
+            "publishProfileBackup: failed to persist last-published marker",
+            persistError,
+          );
+        }
+        setActiveProfile((prev) =>
+          prev && prev.id === profile.id
+            ? {
+                ...prev,
+                lastBackupPublishedAt: createdAtSeconds,
+                lastBackupReachedRelayCount: reachedCount,
+              }
+            : prev,
+        );
+      }
       return { event, reached: result.reached };
     },
-    [activeProfile],
+    [activeProfile, reloadProfiles],
   );
 
   /**
