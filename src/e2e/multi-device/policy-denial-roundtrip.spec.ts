@@ -685,7 +685,17 @@ test.describe(
           // observing the first new `Sign` entry in
           // `pending_operations` or `runtimeFailures` if null.
           const messageHex = "7".repeat(64);
-          const dispatchStartedAt = Date.now();
+          // dispatchStart anchors the shared VAL-POLICIES-010 15 000 ms
+          // budget. Scrutiny r2 flagged that the previous implementation
+          // re-started the 15 s clock AFTER `signRequestId` had been
+          // resolved — so slow `request_id` discovery could push the
+          // total dispatch → OperationFailure window well past the
+          // contract's 15 s ceiling while the test still passed. The
+          // fix: compute `remainingBudget` from a single `dispatchStart`
+          // timestamp captured at the moment of sign dispatch; both
+          // request_id discovery and the OperationFailure wait consume
+          // from this shared budget.
+          const dispatchStart = Date.now();
           const dispatchB = await pageB.evaluate(async (msg: string) => {
             const w = window as unknown as {
               __appState: {
@@ -704,9 +714,26 @@ test.describe(
             });
           }, messageHex);
           expect(dispatchB.debounced).toBe(false);
+          // Backwards-compat alias preserved for the existing
+          // diagnostic log strings that reference
+          // `dispatchStartedAt` (A-side sampler timeline + failure
+          // diag). Semantically identical to `dispatchStart`.
+          const dispatchStartedAt = dispatchStart;
+          const remainingBudget = (): number =>
+            SIGN_FAILURE_TIMEOUT_MS - (Date.now() - dispatchStart);
 
           let signRequestId: string | null = dispatchB.requestId;
           if (!signRequestId) {
+            const discoveryBudget = remainingBudget();
+            if (discoveryBudget <= 0) {
+              throw new Error(
+                `request_id discovery exceeded VAL-POLICIES-010 budget: ` +
+                  `dispatch returned null requestId and ` +
+                  `${SIGN_FAILURE_TIMEOUT_MS}ms already elapsed ` +
+                  `before discovery could start ` +
+                  `(elapsed=${Date.now() - dispatchStart}ms).`,
+              );
+            }
             // PendingOperation.op_type is PascalCase ("Sign") while
             // OperationFailure.op_type is lowercase ("sign"). Match
             // case-insensitively so either channel can provide the
@@ -761,7 +788,7 @@ test.describe(
                   return lifecycleSign?.request_id ?? null;
                 },
                 undefined,
-                { timeout: 30_000, polling: 200 },
+                { timeout: discoveryBudget, polling: 100 },
               )
               .then((handle) => handle.jsonValue() as Promise<string>)
               .catch(async (err) => {
@@ -796,8 +823,13 @@ test.describe(
                   };
                 });
                 throw new Error(
-                  `B never registered a Sign pending_op or Sign failure ` +
-                    `within 30s after dispatch: ${err}\n` +
+                  `request_id discovery exceeded VAL-POLICIES-010 budget: ` +
+                    `B never registered a Sign pending_op or Sign failure ` +
+                    `within the remaining ${discoveryBudget}ms of the ` +
+                    `${SIGN_FAILURE_TIMEOUT_MS}ms shared budget ` +
+                    `(elapsed since dispatch ${
+                      Date.now() - dispatchStart
+                    }ms): ${err}\n` +
                     `B state:\n${JSON.stringify(diag, null, 2)}`,
                 );
               });
@@ -855,13 +887,32 @@ test.describe(
             }
           })();
 
-          // The strict 15 000 ms budget is the OperationFailure wait
-          // itself (what the feature-spec under m3 scrutiny calls out
-          // explicitly), measured from *now* — i.e. once we have the
-          // correlating request_id and the A-side sampler is running.
-          // `dispatchStartedAt` above is used only for logging
-          // timelines; it is NOT used to shrink the failure budget.
+          // The strict 15 000 ms budget is a SHARED ceiling spanning
+          // both request_id discovery and this OperationFailure wait,
+          // measured from `dispatchStart` (i.e. the moment of sign
+          // dispatch). Scrutiny r2 flagged that the previous
+          // implementation anchored the 15 s on failure-wait START —
+          // meaning slow request_id resolution could push the total
+          // dispatch-to-failure window past 15 s undetected. Now any
+          // time spent resolving `signRequestId` consumes from the
+          // same budget that the failure wait draws from, so the
+          // contract's "within 15 s" bound is enforced end-to-end
+          // from B's dispatch.
           const failureWaitStartedAt = Date.now();
+          const failureBudget = remainingBudget();
+          if (failureBudget <= 0) {
+            samplerStop = true;
+            await aSidePoller;
+            throw new Error(
+              `VAL-POLICIES-010 strict ${SIGN_FAILURE_TIMEOUT_MS}ms ` +
+                `OperationFailure bound EXCEEDED before failure-wait ` +
+                `could start: ${SIGN_FAILURE_TIMEOUT_MS}ms already ` +
+                `elapsed since dispatch while resolving request_id ` +
+                `(elapsed since dispatch ${
+                  Date.now() - dispatchStart
+                }ms, request_id=${signRequestId}).`,
+            );
+          }
           try {
             await pageB.waitForFunction(
               (rid: string) => {
@@ -883,7 +934,7 @@ test.describe(
                 });
               },
               signRequestId,
-              { timeout: SIGN_FAILURE_TIMEOUT_MS, polling: 100 },
+              { timeout: failureBudget, polling: 100 },
             );
           } catch (err) {
             samplerStop = true;
@@ -907,13 +958,14 @@ test.describe(
             throw new Error(
               `VAL-POLICIES-010 strict ${SIGN_FAILURE_TIMEOUT_MS}ms ` +
                 `OperationFailure bound EXCEEDED: no failure matching ` +
-                `/denied|policy/i observed on B within ` +
-                `${SIGN_FAILURE_TIMEOUT_MS}ms of failure-wait start ` +
-                `(elapsed since dispatch ${
-                  Date.now() - dispatchStartedAt
+                `/denied|policy/i observed on B within the shared ` +
+                `${SIGN_FAILURE_TIMEOUT_MS}ms budget measured from ` +
+                `dispatch (elapsed since dispatch ${
+                  Date.now() - dispatchStart
                 }ms, elapsed since failure-wait start ${
                   Date.now() - failureWaitStartedAt
-                }ms, request_id=${signRequestId}): ${err}\n` +
+                }ms, remaining-budget-allocated=${failureBudget}ms, ` +
+                `request_id=${signRequestId}): ${err}\n` +
                 `B state:\n${JSON.stringify(diag, null, 2)}`,
             );
           }
