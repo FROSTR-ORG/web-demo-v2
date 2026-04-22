@@ -70,13 +70,13 @@ No Promise-based correlation — callers correlate by `request_id` in `pending_o
 
 ## Data Flow: Approval Prompts (reactive denial)
 
-bifrost auto-approves/denies based on policy synchronously. There is NO protocol-level "pending request hold" API. When a peer's request is denied by policy, bifrost emits `peer_denied` via `drain_runtime_events()`. The reactive flow:
+bifrost auto-approves/denies based on policy synchronously. There is NO protocol-level "pending request hold" API. For denial round-trips, the contract-critical observable is requester-side failure (`OperationFailure` / peer-error) rather than a guaranteed local denial event on the denying device.
 
 1. Peer B sends sign request to A.
-2. A's runtime checks `respond.sign` for B. If Deny: emits `peer_denied` envelope to B, emits `peer_denied` runtime event locally.
-3. A's EventLog consumer observes `peer_denied` → AppStateProvider queues it for `PolicyPromptModal`.
-4. Modal shows peer B identity, verb, any decoded event context.
-5. User clicks "Allow once": `setPolicyOverride(B, respond, sign, allow)` — temporary allow; user hint asks B to retry.
+2. A's runtime checks `respond.sign` for B. If Deny: runtime rejects the request and B surfaces a policy/denied failure.
+3. If the runtime emits a `peer_denied` runtime event (`drain_runtime_events()`), AppState can queue it for `PolicyPromptModal`; this event is not assumed for VAL-POLICIES-010 timing assertions.
+4. Modal (when present) shows peer identity, verb, and decoded context.
+5. User clicks "Allow once": `setPolicyOverride(peer, respond, verb, allow)` — temporary allow; user hint asks requester to retry.
 6. User clicks "Always allow": same but override persists via stored profile.
 7. User clicks "Deny": modal dismisses (request already denied).
 

@@ -1,7 +1,7 @@
 {
   "milestone": "m3-policies",
-  "round": 2,
-  "status": "fail",
+  "round": 3,
+  "status": "pass",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -20,65 +20,32 @@
     }
   },
   "reviewsSummary": {
-    "total": 5,
+    "total": 2,
     "passed": 2,
-    "failed": 3,
-    "failedFeatures": [
-      "fix-m3-default-policy-direction-respond",
-      "fix-m3-default-policy-no-clobber-user-overrides",
-      "fix-m3-nonce-prepopulate-test-hook"
-    ]
+    "failed": 0,
+    "failedFeatures": []
   },
-  "blockingIssues": [
+  "blockingIssues": [],
+  "appliedUpdates": [
     {
-      "featureId": "fix-m3-default-policy-no-clobber-user-overrides",
-      "severity": "blocking",
-      "description": "DefaultPolicyDropdown ownership cleanup remains snapshot-lag dependent, so a user-authored override can still be unset by a quick default switch before runtime_status reflects the user's update."
-    },
-    {
-      "featureId": "fix-m3-nonce-prepopulate-test-hook",
-      "severity": "blocking",
-      "description": "policy-denial-roundtrip still does not enforce the 15s dispatch-to-failure bound in the requestId-null branch because it may wait up to 30s for request id discovery before starting the 15s timer."
+      "target": "library",
+      "description": "Updated .factory/library/architecture.md denial-flow guidance to treat requester-side OperationFailure as contract-critical and avoid assuming a guaranteed local A-side peer_denied runtime event.",
+      "sourceFeature": "fix-m3-denial-roundtrip-15s-from-dispatch"
     }
   ],
-  "appliedUpdates": [],
   "suggestedGuidanceUpdates": [
     {
-      "target": "AGENTS.md",
-      "suggestion": "Make policy-direction semantics unambiguous across all policy surfaces by explicitly documenting PeerPolicyChip direction as implemented (or requiring a follow-up alignment change), and keep mission guidance consistent with code comments/tests.",
-      "evidence": "Both fix-m3-default-policy-direction-respond and fix-m3-default-policy-no-clobber-user-overrides reviews observed AGENTS guidance stating chips target respond.* while implementation still defaults chip writes to request.*.",
-      "isSystemic": true
-    },
-    {
       "target": "skills",
-      "suggestion": "Clarify ui-screen-worker/runtime-worker agent-browser requirements for logic-only or e2e-spec-only fixes so workers can remain compliant without reporting procedural deviations when no UI-surface verification is applicable.",
-      "evidence": "Multiple fix reviews reported followedProcedure=false solely because work was non-visual (state-invariant or spec-hardening) while skill text still implied mandatory agent-browser validation.",
+      "suggestion": "Allow scoped validator profiles for scrutiny fix features that are logic/e2e-spec-only so workers can satisfy procedure without artificial agent-browser or full-suite deviations.",
+      "evidence": "Both fix-m3-default-policy-no-clobber-race-eager-drop and fix-m3-denial-roundtrip-15s-from-dispatch reviews reported skill-procedure mismatch because current ui-screen-worker/runtime-worker steps are broader than these narrowly scoped fixes.",
       "isSystemic": true
-    },
-    {
-      "target": "validation-contract.md",
-      "suggestion": "Clarify denial-roundtrip evidence language to distinguish strict timing from dispatch time and to explicitly call out when Sign-typed pending invariance is the required observable versus total pending queue length.",
-      "evidence": "fix-m3-denial-roundtrip-15s-bound-and-a-side-invariance review noted contract/evidence wording drift versus implemented and runtime-realistic assertions.",
-      "isSystemic": false
     }
   ],
   "rejectedObservations": [
     {
-      "observation": "No demo scenario exists for the exact runtime offline-peer/permissionState combination used by the PeerRow parity fix.",
-      "reason": "ambiguous"
-    },
-    {
-      "observation": "Repeated policy-direction mismatch observations from two fix reviews.",
+      "observation": "Two separate skill-procedure mismatch observations from this round (ui-screen-worker and runtime-worker variants).",
       "reason": "duplicate"
-    },
-    {
-      "observation": "Repeated skill strictness observations for non-visual fixes from multiple fix reviews.",
-      "reason": "duplicate"
-    },
-    {
-      "observation": "library/architecture.md denial-event wording drift was flagged, but not updated in this scrutiny run.",
-      "reason": "ambiguous"
     }
   ],
-  "previousRound": ".factory/validation/m3-policies/scrutiny/synthesis.round1.json"
+  "previousRound": ".factory/validation/m3-policies/scrutiny/synthesis.round2.json"
 }

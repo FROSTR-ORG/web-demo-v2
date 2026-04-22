@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m3-default-policy-no-clobber-race-eager-drop",
+  "reviewedAt": "2026-04-22T03:03:02Z",
+  "commitId": "f864eba",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Compared the original failed fix (83898ff) and this re-run fix (f864eba). The new implementation closes the specific snapshot-lag race by eagerly deleting dropdown ownership at dispatch time via `DefaultPolicyDropdownHandle.notifyPeerPolicyWrite`, wired through `PoliciesState` chip dispatch wrapper, while retaining snapshot pruning as a safety net. The added race-reproduction test covers the exact failure window from the prior review and now asserts no `unset` is dispatched for the user-authored cell.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "ui-screen-worker still effectively forces procedural deviations for logic/race fixes that touch no directly exercisable UI path in demo scenarios.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md:23,51,53 require agent-browser walkthroughs; handoff 2026-04-22T02-54-28-383Z__fix-m3-default-policy-no-clobber-race-eager-drop__f0770410-492f-4166-943b-4a1e8182325c.json:42-43,71-73 documents no interactive chip surface in demo and `followedProcedure=false` despite deterministic test coverage."
+    }
+  ],
+  "addressesFailureFrom": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/.factory/validation/m3-policies/scrutiny/reviews/fix-m3-default-policy-no-clobber-user-overrides.json",
+  "summary": "PASS: The re-run fix adequately addresses the original blocking ownership-race failure by introducing eager ownership drop on override dispatch and verifying the pre-snapshot default-switch race with targeted tests; no new blocking or non-blocking code defects were found in scope."
+}
