@@ -172,6 +172,36 @@ describe("profileStore + migrateProfileRecord — legacy records load cleanly", 
   );
 
   it(
+    "listProfiles deletes the backing record for orphan/malformed entries (no stale IDB rows)",
+    async () => {
+      // Scrutiny m5 r1 fix: previously the index was swept but the
+      // backing record key was left behind in IndexedDB. Now the
+      // backing row must be removed too so a follow-up `del()` is
+      // unnecessary and no phantom row survives a reload.
+      const malformedId = "malformed-with-stale-row";
+      const malformedKey = `${PROFILE_RECORD_PREFIX}${malformedId}`;
+      storage.set(PROFILE_INDEX_KEY, [malformedId]);
+      storage.set(malformedKey, {
+        summary: { id: malformedId, deviceName: "No Body" },
+        // NOTE: no encryptedProfilePackage → migrateProfileRecord
+        // returns null, so this entry is an orphan body.
+      });
+
+      // Sanity: the backing row is present before listProfiles runs.
+      expect(storage.has(malformedKey)).toBe(true);
+
+      const summaries = await listProfiles();
+      expect(summaries).toEqual([]);
+
+      // Index was swept…
+      const indexAfter = storage.get(PROFILE_INDEX_KEY) as string[];
+      expect(indexAfter).toEqual([]);
+      // …and the orphan backing row was ALSO deleted from idb-keyval.
+      expect(storage.has(malformedKey)).toBe(false);
+    },
+  );
+
+  it(
     "preserves unknown future-mission keys on the record, not silently dropping them",
     async () => {
       // Forward-compat hedge: if a future mission adds a new top-level

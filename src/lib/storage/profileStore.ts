@@ -20,16 +20,30 @@ export async function listProfiles(): Promise<StoredProfileSummary[]> {
   // m5-idb-migration: any index entry whose record is missing or
   // unreadable (orphan) is filtered out here AND swept from the index
   // so `listProfiles` → welcome UI never surfaces a phantom profile.
+  // Scrutiny m5 r1: ALSO delete the backing record key via idb-keyval's
+  // `del` for each orphan (malformed body OR index entry whose body was
+  // never stored). Previously only the index was rebuilt, leaving stale
+  // rows behind in IndexedDB.
   const liveRecords: StoredProfileRecord[] = [];
   const liveIds: string[] = [];
+  const orphanIds: string[] = [];
   for (let i = 0; i < ids.length; i += 1) {
     const record = records[i];
+    const id = ids[i]!;
     if (record) {
       liveRecords.push(record);
-      liveIds.push(ids[i]);
+      liveIds.push(id);
+    } else {
+      orphanIds.push(id);
     }
   }
-  if (liveIds.length !== ids.length) {
+  if (orphanIds.length > 0) {
+    // `del` is a no-op when the key is already absent (i.e. a pure
+    // index-only orphan) so this is safe for both malformed backing
+    // rows and index entries pointing to a nonexistent key.
+    await Promise.all(
+      orphanIds.map((id) => del(`${PROFILE_RECORD_PREFIX}${id}`)),
+    );
     await setProfileIds(liveIds);
   }
   return liveRecords
