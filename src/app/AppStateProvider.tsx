@@ -98,6 +98,7 @@ import {
 import type {
   AppStateValue,
   CreateDraft,
+  BackupPublishLocalMutationPayload,
   CreateKeysetDraft,
   CreateProfileDraft,
   CreateSession,
@@ -591,6 +592,40 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     runtimeEventLogRef.current = [];
     runtimeEventLogSeqRef.current = 0;
   }, []);
+
+  /**
+   * Append a single {@link RuntimeEventLogEntry} synthesised by a local
+   * AppStateProvider mutator (i.e. not produced by a WASM drain) to the
+   * event-log ring buffer. Assigns a fresh monotonic `seq` via
+   * {@link runtimeEventLogSeqRef} and routes the update through the
+   * same {@link appendRuntimeEventLogEntries} cap-enforcement path as
+   * real drain output so the 500-entry cap and FIFO eviction behaviour
+   * are identical to the production drain path (VAL-EVENTLOG-014).
+   *
+   * Use the typed `badge` + `source` arguments to classify the entry.
+   * The `payload` MUST be a scrub-safe, literal-field-only record —
+   * callers are responsible for omitting credential material
+   * (VAL-BACKUP-007 and every other local_mutation producer).
+   */
+  const appendLocalMutationRuntimeEventLogEntry = useCallback(
+    (input: {
+      badge: RuntimeEventLogBadge;
+      payload: unknown;
+    }) => {
+      runtimeEventLogSeqRef.current += 1;
+      const entry: RuntimeEventLogEntry = {
+        seq: runtimeEventLogSeqRef.current,
+        at: Date.now(),
+        badge: input.badge,
+        source: "local_mutation",
+        payload: input.payload,
+      };
+      setRuntimeEventLog((previous) =>
+        appendRuntimeEventLogEntries(previous, [entry]),
+      );
+    },
+    [],
+  );
 
   /**
    * Append a new {@link PeerDeniedEvent} to the FIFO denial queue. No-op
@@ -2748,6 +2783,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const pump = relayPumpRef.current;
       const configuredRelays = profile.relays ?? [];
       if (configuredRelays.length === 0 || !pump) {
+        // VAL-BACKUP-007 — surface the failure in the runtime event
+        // log in addition to the inline error so the failure is
+        // observable via the EventLogPanel stream. Payload is a
+        // literal, credential-free record by construction (see
+        // `BackupPublishLocalMutationPayload` in AppStateTypes).
+        appendLocalMutationRuntimeEventLogEntry({
+          badge: "BACKUP_PUBLISH",
+          payload: {
+            kind: "backup_publish_failed",
+            reason: "no-relays",
+            attemptedRelayCount: configuredRelays.length,
+          } satisfies BackupPublishLocalMutationPayload,
+        });
         throw new Error("No relays available to publish to.");
       }
       const snapshot = runtime.snapshot();
@@ -2780,6 +2828,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       });
       const result = await pump.publishEvent(event);
       if (result.reached.length === 0) {
+        // VAL-BACKUP-007 — distinguish "all relays offline" from the
+        // pre-flight "no relays configured" case by reason tag so
+        // operators can tell at a glance from EventLogPanel which
+        // branch tripped. Payload stays credential-free by
+        // construction.
+        appendLocalMutationRuntimeEventLogEntry({
+          badge: "BACKUP_PUBLISH",
+          payload: {
+            kind: "backup_publish_failed",
+            reason: "all-offline",
+            attemptedRelayCount: configuredRelays.length,
+          } satisfies BackupPublishLocalMutationPayload,
+        });
         throw new Error("No relays available to publish to.");
       }
       // VAL-BACKUP-005 / VAL-BACKUP-031 — persist a "last published"
@@ -2870,7 +2931,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       return { event, reached: result.reached };
     },
-    [activeProfile, reloadProfiles],
+    [activeProfile, reloadProfiles, appendLocalMutationRuntimeEventLogEntry],
   );
 
   /**

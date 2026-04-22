@@ -37,6 +37,7 @@ const RUNTIME_BADGES: RuntimeEventLogBadge[] = [
   "READY",
   "INFO",
   "ERROR",
+  "BACKUP_PUBLISH",
 ];
 
 /**
@@ -67,6 +68,8 @@ function runtimeBadgeClassName(badge: RuntimeEventLogBadge): string {
       return "info";
     case "ERROR":
       return "error";
+    case "BACKUP_PUBLISH":
+      return "backup-publish";
   }
 }
 
@@ -135,6 +138,29 @@ function summarizeEntry(entry: RuntimeEventLogEntry): string {
     const op = payload?.op_type ?? "operation";
     const code = payload?.code ? ` (${payload.code})` : "";
     return `${op} failed${code}${payload?.message ? ` — ${payload.message}` : ""}`;
+  }
+  if (entry.source === "local_mutation") {
+    // Today the only local_mutation producer is publishProfileBackup's
+    // BACKUP_PUBLISH entry — see `BackupPublishLocalMutationPayload`
+    // in `AppStateTypes.ts`. Surface a terse one-liner that matches
+    // the inline error copy on the Publish Backup modal so users can
+    // correlate the two surfaces at a glance (VAL-BACKUP-007).
+    const payload = entry.payload as {
+      kind?: string;
+      reason?: "no-relays" | "all-offline";
+      attemptedRelayCount?: number;
+    } | null;
+    if (payload?.kind === "backup_publish_failed") {
+      const count = payload.attemptedRelayCount ?? 0;
+      if (payload.reason === "no-relays") {
+        return "Backup publish failed — no relays configured";
+      }
+      if (payload.reason === "all-offline") {
+        return `Backup publish failed — all ${count} relays offline`;
+      }
+      return "Backup publish failed";
+    }
+    return "Local mutation";
   }
   // runtime_event
   const payload = entry.payload as { kind?: string } | null;

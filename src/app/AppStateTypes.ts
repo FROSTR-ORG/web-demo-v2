@@ -422,6 +422,12 @@ export interface NoncePoolSnapshot {
  *                       dedicated colour (command_queued, config_updated,
  *                       state_wiped, Onboard completion)
  *   - `ERROR`        — any drained `OperationFailure`
+ *   - `BACKUP_PUBLISH` — local-mutation marker emitted by
+ *                       {@link AppStateValue.publishProfileBackup} when a
+ *                       publish attempt fails pre-flight (no relays
+ *                       configured) or post-fan-out (all relays offline).
+ *                       Surfaced so operators can correlate the inline
+ *                       error with the event stream (VAL-BACKUP-007).
  */
 export type RuntimeEventLogBadge =
   | "SYNC"
@@ -433,20 +439,30 @@ export type RuntimeEventLogBadge =
   | "PEER_POLICY"
   | "READY"
   | "INFO"
-  | "ERROR";
+  | "ERROR"
+  | "BACKUP_PUBLISH";
 
 /**
- * Origin of a {@link RuntimeEventLogEntry}: which of the three runtime
- * drain channels produced the entry.
+ * Origin of a {@link RuntimeEventLogEntry}: which of the runtime
+ * drain channels (or local mutator) produced the entry.
  *
  *  - `runtime_event` — drained from `RuntimeClient.drainRuntimeEvents()`
  *  - `completion`    — drained from `RuntimeClient.drainCompletions()`
  *  - `failure`       — drained from `RuntimeClient.drainFailures()`
+ *  - `local_mutation` — synthesised by an AppStateProvider mutator to
+ *                       record a notable local action that has no
+ *                       direct WASM drain correlate. Currently used by
+ *                       {@link AppStateValue.publishProfileBackup} to
+ *                       record backup-publish pre-flight/post-fan-out
+ *                       failures so operators can correlate the inline
+ *                       error surface with the event stream
+ *                       (VAL-BACKUP-007).
  */
 export type RuntimeEventLogSource =
   | "runtime_event"
   | "completion"
-  | "failure";
+  | "failure"
+  | "local_mutation";
 
 /**
  * One entry in the {@link AppStateValue.runtimeEventLog} ring buffer. Each
@@ -473,14 +489,51 @@ export interface RuntimeEventLogEntry {
   source: RuntimeEventLogSource;
   /**
    * Raw payload drained from the runtime. Shape depends on `source`:
-   *  - `runtime_event` → {@link RuntimeEvent}
-   *  - `completion`    → {@link CompletedOperation}
-   *  - `failure`       → {@link EnrichedOperationFailure}
+   *  - `runtime_event`   → {@link RuntimeEvent}
+   *  - `completion`      → {@link CompletedOperation}
+   *  - `failure`         → {@link EnrichedOperationFailure}
+   *  - `local_mutation`  → a minimal, scrub-safe record describing the
+   *                        local action. For BACKUP_PUBLISH entries
+   *                        see {@link BackupPublishLocalMutationPayload}.
+   *                        By construction this path NEVER includes
+   *                        ciphertext, password, or share material
+   *                        (VAL-BACKUP-007 security invariant).
    *
    * Kept as `unknown` at this layer to avoid coupling consumers to the
    * discriminated shape — `EventLogPanel` narrows by `source`.
    */
   payload: unknown;
+}
+
+/**
+ * Payload shape for the `local_mutation` / `BACKUP_PUBLISH` runtime
+ * event-log entry emitted by
+ * {@link AppStateValue.publishProfileBackup} when a publish attempt
+ * fails. Contract:
+ *
+ *  - `kind`: always `"backup_publish_failed"` so the entry is easily
+ *    filterable/searchable in the JSON body even though the typed
+ *    `badge`/`source` are the primary narrowing channels.
+ *  - `reason`: why the publish could not succeed.
+ *      - `"no-relays"`  — relays.length === 0 OR the relay pump is
+ *                         not attached (pre-flight guard).
+ *      - `"all-offline"` — relay fan-out completed but no relay
+ *                          accepted the event (all attempts failed).
+ *  - `attemptedRelayCount`: how many configured relays were attempted
+ *    at the point of failure. Zero for `no-relays`; matches the
+ *    profile's `relays.length` for `all-offline`.
+ *
+ * SECURITY INVARIANT: this payload MUST NOT include the encrypted
+ * backup ciphertext, the user's password, the share secret, or any
+ * other credential-bearing field. The publish mutator enforces this
+ * by construction — the payload is built from literal, typed fields
+ * only. See VAL-BACKUP-007 contract clause "no ciphertext/password
+ * leak in event-log payload".
+ */
+export interface BackupPublishLocalMutationPayload {
+  readonly kind: "backup_publish_failed";
+  readonly reason: "no-relays" | "all-offline";
+  readonly attemptedRelayCount: number;
 }
 
 /**
