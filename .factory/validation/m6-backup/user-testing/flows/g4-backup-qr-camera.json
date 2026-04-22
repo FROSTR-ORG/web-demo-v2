@@ -1,0 +1,276 @@
+{
+  "groupId": "g4-backup-qr-camera",
+  "testedAt": "2026-04-22T22:14:53Z",
+  "milestone": "m6-backup",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "agentBrowserSession": "g4-backup-qr-camera",
+    "mobileViewport": "390x844"
+  },
+  "toolsUsed": [
+    "agent-browser",
+    "python3",
+    "node"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-BACKUP-014",
+      "title": "Replace Share 'Scan QR' fills bfonboard textarea",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /replace-share and click Scan QR",
+          "expected": "QR Scanner dialog opens",
+          "observed": "QR scanner dialog opened (role=dialog, aria-label=QR Scanner)"
+        },
+        {
+          "action": "Provide valid bfonboard QR payload via camera stream",
+          "expected": "Scanner closes and onboarding-package textarea is populated",
+          "observed": "Textarea value became bfonboard1... and scanner closed"
+        },
+        {
+          "action": "Fill package + profile passwords",
+          "expected": "Replace Share CTA enabled",
+          "observed": "Replace Share button became enabled"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-014-scanner-open.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-014-populated.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-014-cta-enabled.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No assertion-relevant API/WS traffic required; route remained local on 127.0.0.1:5173"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-015",
+      "title": "Onboard 'Scan QR' fills bfonboard textarea",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /onboard and click Scan QR",
+          "expected": "Scanner opens",
+          "observed": "Scanner opened"
+        },
+        {
+          "action": "Provide valid bfonboard QR payload",
+          "expected": "Scanner closes and onboarding textarea is populated",
+          "observed": "Onboarding Package textbox populated with bfonboard1... and dialog closed"
+        },
+        {
+          "action": "Fill Package Password",
+          "expected": "Begin Onboarding becomes enabled",
+          "observed": "Begin Onboarding button became enabled"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-015-scanner-open.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-015-populated.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-015-cta-enabled.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No assertion-relevant API/WS traffic required"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-016",
+      "title": "Import 'Scan QR' fills bfprofile textarea",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /import and click Scan QR",
+          "expected": "Scanner opens",
+          "observed": "Scanner opened"
+        },
+        {
+          "action": "Provide valid bfprofile QR payload",
+          "expected": "Scanner closes and Profile Backup textarea is populated",
+          "observed": "Profile Backup textbox populated with bfprofile1... and scanner closed"
+        },
+        {
+          "action": "Continue to /import/decrypt and fill Backup Password",
+          "expected": "Decrypt Backup CTA enabled once content + password are present",
+          "observed": "Decrypt Backup button became enabled"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-016-scanner-open.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-016-populated.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-016-decrypt-enabled.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No assertion-relevant API/WS traffic required"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-017",
+      "title": "Camera permission denied falls back gracefully",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "On /onboard, /import, and /replace-share reject getUserMedia and click Scan QR",
+          "expected": "Visible camera-denied/unavailable error and Close button; no crash/navigation",
+          "observed": "Each surface showed 'Camera access was denied or the camera is unavailable.' with Close button; URLs stayed on same route"
+        },
+        {
+          "action": "Close scanner and paste package text into textarea on each surface",
+          "expected": "Textarea remains editable and paste flow works without reload",
+          "observed": "Manual paste accepted on all three surfaces immediately after closing scanner"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-017-onboard-camera-denied.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-017-onboard-paste-after-denied.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-017-import-camera-denied.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-017-import-paste-after-denied.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-017-replace-camera-denied.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-017-replace-paste-after-denied.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No assertion-relevant API/WS traffic required"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-018",
+      "title": "Invalid QR content surfaces inline error",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /onboard and scan invalid bfshare QR content",
+          "expected": "Inline validation error; textarea unchanged; no navigation",
+          "observed": "Scanner stayed open, showed 'Not a valid bfonboard package. Align a valid QR code within the frame.', textarea stayed empty, URL stayed /onboard"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-018-invalid-error.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No assertion-relevant API/WS traffic required"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-019",
+      "title": "Mobile viewport works (or surfaces a clear desktop-only message)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Set viewport to 390x844 and open /onboard, /import, /replace-share",
+          "expected": "Scan QR visible on all three surfaces",
+          "observed": "Scan QR button visible on all three routes"
+        },
+        {
+          "action": "On each route click Scan QR with denied camera",
+          "expected": "Clear unavailable message (no silent failure) OR operational scanner",
+          "observed": "All three showed explicit unavailable message 'Camera access was denied or the camera is unavailable.'; no silent failure"
+        },
+        {
+          "action": "Inspect getUserMedia constraints in mobile runs",
+          "expected": "facingMode environment requested when scanner opens",
+          "observed": "Captured constraints included {\"video\":{\"facingMode\":\"environment\"}}"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-019-mobile-onboard-scan-visible.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-019-mobile-onboard-error.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-019-mobile-import-scan-visible.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-019-mobile-import-error.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-019-mobile-replace-scan-visible.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-019-mobile-replace-error.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No assertion-relevant API/WS traffic required"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-026",
+      "title": "Camera permission revoked mid-scan dismisses scanner cleanly",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open scanner on /onboard with live stream and simulate revocation via MediaStreamTrack ended",
+          "expected": "Inline error appears and tracks end",
+          "observed": "After dispatching ended on live tracks, scanner showed 'Camera access was lost. Please re-enable camera permission and try again.'; track readyState values were ended"
+        },
+        {
+          "action": "Close scanner and continue interacting",
+          "expected": "Scanner closable without freeze; textarea remains editable",
+          "observed": "Close action worked and onboarding textarea accepted manual input"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-026-permission-revoked-error.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-026-closed-and-editable.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No assertion-relevant API/WS traffic required"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-027",
+      "title": "Scanner releases camera on close / navigation",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open scanner with live stream and capture pre-close track states",
+          "expected": "Tracks live before close",
+          "observed": "Latest scanner stream tracks were live before close"
+        },
+        {
+          "action": "Close scanner via X",
+          "expected": "Tracks become ended and dialog closes",
+          "observed": "Tracks transitioned to ended and dialog unmounted"
+        },
+        {
+          "action": "Reopen scanner",
+          "expected": "Fresh stream acquired with new live track(s)",
+          "observed": "Reopen created a new live track with different track id from previous stream"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-027-open-live-stream.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-027-after-close.png",
+          "m6-backup/g4-backup-qr-camera/VAL-BACKUP-027-reopened-fresh-stream.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No assertion-relevant API/WS traffic required"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Headless validation environment has no physical camera stream, so camera flows required controlled getUserMedia/media-track simulation to exercise scan and revocation paths through the real UI.",
+      "resolved": true,
+      "resolution": "Used agent-browser eval hooks to supply deterministic MediaStream/canvas-backed QR frames and explicit track-ended events while keeping route/UI behavior real.",
+      "affectedAssertions": [
+        "VAL-BACKUP-014",
+        "VAL-BACKUP-015",
+        "VAL-BACKUP-016",
+        "VAL-BACKUP-017",
+        "VAL-BACKUP-018",
+        "VAL-BACKUP-019",
+        "VAL-BACKUP-026",
+        "VAL-BACKUP-027"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 8 assigned backup QR/camera assertions: 8 passed, 0 failed, 0 blocked."
+}

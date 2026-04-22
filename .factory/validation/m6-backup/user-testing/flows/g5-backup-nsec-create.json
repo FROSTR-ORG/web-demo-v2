@@ -1,0 +1,217 @@
+{
+  "groupId": "g5-backup-nsec-create",
+  "testedAt": "2026-04-22T22:11:57Z",
+  "isolation": {
+    "appUrl": "http://127.0.0.1:5173",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "agentBrowserSession": "g5-backup-nsec-create-b481"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-BACKUP-020",
+      "title": "Pasted nsec is used as the root of the new keyset (not replaced)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Navigate to /create, paste a checksum-valid nsec, and submit Create Keyset.",
+          "expected": "Create flow should proceed using pasted nsec path.",
+          "observed": "Flow proceeded to /create/progress then /create/profile with keyset session present."
+        },
+        {
+          "action": "Capture create-session + WASM verification via in-page eval (recompute from pasted nsec and recover from threshold shares).",
+          "expected": "group_pk should match create_keyset_bundle_from_nsec path and recovered nsec should equal pasted nsec.",
+          "observed": "groupPkMatchesFromNsecPath=true, groupPkDiffersFromRandomCreateKeysetBundle=true, recoveredMatchesPastedTrimmedNsec=true."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-028-validation-success-progress.png"
+        ],
+        "artifacts": [
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-020-roundtrip-call-trace.json"
+        ],
+        "consoleErrors": "none",
+        "network": "No API dependency for this assertion (local UI + WASM path)."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-021",
+      "title": "Invalid nsec shows inline error, does not proceed",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Enter invalid non-nsec value ('invalid-key') and click Create Keyset.",
+          "expected": "Inline error and no navigation to progress screen.",
+          "observed": "Inline error 'Invalid nsec format — must start with nsec1.' shown; URL remained /create."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-021-invalid-nsec-inline-error.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No relevant outbound API call observed."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-022",
+      "title": "Nsec field is masked by default; reveal toggle flips masked ↔ revealed",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Load /create and inspect nsec input + reveal control before entry.",
+          "expected": "Input type=password and reveal button disabled when field empty.",
+          "observed": "type=password; reveal button disabled."
+        },
+        {
+          "action": "Paste valid nsec, toggle reveal, then toggle back.",
+          "expected": "type should switch password→text→password and aria-label should alternate Reveal/Hide.",
+          "observed": "type switched to text (Hide nsec), then back to password (Reveal nsec)."
+        },
+        {
+          "action": "Navigate away and return to /create.",
+          "expected": "Field returns masked state.",
+          "observed": "Returned input type=password with empty field and disabled reveal."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-022-masked-default.png",
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-022-revealed.png",
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-022-hidden-again.png",
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-022-masked-after-navigation.png"
+        ],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-023",
+      "title": "Nsec is never persisted to any browser storage",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Capture baseline localStorage/sessionStorage/IndexedDB before paste.",
+          "expected": "No nsec/plaintext secret present.",
+          "observed": "needleHits false for trimmed and whitespace variants."
+        },
+        {
+          "action": "Capture storage immediately after paste and after keyset generation.",
+          "expected": "No verbatim nsec persisted.",
+          "observed": "needleHits remained false in both snapshots."
+        },
+        {
+          "action": "Unlock and navigate to dashboard, then capture storage again.",
+          "expected": "No plaintext nsec persisted post-navigation.",
+          "observed": "needleHits remained false; profile persisted only as encrypted bfprofile payload."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-023-dashboard-unlocked.png"
+        ],
+        "artifacts": [
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-023-storage-baseline.json",
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-023-storage-after-paste.json",
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-023-storage-after-createkeyset.json",
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-023-storage-after-dashboard.json"
+        ],
+        "consoleErrors": "none",
+        "network": "Dashboard session opened relay sockets to wss://relay.damus.io and wss://relay.primal.net; no leak of test nsec in captured storage/network metadata."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-028",
+      "title": "Pasted nsec whitespace is trimmed without losing material",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Paste whitespace-wrapped nsec into /create input and inspect field value before submit.",
+          "expected": "Input value reflects trimmed nsec string.",
+          "observed": "Input retained surrounding spaces (valueEqualsTrimmed=false, valueEqualsWhitespaceWrapped=true)."
+        },
+        {
+          "action": "Submit Create Keyset with whitespace-wrapped nsec.",
+          "expected": "Validation succeeds and flow proceeds.",
+          "observed": "Flow navigated to /create/progress (validation success)."
+        },
+        {
+          "action": "Scan persisted storage for both trimmed and untrimmed variants.",
+          "expected": "No persisted hit for either variant.",
+          "observed": "No persisted hit for either variant."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-028-whitespace-pasted-before-submit.png",
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-028-validation-success-progress.png"
+        ],
+        "artifacts": [
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-028-input-value-check.json",
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-028-validation-success-url.json",
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-023-storage-after-paste.json"
+        ],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": "Contract clause 'input value reflects trimmed string' did not hold; trimming occurs for validation/submit path but the field value remained whitespace-wrapped before submit."
+    },
+    {
+      "id": "VAL-BACKUP-029",
+      "title": "Nsec is scrubbed from DOM on navigation / lock",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Submit create flow with pasted nsec and navigate away from /create.",
+          "expected": "Nsec should not remain present in DOM/input values after navigation.",
+          "observed": "DOM scan at /create/profile showed 0 text/value hits for the pasted nsec."
+        },
+        {
+          "action": "Reverse-navigate back to /create and inspect input + full DOM.",
+          "expected": "Input should be empty/masked and no residual nsec text in document.",
+          "observed": "nsec input empty with type=password; full DOM scan returned 0 hits."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-029-revisit-create-empty-masked.png"
+        ],
+        "artifacts": [
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-029-dom-scan-after-navigation.json",
+          "m6-backup/g5-backup-nsec-create/VAL-BACKUP-029-dom-scan-reverse-navigation.json"
+        ],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "The /create/progress screen auto-advances quickly to /create/profile, requiring immediate evidence capture for intermediate-state assertions.",
+      "resolved": true,
+      "resolution": "Captured progress evidence immediately after wait-for-url and used persisted JSON artifacts for call-trace/storage proof.",
+      "affectedAssertions": [
+        "VAL-BACKUP-020",
+        "VAL-BACKUP-028"
+      ]
+    },
+    {
+      "description": "The reveal-toggle button accessible name flips between 'Reveal nsec' and 'Hide nsec', invalidating stale element refs mid-step.",
+      "resolved": true,
+      "resolution": "Re-snapshotted the page after each toggle before continuing interactions.",
+      "affectedAssertions": [
+        "VAL-BACKUP-022"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 6 assertions: 5 passed, 1 failed (VAL-BACKUP-028 due to input value not being trimmed in-field before submit)."
+}

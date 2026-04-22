@@ -168,3 +168,9 @@ All hooks are **DEV-only**. If your validation runs a production build (`vite bu
 ## Observed Tooling Notes (m5-settings)
 
 - `VAL-CROSS-009` has a strict source-grep clause (`rg -n "Rotate Share" src/`), and this currently fails because `src/__tests__/noRotateShareTerminology.test.ts` intentionally contains the literal phrase in test expectations/regex. UI and `/demo` DOM sweeps show zero rendered `"Rotate Share"` strings, but strict contract scoring should still mark the assertion failed until source text is fully removed or the contract scope is narrowed.
+
+## Observed Tooling Notes (m6-backup)
+
+- Local `bifrost-devtools` relay (`ws://127.0.0.1:8194`) did not enforce single-winner replaceable semantics for kind `10000` during user-testing validation queries; duplicate/race publish checks returned multiple events for the same author (`VAL-BACKUP-006`, `VAL-BACKUP-031` blocked in this round).
+- Relay-backed restore submission emitted the expected kind `10000` author-filter subscription from the UI, but success-path retrieval returned no matching backup event in this run; this blocked restore-success assertions (`VAL-BACKUP-010`, `VAL-BACKUP-013`, `VAL-BACKUP-030`).
+- Nsec whitespace trimming currently succeeds in submit/validation flow, but the input field value remained whitespace-wrapped before submit (`VAL-BACKUP-028` failed against strict in-field-trim contract wording).
