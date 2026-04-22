@@ -165,7 +165,13 @@ export function CreateKeysetScreen() {
               type={showNsec ? "text" : "password"}
               value={nsec}
               onChange={(event) => {
-                const next = event.target.value;
+                // Trim surrounding whitespace on change so the input's
+                // displayed value never contains leading/trailing
+                // whitespace or newlines. Paste contract: pasting
+                // "   nsec1abc...   \n" must leave input.value === the
+                // trimmed string BEFORE the user clicks Create
+                // (VAL-BACKUP-028). Do NOT log / persist `next`.
+                const next = event.target.value.trim();
                 setNsec(next);
                 if (generatedNsec && next !== generatedNsec.nsec)
                   clearGeneratedNsec();

@@ -522,6 +522,31 @@ describe("CreateKeysetScreen", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("reflects the trimmed nsec in input.value on change, before submit (VAL-BACKUP-028)", () => {
+    const pasted = VALID_NSEC_A;
+
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    ) as HTMLInputElement;
+
+    // Simulate a paste that includes surrounding whitespace / newline.
+    // The contract clause "Input value reflects trimmed string" requires
+    // the displayed DOM value to already be trimmed BEFORE the user
+    // clicks Create — validators check the field prior to submission.
+    fireEvent.change(nsecInput, {
+      target: { value: `   ${pasted}   \n` },
+    });
+
+    expect(nsecInput.value).toBe(pasted);
+    expect(nsecInput.value).not.toMatch(/^\s|\s$/);
+  });
+
   it("rejects whitespace-wrapped invalid nsec with inline error (VAL-BACKUP-021)", async () => {
     render(
       <MemoryRouter>
