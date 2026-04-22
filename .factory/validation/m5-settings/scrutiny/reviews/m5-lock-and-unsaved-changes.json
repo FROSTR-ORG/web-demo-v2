@@ -1,0 +1,34 @@
+{
+  "featureId": "m5-lock-and-unsaved-changes",
+  "reviewedAt": "2026-04-22T18:22:39Z",
+  "commitId": "c319d752746e58273c5005c5888ddc6fd575f35d",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "Lock-path relay pump shutdown is implemented correctly, but the unsaved-changes guard is incomplete: one route-change affordance in Settings bypasses the confirm dialog and can silently discard edits, so VAL-SETTINGS-029 is not fully met.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen/sidebar/SettingsSidebar.tsx",
+        "line": 962,
+        "severity": "blocking",
+        "description": "The Replace Share CTA performs `onClose(); navigate('/replace-share')` directly instead of going through `guardNav(...)`. With an unsaved Profile Name draft or partial Change Password form, this route change drops in-memory edits without confirmation or auto-save, violating the feature's navigate-away requirement (VAL-SETTINGS-029 forbids silent loss on route change)."
+      },
+      {
+        "file": "docs/runtime-deviations-from-paper.md",
+        "line": 407,
+        "severity": "non_blocking",
+        "description": "The deviation doc claims route-level navigation (including Replace Share) is covered because the parent `onClose()` path triggers the guard, but current code bypasses `guardNav` on the Replace Share button. The documentation is out of sync with implementation."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "UI-validation guidance is inconsistent across shared state: AGENTS requires agent-browser for UI validation, while the ui-screen-worker skill permits some skips. This ambiguity can allow behavioral UI changes to ship without manual UI verification.",
+      "evidence": "Mission AGENTS.md line 84 says \"The `agent-browser` skill is mandatory for UI validation\"; `.factory/skills/ui-screen-worker/SKILL.md` line 23 allows skips for \"Pure copy-string / neutral-fallback / data-wiring fixes\"; this worker reported `followedProcedure: false` and skipped agent-browser in the handoff for a new confirm-dialog interaction."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed handoff, transcript skeleton, commit diff, and shared-state docs for m5-lock-and-unsaved-changes. Result: fail due to a blocking unsaved-changes gap on Replace Share route navigation, plus one non-blocking documentation mismatch."
+}

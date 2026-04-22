@@ -1,0 +1,31 @@
+{
+  "featureId": "fix-m5-relay-churn-multidevice-spec",
+  "reviewedAt": "2026-04-22T18:23:55Z",
+  "commitId": "afb590e",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix addresses the missing VAL-CROSS-005 coverage by adding a full multi-device relay-churn Playwright spec, including local relay spawn, decoy relay churn mid-sign, symmetry (both directions), and duplicate-connection safeguards via relayHistory/reconnect assertions. The supporting dev-only __iglooTestUpdateRelays hook and observability tests are scoped and aligned with existing test-hook patterns.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "runtime-worker procedure compliance signaling is inconsistent: the handoff marks followedProcedure=true, but the logged verification set omits commands explicitly listed in the skill and does not include agent-browser interactive checks.",
+      "evidence": ".factory/skills/runtime-worker/SKILL.md:22,44,46,49 requires demo-gallery/tsconfig.node and agent-browser expectations; /Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/handoffs/2026-04-22T17-04-36-071Z__fix-m5-relay-churn-multidevice-spec__68a204af-acd6-4775-9ea9-4e191d0dc7d5.json:14-36 lists only tsconfig.json+vitest+target spec runs, while line 72 reports followedProcedure=true."
+    },
+    {
+      "area": "conventions",
+      "observation": "Mission convention text says no `.skip` additions, but multi-device specs (including this one) use conditional cargo-gated `test.skip(...)` guards; this rule is currently ambiguous for environment-availability guards.",
+      "evidence": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/AGENTS.md:67 says no `.skip` additions; src/e2e/multi-device/relay-churn.spec.ts:184 and src/e2e/multi-device/policy-denial-allow-once-retry.spec.ts:202 both use conditional test.skip guards."
+    },
+    {
+      "area": "knowledge",
+      "observation": "A repeat discovery surfaced that AppStateValue.updateRelays is profile/unlock gated and therefore unusable from __iglooTestSeedRuntime contexts; this prompted a new dev hook. That constraint is not clearly captured in shared architecture guidance.",
+      "evidence": "src/app/AppStateProvider.tsx:2433-2443 enforces active profile + unlocked payload/password for updateRelays; src/app/AppStateProvider.tsx:3807 adds __iglooTestUpdateRelays bypass for test contexts; handoff notes the same blocker in implementation summary (/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/handoffs/2026-04-22T17-04-36-071Z__fix-m5-relay-churn-multidevice-spec__68a204af-acd6-4775-9ea9-4e191d0dc7d5.json:11)."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "PASS: the fix closes the prior gap by adding the missing relay-churn multi-device spec with deterministic repeated execution evidence and symmetric churn assertions. No blocking code defects were found in the reviewed commit."
+}

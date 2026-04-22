@@ -1,0 +1,28 @@
+{
+  "featureId": "m5-group-profile-metadata",
+  "reviewedAt": "2026-04-22T18:21:54.083023Z",
+  "commitId": "fb0cacb",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Implementation satisfies VAL-SETTINGS-008/009: Group Profile rows now source Keyset Name/npub/Threshold and Created/Updated from active profile metadata, placeholder literals were removed, and fields remain read-only. Storage/runtime plumbing introduces updatedAt with legacy backfill and mutation-time updates so displayed timestamps come from persisted profile state.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.groupProfileMetadata.test.tsx",
+        "line": 29,
+        "severity": "non_blocking",
+        "description": "The test named 'falls back to createdAt when updatedAt is absent' does not actually model an absent value because the local stub type requires `updatedAt: number` and the test sets `updatedAt` equal to `createdAt` instead of omitting it. This weakens direct coverage of the undefined-updatedAt fallback path."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "`ui-screen-worker` procedure requires a Playwright run in verification step 6, but this feature handoff reports only typecheck + Vitest + agent-browser checks while still marking `followedProcedure: true`.",
+      "evidence": "Handoff file `/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/handoffs/2026-04-22T17-17-57-970Z__m5-group-profile-metadata__0e828b64-2639-4e5e-8a89-28b7c052ae69.json` under `handoff.verification.commandsRun` contains no Playwright command, while `.factory/skills/ui-screen-worker/SKILL.md` lists Playwright as required in step 6."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "PASS. The feature behavior matches the requirement: Group Profile metadata is sourced from real profile state, hardcoded dates are removed, and the section is read-only. I noted one non-blocking test-coverage mismatch and one skill/procedure consistency observation for shared-state triage."
+}
