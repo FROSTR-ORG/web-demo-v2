@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m6-nsec-structural-validation",
+  "reviewedAt": "2026-04-22T21:48:46Z",
+  "commitId": "214cab2",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Reviewed the fix commit (214cab2) and the original failed feature commit (0261192). The prior blocking gap (CreateKeysetScreen validating pasted nsec with only startsWith(\"nsec1\")) is now closed by structural bech32 validation at inline input-validation stage. The updated submit path preserves the non-nsec-prefix error copy, adds a distinct structural-malformed error for nsec1-prefixed garbage, trims before validation, blocks createKeyset dispatch on invalid input, and keeps secret-handling constraints intact (no logging/storage writes introduced). Added unit coverage for the validator and expanded Create flow tests adequately cover malformed-prefix, malformed-structure, error clearing, and leak-guard behavior.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The worker skipped agent-browser manual verification under the skill's 'pure copy/data-wiring' exception, but this fix changes validation behavior (not only text copy) by introducing new bech32 structural gating logic in the submit path. Skill exception wording may be too broad/ambiguous for behavior-changing validation fixes.",
+      "evidence": "Handoff skillFeedback marks followedProcedure=false and cites copy-only exception; commit 214cab2 adds src/lib/nsec/validateNsec.ts and modifies src/screens/CreateKeysetScreen.tsx validation flow."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m6-backup/scrutiny/reviews/m6-nsec-split-create.json",
+  "summary": "Pass. This fix adequately addresses the original failure from m6-nsec-split-create by preventing structurally malformed nsec1 inputs from bypassing inline validation, while preserving intended error copy and adding focused regression coverage."
+}

@@ -1,0 +1,15 @@
+{
+  "featureId": "fix-m6-restore-relay-wss-and-parallel",
+  "reviewedAt": "2026-04-22T21:49:21Z",
+  "commitId": "e09187a3054052cb7fc9f9d671904c018ff6f1fb",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly addresses both prior blocking failures: restore now supports a DEV-only ws:// opt-in scoped to restoreProfileFromRelay for local-relay e2e, and relay querying was refactored into true parallel fan-out with per-relay timeout semantics so a hung earlier relay no longer starves later relays. Existing user-facing wss:// validation and canonical error paths remain intact.",
+    "issues": []
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": ".factory/validation/m6-backup/scrutiny/reviews/m6-backup-restore.json",
+  "summary": "Reviewed the fix feature transcript skeleton, handoff, prior failed review, and both commit diffs (original and fix). The fix is adequate: it resolves the ws:// local-relay test blockage without relaxing end-user validation, and it resolves the sequential relay-starvation bug via parallel per-relay attempts with focused test coverage."
+}
