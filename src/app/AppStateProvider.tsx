@@ -35,8 +35,10 @@ import type {
   BfPolicyOverrideValue,
   BfProfilePayload,
   CompletedOperation,
+  DerivedPublicNonceWire,
   GroupPackageWire,
   OperationFailure,
+  RuntimeBootstrapInput,
   RuntimeEvent,
   RuntimeSnapshotInput,
   RuntimeStatusSummary,
@@ -3143,12 +3145,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         share: SharePackageWire;
         relays: string[];
         deviceName?: string;
+        initial_peer_nonces?: Array<{
+          peer: string;
+          nonces: DerivedPublicNonceWire[];
+        }>;
       }) => Promise<void>;
       __iglooTestCreateKeysetBundle?: typeof createKeysetBundle;
       __iglooTestMemberPubkey32?: (
         group: GroupPackageWire,
         shareIdx: number,
       ) => string;
+      __iglooTestCreatePeerNonces?: (input: {
+        share_secret_hex: string;
+        peer_pubkey32_hex: string;
+        event_kind?: number;
+      }) => Promise<DerivedPublicNonceWire[]>;
+      __iglooTestPrePopulateNonces?: (input: {
+        peer_pubkey32_hex: string;
+        peer_share_secret_hex: string;
+        count?: number;
+      }) => Promise<void>;
       __iglooTestDropRelays?: (closeCode?: number) => void;
       __iglooTestRestoreRelays?: () => Promise<void>;
       __iglooTestSimulateNonceDepletion?: (input?: {
@@ -3196,6 +3212,34 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     };
     globalWindow.__debug = debugSurface;
     globalWindow.__iglooTestSeedRuntime = async (input) => {
+      // Fast path: when the caller provides `initial_peer_nonces`, bypass
+      // the profile-payload pipeline and boot a `RuntimeClient` directly
+      // from a synthesised `RuntimeBootstrapInput`. This is the only
+      // entry point that can seed the runtime's `state.nonce_pool` at
+      // init time (the upstream bifrost-bridge-wasm only honours
+      // `initial_peer_nonces` on `init_runtime`, never on
+      // `restore_runtime`). Tests use this to skip the ping/pong
+      // convergence loop that would otherwise gate `sign_ready`.
+      if (
+        input.initial_peer_nonces &&
+        input.initial_peer_nonces.length > 0
+      ) {
+        const peers = input.group.members
+          .filter((member) => member.idx !== input.share.idx)
+          .map(memberPubkeyXOnly)
+          .sort();
+        const bootstrap: RuntimeBootstrapInput = {
+          group: input.group,
+          share: input.share,
+          peers,
+          initial_peer_nonces: input.initial_peer_nonces,
+        };
+        const runtime = new RuntimeClient();
+        await runtime.init({}, bootstrap);
+        setRuntime(runtime, undefined, input.relays);
+        return;
+      }
+
       const payload: BfProfilePayload = {
         profile_id: `igloo-test-${input.share.idx}`,
         version: 1,
@@ -3218,6 +3262,93 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         );
       }
       return memberPubkeyXOnly(member);
+    };
+    // Generate a batch of valid `DerivedPublicNonceWire` values bound to
+    // a given share's private key, targeting `peer_pubkey32_hex` as the
+    // intended receiver. Internally wraps the WASM
+    // `create_onboarding_request_bundle` primitive — the only available
+    // JS-accessible source of real FROST round-1 public nonces derived
+    // from a share secret. Returns the bundle's `request_nonces` array
+    // (defaults to the `NoncePoolConfig::default().pool_size == 100`
+    // nonces on the bifrost side), suitable for passing into the
+    // extended `__iglooTestSeedRuntime({initial_peer_nonces})` path
+    // above or into `__iglooTestPrePopulateNonces` below.
+    //
+    // This hook is test-only; production code must never ferry raw
+    // share secrets across page boundaries.
+    globalWindow.__iglooTestCreatePeerNonces = async (input) => {
+      const eventKind =
+        typeof input.event_kind === "number"
+          ? input.event_kind
+          : await defaultBifrostEventKind();
+      const bundle = await createOnboardingRequestBundle({
+        shareSecret: input.share_secret_hex,
+        peerPubkey32Hex: input.peer_pubkey32_hex,
+        eventKind,
+      });
+      return bundle.request_nonces;
+    };
+    // Directly populate the currently-seeded runtime's
+    // `state.nonce_pool.incoming[peer_idx]` with enough nonces to
+    // satisfy `can_sign(peer_idx)` (> critical_threshold = 5 by
+    // default). Mechanism: snapshot the live runtime, use the recovered
+    // `bootstrap` + `state.manual_policy_overrides` as-is, generate
+    // nonces from the supplied `peer_share_secret_hex`, then re-init
+    // the runtime via `init_runtime` with the nonces seeded into
+    // `initial_peer_nonces`.
+    //
+    // Intended for specs that want to skip the ping/pong convergence
+    // phase entirely — e.g. the policy-denial-roundtrip spec where the
+    // real-protocol handshake is orthogonal to what's under test.
+    //
+    // Each call concatenates `count` pool_size-sized batches so callers
+    // can request an arbitrarily large seeded pool. `count` defaults
+    // to 1 (100 nonces per `NoncePoolConfig::default()`), which is far
+    // above the > 5 gate and sufficient for any realistic sign
+    // dispatch.
+    globalWindow.__iglooTestPrePopulateNonces = async (input) => {
+      const runtime = runtimeRef.current;
+      if (!runtime) {
+        throw new Error(
+          "__iglooTestPrePopulateNonces: no active runtime. Call " +
+            "__iglooTestSeedRuntime (or unlock a profile) first.",
+        );
+      }
+      const snapshot = runtime.snapshot();
+      // The "local" pubkey from the runtime's own perspective — this is
+      // what the peer's (synthetic) onboarding request will target, and
+      // it is irrelevant to the FROST commitments themselves (which are
+      // derived solely from the peer's share seckey). Using the real
+      // local pubkey keeps the request bundle consistent with
+      // `create_onboarding_request_bundle`'s expectations.
+      const localPubkey32 = memberPubkeyXOnly(
+        memberForShare(snapshot.bootstrap.group, snapshot.bootstrap.share),
+      );
+      const eventKind = await defaultBifrostEventKind();
+      const count = Math.max(1, Math.floor(input.count ?? 1));
+      const aggregatedNonces: DerivedPublicNonceWire[] = [];
+      for (let i = 0; i < count; i += 1) {
+        const bundle = await createOnboardingRequestBundle({
+          shareSecret: input.peer_share_secret_hex,
+          peerPubkey32Hex: localPubkey32,
+          eventKind,
+        });
+        aggregatedNonces.push(...bundle.request_nonces);
+      }
+      const nextBootstrap: RuntimeBootstrapInput = {
+        group: snapshot.bootstrap.group,
+        share: snapshot.bootstrap.share,
+        peers: snapshot.bootstrap.peers,
+        initial_peer_nonces: [
+          {
+            peer: input.peer_pubkey32_hex,
+            nonces: aggregatedNonces,
+          },
+        ],
+      };
+      const nextRuntime = new RuntimeClient();
+      await nextRuntime.init({}, nextBootstrap);
+      setRuntime(nextRuntime, undefined, liveRelayUrlsRef.current);
     };
     // Forcibly close every live relay socket with a simulated close code
     // (default 1006 "abnormal closure"). Does NOT synchronously mutate
@@ -3258,7 +3389,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         delete globalWindow.__appState;
       }
     };
-  }, [value, startRuntimeFromPayload, applyRuntimeStatus]);
+  }, [value, startRuntimeFromPayload, applyRuntimeStatus, setRuntime]);
 
   return (
     <AppStateContext.Provider value={value}>

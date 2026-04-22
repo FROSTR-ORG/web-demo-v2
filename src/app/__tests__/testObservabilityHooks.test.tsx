@@ -8,6 +8,12 @@
  *   4. `window.__iglooTestDropRelays()` / `__iglooTestRestoreRelays()`
  *   5. `window.__iglooTestSimulateNonceDepletion()` / `__iglooTestRestoreNonce()`
  *
+ * plus the nonce-prepopulate hooks added by
+ * `fix-m3-nonce-prepopulate-test-hook`:
+ *   6. `window.__iglooTestCreatePeerNonces()`
+ *   7. `window.__iglooTestPrePopulateNonces()`
+ *   8. the extended `__iglooTestSeedRuntime({initial_peer_nonces})` path
+ *
  * All assertions target the DEV code path (vitest sets `import.meta.env.DEV`
  * to `true`). A complementary `dist/` grep in the build verification step
  * guards the production strip-out contract.
@@ -32,6 +38,12 @@ vi.mock("idb-keyval", () => ({
   }),
 }));
 
+interface IglooDerivedPublicNonceWire {
+  binder_pn: string;
+  hidden_pn: string;
+  code: string;
+}
+
 interface IglooTestWindow extends Window {
   __debug?: {
     relayHistory: Array<{ type: string; url: string; at: string; code?: number | null }>;
@@ -46,6 +58,17 @@ interface IglooTestWindow extends Window {
     reason?: string;
   }) => void;
   __iglooTestRestoreNonce?: () => void;
+  __iglooTestCreatePeerNonces?: (input: {
+    share_secret_hex: string;
+    peer_pubkey32_hex: string;
+    event_kind?: number;
+  }) => Promise<IglooDerivedPublicNonceWire[]>;
+  __iglooTestPrePopulateNonces?: (input: {
+    peer_pubkey32_hex: string;
+    peer_share_secret_hex: string;
+    count?: number;
+  }) => Promise<void>;
+  __iglooTestSeedRuntime?: (input: unknown) => Promise<void>;
 }
 
 function Capture({ onState }: { onState: (state: AppStateValue) => void }) {
@@ -108,6 +131,11 @@ describe("AppStateProvider — dev-only test-observability hooks", () => {
       "function",
     );
     expect(typeof iglooWindow.__iglooTestRestoreNonce).toBe("function");
+    // fix-m3-nonce-prepopulate-test-hook: new dev-only hooks for
+    // deterministic nonce seeding.
+    expect(typeof iglooWindow.__iglooTestCreatePeerNonces).toBe("function");
+    expect(typeof iglooWindow.__iglooTestPrePopulateNonces).toBe("function");
+    expect(typeof iglooWindow.__iglooTestSeedRuntime).toBe("function");
   });
 
   it("visibilityHistory is seeded with the initial state and appended on transitions", async () => {
@@ -194,5 +222,84 @@ describe("AppStateProvider — dev-only test-observability hooks", () => {
     await expect(
       iglooWindow.__iglooTestRestoreRelays?.(),
     ).resolves.toBeUndefined();
+  });
+
+  it("__iglooTestPrePopulateNonces rejects when no runtime is attached", async () => {
+    let latest!: AppStateValue;
+    render(
+      <AppStateProvider>
+        <Capture onState={(state) => (latest = state)} />
+      </AppStateProvider>,
+    );
+    await waitFor(() => expect(latest).toBeTruthy());
+
+    const iglooWindow = window as IglooTestWindow;
+    await expect(
+      iglooWindow.__iglooTestPrePopulateNonces?.({
+        peer_pubkey32_hex: "a".repeat(64),
+        peer_share_secret_hex: "b".repeat(64),
+      }),
+    ).rejects.toThrow(/no active runtime/);
+  });
+});
+
+describe("Production build guard — nonce-prepopulate hooks are gated on import.meta.env.DEV", () => {
+  it("all __iglooTest* installer paths for prepopulate hooks are wrapped in `if (!import.meta.env.DEV) return`", async () => {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const repoRoot = process.cwd();
+    const providerSrc = await fs.readFile(
+      path.join(repoRoot, "src/app/AppStateProvider.tsx"),
+      "utf8",
+    );
+
+    // All new hooks must live inside a useEffect that bails out in
+    // non-DEV. The installer block's sole `if (!import.meta.env.DEV)
+    // return;` guard sits above every `globalWindow.__iglooTest*`
+    // assignment; Vite's dead-code elimination drops the entire effect
+    // body (and thus every symbol it references) from production
+    // bundles.
+    const guardIdx = providerSrc.indexOf(
+      "if (!import.meta.env.DEV) return;",
+    );
+    expect(guardIdx).toBeGreaterThan(-1);
+
+    // Each installer assignment must appear AFTER the guard — i.e. in
+    // the same useEffect. This catches the accidental case of someone
+    // moving an installer above the guard or into an ungated effect.
+    const afterGuard = providerSrc.slice(guardIdx);
+    expect(afterGuard).toMatch(
+      /globalWindow\.__iglooTestSeedRuntime\s*=/,
+    );
+    expect(afterGuard).toMatch(
+      /globalWindow\.__iglooTestCreatePeerNonces\s*=/,
+    );
+    expect(afterGuard).toMatch(
+      /globalWindow\.__iglooTestPrePopulateNonces\s*=/,
+    );
+
+    // Source-level sanity: every reference to the new hook identifier
+    // in the provider must sit AFTER the `import.meta.env.DEV` guard
+    // line, i.e. inside the gated installer effect. Anything before
+    // the guard would leak the symbol into the production bundle via
+    // a non-gated code path.
+    const hookRegex = /__iglooTestPrePopulateNonces/g;
+    let match: RegExpExecArray | null;
+    while ((match = hookRegex.exec(providerSrc)) !== null) {
+      expect(
+        match.index,
+        `reference to __iglooTestPrePopulateNonces at index ${match.index} ` +
+          `appears before the import.meta.env.DEV guard at ${guardIdx}`,
+      ).toBeGreaterThan(guardIdx);
+    }
+
+    const generateHookRegex = /__iglooTestCreatePeerNonces/g;
+    while ((match = generateHookRegex.exec(providerSrc)) !== null) {
+      expect(
+        match.index,
+        `reference to __iglooTestCreatePeerNonces at index ${match.index} ` +
+          `appears before the import.meta.env.DEV guard at ${guardIdx}`,
+      ).toBeGreaterThan(guardIdx);
+    }
   });
 });

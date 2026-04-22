@@ -56,13 +56,13 @@ const RELAY_PORT = 8194;
 const RELAY_URL = `ws://${RELAY_HOST}:${RELAY_PORT}`;
 
 const RELAY_READY_TIMEOUT_MS = 20_000;
-// Sign_ready on B requires a successful ping/pong round-trip so A's
-// advertised_nonces land in B's state.nonce_pool. The refresh timer
-// runs every 2.5 s in production; in this spec we drive
-// `refresh_all_peers` explicitly on both pages, but the underlying
-// runtime convergence can still take a handful of iterations. 90 s
-// is the outer bound observed during mission validator dry-runs.
-const SIGN_READY_TIMEOUT_MS = 90_000;
+// With nonce prepopulation via `__iglooTestSeedRuntime({initial_peer_nonces})`
+// (see `fix-m3-nonce-prepopulate-test-hook`) B's `sign_ready` flips to
+// true the moment its runtime reports initialized — no ping/pong
+// round-trip required. The 10 s ceiling is a generous upper bound for
+// the init + first `runtime_status` refresh tick on a stressed CI
+// host; a healthy run resolves inside ~1 s.
+const SIGN_READY_TIMEOUT_MS = 10_000;
 // VAL-POLICIES-010 mandates "B receives OperationFailure within 15 s of
 // the dispatch". This bound is enforced strictly here (not as a loose
 // Playwright step timeout): the wait starts the instant B's
@@ -70,12 +70,6 @@ const SIGN_READY_TIMEOUT_MS = 90_000;
 // descriptive error the moment 15 000 ms elapse without a matching
 // failure surfacing on B.
 const SIGN_FAILURE_TIMEOUT_MS = 15_000;
-// Each manual refresh nudges the sign_ready convergence forward by
-// one ping/pong round-trip. 12 cycles at ~1 s each matches the 90 s
-// convergence budget without running afoul of Playwright step-timeout
-// ceilings.
-const REFRESH_POKE_COUNT = 12;
-const REFRESH_POKE_INTERVAL_MS = 1_000;
 
 function cargoAvailable(): boolean {
   try {
@@ -300,12 +294,14 @@ test.describe(
                     __iglooTestSeedRuntime?: unknown;
                     __iglooTestCreateKeysetBundle?: unknown;
                     __iglooTestMemberPubkey32?: unknown;
+                    __iglooTestCreatePeerNonces?: unknown;
                   };
                   return (
                     typeof w.__appState === "object" &&
                     typeof w.__iglooTestSeedRuntime === "function" &&
                     typeof w.__iglooTestCreateKeysetBundle === "function" &&
-                    typeof w.__iglooTestMemberPubkey32 === "function"
+                    typeof w.__iglooTestMemberPubkey32 === "function" &&
+                    typeof w.__iglooTestCreatePeerNonces === "function"
                   );
                 },
                 undefined,
@@ -346,19 +342,114 @@ test.describe(
           const shareB = keyset.shares[1];
           expect(shareA.idx).not.toBe(shareB.idx);
 
-          const seed = async (
+          // Derive both 32-byte x-only peer pubkeys up-front so we can
+          // generate peer-scoped nonces BEFORE seeding the runtimes.
+          // Reading these on page A is cheap (no runtime required —
+          // derived purely from the keyset group metadata).
+          const [peerAPubkey32, peerBPubkey32] = await pageA.evaluate(
+            ({ group, idxA, idxB }) => {
+              const w = window as unknown as {
+                __iglooTestMemberPubkey32: (
+                  group: unknown,
+                  shareIdx: number,
+                ) => string;
+              };
+              return [
+                w.__iglooTestMemberPubkey32(group, idxA),
+                w.__iglooTestMemberPubkey32(group, idxB),
+              ];
+            },
+            { group: keyset.group, idxA: shareA.idx, idxB: shareB.idx },
+          );
+          expect(peerAPubkey32).toMatch(/^[0-9a-f]{64}$/);
+          expect(peerBPubkey32).toMatch(/^[0-9a-f]{64}$/);
+
+          // Nonce prepopulation: generate peer-bound
+          // `DerivedPublicNonceWire` batches on page A (which has
+          // access to both share secrets via `__iglooTestCreateKeysetBundle`'s
+          // return value) for each direction of the pair. The nonces
+          // are bound to the FROST commitments derived from the
+          // corresponding share secret, so seeding pageB's incoming
+          // pool for peer A with nonces generated from shareA's
+          // secret satisfies the `can_sign(A_idx)` gate deterministically
+          // — no ping/pong round-trip required.
+          //
+          // See `fix-m3-nonce-prepopulate-test-hook`: this replaces
+          // the previous `refresh_all_peers` pump loop that took
+          // ~90 s to converge and fell outside the VAL-POLICIES-010
+          // 15 s failure bound under CPU contention.
+          const { noncesFromA, noncesFromB } = await pageA.evaluate(
+            async ({ shareASec, shareBSec, peerAHex, peerBHex }) => {
+              const w = window as unknown as {
+                __iglooTestCreatePeerNonces: (input: {
+                  share_secret_hex: string;
+                  peer_pubkey32_hex: string;
+                  event_kind?: number;
+                }) => Promise<
+                  Array<{
+                    binder_pn: string;
+                    hidden_pn: string;
+                    code: string;
+                  }>
+                >;
+              };
+              // Nonces generated from A's secret, targeting B — these
+              // go into B's incoming pool keyed on peer A.
+              const noncesFromA = await w.__iglooTestCreatePeerNonces({
+                share_secret_hex: shareASec,
+                peer_pubkey32_hex: peerBHex,
+              });
+              // Nonces generated from B's secret, targeting A — these
+              // go into A's incoming pool keyed on peer B.
+              const noncesFromB = await w.__iglooTestCreatePeerNonces({
+                share_secret_hex: shareBSec,
+                peer_pubkey32_hex: peerAHex,
+              });
+              return { noncesFromA, noncesFromB };
+            },
+            {
+              shareASec: shareA.seckey,
+              shareBSec: shareB.seckey,
+              peerAHex: peerAPubkey32,
+              peerBHex: peerBPubkey32,
+            },
+          );
+          // Both batches must exceed the default `critical_threshold`
+          // (=5) so `NoncePool::can_sign` flips to true immediately
+          // after seeding.
+          expect(noncesFromA.length).toBeGreaterThan(5);
+          expect(noncesFromB.length).toBeGreaterThan(5);
+
+          const seedWithNonces = async (
             page: Page,
             share: SpecShare,
             deviceName: string,
+            peerHex: string,
+            peerNonces: typeof noncesFromA,
           ) =>
             page.evaluate(
-              async ({ group, share, relayUrl, deviceName }) => {
+              async ({
+                group,
+                share,
+                relayUrl,
+                deviceName,
+                peerHex,
+                peerNonces,
+              }) => {
                 const w = window as unknown as {
                   __iglooTestSeedRuntime: (input: {
                     group: unknown;
                     share: unknown;
                     relays: string[];
                     deviceName: string;
+                    initial_peer_nonces?: Array<{
+                      peer: string;
+                      nonces: Array<{
+                        binder_pn: string;
+                        hidden_pn: string;
+                        code: string;
+                      }>;
+                    }>;
                   }) => Promise<void>;
                 };
                 await w.__iglooTestSeedRuntime({
@@ -366,12 +457,36 @@ test.describe(
                   share,
                   relays: [relayUrl],
                   deviceName,
+                  initial_peer_nonces: [
+                    { peer: peerHex, nonces: peerNonces },
+                  ],
                 });
               },
-              { group: keyset.group, share, relayUrl: RELAY_URL, deviceName },
+              {
+                group: keyset.group,
+                share,
+                relayUrl: RELAY_URL,
+                deviceName,
+                peerHex,
+                peerNonces,
+              },
             );
-          await seed(pageA, shareA, "Alice");
-          await seed(pageB, shareB, "Bob");
+          // Seed A with B's nonces (so A.incoming[B] is preloaded).
+          // Seed B with A's nonces (so B.incoming[A] is preloaded).
+          await seedWithNonces(
+            pageA,
+            shareA,
+            "Alice",
+            peerBPubkey32,
+            noncesFromB,
+          );
+          await seedWithNonces(
+            pageB,
+            shareB,
+            "Bob",
+            peerAPubkey32,
+            noncesFromA,
+          );
 
           const waitForRelayOnline = async (page: Page, label: string) =>
             page
@@ -404,90 +519,45 @@ test.describe(
             waitForRelayOnline(pageB, "B"),
           ]);
 
-          // Drive `refresh_all_peers` on both pages repeatedly so the
-          // ping/pong cycle advances A's advertised_nonces into B's
-          // nonce_pool (and vice versa) faster than the 2.5 s
-          // background refresh timer would on its own. Combined with
-          // the 90 s sign_ready wait, this reliably gets the seeded
-          // 2-of-N runtime to sign_ready within the spec budget.
-          const pokeRefresh = async (page: Page) =>
-            page.evaluate(async () => {
-              const w = window as unknown as {
-                __appState?: {
-                  handleRuntimeCommand?: (cmd: {
-                    type: "refresh_all_peers";
-                  }) => Promise<{
-                    requestId: string | null;
-                    debounced: boolean;
-                  }>;
-                };
-              };
-              try {
-                await w.__appState?.handleRuntimeCommand?.({
-                  type: "refresh_all_peers",
-                });
-              } catch {
-                // refresh_all_peers may debounce or transiently error
-                // when the pump is between ticks — surface nothing,
-                // the next poke will retry.
-              }
-            });
-
-          const waitForSignReadyWithPokes = async (
-            page: Page,
-            label: string,
-          ) => {
-            const isReady = () =>
-              page.evaluate(() => {
-                const w = window as unknown as {
-                  __appState?: {
-                    runtimeStatus?: {
-                      readiness?: { sign_ready?: boolean };
+          // With the nonce pools pre-seeded, `sign_ready` must flip to
+          // true on the first `runtime_status` refresh tick — no
+          // ping/pong pump needed. A tight loop polling the observable
+          // snapshot bounds the wait to `SIGN_READY_TIMEOUT_MS` (10 s).
+          const waitForSignReady = async (page: Page, label: string) =>
+            page
+              .waitForFunction(
+                () => {
+                  const w = window as unknown as {
+                    __appState?: {
+                      runtimeStatus?: {
+                        readiness?: { sign_ready?: boolean };
+                      };
                     };
                   };
-                };
-                return Boolean(
-                  w.__appState?.runtimeStatus?.readiness?.sign_ready,
+                  return Boolean(
+                    w.__appState?.runtimeStatus?.readiness?.sign_ready,
+                  );
+                },
+                undefined,
+                { timeout: SIGN_READY_TIMEOUT_MS, polling: 100 },
+              )
+              .catch((err) => {
+                throw new Error(
+                  `runtime_status.readiness.sign_ready never became true ` +
+                    `on page ${label} within ${SIGN_READY_TIMEOUT_MS}ms ` +
+                    `(nonce prepopulate seed should have flipped sign_ready ` +
+                    `immediately). (${err})`,
                 );
               });
-            const deadline = Date.now() + SIGN_READY_TIMEOUT_MS;
-            while (Date.now() < deadline) {
-              if (await isReady()) return;
-              await pokeRefresh(page);
-              await new Promise((resolve) =>
-                setTimeout(resolve, REFRESH_POKE_INTERVAL_MS),
-              );
-            }
-            throw new Error(
-              `runtime_status.readiness.sign_ready never became true ` +
-                `on page ${label} within ${SIGN_READY_TIMEOUT_MS}ms`,
-            );
-          };
-          // Poke both pages in parallel so neither side's ping refills
-          // get starved by the other's.
           await Promise.all([
-            waitForSignReadyWithPokes(pageA, "A"),
-            waitForSignReadyWithPokes(pageB, "B"),
+            waitForSignReady(pageA, "A"),
+            waitForSignReady(pageB, "B"),
           ]);
 
-          // Derive both 32-byte x-only peer pubkeys.
-          const [peerAPubkey32, peerBPubkey32] = await pageA.evaluate(
-            ({ group, idxA, idxB }) => {
-              const w = window as unknown as {
-                __iglooTestMemberPubkey32: (
-                  group: unknown,
-                  shareIdx: number,
-                ) => string;
-              };
-              return [
-                w.__iglooTestMemberPubkey32(group, idxA),
-                w.__iglooTestMemberPubkey32(group, idxB),
-              ];
-            },
-            { group: keyset.group, idxA: shareA.idx, idxB: shareB.idx },
-          );
-          expect(peerAPubkey32).toMatch(/^[0-9a-f]{64}$/);
-          expect(peerBPubkey32).toMatch(/^[0-9a-f]{64}$/);
+          // Note: peerAPubkey32 / peerBPubkey32 were derived earlier,
+          // before seeding, so the nonce-generation step could target
+          // each peer precisely. They remain in scope here for the
+          // override + assertion steps below.
 
           // Install `respond.sign = deny` for peer B on page A via the
           // AppState bridge. `setPeerPolicyOverride` dispatches
@@ -551,10 +621,8 @@ test.describe(
           //     (no entry keyed on B's sign request_id is ever
           //     admitted). A's total pending_operations.length can
           //     and does churn freely due to background Ping traffic
-          //     emitted by the refresh cadence (seeded runtime runs
-          //     2.5 s refresh ticks plus the REFRESH_POKE_INTERVAL_MS
-          //     cadence used during sign_ready convergence), so we
-          //     snapshot total length for diagnostics only and
+          //     emitted by the seeded runtime's 2.5 s refresh ticks,
+          //     so we snapshot total length for diagnostics only and
           //     assert equality on the *Sign-typed subset*. The
           //     "no entry keyed on B's request_id" assertion below
           //     covers the actual contract invariant via continuous
