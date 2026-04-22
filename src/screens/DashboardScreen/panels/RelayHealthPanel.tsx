@@ -3,6 +3,7 @@ import type { RuntimeRelayStatus } from "../../../lib/relay/runtimeRelayPump";
 import {
   formatRelayLastSeen,
   isRelaySlow,
+  resolveRelayLastSeenSource,
 } from "../../../lib/relay/relayTelemetry";
 
 /**
@@ -58,11 +59,13 @@ export function RelayHealthPanel({
           typeof relay.eventsReceived === "number"
             ? String(relay.eventsReceived)
             : "0";
-        const lastSeenSource =
-          relay.lastEventAt ??
-          (relay.state === "online"
-            ? relay.lastConnectedAt
-            : relay.lastDisconnectedAt ?? relay.lastConnectedAt);
+        // State-aware last-seen precedence — see
+        // `resolveRelayLastSeenSource` and
+        // fix-m5-relay-telemetry-last-seen-precedence: online relays
+        // prefer `lastEventAt`, disconnected/offline relays prefer
+        // `max(lastDisconnectedAt, lastEventAt)` so a stale pre-
+        // disconnect event cannot win over a fresher disconnect.
+        const lastSeenSource = resolveRelayLastSeenSource(relay);
         const lastSeen = formatRelayLastSeen(lastSeenSource, nowMs);
         return (
           <div

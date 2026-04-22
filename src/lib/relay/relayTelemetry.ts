@@ -93,3 +93,53 @@ export function isRelaySlow(
     (consecutiveSlowSamples ?? 0) >= SLOW_RELAY_CONSECUTIVE_SAMPLES
   );
 }
+
+/**
+ * Pick the single Unix-ms timestamp that backs a relay's relative
+ * "last seen" copy (fix-m5-relay-telemetry-last-seen-precedence).
+ *
+ * The precedence depends on the relay's current state so the column
+ * reflects what the user actually wants to know:
+ *
+ *   - **Online** — the last meaningful activity is the most recent
+ *     inbound event; fall back to the connect-open timestamp when no
+ *     event has arrived yet.
+ *   - **Offline / connecting (i.e. NOT online)** — the user wants to
+ *     see "when did we lose the connection". That is ordinarily
+ *     `lastDisconnectedAt`, but `lastEventAt` may be even more recent
+ *     if a late inbound frame arrived between the last recorded close
+ *     and the current tick, so we take the MAX of the two. We still
+ *     fall back to `lastConnectedAt` when neither is populated
+ *     (e.g. a relay that has never observed a disconnect).
+ *
+ * The prior implementation always preferred `lastEventAt` first, which
+ * produced stale values across disconnect cycles
+ * (e.g. "5m ago" moments after a relay dropped, because the last event
+ * arrived 5 min earlier). Swapping precedence by state fixes that
+ * without disturbing the online-state behaviour. Returns `undefined`
+ * when no usable timestamp is available; callers typically map that
+ * to "--" via {@link formatRelayLastSeen}.
+ */
+export function resolveRelayLastSeenSource(
+  relay: {
+    state: "connecting" | "online" | "offline";
+    lastEventAt?: number;
+    lastConnectedAt?: number;
+    lastDisconnectedAt?: number;
+  },
+): number | undefined {
+  if (relay.state === "online") {
+    return relay.lastEventAt ?? relay.lastConnectedAt;
+  }
+  // Not online: prefer the most recent of lastDisconnectedAt /
+  // lastEventAt so a stale pre-disconnect event cannot win over a
+  // fresher disconnect timestamp.
+  const event = relay.lastEventAt;
+  const disconnected = relay.lastDisconnectedAt;
+  if (typeof event === "number" && typeof disconnected === "number") {
+    return Math.max(event, disconnected);
+  }
+  if (typeof disconnected === "number") return disconnected;
+  if (typeof event === "number") return event;
+  return relay.lastConnectedAt;
+}

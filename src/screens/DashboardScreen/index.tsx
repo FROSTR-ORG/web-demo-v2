@@ -46,6 +46,7 @@ import type { RuntimeRelayStatus } from "../../lib/relay/runtimeRelayPump";
 import {
   formatRelayLastSeen,
   isRelaySlow,
+  resolveRelayLastSeenSource,
 } from "../../lib/relay/relayTelemetry";
 
 export type { DashboardState, ModalState } from "./types";
@@ -107,14 +108,16 @@ export function relayHealthRowsFromRuntime(
       typeof relay.eventsReceived === "number"
         ? String(relay.eventsReceived)
         : "0";
-    // LastSeen: prefer the most recent inbound event, then connection
-    // open, then disconnect (offline). "--" only when a relay has
-    // literally never transitioned past `connecting`.
-    const lastSeenSource =
-      relay.lastEventAt ??
-      (relay.state === "online"
-        ? relay.lastConnectedAt
-        : relay.lastDisconnectedAt ?? relay.lastConnectedAt);
+    // LastSeen: state-aware precedence
+    // (fix-m5-relay-telemetry-last-seen-precedence).
+    //   - Online: prefer lastEventAt, then lastConnectedAt.
+    //   - Not online (offline / connecting): prefer
+    //     max(lastDisconnectedAt, lastEventAt) so a stale pre-
+    //     disconnect event cannot win over a fresher disconnect
+    //     timestamp. Fallback to lastConnectedAt when neither is
+    //     populated. "--" only when a relay has literally never
+    //     transitioned past `connecting`.
+    const lastSeenSource = resolveRelayLastSeenSource(relay);
     const lastSeen = formatRelayLastSeen(lastSeenSource, nowMs);
     return {
       relay: relay.url,

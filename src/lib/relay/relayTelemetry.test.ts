@@ -11,6 +11,7 @@ import {
   SLOW_RELAY_THRESHOLD_MS,
   formatRelayLastSeen,
   isRelaySlow,
+  resolveRelayLastSeenSource,
 } from "./relayTelemetry";
 
 describe("relayTelemetry constants", () => {
@@ -85,5 +86,90 @@ describe("isRelaySlow", () => {
   it("returns true at the configured 2-sample threshold", () => {
     expect(isRelaySlow(2)).toBe(true);
     expect(isRelaySlow(3)).toBe(true);
+  });
+});
+
+/**
+ * fix-m5-relay-telemetry-last-seen-precedence — the state-aware
+ * precedence helper used by the RelayHealthPanel and the
+ * `relayHealthRowsFromRuntime` mapper. Validates the three
+ * transitions: online (fresh event), disconnect (no new events),
+ * reconnect (fresh event again).
+ */
+describe("resolveRelayLastSeenSource", () => {
+  it("online: prefers lastEventAt over lastConnectedAt", () => {
+    expect(
+      resolveRelayLastSeenSource({
+        state: "online",
+        lastEventAt: 500,
+        lastConnectedAt: 100,
+      }),
+    ).toBe(500);
+  });
+
+  it("online: falls back to lastConnectedAt when no event has arrived", () => {
+    expect(
+      resolveRelayLastSeenSource({
+        state: "online",
+        lastConnectedAt: 100,
+      }),
+    ).toBe(100);
+  });
+
+  it("online: never falls through to lastDisconnectedAt", () => {
+    // A reconnected relay may still carry the prior lastDisconnectedAt
+    // in its status struct; when state === online we must ignore it.
+    expect(
+      resolveRelayLastSeenSource({
+        state: "online",
+        lastEventAt: 500,
+        lastConnectedAt: 400,
+        lastDisconnectedAt: 9_999,
+      }),
+    ).toBe(500);
+  });
+
+  it("offline: prefers lastDisconnectedAt when it is more recent than a stale lastEventAt", () => {
+    expect(
+      resolveRelayLastSeenSource({
+        state: "offline",
+        lastEventAt: 100,
+        lastDisconnectedAt: 900,
+        lastConnectedAt: 50,
+      }),
+    ).toBe(900);
+  });
+
+  it("offline: takes max(lastEventAt, lastDisconnectedAt) when event is newer (late frame)", () => {
+    expect(
+      resolveRelayLastSeenSource({
+        state: "offline",
+        lastEventAt: 1_500,
+        lastDisconnectedAt: 1_000,
+      }),
+    ).toBe(1_500);
+  });
+
+  it("offline: falls back to lastConnectedAt when neither event nor disconnect is populated", () => {
+    expect(
+      resolveRelayLastSeenSource({
+        state: "offline",
+        lastConnectedAt: 50,
+      }),
+    ).toBe(50);
+  });
+
+  it("offline: returns undefined when no timestamp fields are populated", () => {
+    expect(resolveRelayLastSeenSource({ state: "offline" })).toBeUndefined();
+  });
+
+  it("connecting: follows the non-online branch (max of event / disconnected)", () => {
+    expect(
+      resolveRelayLastSeenSource({
+        state: "connecting",
+        lastEventAt: 100,
+        lastDisconnectedAt: 400,
+      }),
+    ).toBe(400);
   });
 });
