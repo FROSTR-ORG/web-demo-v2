@@ -280,6 +280,52 @@ and the validation assertion IDs that cover it.
   prompt); reinforces VAL-APPROVALS-007 (peer_denied → reactive modal
   via enqueuePeerDenial pipeline as the ONLY runtime open path).
 
+### Default Policy dropdown writes to `respond.*`, not `request.*` (VAL-POLICIES-011/012/013)
+
+- **Paper / task source**: The `m3-default-policy-dropdown` feature description specifies the
+  three Default Policy options (`Ask every time`, `Allow known peers`, `Deny by default`) as
+  the global fallback for peers without manual overrides. Early drafts of the validation
+  contract (VAL-POLICIES-011/012/013) framed the effect on `effective_policy.request.*`,
+  which does not match the direction the dropdown actually governs.
+- **web-demo-v2 implementation**:
+  `src/screens/DashboardScreen/panels/PoliciesState.tsx` (default-policy dropdown),
+  routing through `setPolicyOverride({ direction: "respond", ... })` for the per-peer
+  writes that the three options imply.
+- **Protocol / data constraint**: Per
+  `bifrost-rs/crates/bifrost-core/src/types.rs` (`PeerPolicy`, lines ~304–307) and the
+  signer's effective-policy computation in
+  `bifrost-rs/crates/bifrost-signer/src/lib.rs` (`effective_policy_for_peer`, line ~743,
+  and the `effective_policy: PeerPolicy` field on `PeerPermissionState` at line ~324),
+  the policy model has two orthogonal directions per peer:
+    - **`request.*`** — *outbound-intent*: whether THIS device (A) is willing to DRIVE a
+      given method TOWARD the peer (A initiates a `sign` / `ecdh` / `ping` / `onboard`
+      dispatch at the peer). Controlled by the dispatch-side gating in `sign_peers_online`
+      / `ecdh_peers_online` / the `request.ping` / `request.onboard` checks in the signer
+      (lines ~858, 863, 1268, 1309, 1500, 1508, 1542) — none of which are wired to the
+      Default Policy UI.
+    - **`respond.*`** — *inbound-response-permission*: whether THIS device (A) is willing
+      to ACCEPT and service an inbound request FROM the peer (does A sign / echo / ping /
+      onboard when the peer asks). This is exactly what the Default Policy dropdown
+      controls: A's willingness to respond to others.
+- **What the app actually does**: all three default options write to `respond.*` for
+  override-free peers:
+    - `Ask every time` → `effective_policy.respond.* = unset/prompt` (chips muted; a
+      `peer_denied`-style prompt is expected when a peer drives a request).
+    - `Allow known peers` → `effective_policy.respond.{sign,ecdh,ping,onboard} = allow`
+      for known roster peers (chips saturated).
+    - `Deny by default` → `effective_policy.respond.* = deny` for every override-free
+      peer (chips muted).
+  The `request.*` side is NOT controlled by the Default Policy UI and is typically left
+  at its permissive default (`MethodPolicy::default()` → all methods `true` per
+  `bifrost-rs/crates/bifrost-core/src/types.rs` lines ~382–394). Outbound gating on the
+  `request.*` side is surfaced elsewhere (peer-level overrides / Signer Policies rule
+  rows in `PoliciesState`) and is not the Default Policy dropdown's concern.
+- **Assertion IDs covered**: VAL-POLICIES-011 (Deny by default → `respond.* = deny` for
+  override-free peers), VAL-POLICIES-012 (Allow known peers →
+  `respond.{sign,ecdh,ping,onboard} = allow` for known roster peers), VAL-POLICIES-013
+  (Ask every time → `respond.*` at unset/prompt). The assertions were corrected from the
+  earlier `request.*` framing; stable IDs unchanged.
+
 ### VAL-POLICIES-010 — `peer_denied` RuntimeEvent on A is unobservable (protocol reality)
 
 - **Paper / task source**: The original VAL-POLICIES-010 assertion in
