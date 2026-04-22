@@ -396,6 +396,203 @@ describe("DefaultPolicyDropdown — semantics + keyboard + ARIA (VAL-POLICIES-01
     expect(dispatch).not.toHaveBeenCalled();
   });
 
+  it("user-authored chip overrides survive a subsequent default switch (no-clobber invariant, fix-m3-default-policy-no-clobber-user-overrides)", async () => {
+    // Scenario:
+    //  (a) Default is applied: "Deny by default" dispatches
+    //      respond.sign=deny (etc) for peer P. The dropdown records
+    //      these cells in `defaultAppliedKeys` so a future switch can
+    //      revert only what the dropdown itself wrote.
+    //  (b) The runtime snapshot propagates the deny into
+    //      `manual_override.respond.*` for P.
+    //  (c) The user clicks P's SIGN chip and overrides
+    //      respond.sign → "allow". The snapshot now shows a concrete
+    //      value that differs from what the dropdown originally wrote.
+    //  (d) The user switches the default to "Ask every time". The
+    //      dropdown should revert the three cells it still owns
+    //      (respond.{ecdh,ping,onboard}) but MUST NOT dispatch
+    //      `unset` for (P, respond, sign) — doing so would clobber the
+    //      user-authored override.
+    //
+    // We drive the snapshot transitions explicitly via `rerender`
+    // rather than relying on runtime propagation because the test
+    // dispatcher is a bare `vi.fn` that doesn't mutate AppState.
+    const dispatch = vi.fn(async () => undefined);
+    const peers = [makePeer(0, PEER_A_PUBKEY)];
+    const seed = createDemoAppState({ setPeerPolicyOverride: dispatch });
+
+    const initialStates: PeerPermissionState[] = [
+      {
+        pubkey: PEER_A_PUBKEY,
+        manual_override: null,
+        remote_observation: { observed_at: Date.now() },
+        effective_policy: {
+          request: {
+            sign: "allow",
+            ecdh: "allow",
+            ping: "allow",
+            onboard: "deny",
+          },
+          respond: {},
+        },
+      } as PeerPermissionState,
+    ];
+
+    const renderTree = (states: PeerPermissionState[]) => (
+      <MemoryRouter>
+        <MockAppStateProvider value={seed} bridge={false}>
+          <PoliciesState
+            peers={peers}
+            peerPermissionStates={states}
+            paperPanels={false}
+          />
+        </MockAppStateProvider>
+      </MemoryRouter>
+    );
+
+    const view = render(renderTree(initialStates));
+
+    // (a) Apply Deny by default.
+    await openDropdown();
+    const denyOption = screen.getByRole("radio", { name: "Deny by default" });
+    await act(async () => {
+      fireEvent.click(denyOption);
+    });
+    await waitFor(() => {
+      const deniedPeers = dispatchedPeersForValue(dispatch, "deny");
+      expect(deniedPeers.has(PEER_A_PUBKEY)).toBe(true);
+    });
+
+    // (b) Propagate the deny into the snapshot so the dropdown sees
+    // its writes reflected in `manual_override.respond.*`.
+    const afterDeny: PeerPermissionState[] = [
+      {
+        pubkey: PEER_A_PUBKEY,
+        manual_override: {
+          request: {},
+          respond: {
+            sign: "deny",
+            ecdh: "deny",
+            ping: "deny",
+            onboard: "deny",
+          },
+        },
+        remote_observation: { observed_at: Date.now() },
+        effective_policy: {
+          request: {
+            sign: "allow",
+            ecdh: "allow",
+            ping: "allow",
+            onboard: "deny",
+          },
+          respond: {
+            sign: "deny",
+            ecdh: "deny",
+            ping: "deny",
+            onboard: "deny",
+          },
+        },
+      } as PeerPermissionState,
+    ];
+    view.rerender(renderTree(afterDeny));
+
+    // (c) Simulate user flipping respond.sign → allow (e.g. via a chip
+    //     surface that writes `respond.*`).
+    const afterUserOverride: PeerPermissionState[] = [
+      {
+        pubkey: PEER_A_PUBKEY,
+        manual_override: {
+          request: {},
+          respond: {
+            sign: "allow",
+            ecdh: "deny",
+            ping: "deny",
+            onboard: "deny",
+          },
+        },
+        remote_observation: { observed_at: Date.now() },
+        effective_policy: {
+          request: {
+            sign: "allow",
+            ecdh: "allow",
+            ping: "allow",
+            onboard: "deny",
+          },
+          respond: {
+            sign: "allow",
+            ecdh: "deny",
+            ping: "deny",
+            onboard: "deny",
+          },
+        },
+      } as PeerPermissionState,
+    ];
+    view.rerender(renderTree(afterUserOverride));
+
+    // Drop the dispatches accumulated so far so we only observe the
+    // switch-to-"Ask every time" call log.
+    dispatch.mockClear();
+
+    // (d) Switch the default to "Ask every time".
+    await openDropdown();
+    const askOption = screen.getByRole("radio", { name: "Ask every time" });
+    await act(async () => {
+      fireEvent.click(askOption);
+    });
+
+    // Wait for the unset dispatches to settle for the three cells the
+    // dropdown still owns (ecdh / ping / onboard on P).
+    await waitFor(() => {
+      for (const method of ["ecdh", "ping", "onboard"] as const) {
+        expect(dispatch).toHaveBeenCalledWith({
+          peer: PEER_A_PUBKEY,
+          direction: "respond",
+          method,
+          value: "unset",
+        });
+      }
+    });
+
+    // Invariant: no `unset` dispatch is emitted for (P, respond,
+    // sign) because the user-authored chip override removed that key
+    // from `defaultAppliedKeys` — switching defaults must not revert
+    // user-authored cells. We walk `mock.calls` via the loose
+    // `ReturnType<typeof vi.fn>` cast the other helpers in this file
+    // use so we don't trip on vitest's empty-args inference for typed
+    // `vi.fn` returns.
+    const dispatchLog = (
+      dispatch as unknown as ReturnType<typeof vi.fn>
+    ).mock.calls as unknown as ReadonlyArray<
+      [
+        {
+          peer: string;
+          direction: string;
+          method: string;
+          value: string;
+        },
+      ]
+    >;
+    const signUnsetCalls = dispatchLog.filter((call) => {
+      const arg = call[0];
+      return (
+        arg.peer === PEER_A_PUBKEY &&
+        arg.direction === "respond" &&
+        arg.method === "sign" &&
+        arg.value === "unset"
+      );
+    });
+    expect(signUnsetCalls).toHaveLength(0);
+
+    // And the dropdown must not emit any new allow/deny dispatches
+    // under "Ask every time".
+    const allowDenyCalls = dispatchLog.filter((call) => {
+      const arg = call[0];
+      return arg.value === "allow" || arg.value === "deny";
+    });
+    expect(allowDenyCalls).toHaveLength(0);
+    // All dropdown-emitted dispatches still target `respond.*`.
+    assertAllDispatchesTargetRespond(dispatch);
+  });
+
   it("role=radio with aria-checked: exactly one option checked at a time (VAL-POLICIES-019)", async () => {
     const dispatch = vi.fn(async () => undefined);
     renderPolicies({ dispatch });

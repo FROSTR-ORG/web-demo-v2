@@ -96,14 +96,17 @@ function currentRespondOverride(
  * dropdown should leave that peer alone.
  *
  * The check subtracts cells we previously wrote from the default-policy
- * itself (tracked in `defaultAppliedKeys`) so switching defaults does
- * not treat our prior writes as user overrides. Peer Policies chip
- * overrides are tracked under `request.*` today and therefore do NOT
- * block the dropdown (the two directions are orthogonal).
+ * itself (tracked in `defaultAppliedKeys`, keyed to the value the
+ * dropdown applied) so switching defaults does not treat our prior
+ * writes as user overrides. Peer Policies chip overrides land in the
+ * same `manual_override.respond.*` storage when the chip is wired with
+ * `direction="respond"`, and the caller is expected to have pruned
+ * user-overridden cells out of the map before calling this helper
+ * (see `pruneDefaultAppliedMap`).
  */
 function hasUserOverride(
   state: PeerPermissionState,
-  defaultAppliedKeys: Set<string>,
+  defaultAppliedKeys: Map<string, "allow" | "deny">,
 ): boolean {
   for (const method of METHODS) {
     if (currentRespondOverride(state, method) !== null) {
@@ -112,6 +115,47 @@ function hasUserOverride(
     }
   }
   return false;
+}
+
+/**
+ * Remove any entry from `defaultAppliedKeys` whose cell in the current
+ * `peer_permission_states` snapshot has been concretely overwritten to
+ * a different value than the dropdown last applied. This is how the
+ * dropdown drops ownership of a cell after the user clicks a chip that
+ * writes into the same `respond.*` slot — the next default-policy
+ * switch will then leave that user-authored cell alone instead of
+ * reverting it to `unset`.
+ *
+ * Only CONCRETE mismatches (`allow` vs `deny`) trigger removal.
+ * `null`/`unset` is ignored because:
+ *   - After the dropdown dispatches a write, runtime snapshot
+ *     propagation is async — the cell can briefly read `null` before
+ *     it reflects the applied value. Dropping the key then would
+ *     incorrectly leak the prior write on the next switch.
+ *   - A `null` cell cannot clobber anything on revert (dispatching
+ *     `unset` on an already-unset cell is a no-op).
+ *
+ * See `fix-m3-default-policy-no-clobber-user-overrides` for the
+ * scrutiny finding that motivated this helper.
+ */
+function pruneDefaultAppliedMap(
+  map: Map<string, "allow" | "deny">,
+  states: PeerPermissionState[],
+): void {
+  if (map.size === 0) return;
+  for (const [key, applied] of Array.from(map.entries())) {
+    const parts = key.split(":");
+    const peer = parts[0];
+    const direction = parts[1];
+    const method = parts[2] as PolicyMethod | undefined;
+    if (!peer || direction !== "respond" || !method) continue;
+    const state = states.find((entry) => entry.pubkey === peer);
+    if (!state) continue;
+    const current = currentRespondOverride(state, method);
+    if ((current === "allow" || current === "deny") && current !== applied) {
+      map.delete(key);
+    }
+  }
 }
 
 /**
@@ -165,13 +209,20 @@ export function DefaultPolicyDropdown({
   );
   /**
    * Track which (peer, direction, method) cells this dropdown applied
-   * on a prior default-policy switch. On the next switch we revert
-   * those cells (dispatch `unset`) so the new default starts from a
-   * clean baseline. User-driven chip clicks land in the same manual
-   * override storage but are NOT in this set — so the revert logic
-   * correctly leaves them untouched (VAL-POLICIES-011).
+   * on a prior default-policy switch, keyed to the value the dropdown
+   * wrote (`allow` or `deny`). On the next switch we revert those
+   * cells (dispatch `unset`) so the new default starts from a clean
+   * baseline.
+   *
+   * If the user concretely overrides one of these cells in the
+   * meantime (e.g. via a `respond.*` chip surface), the `pruneEffect`
+   * below drops that entry from the map so the next switch leaves the
+   * user-authored value intact — `fix-m3-default-policy-no-clobber-
+   * user-overrides`.
    */
-  const defaultAppliedKeysRef = useRef<Set<string>>(new Set());
+  const defaultAppliedKeysRef = useRef<Map<string, "allow" | "deny">>(
+    new Map(),
+  );
 
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -184,6 +235,15 @@ export function DefaultPolicyDropdown({
     (index: number) => `${optionIdPrefix}-opt-${index}`,
     [optionIdPrefix],
   );
+
+  // Whenever the peer snapshot updates, prune entries the dropdown
+  // once owned but the user has since concretely re-written. This is
+  // the mechanism that upholds the no-clobber invariant for
+  // user-authored chip overrides on dropdown-owned cells
+  // (`fix-m3-default-policy-no-clobber-user-overrides`).
+  useEffect(() => {
+    pruneDefaultAppliedMap(defaultAppliedKeysRef.current, peerPermissionStates);
+  }, [peerPermissionStates]);
 
   // Close on outside click.
   useEffect(() => {
@@ -216,13 +276,23 @@ export function DefaultPolicyDropdown({
 
   const applyDefault = useCallback(
     async (next: DefaultPolicyOption) => {
-      const priorKeys = Array.from(defaultAppliedKeysRef.current);
-      const newKeys = new Set<string>();
+      // Freshly prune before any reads — the user may have clicked a
+      // chip since the last render and the effect-driven prune may not
+      // have raced ahead of this switch. Running it again here is
+      // idempotent and guarantees we never revert a user-authored
+      // cell (`fix-m3-default-policy-no-clobber-user-overrides`).
+      pruneDefaultAppliedMap(
+        defaultAppliedKeysRef.current,
+        peerPermissionStates,
+      );
+      const priorKeys = Array.from(defaultAppliedKeysRef.current.keys());
+      const newKeys = new Map<string, "allow" | "deny">();
 
-      // 1. Revert everything we previously wrote from the dropdown so
-      //    the new default starts from a known-clean baseline. We fire
-      //    dispatches in parallel but ignore individual failures — the
-      //    per-chip error surface owns UI feedback for policy writes.
+      // 1. Revert everything we previously wrote (and still own) from
+      //    the dropdown so the new default starts from a known-clean
+      //    baseline. We fire dispatches in parallel but ignore
+      //    individual failures — the per-chip error surface owns UI
+      //    feedback for policy writes.
       await Promise.allSettled(
         priorKeys.map(async (key) => {
           const [peer, direction, method] = key.split(":");
@@ -238,6 +308,12 @@ export function DefaultPolicyDropdown({
 
       // 2. Apply the new default to eligible peers.
       //    All writes target `respond.*` — see class-level comment.
+      //    `hasUserOverride` is called against the still-populated
+      //    `defaultAppliedKeysRef.current` so peers whose cells the
+      //    dropdown just reverted do NOT look like user overrides
+      //    (snapshot propagation is async; the prior-applied keys are
+      //    still present until we overwrite `defaultAppliedKeysRef`
+      //    at the end of this callback).
       if (next === "Ask every time") {
         // No overrides applied — all peer cells we previously wrote
         // have been reverted above, leaving override-free peers with
@@ -249,7 +325,7 @@ export function DefaultPolicyDropdown({
               return [] as Array<Promise<void>>;
             }
             return METHODS.map(async (method) => {
-              newKeys.add(`${state.pubkey}:respond:${method}`);
+              newKeys.set(`${state.pubkey}:respond:${method}`, "deny");
               await dispatch({
                 peer: state.pubkey,
                 direction: "respond",
@@ -269,7 +345,7 @@ export function DefaultPolicyDropdown({
               return [] as Array<Promise<void>>;
             }
             return METHODS.map(async (method) => {
-              newKeys.add(`${state.pubkey}:respond:${method}`);
+              newKeys.set(`${state.pubkey}:respond:${method}`, "allow");
               await dispatch({
                 peer: state.pubkey,
                 direction: "respond",
