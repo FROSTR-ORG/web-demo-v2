@@ -211,6 +211,17 @@ export function MockAppStateProvider({
     [value],
   );
 
+  /**
+   * Forward matrix-wide override clears to the caller-supplied
+   * implementation (tests seed a spy here) before pruning the mock's
+   * own `policyOverrides` copy so the parent can observe the dispatch
+   * (VAL-POLICIES-009).
+   */
+  const clearPolicyOverrides = useCallback(async () => {
+    await value.clearPolicyOverrides();
+    setPolicyOverrides([]);
+  }, [value]);
+
   const createKeyset = useCallback(
     async (draft: CreateKeysetDraft) => {
       await value.createKeyset(draft);
@@ -645,6 +656,7 @@ export function MockAppStateProvider({
       policyOverrides,
       removePolicyOverride,
       setPeerPolicyOverride,
+      clearPolicyOverrides,
       handleRuntimeCommand,
       createKeyset,
       createProfile,
@@ -705,6 +717,7 @@ export function MockAppStateProvider({
       policyOverrides,
       removePolicyOverride,
       setPeerPolicyOverride,
+      clearPolicyOverrides,
       handleRuntimeCommand,
       createKeyset,
       createProfile,

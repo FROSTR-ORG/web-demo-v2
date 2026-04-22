@@ -875,6 +875,37 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   );
 
   /**
+   * VAL-POLICIES-009 — thin AppState wrapper around
+   * `RuntimeClient.clearPolicyOverrides()`. One bridge call resets every
+   * `manual_override` cell (across every peer + direction + method) to
+   * the bifrost-rs default; the runtime re-emits a fresh
+   * `peer_permission_states` whose `manual_override` is empty/unset for
+   * every peer and whose `effective_policy` reflects only the
+   * default-derived values.
+   *
+   * Also drops the in-memory `policyOverrides` slice and the session
+   * "Allow once" tracking ref so the Peer Policies view and the
+   * `sessionAllowOnceRef`-driven lock rollback stay consistent with the
+   * runtime (the runtime is now authoritative — no stale slice entries
+   * should survive). Profile persistence is intentionally not mutated
+   * here: a caller that needs to wipe persistent overrides from storage
+   * must combine this with the profile-save path (or use
+   * `clearCredentials`), matching the documented contract on the
+   * AppStateValue type.
+   */
+  const clearPolicyOverrides = useCallback(async (): Promise<void> => {
+    const runtime = runtimeRef.current;
+    if (!runtime) {
+      throw new Error(
+        "Cannot clear policy overrides: no runtime is active.",
+      );
+    }
+    runtime.clearPolicyOverrides();
+    setPolicyOverrides([]);
+    sessionAllowOnceRef.current.clear();
+  }, []);
+
+  /**
    * Apply the dev-only nonce-depletion override to a runtime_status snapshot
    * before it is committed to React state. When the override is active we:
    *   - push an `insufficient_signing_peers` entry tagged with
@@ -3006,6 +3037,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       policyOverrides,
       removePolicyOverride,
       setPeerPolicyOverride,
+      clearPolicyOverrides,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,
@@ -3068,6 +3100,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       policyOverrides,
       removePolicyOverride,
       setPeerPolicyOverride,
+      clearPolicyOverrides,
       reloadProfiles,
       handleRuntimeCommand,
       createKeyset,

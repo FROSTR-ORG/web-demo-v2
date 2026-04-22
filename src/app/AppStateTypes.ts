@@ -596,6 +596,22 @@ export interface AppStateValue {
     method: "sign" | "ecdh" | "ping" | "onboard";
     value: "unset" | "allow" | "deny";
   }) => Promise<void>;
+  /**
+   * Reset every manual policy override cell across every peer and every
+   * direction/method in one dispatch. Thin passthrough to the runtime's
+   * `WasmBridgeRuntime.clear_policy_overrides()` bridge — the fresh
+   * `runtime_status.peer_permission_states` emitted after the call
+   * reports `manual_override` as empty/unset for every (peer, direction,
+   * method) cell, and each peer's `effective_policy` resolves to the
+   * default-derived values only. Also drops the in-memory
+   * `policyOverrides` slice and the session "Allow once" tracking ref
+   * so surfaces consuming those stay consistent with the runtime.
+   * Profile persistence is intentionally NOT touched by this helper:
+   * callers that want to wipe persisted overrides must combine this
+   * with the profile-save path (or use `clearCredentials`).
+   * Surface assertion: VAL-POLICIES-009.
+   */
+  clearPolicyOverrides: () => Promise<void>;
   reloadProfiles: () => Promise<void>;
   createKeyset: (draft: CreateKeysetDraft) => Promise<void>;
   createProfile: (draft: CreateProfileDraft) => Promise<string>;

@@ -340,6 +340,7 @@ export function createDemoAppState(
     policyOverrides: [],
     removePolicyOverride: async () => undefined,
     setPeerPolicyOverride: async () => undefined,
+    clearPolicyOverrides: async () => undefined,
     handleRuntimeCommand: createMockHandleRuntimeCommand(),
   };
 
