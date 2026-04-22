@@ -54,6 +54,12 @@ The relay binary lives in the sibling `bifrost-rs` workspace and is NOT produced
 - `stop`: `lsof -ti :8194 | xargs kill -9` (port-based kill is allowed because the port is declared in the manifest)
 - `healthcheck`: `nc -z 127.0.0.1 8194` (returns 0 once the listener is bound)
 
+### Restore-flow caveat (m6-backup)
+
+- The backup restore form validates relay inputs with `validateRelayUrl`, which accepts only `wss://` URLs.
+- `services.local_relay` exposes `ws://127.0.0.1:8194` (no TLS), so it is valid for local multi-device transport tests but **not** for restore-from-relay validation.
+- For restore assertions, use real `wss://` relays (or an explicit local TLS terminator in front of `local_relay`).
+
 ### Running the multi-device ECDH spec
 
 ```
