@@ -2541,7 +2541,41 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const clearCredentials = useCallback(async () => {
     abortOnboardHandshake();
     const id = activeProfile?.id;
+    // Reset the phase log so validators only observe entries from the
+    // current flow (VAL-SETTINGS-015 / VAL-CROSS-006).
+    resetClearCredentialsLog();
+    // Capture the live runtime ref BEFORE any tear-down so we can
+    // invoke `wipe_state()` while the WASM bridge is still attached.
+    // The contract (VAL-SETTINGS-015) requires the wipe to complete on
+    // the live runtime; only AFTER the wipe resolves may the reference
+    // be released.
+    const runtime = runtimeRef.current;
+    if (runtime) {
+      appendClearCredentialsLogEntry("wipe_state.invoked");
+      try {
+        // `RuntimeClient.wipeState` is currently a synchronous WASM
+        // bridge call, but we `await Promise.resolve(...)` it to
+        // (a) enforce the "await resolution" contract literally, and
+        // (b) be forward-compatible with a future async bridge.
+        await Promise.resolve(runtime.wipeState());
+        appendClearCredentialsLogEntry("wipe_state.resolved");
+      } catch (error) {
+        // wipe_state is best-effort — if the WASM bridge throws we
+        // still dispose the runtime ref so the app recovers. The
+        // error is surfaced via the phase log and a console warning;
+        // the outer promise resolves successfully so Clear Credentials
+        // always completes from the user's perspective.
+        const message =
+          error instanceof Error ? error.message : String(error);
+        appendClearCredentialsLogEntry("wipe_state.error", { message });
+        // eslint-disable-next-line no-console
+        console.warn(
+          `runtime.wipe_state() threw during clearCredentials: ${message}`,
+        );
+      }
+    }
     runtimeRef.current = null;
+    appendClearCredentialsLogEntry("runtime.dispose");
     liveRelayUrlsRef.current = [];
     stopRelayPump();
     simulatorRef.current?.stop();
@@ -3496,6 +3530,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     const debugSurface: TestObservabilityDebugSurface = {
       relayHistory: getRelayHistoryArray(),
       visibilityHistory: getVisibilityHistoryArray(),
+      // Stable reference mutated in-place by `appendClearCredentialsLogEntry`
+      // / `resetClearCredentialsLog` so validators can hold a single
+      // reference through provider remounts (VAL-SETTINGS-015 /
+      // VAL-CROSS-006).
+      clearCredentialsLog: getClearCredentialsLogArray(),
       get noncePoolSnapshot(): NoncePoolSnapshot | null {
         const override = nonceOverrideRef.current;
         if (override) {
@@ -4132,6 +4171,29 @@ export interface VisibilityHistoryEntry {
 }
 
 /**
+ * Single entry in `window.__debug.clearCredentialsLog` — one per phase
+ * of the Clear Credentials destructive flow. Validators (VAL-SETTINGS-015
+ * / VAL-CROSS-006) read this log to confirm the runtime bridge was wiped
+ * BEFORE the runtime reference was released:
+ *
+ *   wipe_state.invoked → wipe_state.resolved → runtime.dispose
+ *
+ * If the WASM `wipe_state` throws, the intermediate phase is
+ * `wipe_state.error` instead of `wipe_state.resolved`; dispose still
+ * runs so the app can recover from a broken runtime.
+ */
+export interface ClearCredentialsLogEntry {
+  phase:
+    | "wipe_state.invoked"
+    | "wipe_state.resolved"
+    | "wipe_state.error"
+    | "runtime.dispose";
+  at: string;
+  /** Only present for `wipe_state.error` — the thrown error message. */
+  message?: string;
+}
+
+/**
  * Shape of the dev-only `window.__debug` surface. Not shipped to
  * production (the installer effect is gated on `import.meta.env.DEV`).
  */
@@ -4147,6 +4209,14 @@ export interface TestObservabilityDebugSurface {
    * always observe the current buffer (VAL-EVENTLOG-012 / VAL-EVENTLOG-014).
    */
   readonly runtimeEventLog: RuntimeEventLogEntry[];
+  /**
+   * Append-only phase log for the most recent Clear Credentials
+   * invocation (reset each time `clearCredentials()` is called).
+   * Validators (VAL-SETTINGS-015 / VAL-CROSS-006) read this to prove
+   * the runtime was wiped BEFORE the runtime ref was released.
+   * The reference stays stable across invocations; mutated in-place.
+   */
+  clearCredentialsLog: ClearCredentialsLogEntry[];
 }
 
 // Capacity of the ring buffers. Large enough for a multi-minute agent-browser
@@ -4171,6 +4241,15 @@ const RELAY_HISTORY_SESSION_KEY = "__debug.relayHistory";
  */
 const relayHistoryBuffer: RelayHistoryEntry[] = [];
 const visibilityHistoryBuffer: VisibilityHistoryEntry[] = [];
+/**
+ * Phase-log ring buffer for the most recent Clear Credentials flow.
+ * Module-scoped so the stable array reference handed to
+ * `window.__debug.clearCredentialsLog` survives unmount/remount of the
+ * provider (mirrors the pattern used by `relayHistoryBuffer`).
+ * Reset on every `clearCredentials()` invocation so validators observe
+ * exactly the call-order of the current flow.
+ */
+const clearCredentialsLogBuffer: ClearCredentialsLogEntry[] = [];
 
 function getRelayHistoryArray(): RelayHistoryEntry[] {
   return relayHistoryBuffer;
@@ -4178,6 +4257,34 @@ function getRelayHistoryArray(): RelayHistoryEntry[] {
 
 function getVisibilityHistoryArray(): VisibilityHistoryEntry[] {
   return visibilityHistoryBuffer;
+}
+
+function getClearCredentialsLogArray(): ClearCredentialsLogEntry[] {
+  return clearCredentialsLogBuffer;
+}
+
+function resetClearCredentialsLog(): void {
+  clearCredentialsLogBuffer.length = 0;
+}
+
+/**
+ * Record a Clear Credentials phase transition into the shared ring
+ * buffer. Every phase is timestamped ISO-8601. Kept untouched in
+ * production builds — the installer effect that publishes this buffer
+ * onto `window.__debug` is `import.meta.env.DEV` gated, so the only
+ * visible side effect in production is the (intentional) mutation of
+ * this module-scoped array, which is unreachable from user code.
+ */
+function appendClearCredentialsLogEntry(
+  phase: ClearCredentialsLogEntry["phase"],
+  meta?: { message?: string },
+): void {
+  const entry: ClearCredentialsLogEntry = {
+    phase,
+    at: new Date().toISOString(),
+    ...(meta?.message !== undefined ? { message: meta.message } : {}),
+  };
+  clearCredentialsLogBuffer.push(entry);
 }
 
 /**
