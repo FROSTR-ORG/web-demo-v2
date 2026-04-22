@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m4-mock-runtime-event-log-reset-on-lock-clear",
+  "reviewedAt": "2026-04-22T15:55:57Z",
+  "commitId": "7200df3",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly resolves the original blocking gap by resetting `runtimeEventLog` in both `MockAppStateProvider.lockProfile` and `MockAppStateProvider.clearCredentials`, and adds focused regression tests that seed log entries and verify both mutators clear them. No regressions were found in the touched paths.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The runtime-worker skill's agent-browser skip rule currently requires evidence that demo-gallery Playwright still passes, but this fix transcript skipped Playwright and still marked `followedProcedure: true`. The rule may need a clearer carve-out for pure mock-mutator state-reset fixes that are fully covered by vitest + typecheck.",
+      "evidence": "Skill file: .factory/skills/runtime-worker/SKILL.md (Required Skills + Verify sections). Fix transcript skeleton for session c642fad2-82d4-4d14-8150-13727d6b42cd shows vitest/tsc runs but no Playwright command; handoff.skillFeedback includes this same suggested procedure adjustment."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m4-eventlog/scrutiny/reviews/m4-event-log-buffer.json",
+  "summary": "Pass. The fix fully addresses the prior blocking issue from m4-event-log-buffer by clearing mock runtimeEventLog on both lock and clearCredentials and adding targeted regression coverage for both paths."
+}

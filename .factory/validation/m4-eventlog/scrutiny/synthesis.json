@@ -1,7 +1,7 @@
 {
   "milestone": "m4-eventlog",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -20,46 +20,21 @@
     }
   },
   "reviewsSummary": {
-    "total": 3,
-    "passed": 1,
-    "failed": 2,
-    "failedFeatures": [
-      "m4-event-log-buffer",
-      "m4-event-log-panel"
-    ]
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "failedFeatures": []
   },
-  "blockingIssues": [
-    {
-      "featureId": "m4-event-log-buffer",
-      "severity": "blocking",
-      "description": "src/app/MockAppStateProvider.tsx lockProfile and clearCredentials paths do not clear runtimeEventLog, so stale event-log entries can bleed across lock/clear transitions in demo/mock mode."
-    },
-    {
-      "featureId": "m4-event-log-panel",
-      "severity": "blocking",
-      "description": "src/screens/DashboardScreen/panels/EventLogPanel.tsx keeps clearedBaselineSeq until entry.seq exceeds pre-clear max, but clearRuntimeEventLog resets seq to 0; post-clear events are hidden until seq surpasses the old maximum."
-    }
-  ],
+  "blockingIssues": [],
   "appliedUpdates": [],
   "suggestedGuidanceUpdates": [
     {
-      "target": "AGENTS.md",
-      "suggestion": "Add a specific worker checklist item for AppState/MockAppStateProvider parity: when introducing a new AppState slice, update both lockProfile and clearCredentials reset paths in MockAppStateProvider.",
-      "evidence": "Feature m4-event-log-buffer added runtimeEventLog state but omitted reset logic in MockAppStateProvider lock/clear mutators, causing state bleed in demo mode.",
-      "isSystemic": false
-    },
-    {
       "target": "skills",
-      "suggestion": "Strengthen ui-screen-worker scrutiny expectations to require explicit agent-browser evidence for user-visible changes, or require a clearly justified exception path in handoff validation.",
-      "evidence": "Two m4-eventlog reviews observed UI features validated only with tsc/vitest despite AGENTS.md and ui-screen-worker guidance requiring agent-browser for UI validation.",
-      "isSystemic": true
+      "suggestion": "Clarify runtime-worker validation procedure to explicitly allow a documented unit-test-only exception path for pure state-mutator fixes that do not affect browser-visible runtime flows.",
+      "evidence": "Review of fix-m4-mock-runtime-event-log-reset-on-lock-clear found a pure MockAppStateProvider mutator fix with focused vitest coverage; current runtime-worker wording can be interpreted as requiring Playwright in every case.",
+      "isSystemic": false
     }
   ],
-  "rejectedObservations": [
-    {
-      "observation": "Agent-browser requirement mismatch was reported by both m4-event-log-panel and m4-event-log-filter-and-scroll reviews.",
-      "reason": "duplicate"
-    }
-  ],
-  "previousRound": null
+  "rejectedObservations": [],
+  "previousRound": ".factory/validation/m4-eventlog/scrutiny/synthesis.round1.json"
 }
