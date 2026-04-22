@@ -2557,6 +2557,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
     runtimeRef.current = null;
     liveRelayUrlsRef.current = [];
+    // VAL-SETTINGS-021 — Lock Profile stops the RuntimeRelayPump and
+    // closes every live WebSocket with a well-formed close frame
+    // (code 1000 "lock-profile") BEFORE tearing down the pump so
+    // server-side logs and the persisted `__debug.relayHistory` ring
+    // record a clean shutdown rather than the abnormal 1006 the
+    // browser would otherwise report when the sockets are garbage
+    // collected. After this, no further `runtime_status` polling can
+    // reach the runtime (runtimeRef is null) nor the sockets (all
+    // closed), so WS frames cease within one runtime tick.
+    try {
+      relayPumpRef.current?.closeCleanly(1000, "lock-profile");
+    } catch {
+      // best-effort cleanup — fall through to stopRelayPump() below.
+    }
     stopRelayPump();
     simulatorRef.current?.stop();
     simulatorRef.current?.setOnDrains(undefined);

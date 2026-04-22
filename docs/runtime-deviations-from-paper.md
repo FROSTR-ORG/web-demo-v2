@@ -374,6 +374,86 @@ and the validation assertion IDs that cover it.
   observable; A-side `peer_denied` RuntimeEvent removed from the
   assertion until upstream exposes it).
 
+### Settings confirm-unsaved-changes dialog on navigate-away (VAL-SETTINGS-029)
+
+- **Paper / task source**: `igloo-paper/screens/dashboard/3-settings-lock-profile`
+  depicts the Settings sidebar with inline Profile Name edit and
+  Change Password flows but does not spec behavior when the user
+  attempts to close the sidebar (X / scrim / Lock / Clear
+  Credentials) mid-edit. VAL-SETTINGS-029 extends the UX to forbid
+  silent loss of typed input.
+- **web-demo-v2 implementation**:
+  `src/screens/DashboardScreen/sidebar/SettingsSidebar.tsx`
+  (`guardNav()` + `pendingNavAction` state + modal rendered with
+  reused `.clear-creds-*` markup).
+- **Chosen option**: option (a) "confirm dialog on navigate-away".
+  The assertion permits either (a) or (b) "auto-save on
+  navigate-away"; we chose the confirm dialog because:
+    - The Profile Name mutator performs an expensive encrypted
+      profile re-write (IndexedDB round-trip + AES re-encrypt) that
+      would otherwise silently run on every unfocus, multiplying
+      storage writes for no user benefit.
+    - The Change Password flow requires three validated inputs
+      (current, new, confirm); auto-saving a partial form is
+      impossible because the current-password round-trip cannot
+      succeed without the user's full input. A confirm dialog is
+      the only correct option for that flow, so aligning Profile
+      Name with the same gesture keeps the mental model uniform.
+    - The dialog is a pure UI concern — it adds zero new runtime
+      side effects and no new persistence path.
+- **Scope of the guard**: the gate triggers on the three
+  navigate-away affordances inside the sidebar — the X button, the
+  scrim click, the Lock Profile CTA, and the Clear Credentials
+  CTA. Route-level navigation (e.g. Replace Share button, hard
+  reload, back button) is intentionally out of scope because those
+  actions close the sidebar through the parent
+  `DashboardScreen` — which in turn calls our `onClose()` — so the
+  guard fires via the parent-provided close path. Hard reload /
+  tab close are handled by the existing
+  `beforeunload` handler (VAL-OPS-028) and will drop any draft
+  state alongside the runtime, consistent with "revert to
+  persisted state on return" for those cases.
+- **Dirty-state detection**: a draft is considered dirty when (a)
+  the Profile Name editor is open AND the trimmed draft differs
+  from the persisted name, OR (b) the Change Password form is
+  open AND any of the three password inputs has non-empty
+  content. Relay add/edit/remove rows are NOT tracked because the
+  relay mutator persists immediately on each Save/Remove click —
+  there is no window where the row holds unsaved state after the
+  async mutator resolves.
+- **Assertion IDs covered**: VAL-SETTINGS-029 (navigate-away
+  triggers confirm dialog or auto-save; silent loss forbidden).
+
+### Lock Profile closes relay sockets with code 1000 "lock-profile" (VAL-SETTINGS-021)
+
+- **Paper / task source**: VAL-SETTINGS-021 requires Lock → all
+  WS connections close cleanly; Paper does not prescribe a close
+  code.
+- **web-demo-v2 implementation**:
+  `src/app/AppStateProvider.tsx::lockProfile` invokes
+  `relayPumpRef.current?.closeCleanly(1000, "lock-profile")`
+  before `stopRelayPump()`, mirroring the VAL-OPS-028 `beforeunload`
+  path but with a distinct 1000/1001 split so validators inspecting
+  `lastCloseCode` can distinguish a Lock (1000) from a tab unload
+  (1001).
+- **Why 1000**: RFC 6455 treats 1000 as the "normal closure"
+  close code, which matches the semantics of a user-initiated
+  Lock — the session is intentionally ending, not being torn
+  down due to a transport failure. The surviving peers should
+  treat this the same as any other graceful disconnect and must
+  not attempt immediate reconnect.
+- **Polling gate**: the runtime-status refresh interval installed
+  by the provider (`setInterval(refreshRuntime, 2500)`) remains
+  scheduled after Lock, but `refreshRuntime` short-circuits via
+  `runtimeRef.current === null` (set synchronously by
+  `lockProfile`) so no further `runtime.runtimeStatus()` call
+  reaches the WASM bridge and no new WS traffic is emitted. The
+  next user action (Unlock, Clear Credentials, page close) either
+  re-arms the pump with a fresh runtime or tears the interval
+  down via the effect cleanup.
+- **Assertion IDs covered**: VAL-SETTINGS-021 (Lock → clean WS
+  close + no further polling).
+
 ### Runtime-mode Relay Health panel on the Running Dashboard (VAL-SETTINGS-010..014)
 
 - **Paper / task source**: `igloo-paper/screens/dashboard/1-signer-dashboard`

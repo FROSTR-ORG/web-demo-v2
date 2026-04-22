@@ -66,6 +66,23 @@ export const CHANGE_PASSWORD_WRONG_CURRENT_ERROR =
 export const MISSING_PROFILE_DATE_PLACEHOLDER = "—";
 
 /**
+ * Copy surfaced by the confirm-unsaved-changes dialog that guards
+ * navigation away from Settings while there is a pending Profile
+ * Name edit or an in-flight Change Password form (VAL-SETTINGS-029).
+ * Exported so component tests can pin on the exact strings without
+ * re-hardcoding them.
+ *
+ * The chosen approach is "confirm dialog on navigate-away" (option
+ * (a) of VAL-SETTINGS-029) — see
+ * `docs/runtime-deviations-from-paper.md` for the rationale.
+ */
+export const UNSAVED_CHANGES_TITLE = "Discard unsaved changes?";
+export const UNSAVED_CHANGES_DESCRIPTION =
+  "You have unsaved changes in Settings. Close without saving?";
+export const UNSAVED_CHANGES_KEEP_LABEL = "Keep editing";
+export const UNSAVED_CHANGES_DISCARD_LABEL = "Discard";
+
+/**
  * Format an epoch-ms timestamp as a human-readable Gregorian date
  * (e.g. "Feb 24, 2026"). Returns {@link MISSING_PROFILE_DATE_PLACEHOLDER}
  * when the input is missing or non-finite so the Group Profile rows
@@ -177,6 +194,16 @@ export function SettingsSidebar({
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
+  /**
+   * VAL-SETTINGS-029 — tracks which navigation-away action the user
+   * attempted while a pending edit (Profile Name draft or Change
+   * Password form with any typed content) was dirty. The confirm
+   * dialog renders when this is non-null; clicking "Discard" runs
+   * the pending action, clicking "Keep editing" clears it and
+   * leaves the sidebar open.
+   */
+  const [pendingNavAction, setPendingNavAction] =
+    useState<null | "close" | "lock" | "clearCredentials">(null);
 
   // Keep the draft in sync with the persisted name whenever the user is
   // NOT actively editing. Without this, a rename persisted from another
@@ -440,6 +467,89 @@ export function SettingsSidebar({
     setEditingError("");
   }
 
+  /**
+   * VAL-SETTINGS-029 — evaluates whether the user has a pending edit
+   * that would be silently lost if we honored a navigate-away action
+   * without confirmation. Two sources are tracked:
+   *   1. The Profile Name draft differs from the persisted value while
+   *      the inline editor is open.
+   *   2. The Change Password form is open AND any of the three
+   *      password inputs has non-empty content.
+   * Relay add/edit rows are not tracked here: relay mutations persist
+   * immediately on Save/Remove and do not carry a discard-on-close
+   * failure mode (the list always reflects the persisted state once
+   * the mutator resolves).
+   */
+  function hasUnsavedChanges(): boolean {
+    if (
+      editingDeviceName &&
+      draftDeviceName.trim() !== persistedDeviceName.trim()
+    ) {
+      return true;
+    }
+    if (
+      changingPassword &&
+      (oldPassword.length > 0 ||
+        newPassword.length > 0 ||
+        confirmNewPassword.length > 0)
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Wrap an outbound navigation action (close, lock, clearCredentials)
+   * with the confirm-unsaved-changes gate. When there are unsaved
+   * edits, we hold the action in `pendingNavAction` and surface the
+   * confirm dialog; the caller's handler only runs after the user
+   * clicks "Discard" (see {@link confirmDiscardPending}). When
+   * nothing is dirty the handler fires immediately — zero-cost for
+   * the happy path.
+   */
+  function guardNav(
+    action: "close" | "lock" | "clearCredentials",
+    run: () => void,
+  ): void {
+    if (!hasUnsavedChanges()) {
+      run();
+      return;
+    }
+    setPendingNavAction(action);
+  }
+
+  function confirmDiscardPending(): void {
+    const action = pendingNavAction;
+    setPendingNavAction(null);
+    // Clear any transient form state so a re-open of the sidebar /
+    // re-start of the edit flow begins from persisted values.
+    if (editingDeviceName) {
+      setDraftDeviceName(persistedDeviceName);
+      setDeviceNameError("");
+      setEditingDeviceName(false);
+    }
+    if (changingPassword) {
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+      setPasswordError("");
+      setPasswordSuccess("");
+      setSubmitAttempted(false);
+      setChangingPassword(false);
+    }
+    if (action === "close") {
+      onClose();
+    } else if (action === "lock") {
+      onLock();
+    } else if (action === "clearCredentials") {
+      onClearCredentials();
+    }
+  }
+
+  function keepEditing(): void {
+    setPendingNavAction(null);
+  }
+
   async function saveEditRelay() {
     if (editingIndex === null) return;
     const trimmed = editingDraft.trim();
@@ -472,7 +582,7 @@ export function SettingsSidebar({
       {/* Scrim — stacked above dashboard content (z-index: 100) */}
       <div
         className="settings-scrim"
-        onClick={onClose}
+        onClick={() => guardNav("close", onClose)}
         data-testid="settings-scrim"
         style={{ zIndex: 100 }}
       />
@@ -501,7 +611,7 @@ export function SettingsSidebar({
             <button
               type="button"
               className="settings-close"
-              onClick={onClose}
+              onClick={() => guardNav("close", onClose)}
               aria-label="Close settings"
             >
               <X size={16} />
@@ -898,7 +1008,11 @@ export function SettingsSidebar({
                     Return to profile list to open another profile
                   </div>
                 </div>
-                <button type="button" className="settings-btn-red" onClick={onLock}>
+                <button
+                  type="button"
+                  className="settings-btn-red"
+                  onClick={() => guardNav("lock", onLock)}
+                >
                   Lock
                 </button>
               </div>
@@ -909,7 +1023,13 @@ export function SettingsSidebar({
                     Delete this device's saved profile, share, password, and relay configuration
                   </div>
                 </div>
-                <button type="button" className="settings-btn-red" onClick={onClearCredentials}>
+                <button
+                  type="button"
+                  className="settings-btn-red"
+                  onClick={() =>
+                    guardNav("clearCredentials", onClearCredentials)
+                  }
+                >
                   Clear
                 </button>
               </div>
@@ -917,6 +1037,77 @@ export function SettingsSidebar({
           </div>
         </div>
       </div>
+
+      {/*
+        VAL-SETTINGS-029 — confirm-unsaved-changes dialog.
+
+        Surfaces when the user attempts to navigate away (Close, Lock,
+        Clear Credentials) while there is a dirty Profile Name draft
+        or a non-empty Change Password form. Blocks the action until
+        the user either Discards (action proceeds, form cleared) or
+        Keeps editing (dialog dismissed, sidebar stays open).
+
+        Structure + styles reuse the `.clear-creds-*` modal family so
+        visual weight matches other destructive/confirmation dialogs
+        in Settings without introducing a new CSS footprint.
+      */}
+      {pendingNavAction !== null && (
+        <div
+          className="clear-creds-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settings-unsaved-title"
+          data-testid="settings-unsaved-confirm"
+          style={{ zIndex: 210 }}
+        >
+          <div
+            className="clear-creds-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="clear-creds-header">
+              <div className="clear-creds-title-group">
+                <h2
+                  className="clear-creds-title"
+                  id="settings-unsaved-title"
+                >
+                  {UNSAVED_CHANGES_TITLE}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="clear-creds-close"
+                onClick={keepEditing}
+                aria-label="Close unsaved changes dialog"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="clear-creds-body">
+              <p className="clear-creds-description">
+                {UNSAVED_CHANGES_DESCRIPTION}
+              </p>
+            </div>
+            <div className="clear-creds-actions">
+              <button
+                type="button"
+                className="clear-creds-cancel"
+                onClick={keepEditing}
+                data-testid="settings-unsaved-keep-editing"
+              >
+                {UNSAVED_CHANGES_KEEP_LABEL}
+              </button>
+              <button
+                type="button"
+                className="clear-creds-confirm"
+                onClick={confirmDiscardPending}
+                data-testid="settings-unsaved-discard"
+              >
+                {UNSAVED_CHANGES_DISCARD_LABEL}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

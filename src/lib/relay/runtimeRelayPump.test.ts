@@ -553,4 +553,92 @@ describe("RuntimeRelayPump", () => {
       expect((close as { wasClean: boolean }).wasClean).toBe(true);
     });
   });
+
+  /**
+   * VAL-SETTINGS-021 — Lock Profile must close every active relay
+   * socket with a well-formed close frame. `lockProfile()` in
+   * `AppStateProvider` invokes `closeCleanly(1000, "lock-profile")`
+   * specifically so validators inspecting `lastCloseCode` can
+   * distinguish a Lock (1000) from a tab unload (1001 — see
+   * VAL-OPS-028). This test pins the mechanism independently of the
+   * caller to guarantee the code + reason survive pump edits.
+   */
+  it(
+    "closeCleanly(1000, 'lock-profile') emits code 1000 with reason 'lock-profile' on every active socket (VAL-SETTINGS-021)",
+    async () => {
+      const runtime = new FakeRuntime();
+      const events: unknown[] = [];
+      class MiniFakeSocket {
+        readyState = 0;
+        closeCalls: Array<{ code?: number; reason?: string }> = [];
+        private openL: Array<(event: Event | MessageEvent) => void> = [];
+        private closeL: Array<(event: Event | MessageEvent) => void> = [];
+        constructor(readonly url: string) {}
+        send() {
+          /* no-op */
+        }
+        close(code?: number, reason?: string) {
+          this.closeCalls.push({ code, reason });
+          this.readyState = 3;
+        }
+        addEventListener(
+          type: "open" | "message" | "error" | "close",
+          listener: (event: Event | MessageEvent) => void,
+        ) {
+          if (type === "open") {
+            this.openL.push(listener);
+            queueMicrotask(() => {
+              this.readyState = 1;
+              listener(new Event("open"));
+            });
+          }
+          if (type === "close") {
+            this.closeL.push(listener);
+          }
+        }
+        removeEventListener() {
+          /* no-op */
+        }
+      }
+      const createdSockets: MiniFakeSocket[] = [];
+      const { BrowserRelayClient } = await import("./browserRelayClient");
+      const relayClient = new BrowserRelayClient({
+        createSocket: (url) => {
+          const socket = new MiniFakeSocket(url);
+          createdSockets.push(socket);
+          return socket;
+        },
+        onSocketEvent: (event) => events.push(event),
+      });
+      const pump = new RuntimeRelayPump({
+        runtime: runtime as never,
+        relays: ["wss://primal.test", "wss://damus.test"],
+        relayClient,
+        eventKind: 27000,
+        now: () => 42,
+      });
+      await pump.start();
+
+      pump.closeCleanly(1000, "lock-profile");
+
+      expect(
+        createdSockets
+          .map((socket) => socket.closeCalls)
+          .sort((a, b) =>
+            JSON.stringify(a).localeCompare(JSON.stringify(b)),
+          ),
+      ).toEqual([
+        [{ code: 1000, reason: "lock-profile" }],
+        [{ code: 1000, reason: "lock-profile" }],
+      ]);
+      const closes = events.filter(
+        (event) => (event as { type: string }).type === "close",
+      );
+      expect(closes.length).toBe(2);
+      closes.forEach((close) => {
+        expect((close as { code: number }).code).toBe(1000);
+        expect((close as { wasClean: boolean }).wasClean).toBe(true);
+      });
+    },
+  );
 });
