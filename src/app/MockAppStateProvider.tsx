@@ -656,6 +656,12 @@ export function MockAppStateProvider({
     [value],
   );
 
+  const restoreProfileFromRelay = useCallback(
+    (input: Parameters<AppStateValue["restoreProfileFromRelay"]>[0]) =>
+      value.restoreProfileFromRelay(input),
+    [value],
+  );
+
   /**
    * Delegates to the seed's `handleRuntimeCommand`. The default fixture
    * (`createDemoAppState`) supplies a stateful mock that generates fresh
@@ -779,6 +785,7 @@ export function MockAppStateProvider({
       exportRuntimePackages,
       createProfileBackup,
       publishProfileBackup,
+      restoreProfileFromRelay,
       setSignerPaused,
       restartRuntimeConnections,
     }),
@@ -845,6 +852,7 @@ export function MockAppStateProvider({
       exportRuntimePackages,
       createProfileBackup,
       publishProfileBackup,
+      restoreProfileFromRelay,
       setSignerPaused,
       restartRuntimeConnections,
     ],

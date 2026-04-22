@@ -919,6 +919,50 @@ export interface AppStateValue {
     };
     reached: string[];
   }>;
+  /**
+   * m6-backup-restore — fetch an encrypted profile-backup event from
+   * one or more relays and persist the decrypted backup as a new
+   * `SavedProfile` in IndexedDB (without starting the runtime).
+   *
+   * The caller supplies the shareholding bfshare package text + its
+   * package password — this is the "equivalent derivation flow" from
+   * VAL-BACKUP-009 because `parse_profile_backup_event` needs the
+   * share secret (not just the pubkey) to decrypt the ciphertext.
+   * The share secret is derived from the decoded bfshare locally; it
+   * is NEVER transmitted. The author pubkey of the replaceable
+   * kind-10000 event is derived from the share secret and used as
+   * the `authors` filter so relays return only this share's backup.
+   *
+   * Relay URLs must all pass `validateRelayUrl` — the restore screen
+   * disables submit on any invalid entry (VAL-BACKUP-032) but the
+   * mutator also rejects defensively.
+   *
+   * Behaviour:
+   *   - Opens a REQ subscription `{ kinds: [profile_backup_event_kind()],
+   *     authors: [<derivedAuthor>] }` on each relay in parallel.
+   *   - Resolves on the first matching EVENT (wins race across relays).
+   *   - If no EVENT arrives within `NO_BACKUP_FOUND_TIMEOUT_MS` (≥3 s
+   *     per VAL-BACKUP-012), rejects with `"No backup found"` so the
+   *     screen can surface the dedicated empty state.
+   *   - Decrypts via `parseProfileBackupEvent`. If the wrong share
+   *     secret / password is supplied, the WASM bridge surfaces an
+   *     error that this mutator remaps to the canonical
+   *     `"Invalid password"` copy (VAL-BACKUP-011).
+   *   - Persists via `saveProfile` — profile id is derived from the
+   *     share secret so repeat restores of the same backup idempotently
+   *     update the single existing record (VAL-BACKUP-030). Runtime is
+   *     NOT started; the user unlocks the profile from Welcome
+   *     (VAL-BACKUP-013).
+   */
+  restoreProfileFromRelay: (input: {
+    bfshare: string;
+    bfsharePassword: string;
+    backupPassword: string;
+    relays: string[];
+  }) => Promise<{
+    profile: StoredProfileSummary;
+    alreadyExisted: boolean;
+  }>;
   setSignerPaused: (paused: boolean) => void;
   refreshRuntime: () => void;
   restartRuntimeConnections: () => Promise<void>;

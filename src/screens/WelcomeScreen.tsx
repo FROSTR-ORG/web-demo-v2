@@ -172,6 +172,13 @@ export function WelcomeScreen() {
         >
           Onboard
         </button>
+        <button
+          type="button"
+          className="returning-chip-btn"
+          onClick={() => navigate("/restore-from-relay")}
+        >
+          Restore from Relay
+        </button>
       </div>
     );
   }
@@ -262,6 +269,13 @@ export function WelcomeScreen() {
                 onClick={() => navigate("/onboard")}
               >
                 Onboard
+              </button>
+              <button
+                type="button"
+                className="returning-chip-btn"
+                onClick={() => navigate("/restore-from-relay")}
+              >
+                Restore from Relay
               </button>
             </div>
           </div>

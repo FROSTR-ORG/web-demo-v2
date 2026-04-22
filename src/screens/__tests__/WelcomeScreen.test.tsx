@@ -107,6 +107,31 @@ describe("WelcomeScreen", () => {
     expect(mocks.navigate).toHaveBeenCalledWith("/onboard");
   });
 
+  it("VAL-BACKUP-008: first-time chip 'Restore from Relay' navigates to /restore-from-relay", () => {
+    render(
+      <MemoryRouter>
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    const chip = screen.getByRole("button", { name: "Restore from Relay" });
+    expect(chip).toBeInTheDocument();
+    fireEvent.click(chip);
+    expect(mocks.navigate).toHaveBeenCalledWith("/restore-from-relay");
+  });
+
+  it("VAL-BACKUP-008: returning users see a 'Restore from Relay' chip that navigates to /restore-from-relay", () => {
+    mocks.profiles = [makeProfile("p1", "My Signing Key")];
+    render(
+      <MemoryRouter>
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    const chip = screen.getByRole("button", { name: "Restore from Relay" });
+    expect(chip).toBeInTheDocument();
+    fireEvent.click(chip);
+    expect(mocks.navigate).toHaveBeenCalledWith("/restore-from-relay");
+  });
+
   it("renders single returning profile with subtitle, Unlock + Rotate, and chip-style 'or' row", () => {
     mocks.profiles = [makeProfile("p1", "My Signing Key")];
     render(

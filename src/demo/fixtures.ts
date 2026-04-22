@@ -354,6 +354,11 @@ export function createDemoAppState(
       event: { id: "mock", pubkey: "mock", created_at: 0, kind: 10000, tags: [], content: "mock", sig: "mock" },
       reached: [],
     }),
+    restoreProfileFromRelay: async () => {
+      throw new Error(
+        "restoreProfileFromRelay is not implemented in the demo fixture.",
+      );
+    },
     setSignerPaused: () => undefined,
     refreshRuntime: () => undefined,
     restartRuntimeConnections: async () => undefined,

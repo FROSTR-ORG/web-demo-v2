@@ -17,12 +17,16 @@ import {
   createKeysetBundle,
   createKeysetBundleFromNsec,
   createOnboardingRequestBundle,
+  decodeBfsharePackage,
+  encodeBfsharePackage,
   defaultManualPeerPolicyOverrides,
   defaultBifrostEventKind,
   decodeBfonboardPackage,
   decodeOnboardingResponseEvent,
   decodeProfilePackage,
   deriveProfileIdFromShareSecret,
+  parseProfileBackupEvent,
+  profileBackupEventKind,
   profilePayloadForShare,
   recoverNsecFromShares,
   resolveShareIndex,
@@ -2783,6 +2787,233 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [activeProfile],
   );
 
+  /**
+   * m6-backup-restore — fetch an encrypted profile-backup event from a
+   * user-supplied relay list + bfshare package, decrypt with the share
+   * secret, and persist as a new SavedProfile (without starting the
+   * runtime).
+   *
+   * See `AppStateValue.restoreProfileFromRelay` JSDoc for the full
+   * contract. User input model:
+   *   - `input.bfshare`           bfshare1… package text
+   *   - `input.bfsharePassword`   unlocks the bfshare AND is used as
+   *                               the new profile's save password
+   *   - `input.backupPassword`    currently same as bfsharePassword
+   *                               (reserved for a future two-password
+   *                               flow — not yet wired in the UI)
+   *   - `input.relays`            must all pass validateRelayUrl
+   *
+   * Error copy is stable and matches the validation contract so the
+   * restore screen can render the user-facing message verbatim:
+   *   - "Relay URL must start with wss://"  (VAL-BACKUP-032)
+   *   - "Invalid password — could not decrypt this backup."
+   *                                         (VAL-BACKUP-011)
+   *   - "No backup found for this share."   (VAL-BACKUP-012)
+   */
+  const restoreProfileFromRelay = useCallback(
+    async (input: {
+      bfshare: string;
+      bfsharePassword: string;
+      backupPassword: string;
+      relays: string[];
+    }) => {
+      if (typeof input.bfsharePassword !== "string" ||
+          input.bfsharePassword.length < 8) {
+        throw new Error(
+          "Invalid password — could not decrypt this backup.",
+        );
+      }
+      const { validateRelayUrl, normalizeRelayKey } = await import(
+        "../lib/relay/relayUrl"
+      );
+      const normalizedRelays: string[] = [];
+      const seenKeys = new Set<string>();
+      for (const raw of input.relays ?? []) {
+        const trimmed = typeof raw === "string" ? raw.trim() : "";
+        if (trimmed.length === 0) continue;
+        // validateRelayUrl throws RelayValidationError with the canonical
+        // "Relay URL must start with wss://" copy on failure.
+        const validated = validateRelayUrl(trimmed);
+        const key = normalizeRelayKey(validated);
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        normalizedRelays.push(validated);
+      }
+      if (normalizedRelays.length === 0) {
+        throw new Error("At least one relay is required.");
+      }
+
+      // Decrypt the bfshare package. A wrong password surfaces as a
+      // BifrostPackageError (`wrong_password`) from the WASM bridge;
+      // we re-map it to the canonical invalid-password copy so the
+      // UI can render it verbatim (VAL-BACKUP-011).
+      let share: Awaited<ReturnType<typeof decodeBfsharePackage>>;
+      try {
+        share = await decodeBfsharePackage(
+          input.bfshare.trim(),
+          input.bfsharePassword,
+        );
+      } catch (err) {
+        if (err instanceof BifrostPackageError) {
+          throw new Error(
+            "Invalid password — could not decrypt this backup.",
+          );
+        }
+        throw err;
+      }
+
+      // Derive the share's nostr author pubkey by generating a
+      // throwaway onboarding-request bundle. `local_pubkey32` in the
+      // bundle is computed from the share secret via the exact same
+      // derivation path used by `build_profile_backup_event` on the
+      // publisher side, so this pubkey matches the kind-10000 event's
+      // `pubkey` field.
+      const eventKind = await profileBackupEventKind();
+      const dummyPeer = "0".repeat(64);
+      const bundle = await createOnboardingRequestBundle({
+        shareSecret: share.share_secret,
+        peerPubkey32Hex: dummyPeer,
+        eventKind,
+      });
+      const authorPubkey32 = bundle.local_pubkey32;
+
+      // Open a parallel REQ on each relay; resolve on the first
+      // matching EVENT or reject with "No backup found" on timeout.
+      const { BrowserRelayClient } = await import(
+        "../lib/relay/browserRelayClient"
+      );
+      const client = new BrowserRelayClient();
+      const connections = normalizedRelays.map((url) => client.connect(url));
+      const cleanup = () => {
+        for (const conn of connections) {
+          try {
+            conn.close();
+          } catch {
+            // best-effort — socket may already be torn down
+          }
+        }
+      };
+
+      const eventJson = await new Promise<string>((resolve, reject) => {
+        const timer = globalThis.setTimeout(() => {
+          cleanup();
+          reject(new Error("No backup found for this share."));
+        }, 5000);
+        let settled = false;
+        const subscriptions: Array<{ close: () => void }> = [];
+        const finish = (json: string) => {
+          if (settled) return;
+          settled = true;
+          globalThis.clearTimeout(timer);
+          for (const sub of subscriptions) {
+            try { sub.close(); } catch { /* noop */ }
+          }
+          cleanup();
+          resolve(json);
+        };
+        (async () => {
+          for (const conn of connections) {
+            try {
+              await conn.connect();
+              const sub = conn.subscribe(
+                {
+                  kinds: [eventKind],
+                  authors: [authorPubkey32],
+                },
+                (event: unknown) => {
+                  if (event && typeof event === "object") {
+                    finish(JSON.stringify(event));
+                  }
+                },
+              );
+              subscriptions.push(sub);
+            } catch {
+              // Per-relay connection failure is non-fatal; the others
+              // may still deliver the event.
+            }
+          }
+        })();
+      });
+
+      // Decrypt the backup payload. Errors here mean the share key
+      // doesn't match the event author (user pasted a bfshare for a
+      // different device) — surface the same invalid-password copy
+      // because from the user's perspective the restore can't proceed.
+      let backup: Awaited<ReturnType<typeof parseProfileBackupEvent>>;
+      try {
+        backup = await parseProfileBackupEvent({
+          eventJson,
+          shareSecret: share.share_secret,
+        });
+      } catch (err) {
+        throw new Error(
+          "Invalid password — could not decrypt this backup.",
+        );
+      }
+
+      // Build a BfProfilePayload from the decrypted backup. The share
+      // secret comes from the local bfshare (never the relay event).
+      const localShareIdx = await resolveShareIndex(
+        backup.group_package,
+        share.share_secret,
+      );
+      const profileId = await deriveProfileIdFromShareSecret(
+        share.share_secret,
+      );
+      // Merge the user-specified relay list with the backup's relay
+      // list so the restored profile keeps talking to the relays the
+      // user just confirmed are reachable for this share.
+      const mergedRelays: string[] = [];
+      const mergedKeys = new Set<string>();
+      for (const relay of [...normalizedRelays, ...backup.device.relays]) {
+        try {
+          const validated = validateRelayUrl(relay);
+          const key = normalizeRelayKey(validated);
+          if (mergedKeys.has(key)) continue;
+          mergedKeys.add(key);
+          mergedRelays.push(validated);
+        } catch {
+          // skip invalid relays from the backup silently
+        }
+      }
+      const payload: BfProfilePayload = {
+        profile_id: profileId,
+        version: backup.version,
+        device: {
+          name: backup.device.name,
+          share_secret: share.share_secret,
+          manual_peer_policy_overrides:
+            backup.device.manual_peer_policy_overrides ?? [],
+          relays: mergedRelays,
+        },
+        group_package: backup.group_package,
+      };
+
+      // Idempotence: deriveProfileIdFromShareSecret yields the same id
+      // for the same share, and saveProfile keys by that id, so a
+      // repeat restore updates the existing record in place.
+      const existing = await getProfile(profileId);
+      const alreadyExisted = existing !== null;
+
+      const { record } = await buildStoredProfileRecord(
+        payload,
+        input.bfsharePassword,
+        {
+          label: backup.group_package.group_name,
+          createdAt: existing?.summary.createdAt,
+        },
+      );
+      await saveProfile(record);
+      void localShareIdx; // already captured inside buildStoredProfileRecord
+      await reloadProfiles();
+      return {
+        profile: record.summary,
+        alreadyExisted,
+      };
+    },
+    [reloadProfiles],
+  );
+
   const restartRuntimeConnections = useCallback(async () => {
     const runtime = runtimeRef.current;
     if (!runtime) {
@@ -3506,6 +3737,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       exportRuntimePackages,
       createProfileBackup,
       publishProfileBackup,
+      restoreProfileFromRelay,
       setSignerPaused,
       refreshRuntime,
       restartRuntimeConnections,
@@ -3574,6 +3806,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       exportRuntimePackages,
       createProfileBackup,
       publishProfileBackup,
+      restoreProfileFromRelay,
       setSignerPaused,
       refreshRuntime,
       restartRuntimeConnections,
@@ -3638,6 +3871,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         group: GroupPackageWire,
         shareIdx: number,
       ) => string;
+      // m6-backup-restore — expose the WASM bfshare encoder so the
+      // restore-from-relay multi-device e2e can convert a share secret
+      // + relays + password into the `bfshare1…` package string that
+      // the restore screen consumes. Encodes via
+      // `encode_bfshare_package` on the bridge; no AppState side-
+      // effects. Test-only, DEV-gated like the other hooks.
+      __iglooTestEncodeBfshare?: (input: {
+        shareSecret: string;
+        relays: string[];
+        password: string;
+      }) => Promise<string>;
       __iglooTestCreatePeerNonces?: (input: {
         share_secret_hex: string;
         peer_pubkey32_hex: string;
@@ -3806,6 +4050,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         );
       }
       return memberPubkeyXOnly(member);
+    };
+    // m6-backup-restore — encode a bfshare1… package so the
+    // multi-device e2e can feed it into the restore screen without
+    // running the full Create flow on a second context.
+    globalWindow.__iglooTestEncodeBfshare = async (input) => {
+      return encodeBfsharePackage(
+        {
+          share_secret: input.shareSecret,
+          relays: input.relays,
+        },
+        input.password,
+      );
     };
     // Generate a batch of valid `DerivedPublicNonceWire` values bound to
     // a given share's private key, targeting `peer_pubkey32_hex` as the
