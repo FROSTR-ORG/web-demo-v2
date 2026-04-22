@@ -9,7 +9,7 @@ import type {
   PeerPermissionState,
   PeerStatus,
 } from "../../../lib/bifrost/types";
-import { MOCK_PEER_POLICIES, MOCK_SIGNER_RULES } from "../mocks";
+import { MOCK_PEER_POLICIES } from "../mocks";
 import {
   DefaultPolicyDropdown,
   type DefaultPolicyOption,
@@ -19,6 +19,32 @@ import {
   resolveManualOverrideValue,
   type PeerPolicyChipMethod,
 } from "../panels/PeerPolicyChip";
+
+/**
+ * Resolve a Paper-faithful decision-pill label for a Signer Policies
+ * rule row derived from an active {@link PolicyOverrideEntry}. Mapping
+ * is the inverse of the PolicyPromptModal decisions that produce the
+ * entry:
+ *
+ *   - persistent + allow → "Always"    (pill class `always`)
+ *   - session    + allow → "Allow once" (pill class `allow-once`)
+ *   - persistent + deny  → "Deny"      (pill class `deny`)
+ *
+ * `session + deny` is intentionally absent — the PolicyPromptModal
+ * "Deny" action is a no-op at the policy layer (VAL-APPROVALS-011).
+ */
+function resolveDecisionPill(entry: PolicyOverrideEntry): {
+  label: string;
+  className: string;
+} {
+  if (entry.value === "allow") {
+    return entry.source === "persistent"
+      ? { label: "Always", className: "always" }
+      : { label: "Allow once", className: "allow-once" };
+  }
+  // entry.value === "deny"
+  return { label: "Deny", className: "deny" };
+}
 
 interface RuntimePeerPolicyRow {
   index: number;
@@ -125,9 +151,7 @@ export function PoliciesState({
     appState.setPeerPolicyOverride ?? (async () => undefined);
   const [defaultPolicy, setDefaultPolicy] =
     useState<DefaultPolicyOption>("Ask every time");
-  const [hiddenRules, setHiddenRules] = useState<Set<string>>(() => new Set());
   const [removalError, setRemovalError] = useState<string | null>(null);
-  const visibleRules = MOCK_SIGNER_RULES.filter((rule) => !hiddenRules.has(rule.method));
   // `paperPanels` keeps the Paper fixture rows (static copy, no pubkey
   // wiring) so pixel-parity demo-gallery routes stay pristine. Runtime
   // mode uses the live `peer_permission_states` snapshot, with a
@@ -164,14 +188,6 @@ export function PoliciesState({
     }
   }
 
-  function removeRule(method: string) {
-    setHiddenRules((previous) => {
-      const next = new Set(previous);
-      next.add(method);
-      return next;
-    });
-  }
-
   return (
     <>
       {/* Signer Policies Panel */}
@@ -193,25 +209,57 @@ export function PoliciesState({
             Controls how this signer responds to external signing and encryption requests.
           </p>
           <div className="policies-rules-list">
-            {visibleRules.map((rule) => (
-              <div className="policies-rule-row" key={rule.method}>
-                <span className="policies-method">{rule.method}</span>
-                <span className="policies-domain">{rule.domain}</span>
-                <span className="policies-rule-divider" />
-                <span
-                  className={`policies-permission-badge ${rule.permission === "Always" ? "always" : "allow-once"}`}
+            {overrideRows.map((entry) => {
+              const label = peerDisplayLabel(entry.peer, peers);
+              const pill = resolveDecisionPill(entry);
+              const rowKey = `${entry.peer}:${entry.direction}.${entry.method}`;
+              return (
+                <div
+                  className="policies-rule-row"
+                  key={rowKey}
+                  data-testid="policy-override-row"
+                  data-override-peer={entry.peer}
+                  data-override-method={entry.method}
+                  data-override-direction={entry.direction}
+                  data-override-source={entry.source}
+                  data-override-value={entry.value}
                 >
-                  {rule.permission}
-                </span>
-                <button type="button" className="policies-remove-btn" aria-label="Remove rule" onClick={() => removeRule(rule.method)}>
-                  ✕
-                </button>
-              </div>
-            ))}
-            {visibleRules.length === 0 ? (
+                  <span className="policies-method">
+                    {entry.method.toUpperCase()}
+                  </span>
+                  <span className="policies-domain">{label.shortId}</span>
+                  <span className="policies-rule-divider" />
+                  <span
+                    className={`policies-permission-badge ${pill.className}`}
+                    data-testid="policy-override-decision"
+                  >
+                    {pill.label}
+                  </span>
+                  <button
+                    type="button"
+                    className="policies-remove-btn"
+                    aria-label={`Remove ${entry.method} override for ${label.name}`}
+                    onClick={() => {
+                      void handleRemoveOverride(entry);
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+            {overrideRows.length === 0 ? (
               <div className="policies-empty">No explicit signer policies. Default policy applies to new requests.</div>
             ) : null}
           </div>
+          {removalError ? (
+            <div
+              role="alert"
+              className="policies-override-error"
+            >
+              {removalError}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -319,81 +367,6 @@ export function PoliciesState({
                   </div>
                 ))}
           </div>
-          {overrideRows.length > 0 ? (
-            <div className="policies-override-section">
-              <div className="policies-override-heading">Active overrides</div>
-              <ul
-                className="policies-override-list"
-                aria-label="Active peer policy overrides"
-              >
-                {overrideRows.map((entry) => {
-                  const label = peerDisplayLabel(entry.peer, peers);
-                  const effectLabel =
-                    entry.value === "allow" ? "Allow" : "Deny";
-                  const persistenceLabel =
-                    entry.source === "persistent" ? "Persistent" : "Session";
-                  const rowKey = `${entry.peer}:${entry.direction}.${entry.method}`;
-                  return (
-                    <li
-                      className="policies-override-row"
-                      key={rowKey}
-                      data-testid="policy-override-row"
-                      data-override-peer={entry.peer}
-                      data-override-method={entry.method}
-                      data-override-direction={entry.direction}
-                      data-override-source={entry.source}
-                      data-override-value={entry.value}
-                    >
-                      <div className="policies-override-identity">
-                        <span className="policies-peer-name">
-                          {label.name}
-                        </span>
-                        <span className="policies-peer-key">
-                          {label.shortId}
-                        </span>
-                      </div>
-                      <div className="policies-override-meta">
-                        <span className="policies-override-verb">
-                          {entry.method.toUpperCase()}
-                        </span>
-                        <span
-                          className={`policies-override-effect ${
-                            entry.value === "allow" ? "allow" : "deny"
-                          }`}
-                        >
-                          {effectLabel}
-                        </span>
-                        <span
-                          className={`policies-override-persistence ${entry.source}`}
-                          data-testid="policy-override-persistence"
-                        >
-                          {persistenceLabel}
-                        </span>
-                        <button
-                          type="button"
-                          className="policies-override-remove"
-                          aria-label={`Remove ${entry.method} override for ${label.name}`}
-                          onClick={() => {
-                            void handleRemoveOverride(entry);
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-              {removalError ? (
-                <div
-                  role="alert"
-                  className="policies-override-error"
-                >
-                  {removalError}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
         </div>
       </div>
     </>

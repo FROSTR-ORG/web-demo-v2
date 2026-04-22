@@ -3193,6 +3193,17 @@ button.peer-policy-chip.deny:focus-visible {
   border: 1px solid rgba(202, 138, 4, 0.3);
 }
 
+/**
+ * Persistent-deny decision pill. Uses the shared danger/red token so
+ * denied rows read as destructive at a glance, matching the Peer
+ * Policies chip deny variant (VAL-POLICIES-014 pill mapping).
+ */
+.policies-permission-badge.deny {
+  color: var(--ig-red);
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
 .policies-remove-btn {
   display: flex;
   align-items: center;
