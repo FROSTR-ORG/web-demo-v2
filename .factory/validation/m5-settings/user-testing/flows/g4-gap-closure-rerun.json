@@ -1,0 +1,193 @@
+{
+  "groupId": "g4-gap-closure-rerun",
+  "testedAt": "2026-04-22T19:25:55.832450+00:00",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "reportPath": ".factory/validation/m5-settings/user-testing/flows/g4-gap-closure-rerun.json",
+    "evidenceDir": "m5-settings/g4-gap-closure"
+  },
+  "toolsUsed": [
+    "agent-browser",
+    "ripgrep",
+    "npm build"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-SETTINGS-018",
+      "title": "Change Password persists; next unlock requires new password",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Unlock seeded returning profile and submit Change Password (old-password -> brand-new-password)",
+          "expected": "Password update succeeds",
+          "observed": "Submit accepted; subsequent lock flow enforced rotated credential"
+        },
+        {
+          "action": "Lock profile; attempt unlock with old password",
+          "expected": "Old password rejected with invalid-password error",
+          "observed": "Unlock modal remained open and body text showed 'decryption failed'"
+        },
+        {
+          "action": "Unlock with new password",
+          "expected": "Dashboard unlock succeeds",
+          "observed": "Navigated to /dashboard/<profileId> successfully"
+        },
+        {
+          "action": "Full page reload; retry unlock old then new",
+          "expected": "Old remains rejected; new still succeeds after reload",
+          "observed": "After reload to welcome, old failed again ('decryption failed'); new unlocked to dashboard"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m5-settings/g4-gap-closure/VAL-SETTINGS-018-welcome-returning.png",
+          "m5-settings/g4-gap-closure/VAL-SETTINGS-018-password-updated-state.png",
+          "m5-settings/g4-gap-closure/VAL-SETTINGS-018-after-lock-welcome.png",
+          "m5-settings/g4-gap-closure/VAL-SETTINGS-018-old-password-rejected.png",
+          "m5-settings/g4-gap-closure/VAL-SETTINGS-018-new-password-unlock-success.png",
+          "m5-settings/g4-gap-closure/VAL-SETTINGS-018-post-reload-old-password-rejected.png",
+          "m5-settings/g4-gap-closure/VAL-SETTINGS-018-post-reload-new-password-success.png"
+        ],
+        "logs": [
+          "m5-settings/g4-gap-closure/VAL-SETTINGS-018-old-password-rejected-body.txt",
+          "m5-settings/g4-gap-closure/VAL-SETTINGS-018-post-reload-old-password-body.txt"
+        ],
+        "consoleErrors": "none (see m5-settings/g4-gap-closure/VAL-SETTINGS-018-errors-final.log)",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-004",
+      "title": "Persistence across Lock \u2192 Unlock",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Capture pre-lock state (dashboard/settings/policies + app state snapshot)",
+          "expected": "Profile name, relay order, and policy state are present before lock",
+          "observed": "deviceName alice-prime, relays [primal, damus] in order, Default policy 'Ask every time', peer manual_override respond.sign=unset"
+        },
+        {
+          "action": "Lock and unlock with current password",
+          "expected": "Session restores persisted profile + settings state",
+          "observed": "Returned to same dashboard route and profile after unlock"
+        },
+        {
+          "action": "Capture post-unlock state (settings/policies + app state snapshot)",
+          "expected": "Profile name, relay order, and relevant policy state persist",
+          "observed": "Pre/post app-state snapshots matched for activeProfile relays and policy sample (manual/effective policy unchanged); Ask-every-time still rendered"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m5-settings/g4-gap-closure/VAL-CROSS-004-pre-lock-settings.png",
+          "m5-settings/g4-gap-closure/VAL-CROSS-004-pre-lock-policies.png",
+          "m5-settings/g4-gap-closure/VAL-CROSS-004-after-lock-welcome.png",
+          "m5-settings/g4-gap-closure/VAL-CROSS-004-post-unlock-dashboard.png",
+          "m5-settings/g4-gap-closure/VAL-CROSS-004-post-unlock-settings.png",
+          "m5-settings/g4-gap-closure/VAL-CROSS-004-post-unlock-policies.png"
+        ],
+        "logs": [
+          "m5-settings/g4-gap-closure/VAL-CROSS-004-pre-lock-body.txt",
+          "m5-settings/g4-gap-closure/VAL-CROSS-004-pre-lock-policies-body.txt",
+          "m5-settings/g4-gap-closure/VAL-CROSS-004-post-unlock-body.txt",
+          "m5-settings/g4-gap-closure/VAL-CROSS-004-post-unlock-policies-body.txt",
+          "m5-settings/g4-gap-closure/VAL-CROSS-004-pre-lock-appstate.json",
+          "m5-settings/g4-gap-closure/VAL-CROSS-004-post-unlock-appstate.json"
+        ],
+        "consoleErrors": "none (see m5-settings/g4-gap-closure/VAL-CROSS-004-errors.log)",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-006",
+      "title": "Clear Credentials wipes all state",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open settings \u2192 clear credentials modal and confirm clear",
+          "expected": "wipe_state called before runtime dispose and app navigates to welcome",
+          "observed": "clearCredentials log recorded wipe_state.invoked -> wipe_state.resolved -> runtime.dispose; route moved to /"
+        },
+        {
+          "action": "Inspect post-clear welcome surface",
+          "expected": "Cleared profile absent from welcome list",
+          "observed": "Only Create/Import/Onboard CTAs remained; Unlock button absent"
+        },
+        {
+          "action": "Inspect storage after clear",
+          "expected": "No profile records in IndexedDB and no sensitive session keys",
+          "observed": "profile-index=[] and profileRecordKeys=[]; session/local storage had no keys matching passphrase|share|seed|nsec"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m5-settings/g4-gap-closure/VAL-CROSS-006-clear-confirm-modal.png",
+          "m5-settings/g4-gap-closure/VAL-CROSS-006-post-clear-welcome.png"
+        ],
+        "logs": [
+          "m5-settings/g4-gap-closure/VAL-CROSS-006-clear-log.json",
+          "m5-settings/g4-gap-closure/VAL-CROSS-006-post-clear-storage.json",
+          "m5-settings/g4-gap-closure/VAL-CROSS-006-runtime-handle-state.json"
+        ],
+        "consoleErrors": "none (see m5-settings/g4-gap-closure/VAL-CROSS-006-errors.log)",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-009",
+      "title": "Terminology migration: \"Rotate Share\" \u2192 \"Replace Share\"",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Build app and perform DOM sweep across all /demo scenarios plus key routes",
+          "expected": "0 rendered 'Rotate Share' matches and at least one rendered 'Replace Share'",
+          "observed": "DOM sweep tested 49 demo routes + extra routes; rotateShareCount=0 everywhere; replaceShareCount>0 on replace-share/dashboard settings surfaces"
+        },
+        {
+          "action": "Run strict source grep `rg -n \"Rotate Share\" src/`",
+          "expected": "No matches",
+          "observed": "4 matches remained in src/__tests__/noRotateShareTerminology.test.ts"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m5-settings/g4-gap-closure/VAL-CROSS-009-demo-index.png",
+          "m5-settings/g4-gap-closure/VAL-CROSS-009-replace-share-route.png"
+        ],
+        "logs": [
+          "m5-settings/g4-gap-closure/VAL-CROSS-009-build.log",
+          "m5-settings/g4-gap-closure/VAL-CROSS-009-demo-dom-sweep.jsonl",
+          "m5-settings/g4-gap-closure/VAL-CROSS-009-demo-dom-sweep-summary.json",
+          "m5-settings/g4-gap-closure/VAL-CROSS-009-extra-route-dom-sweep.jsonl",
+          "m5-settings/g4-gap-closure/VAL-CROSS-009-rg-Rotate-Share.log"
+        ],
+        "consoleErrors": "none (see m5-settings/g4-gap-closure/VAL-CROSS-009-errors.log)",
+        "network": "N/A"
+      },
+      "issues": "Strict grep failed with concrete offenders: src/__tests__/noRotateShareTerminology.test.ts lines 2, 27, 42, 44."
+    }
+  ],
+  "summary": {
+    "tested": 4,
+    "pass": 3,
+    "fail": 1,
+    "blocked": 0,
+    "result": "Re-ran 4 assigned assertions: 3 pass, 1 fail (VAL-CROSS-009 strict source grep)."
+  },
+  "blockers": [],
+  "frictions": [
+    {
+      "description": "Dashboard remained in connecting/degraded state (no online peers) during lock/unlock persistence checks.",
+      "resolved": true,
+      "resolution": "Validated composite persistence claims with observable state snapshots (profile name, relay order, policy state) across lock/unlock where feasible.",
+      "affectedAssertions": [
+        "VAL-CROSS-004"
+      ]
+    }
+  ]
+}

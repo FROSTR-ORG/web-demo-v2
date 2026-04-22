@@ -158,3 +158,7 @@ All hooks are **DEV-only**. If your validation runs a production build (`vite bu
   - `VAL-POLICIES-023` conflicting cross-tab writes (`deny -> allow`) with 2s convergence bound
   - `VAL-CROSS-003` full allow-once retry-success loop (beyond denial-only round-trip)
 - For future user-testing reruns, prefer dedicated agent-browser flows for the four assertions above, capturing DOM timing snapshots and request-id correlation artifacts directly from `window.__appState`.
+
+## Observed Tooling Notes (m5-settings)
+
+- `VAL-CROSS-009` has a strict source-grep clause (`rg -n "Rotate Share" src/`), and this currently fails because `src/__tests__/noRotateShareTerminology.test.ts` intentionally contains the literal phrase in test expectations/regex. UI and `/demo` DOM sweeps show zero rendered `"Rotate Share"` strings, but strict contract scoring should still mark the assertion failed until source text is fully removed or the contract scope is narrowed.

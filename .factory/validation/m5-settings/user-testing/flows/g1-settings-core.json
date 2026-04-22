@@ -1,0 +1,441 @@
+{
+  "groupId": "g1-settings-core",
+  "testedAt": "2026-04-22T19:01:32.240165+00:00",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "reportPath": ".factory/validation/m5-settings/user-testing/flows/g1-settings-core.json",
+    "evidenceDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/evidence/m5-settings/g1-settings-core"
+  },
+  "toolsUsed": [
+    "vitest",
+    "grep",
+    "read"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-SETTINGS-001",
+      "title": "Profile Name persists across Lock / Unlock / Reload",
+      "status": "pass",
+      "reason": "Covered by passing mutator + sidebar tests for name save and lock/unlock persistence.",
+      "steps": [
+        {
+          "action": "Run updateProfileName and SettingsSidebar name-edit suites",
+          "expected": "Valid trimmed name saves and persists",
+          "observed": "Both suites passed including VAL-SETTINGS-001 cases"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/app/__tests__/updateProfileNamePersistence.test.tsx",
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.nameEdit.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-002",
+      "title": "Empty / Whitespace Profile Name rejected",
+      "status": "pass",
+      "reason": "Passing UI + mutator tests assert disabled/inline-error behavior and unchanged persistence.",
+      "steps": [
+        {
+          "action": "Run name validation tests",
+          "expected": "Empty/whitespace blocked with unchanged persisted state",
+          "observed": "All VAL-SETTINGS-002 tests passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.nameEdit.test.tsx",
+          "src/app/__tests__/updateProfileNamePersistence.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-008",
+      "title": "Created / Updated timestamps are real ISO-sourced values",
+      "status": "pass",
+      "reason": "Passing tests verify Created/Updated sourced from active profile and updatedAt mutation behavior.",
+      "steps": [
+        {
+          "action": "Run Group Profile metadata and updatedAt persistence suites",
+          "expected": "Human-formatted Created/Updated from stored timestamps",
+          "observed": "VAL-SETTINGS-008 cases passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.groupProfileMetadata.test.tsx",
+          "src/app/__tests__/profileUpdatedAt.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-009",
+      "title": "Threshold / npub / Keyset Name come from the active profile",
+      "status": "pass",
+      "reason": "Group Profile metadata suite passed and explicitly checks activeProfile sourcing + read-only rendering.",
+      "steps": [
+        {
+          "action": "Run SettingsSidebar group profile metadata tests",
+          "expected": "Keyset Name/Threshold/npub from active profile; read-only",
+          "observed": "VAL-SETTINGS-009 checks passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.groupProfileMetadata.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-015",
+      "title": "wipe_state() invoked BEFORE runtime ref is dropped",
+      "status": "pass",
+      "reason": "Dedicated wipe-order test passed and asserts phase ordering via debug call log + runtime spy.",
+      "steps": [
+        {
+          "action": "Run clearCredentials wipe-order suite",
+          "expected": "wipe_state.invoked -> wipe_state.resolved -> runtime.dispose",
+          "observed": "Order assertion passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/app/__tests__/clearCredentialsWipeOrder.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-016",
+      "title": "Profile entry removed from IndexedDB",
+      "status": "pass",
+      "reason": "clearCredentials suite passed and verifies profile record/index removal after clear.",
+      "steps": [
+        {
+          "action": "Run clearCredentials wipe-order suite",
+          "expected": "Cleared profile record removed from persistent store",
+          "observed": "Storage assertions passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/app/__tests__/clearCredentialsWipeOrder.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-017",
+      "title": "Navigates back to Welcome",
+      "status": "pass",
+      "reason": "Supplementary dashboard clear-credentials flow test passed and showed landing no-profiles Welcome state.",
+      "steps": [
+        {
+          "action": "Run supplementary dashboard clear-credentials flow test",
+          "expected": "Clear credentials navigates to landing welcome state with cleared profile/runtime",
+          "observed": "Landing probe showed 0 profiles, no active profile, no runtime"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/__tests__/DashboardClearCredentialsCross012.test.tsx",
+          "src/app/__tests__/clearCredentialsWipeOrder.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-supplementary.log",
+          "m5-settings/g1-settings-core/vitest-targeted.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-018",
+      "title": "Change Password persists; next unlock requires new password",
+      "status": "blocked",
+      "reason": "Lock/unlock with old/new password is covered, but explicit full page reload verification from this assertion is not directly evidenced by executed suites.",
+      "steps": [
+        {
+          "action": "Run change-password suites",
+          "expected": "Old password rejected, new password accepted, and persists across reload",
+          "observed": "Old/new lock-unlock behavior passed; reload-specific proof not directly present"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/app/__tests__/changePasswordPersistence.test.tsx",
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.changePassword.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log"
+        ]
+      },
+      "issues": "Insufficient direct evidence for the reload leg of VAL-SETTINGS-018."
+    },
+    {
+      "id": "VAL-SETTINGS-019",
+      "title": "Wrong current password shows inline error",
+      "status": "pass",
+      "reason": "Passing UI + mutator tests assert canonical inline error and unchanged credential record behavior.",
+      "steps": [
+        {
+          "action": "Run wrong-current password tests",
+          "expected": "Inline error and no rotation",
+          "observed": "VAL-SETTINGS-019 tests passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.changePassword.test.tsx",
+          "src/app/__tests__/changePasswordPersistence.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-024",
+      "title": "Unicode / emoji / RTL / XSS safe in Profile Name",
+      "status": "pass",
+      "reason": "Passing tests validate verbatim unicode handling and no script/img injection behavior.",
+      "steps": [
+        {
+          "action": "Run profile-name unicode/XSS tests",
+          "expected": "Literal rendering with no injected script execution",
+          "observed": "VAL-SETTINGS-024 tests passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.nameEdit.test.tsx",
+          "src/app/__tests__/updateProfileNamePersistence.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-025",
+      "title": "Profile Name enforces max length",
+      "status": "pass",
+      "reason": "Passing tests verify maxLength attribute, oversize validation, and mutator-level rejection.",
+      "steps": [
+        {
+          "action": "Run max-length name validation tests",
+          "expected": "Oversized names blocked/truncated and not persisted",
+          "observed": "VAL-SETTINGS-025 tests passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.nameEdit.test.tsx",
+          "src/app/__tests__/updateProfileNamePersistence.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-026",
+      "title": "Change Password rejects new === current",
+      "status": "pass",
+      "reason": "Passing tests assert inline validation + storage unchanged when new password matches current.",
+      "steps": [
+        {
+          "action": "Run change-password equality validation tests",
+          "expected": "new==current rejected with no rotation",
+          "observed": "VAL-SETTINGS-026 tests passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.changePassword.test.tsx",
+          "src/app/__tests__/changePasswordPersistence.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-027",
+      "title": "Change Password rejects confirm-mismatch",
+      "status": "pass",
+      "reason": "Change-password sidebar suite passed mismatch checks with disabled submit/no dispatch.",
+      "steps": [
+        {
+          "action": "Run confirm-mismatch validation test",
+          "expected": "Mismatch shows error and blocks submit",
+          "observed": "VAL-SETTINGS-027 check passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.changePassword.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-028",
+      "title": "Change Password rejects sub-minimum length",
+      "status": "pass",
+      "reason": "Passing UI + mutator tests assert sub-minimum validation and no persistence mutation.",
+      "steps": [
+        {
+          "action": "Run minimum-length password tests",
+          "expected": "Too-short password rejected",
+          "observed": "VAL-SETTINGS-028 tests passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.changePassword.test.tsx",
+          "src/app/__tests__/changePasswordPersistence.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-029",
+      "title": "Unsaved changes prompt or auto-persist on navigation",
+      "status": "pass",
+      "reason": "Dedicated unsaved-changes suite passed across close/lock/clear/replace-share navigation paths.",
+      "steps": [
+        {
+          "action": "Run SettingsSidebar unsaved changes suite",
+          "expected": "Dirty edits guarded by confirm dialog; no silent loss",
+          "observed": "All VAL-SETTINGS-029 scenarios passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.unsavedChanges.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-004",
+      "title": "Persistence across Lock \u2192 Unlock (M3 + M5 + Welcome/Unlock)",
+      "status": "blocked",
+      "reason": "Partial evidence exists (profile-name lock/unlock), but this full cross assertion's relay-order + specific policy state + connecting-transition + console-clean requirements are not directly covered in executed suites.",
+      "steps": [
+        {
+          "action": "Run profile-name persistence and policy persistence suites",
+          "expected": "Full cross-surface lock/unlock persistence contract",
+          "observed": "Only subparts are directly evidenced"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/app/__tests__/updateProfileNamePersistence.test.tsx",
+          "src/app/__tests__/persistPeerPolicyOverrides.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log",
+          "m5-settings/g1-settings-core/vitest-supplementary.log"
+        ]
+      },
+      "issues": "Insufficient direct evidence for full VAL-CROSS-004 end-to-end contract."
+    },
+    {
+      "id": "VAL-CROSS-006",
+      "title": "Clear Credentials wipes all state (Lock/Clear + M5 + wipe_state)",
+      "status": "blocked",
+      "reason": "Wipe-order/indexeddb/navigation pieces are covered, but full assertion evidence (explicit sensitive-key sessionStorage regex scan and clean-console run) is not fully satisfied by the executed suites.",
+      "steps": [
+        {
+          "action": "Run clearCredentials wipe-order + dashboard clear flow suites",
+          "expected": "Full wipe-state cross assertion with clean telemetry",
+          "observed": "Core wipe/navigation checks passed; full evidence set remains incomplete"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/app/__tests__/clearCredentialsWipeOrder.test.tsx",
+          "src/screens/__tests__/DashboardClearCredentialsCross012.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g1-settings-core/vitest-targeted.log",
+          "m5-settings/g1-settings-core/vitest-supplementary.log"
+        ]
+      },
+      "issues": "Supplementary run includes known pre-existing dashboard console warning; strict no-console + explicit sessionStorage regex-scan evidence not fully direct."
+    }
+  ],
+  "summary": "Validated 17 assigned assertions via targeted and supplementary vitest runs: 14 pass, 0 fail, 3 blocked (VAL-SETTINGS-018, VAL-CROSS-004, VAL-CROSS-006) due insufficient direct evidence for full contract criteria.",
+  "blockers": [
+    {
+      "description": "Direct test evidence does not fully cover VAL-SETTINGS-018's explicit full-page-reload leg after password rotation.",
+      "affectedAssertions": [
+        "VAL-SETTINGS-018"
+      ],
+      "quickFixAttempted": "Executed both UI and mutator change-password suites; lock/unlock leg covered but no explicit reload assertion in executed suites."
+    },
+    {
+      "description": "No executed single flow directly proves the complete VAL-CROSS-004 composite contract (relay order + specific policy state + reconnect transition + console-clean).",
+      "affectedAssertions": [
+        "VAL-CROSS-004"
+      ],
+      "quickFixAttempted": "Added supplementary policy-persistence suite to improve coverage; still partial vs full cross contract."
+    },
+    {
+      "description": "VAL-CROSS-006 strict evidence set remains incomplete (explicit sensitive sessionStorage key-pattern scan and clean-console requirement).",
+      "affectedAssertions": [
+        "VAL-CROSS-006"
+      ],
+      "quickFixAttempted": "Added supplementary dashboard clear-credentials flow test plus wipe-order suite; core wipe checks pass, but strict evidence criteria remain partial."
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Supplementary Dashboard clear-credentials test emitted the known pre-existing nested-button hydration warning from PeersPanel.",
+      "resolved": true,
+      "resolution": "Continued run per AGENTS known-issues guidance; warning did not block test execution.",
+      "affectedAssertions": [
+        "VAL-CROSS-006"
+      ]
+    }
+  ]
+}
