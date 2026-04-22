@@ -1,7 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import {
   useCallback,
-  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -272,51 +271,31 @@ function RuntimeEventLog() {
       return next;
     });
   }, []);
-  // Local "cleared" mirror so the display empties synchronously when
-  // the Clear button is pressed — prior to the AppState round-trip
-  // completing (and so test doubles that stub the AppState mutator
-  // still observe an immediate empty display). Dropped when a new
-  // entry lands whose seq exceeds the max-seq-at-clear-time.
-  const [clearedBaselineSeq, setClearedBaselineSeq] = useState<number | null>(
-    null,
-  );
-
-  // Drop the local cleared-baseline once a strictly-newer entry arrives
-  // in the buffer (real AppStateProvider path). Done in an effect so
-  // we never call setState during render.
-  useEffect(() => {
-    if (clearedBaselineSeq === null) return;
-    for (const entry of runtimeEventLog) {
-      if (entry.seq > clearedBaselineSeq) {
-        setClearedBaselineSeq(null);
-        return;
-      }
-    }
-  }, [clearedBaselineSeq, runtimeEventLog]);
-
   // Rows displayed in the panel: filtered by selected badges and sorted
   // newest-first (descending seq — seq is monotonic per session).
+  //
+  // We deliberately do NOT maintain a local "cleared baseline seq" here.
+  // A prior implementation carried a `clearedBaselineSeq` state and hid
+  // every entry whose `seq <= baseline`, intending to keep the display
+  // empty until genuinely-new post-clear entries landed. That gating was
+  // incompatible with `AppStateProvider.clearRuntimeEventLog`, which not
+  // only empties the buffer but ALSO resets `runtimeEventLogSeqRef` to
+  // 0 — so post-clear entries restart at `seq = 1` and failed the
+  // `entry.seq > baseline` check, hiding legitimate new events until seq
+  // climbed past the old maximum (flagged in scrutiny m4 r1).
+  //
+  // The provider's Clear semantics are "empty the buffer" (NOT "keep
+  // rows, just hide them"), so the only gating we need is the empty
+  // buffer itself. When `runtimeEventLog` is empty the list renders
+  // "No events yet"; when it repopulates, rows appear immediately.
   const visibleRows = useMemo(() => {
-    if (clearedBaselineSeq !== null) {
-      // Only entries strictly newer than the baseline reappear after a
-      // local clear. The real AppState mutator empties the buffer
-      // synchronously so this path only kicks in on stubbed providers.
-      const newer = runtimeEventLog.filter(
-        (entry) => entry.seq > clearedBaselineSeq,
-      );
-      if (newer.length === 0) return [];
-      return newer
-        .filter((entry) => selectedBadges.has(entry.badge))
-        .slice()
-        .sort((a, b) => b.seq - a.seq);
-    }
     const filtered =
       selectedBadges.size === RUNTIME_BADGES.length
         ? runtimeEventLog
         : runtimeEventLog.filter((entry) => selectedBadges.has(entry.badge));
     // Reverse into newest-first order without mutating the buffer.
     return filtered.slice().sort((a, b) => b.seq - a.seq);
-  }, [clearedBaselineSeq, runtimeEventLog, selectedBadges]);
+  }, [runtimeEventLog, selectedBadges]);
 
   // --- Scroll-anchor preservation (VAL-EVENTLOG-021) ------------------
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -370,18 +349,15 @@ function RuntimeEventLog() {
   }, []);
 
   const handleClear = useCallback(() => {
-    // Snapshot the highest seq currently in the buffer so we can
-    // forward-roll the local empty display when genuinely-new entries
-    // arrive after Clear, even if the AppState mutator is a stub.
-    let maxSeq = 0;
-    for (const entry of runtimeEventLog) {
-      if (entry.seq > maxSeq) maxSeq = entry.seq;
-    }
-    setClearedBaselineSeq(maxSeq);
+    // Delegate entirely to the AppState mutator. The real provider
+    // empties the ring buffer AND resets the seq counter, so the
+    // display flips to "No events yet" on the next render without
+    // any local fallback state (see scrutiny m4 r1 fix — previous
+    // seq-threshold fallback hid legitimate post-clear events).
     if (typeof clearRuntimeEventLog === "function") {
       clearRuntimeEventLog();
     }
-  }, [clearRuntimeEventLog, runtimeEventLog]);
+  }, [clearRuntimeEventLog]);
 
   const toggleBadge = useCallback(
     (badge: RuntimeEventLogBadge) => {

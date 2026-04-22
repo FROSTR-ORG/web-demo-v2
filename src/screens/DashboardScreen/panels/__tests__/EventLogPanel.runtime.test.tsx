@@ -179,18 +179,75 @@ describe("EventLogPanel — runtime wiring", () => {
   });
 
   it("Clear button empties display AND calls AppState.clearRuntimeEventLog", () => {
-    const clearRuntimeEventLog = vi.fn();
+    // The real AppStateProvider.clearRuntimeEventLog empties the buffer
+    // synchronously (see src/app/AppStateProvider.tsx — setRuntimeEventLog([])
+    // AND runtimeEventLogSeqRef.current = 0). Simulate that faithfully so
+    // the test verifies the panel's Clear semantics end-to-end rather than
+    // relying on a local seq-threshold fallback that hid the post-clear
+    // "seq resets to 0" bug flagged in scrutiny m4 r1.
+    const clearRuntimeEventLog = vi.fn(() => {
+      currentState.value.runtimeEventLog = [];
+    });
     currentState.value.runtimeEventLog = [
       entry({ seq: 1, badge: "SIGN" }),
       entry({ seq: 2, badge: "ECDH" }),
     ];
     currentState.value.clearRuntimeEventLog = clearRuntimeEventLog;
-    render(<EventLogPanel />);
+    const { rerender } = render(<EventLogPanel />);
     fireEvent.click(screen.getByText("Clear"));
     expect(clearRuntimeEventLog).toHaveBeenCalledTimes(1);
-    // Display empties even before the AppState state round-trip completes.
+    // The mutator emptied the buffer; rerender reflects the new AppState.
+    rerender(<EventLogPanel />);
     expect(screen.getByText("No events yet")).toBeTruthy();
     expect(screen.getByText("0 events")).toBeTruthy();
+  });
+
+  it("post-clear events with reset seq (1, 2, …) render immediately — no seq-threshold gating (scrutiny m4 r1 fix)", () => {
+    // Mirrors the real AppStateProvider.clearRuntimeEventLog contract:
+    // clearing empties the buffer AND resets runtimeEventLogSeqRef to 0,
+    // so subsequent ingestion starts at seq 1 again. The previous local
+    // `clearedBaselineSeq` fallback hid these post-clear entries because
+    // they failed the `entry.seq > baseline` check (baseline was the
+    // pre-clear max seq). This test locks in the new behavior: as soon
+    // as the buffer is non-empty after clear, the new rows render.
+    const clearRuntimeEventLog = vi.fn(() => {
+      currentState.value.runtimeEventLog = [];
+    });
+    // (a) Seed 3 entries (seqs 1..3) and render.
+    currentState.value.runtimeEventLog = [
+      entry({ seq: 1, badge: "SIGN", payload: { request_id: "req-pre-1" } }),
+      entry({ seq: 2, badge: "ECDH", payload: { request_id: "req-pre-2" } }),
+      entry({ seq: 3, badge: "PING", payload: { request_id: "req-pre-3" } }),
+    ];
+    currentState.value.clearRuntimeEventLog = clearRuntimeEventLog;
+    const { container, rerender } = render(<EventLogPanel />);
+    expect(container.querySelectorAll(".event-log-item").length).toBe(3);
+
+    // (b) Click Clear → mutator empties the buffer.
+    fireEvent.click(screen.getByText("Clear"));
+    rerender(<EventLogPanel />);
+    expect(screen.getByText("No events yet")).toBeTruthy();
+
+    // (c) Seed 2 new entries AFTER clear with seq restarting at 1 — the
+    // realistic post-clear state (runtimeEventLogSeqRef was reset to 0).
+    currentState.value.runtimeEventLog = [
+      entry({ seq: 1, badge: "INFO", payload: { request_id: "req-post-1" } }),
+      entry({ seq: 2, badge: "SYNC", payload: { request_id: "req-post-2" } }),
+    ];
+    rerender(<EventLogPanel />);
+
+    // (d) Both post-clear entries render immediately without any
+    //     additional seq advancement past the pre-clear maximum.
+    const items = container.querySelectorAll(".event-log-item");
+    expect(items.length).toBe(2);
+    const badges = Array.from(items).map(
+      (row) => row.querySelector(".event-log-type")?.textContent,
+    );
+    // Newest-first ordering preserved.
+    expect(badges).toEqual(["SYNC", "INFO"]);
+    expect(screen.getByText("2 events")).toBeTruthy();
+    // No residual "No events yet" empty state.
+    expect(screen.queryByText("No events yet")).toBeNull();
   });
 
   it("correlation: the expanded JSON exposes the same request_id as the source payload (VAL-CROSS-015)", () => {
