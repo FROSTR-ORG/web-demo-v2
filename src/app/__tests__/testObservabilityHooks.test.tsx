@@ -52,6 +52,7 @@ interface IglooTestWindow extends Window {
   };
   __iglooTestDropRelays?: (code?: number) => void;
   __iglooTestRestoreRelays?: () => Promise<void>;
+  __iglooTestUpdateRelays?: (nextRelays: string[]) => Promise<void>;
   __iglooTestSimulateNonceDepletion?: (input?: {
     nonce_pool_size?: number;
     nonce_pool_threshold?: number;
@@ -127,6 +128,13 @@ describe("AppStateProvider — dev-only test-observability hooks", () => {
     const iglooWindow = window as IglooTestWindow;
     expect(typeof iglooWindow.__iglooTestDropRelays).toBe("function");
     expect(typeof iglooWindow.__iglooTestRestoreRelays).toBe("function");
+    // fix-m5-relay-churn-multidevice-spec: dev-only hook that proxies
+    // to `RuntimeRelayPump.updateRelays(...)` so the relay-churn e2e
+    // spec can hot-reload the live pump's relay list without routing
+    // through AppStateValue.updateRelays (which requires an active
+    // stored profile, unavailable when seeding via
+    // `__iglooTestSeedRuntime`).
+    expect(typeof iglooWindow.__iglooTestUpdateRelays).toBe("function");
     expect(typeof iglooWindow.__iglooTestSimulateNonceDepletion).toBe(
       "function",
     );
@@ -221,6 +229,22 @@ describe("AppStateProvider — dev-only test-observability hooks", () => {
     expect(() => iglooWindow.__iglooTestDropRelays?.(1006)).not.toThrow();
     await expect(
       iglooWindow.__iglooTestRestoreRelays?.(),
+    ).resolves.toBeUndefined();
+  });
+
+  it("__iglooTestUpdateRelays is callable even when no relay pump is attached (no-op safe)", async () => {
+    let latest!: AppStateValue;
+    render(
+      <AppStateProvider>
+        <Capture onState={(state) => (latest = state)} />
+      </AppStateProvider>,
+    );
+    await waitFor(() => expect(latest).toBeTruthy());
+
+    const iglooWindow = window as IglooTestWindow;
+    // No runtime attached yet — hook must not throw and must resolve.
+    await expect(
+      iglooWindow.__iglooTestUpdateRelays?.(["ws://127.0.0.1:8194"]),
     ).resolves.toBeUndefined();
   });
 

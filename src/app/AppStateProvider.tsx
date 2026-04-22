@@ -3469,6 +3469,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }) => Promise<void>;
       __iglooTestDropRelays?: (closeCode?: number) => void;
       __iglooTestRestoreRelays?: () => Promise<void>;
+      __iglooTestUpdateRelays?: (nextRelays: string[]) => Promise<void>;
       __iglooTestSimulateNonceDepletion?: (input?: {
         nonce_pool_size?: number;
         nonce_pool_threshold?: number;
@@ -3701,6 +3702,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     // increments that relay's `reconnectCount`.
     globalWindow.__iglooTestRestoreRelays = async () => {
       await relayPumpRef.current?.simulateRestoreAll();
+    };
+    // Directly hot-reload the live pump's relay list, bypassing the
+    // profile/password-gated `AppStateValue.updateRelays` path which
+    // requires an active stored profile. Intended for the multi-device
+    // relay-churn e2e spec (VAL-CROSS-005) that seeds its runtimes via
+    // `__iglooTestSeedRuntime` (no IndexedDB profile) and still needs
+    // to exercise the pump's add/remove diff logic mid-sign. No-op when
+    // no pump is attached.
+    globalWindow.__iglooTestUpdateRelays = async (nextRelays) => {
+      await relayPumpRef.current?.updateRelays(nextRelays);
     };
     // Push a synthetic nonce-depletion signal so the `Syncing nonces` /
     // `Trigger Sync` overlay (VAL-OPS-024) renders end-to-end without the
