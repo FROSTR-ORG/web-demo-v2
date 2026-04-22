@@ -191,6 +191,7 @@ export function EnterPackageScreen() {
             setShowQrScanner(false);
           }}
           onClose={() => setShowQrScanner(false)}
+          expectedPrefixes={["bfonboard1"]}
         />
       )}
     </AppShell>

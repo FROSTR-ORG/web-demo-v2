@@ -6866,6 +6866,14 @@ button.peer-policy-chip.deny:focus-visible {
   margin-bottom: 16px;
 }
 
+.qr-scanner-invalid {
+  text-align: center;
+  color: #f87171;
+  font-family: var(--font-inter, "Inter", system-ui, sans-serif);
+  font-size: 13px;
+  margin-top: 8px;
+}
+
 /* ==========================================================
    ReviewPanel
    ========================================================== */

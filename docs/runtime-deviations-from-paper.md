@@ -487,3 +487,50 @@ and the validation assertion IDs that cover it.
   hysteresis for VAL-SETTINGS-013.
 - **Assertion IDs covered**: VAL-SETTINGS-010, VAL-SETTINGS-011,
   VAL-SETTINGS-012, VAL-SETTINGS-013, VAL-SETTINGS-014.
+### Camera QR scanning — Playwright mobile project behaviour (VAL-BACKUP-019)
+
+- **Paper / task source**: `m6-camera-qr-scan` feature description — "Mobile
+  Playwright project behavior documented". VAL-BACKUP-019 requires Scan QR to
+  be visible under the mobile viewport and either operate or surface a clear
+  unavailable message; silent failure is unacceptable.
+- **web-demo-v2 implementation**:
+  `src/components/QrScanner.tsx` (shared scanner modal), used from
+  `src/screens/OnboardScreens.tsx`,
+  `src/screens/ReplaceShareScreens.tsx`, and
+  `src/screens/ImportScreens.tsx`. Playwright mobile viewport is defined in
+  `playwright.config.ts` (`mobile` project, Pixel 5 device, 390×844).
+- **Behaviour under the `mobile` project**: the Scan QR button is rendered
+  in the same DOM location as on desktop on every one of the three
+  surfaces (Onboard, Replace Share, Import → Load Backup). Tapping it opens
+  the `<div role="dialog" aria-label="QR Scanner">` modal just like on
+  desktop. The scanner then requests
+  `getUserMedia({ video: { facingMode: "environment" } })`; Playwright's
+  default launch options do NOT permission-grant `camera` on the `mobile`
+  project, so the promise rejects with `NotAllowedError`. The component
+  catches this and renders the explicit fallback copy
+  **"Camera access was denied or the camera is unavailable."** along with a
+  Close action button — the user-facing surface VAL-BACKUP-019 requires. The
+  underlying textarea stays interactive so a pasted package is still the
+  working path under `mobile`. The MediaStreamTracks are never live under
+  `mobile`, so there is nothing to leak on close (VAL-BACKUP-027 trivially
+  holds).
+- **How to exercise a live capture under `mobile` locally**: grant the
+  camera permission explicitly via the BrowserContext
+  (`context.grantPermissions(['camera'], {origin: 'http://127.0.0.1:5173'})`)
+  and point the browser at a fake MJPEG device
+  (`--use-fake-device-for-media-stream --use-file-for-fake-video-capture=...`).
+  The scanner then behaves identically to the desktop path: jsQR decodes
+  frames, a valid `bfonboard1…` / `bfprofile1…` / `bfshare1…` payload closes
+  the scanner and populates the target textarea, non-matching payloads
+  surface the inline "Not a valid bfonboard/bfprofile/bfshare package"
+  error (VAL-BACKUP-018) while the stream continues. Permission revocation
+  mid-scan (simulated via `page.context().clearPermissions()` followed by
+  `MediaStreamTrack.stop()` injection) fires `track.onended`, the scanner
+  surfaces **"Camera access was lost…"** (VAL-BACKUP-026) and stops every
+  track (`readyState === 'ended'`).
+- **Assertion IDs covered**: VAL-BACKUP-014, VAL-BACKUP-015,
+  VAL-BACKUP-016 (Scan QR buttons on Replace Share / Onboard / Import),
+  VAL-BACKUP-017 (camera-denied fallback), VAL-BACKUP-018 (invalid-content
+  inline error), VAL-BACKUP-019 (mobile viewport behaviour documented),
+  VAL-BACKUP-026 (permission revoked mid-scan), VAL-BACKUP-027 (scanner
+  release all tracks on X, backdrop click, and unmount).

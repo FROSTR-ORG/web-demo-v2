@@ -160,6 +160,7 @@ export function EnterReplacePackageScreen() {
             setShowQrScanner(false);
           }}
           onClose={() => setShowQrScanner(false)}
+          expectedPrefixes={["bfonboard1"]}
         />
       )}
     </AppShell>
