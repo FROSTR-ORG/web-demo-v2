@@ -1,5 +1,12 @@
 import { ChevronDown } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { StatusPill } from "../../../components/ui";
 import { useAppState } from "../../../app/AppState";
 import type {
@@ -137,6 +144,31 @@ function summarizeEntry(entry: RuntimeEventLogEntry): string {
 }
 
 /**
+ * Module-scoped filter selection cache. The `selectedBadges` Set
+ * survives unmount/remount cycles so a user that:
+ *   1. Selects `{SIGN, ECDH}` in the Filter dropdown,
+ *   2. Opens the Settings sidebar (RunningState stays mounted but some
+ *      dashboard-state transitions can remount the panel),
+ *   3. Navigates to another dashboard route and back,
+ * still sees the same filter applied on return. The module cache is
+ * NOT part of AppState because the selection is ephemeral UX state —
+ * it does not need to survive a full reload or a Lock/Unlock cycle.
+ *
+ * Reset exposed via `__resetEventLogFilterPersistenceForTest` so
+ * unit tests can guarantee a clean initial state.
+ */
+const eventLogFilterCache: {
+  selectedBadges: Set<RuntimeEventLogBadge>;
+} = {
+  selectedBadges: new Set(RUNTIME_BADGES),
+};
+
+/** Test-only helper: reset module-scoped filter cache to "all selected". */
+export function __resetEventLogFilterPersistenceForTest(): void {
+  eventLogFilterCache.selectedBadges = new Set(RUNTIME_BADGES);
+}
+
+/**
  * Dashboard Event Log panel.
  *
  * Two driving modes:
@@ -153,6 +185,14 @@ function summarizeEntry(entry: RuntimeEventLogEntry): string {
  *      JSON-stringify so `partial_signature`, `share_secret`,
  *      `nonce_secret`, `passphrase`, and plaintext `bfprofile1…`
  *      tokens never reach the DOM (VAL-EVENTLOG-019).
+ *
+ *      Filter state (selected badges) is cached at module scope so it
+ *      survives unmount/remount (VAL-EVENTLOG-023 + feature
+ *      `m4-event-log-filter-and-scroll`). User scroll state is
+ *      preserved on new event ingestion: when the user has scrolled
+ *      off-top we reposition by `newScrollHeight - prevScrollHeight`
+ *      so the previously-visible row stays in the viewport, and a
+ *      "Jump to newest" affordance appears (VAL-EVENTLOG-021).
  *
  *   2. **Paper-fixture mode:** when a `rows` prop is supplied the
  *      panel renders those rows verbatim, preserving the legacy Paper
@@ -196,8 +236,26 @@ function RuntimeEventLog() {
   const clearRuntimeEventLog = state.clearRuntimeEventLog;
 
   const [filterOpen, setFilterOpen] = useState(false);
-  const [selectedBadges, setSelectedBadges] = useState<Set<RuntimeEventLogBadge>>(
-    () => new Set(RUNTIME_BADGES),
+  // Initialise from the module-level cache so filter selections survive
+  // unmount/remount cycles (see `eventLogFilterCache`).
+  const [selectedBadges, setSelectedBadgesState] = useState<Set<RuntimeEventLogBadge>>(
+    () => new Set(eventLogFilterCache.selectedBadges),
+  );
+  const setSelectedBadges = useCallback(
+    (
+      updater: (
+        previous: Set<RuntimeEventLogBadge>,
+      ) => Set<RuntimeEventLogBadge>,
+    ) => {
+      setSelectedBadgesState((previous) => {
+        const next = updater(previous);
+        // Keep the module cache in lock-step with state so a remount
+        // later re-hydrates from the same selection.
+        eventLogFilterCache.selectedBadges = new Set(next);
+        return next;
+      });
+    },
+    [],
   );
   // Multiple rows may be expanded simultaneously — independent per
   // row. Supports VAL-EVENTLOG-020 ("Expand state persists across new
@@ -260,6 +318,57 @@ function RuntimeEventLog() {
     return filtered.slice().sort((a, b) => b.seq - a.seq);
   }, [clearedBaselineSeq, runtimeEventLog, selectedBadges]);
 
+  // --- Scroll-anchor preservation (VAL-EVENTLOG-021) ------------------
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const previousScrollHeightRef = useRef<number>(0);
+  // `atTop === true` when the user has the list scrolled to top — used
+  // to gate the "Jump to newest" affordance and to disable anchor
+  // correction (scroll at 0 always follows newest ingestion).
+  const [atTop, setAtTop] = useState(true);
+
+  // On every change to the rendered list, compare the new `scrollHeight`
+  // to what we recorded before React committed the change. If the list
+  // grew AND the user wasn't at the top, reposition scrollTop by the
+  // delta so the previously-visible row stays anchored where it was.
+  // Runs in `useLayoutEffect` so the DOM reposition happens inside the
+  // same paint as React's commit — the user never sees a jump frame.
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const previousHeight = previousScrollHeightRef.current;
+    const newHeight = el.scrollHeight;
+    if (
+      previousHeight > 0 &&
+      newHeight > previousHeight &&
+      el.scrollTop > 0
+    ) {
+      el.scrollTop = el.scrollTop + (newHeight - previousHeight);
+    }
+    previousScrollHeightRef.current = newHeight;
+  }, [visibleRows]);
+
+  const handleScroll = useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    setAtTop(el.scrollTop <= 1);
+    // Snapshot the current scrollHeight at the moment the user scrolled
+    // so the next `useLayoutEffect` pass can compute the correct delta
+    // even if list content has already changed between the user's last
+    // scroll and the next ingestion. Without this, a scroll event that
+    // lands between two re-renders can leave the previous-height ref
+    // stale and the anchor correction skipped.
+    previousScrollHeightRef.current = el.scrollHeight;
+  }, []);
+
+  const handleJumpToNewest = useCallback(() => {
+    const el = listRef.current;
+    if (el) {
+      el.scrollTop = 0;
+      previousScrollHeightRef.current = el.scrollHeight;
+    }
+    setAtTop(true);
+  }, []);
+
   const handleClear = useCallback(() => {
     // Snapshot the highest seq currently in the buffer so we can
     // forward-roll the local empty display when genuinely-new entries
@@ -274,22 +383,25 @@ function RuntimeEventLog() {
     }
   }, [clearRuntimeEventLog, runtimeEventLog]);
 
-  const toggleBadge = useCallback((badge: RuntimeEventLogBadge) => {
-    setSelectedBadges((previous) => {
-      const next = new Set(previous);
-      if (next.has(badge)) next.delete(badge);
-      else next.add(badge);
-      return next;
-    });
-  }, []);
+  const toggleBadge = useCallback(
+    (badge: RuntimeEventLogBadge) => {
+      setSelectedBadges((previous) => {
+        const next = new Set(previous);
+        if (next.has(badge)) next.delete(badge);
+        else next.add(badge);
+        return next;
+      });
+    },
+    [setSelectedBadges],
+  );
 
   const selectAll = useCallback(() => {
-    setSelectedBadges(new Set(RUNTIME_BADGES));
-  }, []);
+    setSelectedBadges(() => new Set(RUNTIME_BADGES));
+  }, [setSelectedBadges]);
 
   const clearAll = useCallback(() => {
-    setSelectedBadges(new Set());
-  }, []);
+    setSelectedBadges(() => new Set());
+  }, [setSelectedBadges]);
 
   const countLabel = `${visibleRows.length} event${
     visibleRows.length === 1 ? "" : "s"
@@ -302,6 +414,15 @@ function RuntimeEventLog() {
         <div className="event-log-title">Event Log</div>
         <StatusPill>{countLabel}</StatusPill>
         <span className="event-log-spacer" />
+        {!atTop && visibleRows.length > 0 ? (
+          <button
+            type="button"
+            className="event-log-link event-log-jump"
+            onClick={handleJumpToNewest}
+          >
+            Jump to newest
+          </button>
+        ) : null}
         <button
           type="button"
           className="event-log-link"
@@ -357,36 +478,44 @@ function RuntimeEventLog() {
         </div>
       </div>
       {visibleRows.length > 0 ? (
-        visibleRows.map((entry) => {
-          const expanded = expandedSeqs.has(entry.seq);
-          const scrubbed = scrubEventLogPayload(entry.payload);
-          return (
-            <div className="event-log-item" key={entry.seq}>
-              <button
-                type="button"
-                className="event-log-row"
-                aria-expanded={expanded}
-                onClick={() => toggleExpanded(entry.seq)}
-              >
-                <span className="event-log-time">{formatHhMmSs(entry.at)}</span>
-                <span
-                  className={`event-log-type ${runtimeBadgeClassName(entry.badge)}`}
+        <div
+          className="event-log-list"
+          ref={listRef}
+          onScroll={handleScroll}
+        >
+          {visibleRows.map((entry) => {
+            const expanded = expandedSeqs.has(entry.seq);
+            const scrubbed = scrubEventLogPayload(entry.payload);
+            return (
+              <div className="event-log-item" key={entry.seq}>
+                <button
+                  type="button"
+                  className="event-log-row"
+                  aria-expanded={expanded}
+                  onClick={() => toggleExpanded(entry.seq)}
                 >
-                  {entry.badge}
-                </span>
-                <span className="event-log-copy">{summarizeEntry(entry)}</span>
-                <span className="event-log-chevron" aria-hidden="true">
-                  ⌄
-                </span>
-              </button>
-              {expanded ? (
-                <pre className="event-log-expanded">
-                  {JSON.stringify(scrubbed, null, 2)}
-                </pre>
-              ) : null}
-            </div>
-          );
-        })
+                  <span className="event-log-time">
+                    {formatHhMmSs(entry.at)}
+                  </span>
+                  <span
+                    className={`event-log-type ${runtimeBadgeClassName(entry.badge)}`}
+                  >
+                    {entry.badge}
+                  </span>
+                  <span className="event-log-copy">{summarizeEntry(entry)}</span>
+                  <span className="event-log-chevron" aria-hidden="true">
+                    ⌄
+                  </span>
+                </button>
+                {expanded ? (
+                  <pre className="event-log-expanded">
+                    {JSON.stringify(scrubbed, null, 2)}
+                  </pre>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
       ) : (
         <div className="event-log-empty">No events yet</div>
       )}

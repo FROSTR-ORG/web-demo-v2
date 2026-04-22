@@ -6182,6 +6182,31 @@ button.peer-policy-chip.deny:focus-visible {
   position: relative;
 }
 
+.event-log-list {
+  /*
+   * Scrollable container for the event-log rows. Max height allows
+   * ~8 rows before the overflow kicks in; the panel itself stays at
+   * its natural dashboard height. `overflow-y: auto` drives the
+   * scroll-anchor preservation logic in `EventLogPanel.tsx` — the
+   * component reads `scrollTop` / `scrollHeight` off this element in a
+   * `useLayoutEffect` to keep the user's visible row stable when new
+   * entries prepend (VAL-EVENTLOG-021).
+   */
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.event-log-jump {
+  /*
+   * "Jump to newest" affordance — only rendered when the user has
+   * scrolled off the top (see `atTop` gate in EventLogPanel). Reuses
+   * the `.event-log-link` base styling plus a muted blue accent so it
+   * visually distinguishes from the neutral Clear / Filter buttons.
+   */
+  color: #93c5fd;
+  font-weight: 600;
+}
+
 .event-log-item {
   border-bottom: 1px solid rgba(30, 58, 138, 0.1);
 }
