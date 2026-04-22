@@ -401,6 +401,95 @@ export interface NoncePoolSnapshot {
   nonce_pool_threshold: number;
 }
 
+/**
+ * Typed badge classifying a {@link RuntimeEventLogEntry}. One of the ten
+ * canonical Paper badges:
+ *   - `SYNC`         — pool-sync / status_changed runtime events
+ *   - `SIGN`         — sign completion (successful partial signature or
+ *                       full aggregation)
+ *   - `ECDH`         — ecdh completion (shared secret derived)
+ *   - `ECHO`         — inbound peer event accepted by the local signer
+ *                       (`inbound_accepted` runtime event)
+ *   - `PING`         — ping completion (peer round-trip measured)
+ *   - `SIGNER_POLICY` — a change to the local signer's policy state
+ *                       (`policy_updated` runtime event)
+ *   - `PEER_POLICY`  — a change to a specific peer's effective policy
+ *                       (reserved; emitted by higher-level deriver)
+ *   - `READY`        — runtime finished initialising and is ready to
+ *                       dispatch operations (`initialized`)
+ *   - `INFO`         — any other lifecycle edge that doesn't merit a
+ *                       dedicated colour (command_queued, config_updated,
+ *                       state_wiped, Onboard completion)
+ *   - `ERROR`        — any drained `OperationFailure`
+ */
+export type RuntimeEventLogBadge =
+  | "SYNC"
+  | "SIGN"
+  | "ECDH"
+  | "ECHO"
+  | "PING"
+  | "SIGNER_POLICY"
+  | "PEER_POLICY"
+  | "READY"
+  | "INFO"
+  | "ERROR";
+
+/**
+ * Origin of a {@link RuntimeEventLogEntry}: which of the three runtime
+ * drain channels produced the entry.
+ *
+ *  - `runtime_event` — drained from `RuntimeClient.drainRuntimeEvents()`
+ *  - `completion`    — drained from `RuntimeClient.drainCompletions()`
+ *  - `failure`       — drained from `RuntimeClient.drainFailures()`
+ */
+export type RuntimeEventLogSource =
+  | "runtime_event"
+  | "completion"
+  | "failure";
+
+/**
+ * One entry in the {@link AppStateValue.runtimeEventLog} ring buffer. Each
+ * entry represents a single drained runtime event, completion, or failure
+ * — tagged with its origin channel and a typed UI badge. Downstream
+ * consumers (notably `EventLogPanel`) use `badge` for the colored chip
+ * and `payload` for the expanded JSON body.
+ */
+export interface RuntimeEventLogEntry {
+  /**
+   * Monotonically increasing sequence id assigned at ingest time. Used
+   * for FIFO/reorder detection in high-rate ingestion tests
+   * (VAL-EVENTLOG-024) and for stable React list keys. Resets to zero
+   * on `lockProfile()` / `clearCredentials()` alongside the buffer
+   * itself, so seq values are only unique within a single unlocked
+   * session.
+   */
+  seq: number;
+  /** ms since epoch when the entry was ingested. */
+  at: number;
+  /** Typed badge for UI rendering. */
+  badge: RuntimeEventLogBadge;
+  /** Which runtime drain channel produced the entry. */
+  source: RuntimeEventLogSource;
+  /**
+   * Raw payload drained from the runtime. Shape depends on `source`:
+   *  - `runtime_event` → {@link RuntimeEvent}
+   *  - `completion`    → {@link CompletedOperation}
+   *  - `failure`       → {@link EnrichedOperationFailure}
+   *
+   * Kept as `unknown` at this layer to avoid coupling consumers to the
+   * discriminated shape — `EventLogPanel` narrows by `source`.
+   */
+  payload: unknown;
+}
+
+/**
+ * Maximum number of entries retained in the
+ * {@link AppStateValue.runtimeEventLog} ring buffer. Exceeding entries
+ * are FIFO-evicted so the oldest is dropped first. Documented contract
+ * in VAL-EVENTLOG-014.
+ */
+export const RUNTIME_EVENT_LOG_MAX = 500;
+
 export interface AppStateValue {
   profiles: StoredProfileSummary[];
   activeProfile: StoredProfileSummary | null;
@@ -431,6 +520,20 @@ export interface AppStateValue {
    * (VAL-OPS-007).
    */
   runtimeFailures: EnrichedOperationFailure[];
+  /**
+   * Bounded ring buffer of dashboard-oriented event log entries derived from
+   * all three runtime drain channels (`drainRuntimeEvents`,
+   * `drainCompletions`, `drainFailures`). Each entry is tagged with a
+   * {@link RuntimeEventLogBadge} and retained in insertion order up to
+   * {@link RUNTIME_EVENT_LOG_MAX} (500) entries — once exceeded, the
+   * oldest is FIFO-evicted. Survives tick cycles and relay reconnects;
+   * cleared on `lockProfile()` / `clearCredentials()` so no stale
+   * events bleed between profiles (VAL-EVENTLOG-014 / VAL-EVENTLOG-016).
+   *
+   * Consumed by `EventLogPanel` for rendering; validators inspect
+   * `window.__debug.runtimeEventLog` directly.
+   */
+  runtimeEventLog: RuntimeEventLogEntry[];
   /**
    * Lifecycle events drained from the runtime via
    * `RuntimeClient.drainRuntimeEvents()`. Not consumed by UI in this feature

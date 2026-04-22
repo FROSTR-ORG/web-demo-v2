@@ -599,6 +599,7 @@ describe("MockAppStateProvider bridge arming", () => {
     runtimeCompletions: [],
     runtimeFailures: [],
     lifecycleEvents: [],
+    runtimeEventLog: [],
     signDispatchLog: {},
     signLifecycleLog: [],
     pendingDispatchIndex: {},

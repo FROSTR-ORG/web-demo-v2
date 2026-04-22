@@ -86,7 +86,7 @@ import {
   setupErrorFromOnboardingRelay,
   setupErrorFromPackage,
 } from "./setupFlowErrors";
-import { SetupFlowError } from "./AppStateTypes";
+import { RUNTIME_EVENT_LOG_MAX, SetupFlowError } from "./AppStateTypes";
 import type {
   AppStateValue,
   CreateDraft,
@@ -98,6 +98,9 @@ import type {
   ImportProfileDraft,
   ImportSession,
   NoncePoolSnapshot,
+  RuntimeEventLogBadge,
+  RuntimeEventLogEntry,
+  RuntimeEventLogSource,
   OnboardingPackageStatePatch,
   OnboardSession,
   PeerDeniedEvent,
@@ -146,6 +149,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     Record<string, PendingDispatchEntry>
   >({});
   const [lifecycleEvents, setLifecycleEvents] = useState<RuntimeEvent[]>([]);
+  /**
+   * Bounded ring buffer of tagged event-log entries derived from all three
+   * runtime drain channels (events / completions / failures). Mirrored into
+   * `runtimeEventLogRef` so dev-only hooks and the `window.__debug`
+   * observation surface can read the latest snapshot without going through
+   * React state. Capped at {@link RUNTIME_EVENT_LOG_MAX} entries — oldest
+   * FIFO-evicted when exceeded (VAL-EVENTLOG-014 / VAL-EVENTLOG-024).
+   */
+  const [runtimeEventLog, setRuntimeEventLog] = useState<
+    RuntimeEventLogEntry[]
+  >([]);
+  const runtimeEventLogRef = useRef<RuntimeEventLogEntry[]>([]);
+  /**
+   * Monotonic sequence counter assigned to every ingested entry. Used by
+   * validators to detect reorder / dropped entries under high-rate
+   * ingestion (VAL-EVENTLOG-024). Reset to zero alongside the buffer on
+   * `lockProfile()` / `clearCredentials()` so seq values are unique only
+   * within a single unlocked session.
+   */
+  const runtimeEventLogSeqRef = useRef(0);
   // Reactive peer-denial queue for `PolicyPromptModal`. Populated via
   // `enqueuePeerDenial` (called from the Dashboard's lifecycleEvents
   // observer for `peer_denied` kind events), drained FIFO via
@@ -483,6 +506,55 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         });
       }
     }
+    // Populate the dashboard RuntimeEventLog ring buffer from every drain
+    // channel. Preserves drain order: events first (they precede the
+    // completions/failures they describe in the runtime's own ordering),
+    // then completions, then failures. Each entry is tagged with a typed
+    // badge used by the Event Log panel for colour/label rendering
+    // (VAL-EVENTLOG-005 / VAL-EVENTLOG-014 / VAL-EVENTLOG-024).
+    if (
+      drains.events.length > 0 ||
+      drains.completions.length > 0 ||
+      drains.failures.length > 0
+    ) {
+      const now = Date.now();
+      const newEntries: RuntimeEventLogEntry[] = [];
+      for (const event of drains.events) {
+        runtimeEventLogSeqRef.current += 1;
+        newEntries.push({
+          seq: runtimeEventLogSeqRef.current,
+          at: now,
+          badge: badgeForRuntimeEvent(event),
+          source: "runtime_event",
+          payload: event,
+        });
+      }
+      for (const completion of drains.completions) {
+        runtimeEventLogSeqRef.current += 1;
+        newEntries.push({
+          seq: runtimeEventLogSeqRef.current,
+          at: now,
+          badge: badgeForCompletion(completion),
+          source: "completion",
+          payload: completion,
+        });
+      }
+      for (const failure of drains.failures) {
+        runtimeEventLogSeqRef.current += 1;
+        newEntries.push({
+          seq: runtimeEventLogSeqRef.current,
+          at: now,
+          badge: "ERROR",
+          source: "failure",
+          payload: failure,
+        });
+      }
+      if (newEntries.length > 0) {
+        setRuntimeEventLog((previous) =>
+          appendRuntimeEventLogEntries(previous, newEntries),
+        );
+      }
+    }
   }, []);
 
   const resetDrainSlices = useCallback(() => {
@@ -494,11 +566,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setPendingDispatchIndex({});
     setPeerDenialQueue([]);
     setPolicyOverrides([]);
+    setRuntimeEventLog([]);
     pendingDispatchIndexRef.current = {};
     pendingUnmatchedDispatchesRef.current = [];
     lastDispatchRef.current = null;
     peerDenialResolvedRef.current = new Set();
     sessionAllowOnceRef.current = new Set();
+    runtimeEventLogRef.current = [];
+    runtimeEventLogSeqRef.current = 0;
   }, []);
 
   /**
@@ -2404,6 +2479,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     peerDenialQueueRef.current = peerDenialQueue;
   }, [peerDenialQueue]);
 
+  // Keep runtimeEventLogRef in lock-step with state so the DEV-only
+  // `window.__debug.runtimeEventLog` getter (and the synthetic-injection
+  // test hook) can read the current buffer without subscribing to
+  // React state.
+  useEffect(() => {
+    runtimeEventLogRef.current = runtimeEventLog;
+  }, [runtimeEventLog]);
+
   // Keep activeProfileRef in lock-step with state so long-lived
   // callbacks (notably `persistPolicyOverrideToProfile`, read by the
   // `[]`-deps BroadcastChannel receive effect) always see the CURRENT
@@ -3028,6 +3111,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       runtimeCompletions,
       runtimeFailures,
       lifecycleEvents,
+      runtimeEventLog,
       signDispatchLog,
       signLifecycleLog,
       pendingDispatchIndex,
@@ -3091,6 +3175,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       runtimeCompletions,
       runtimeFailures,
       lifecycleEvents,
+      runtimeEventLog,
       signDispatchLog,
       signLifecycleLog,
       pendingDispatchIndex,
@@ -3206,6 +3291,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         reason?: string;
       }) => void;
       __iglooTestRestoreNonce?: () => void;
+      __iglooTestInjectEventLogEntries?: (
+        entries: Array<{
+          badge: RuntimeEventLogBadge;
+          source?: RuntimeEventLogSource;
+          payload?: unknown;
+          at?: number;
+        }>,
+      ) => void;
     };
     globalWindow.__appState = value;
     // Initialise the dev-only `__debug` surface once per provider mount.
@@ -3242,8 +3335,37 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           return null;
         }
       },
+      get runtimeEventLog(): RuntimeEventLogEntry[] {
+        // Live getter so every read returns the current buffer snapshot.
+        // Mirrored in `runtimeEventLogRef` by the effect above so callers
+        // do not need to re-render to see the latest state.
+        return runtimeEventLogRef.current;
+      },
     };
     globalWindow.__debug = debugSurface;
+    // Dev-only synthetic injection path used by VAL-EVENTLOG-014 /
+    // VAL-EVENTLOG-024 validators and the Event Log panel Playwright
+    // specs. Each entry is assigned a fresh monotonic `seq` and pushed
+    // through the same cap-enforcement path as real drain output so the
+    // 500-entry cap and FIFO eviction behaviour are identical to the
+    // production code path.
+    globalWindow.__iglooTestInjectEventLogEntries = (entries) => {
+      if (!Array.isArray(entries) || entries.length === 0) return;
+      const now = Date.now();
+      const built: RuntimeEventLogEntry[] = entries.map((entry) => {
+        runtimeEventLogSeqRef.current += 1;
+        return {
+          seq: runtimeEventLogSeqRef.current,
+          at: typeof entry.at === "number" ? entry.at : now,
+          badge: entry.badge,
+          source: entry.source ?? "runtime_event",
+          payload: entry.payload ?? null,
+        };
+      });
+      setRuntimeEventLog((previous) =>
+        appendRuntimeEventLogEntries(previous, built),
+      );
+    };
     globalWindow.__iglooTestSeedRuntime = async (input) => {
       // Fast path: when the caller provides `initial_peer_nonces`, bypass
       // the profile-payload pipeline and boot a `RuntimeClient` directly
@@ -3588,6 +3710,75 @@ function completionRequestId(completion: CompletedOperation): string {
 }
 
 /**
+ * Map a {@link CompletedOperation} discriminant to the typed badge used
+ * by the Event Log panel. `Onboard` falls through to `INFO` because
+ * onboarding has no dedicated Paper colour and the completion is a
+ * lifecycle edge rather than a protocol operation.
+ */
+function badgeForCompletion(
+  completion: CompletedOperation,
+): RuntimeEventLogBadge {
+  if ("Sign" in completion) return "SIGN";
+  if ("Ecdh" in completion) return "ECDH";
+  if ("Ping" in completion) return "PING";
+  return "INFO";
+}
+
+/**
+ * Map a {@link RuntimeEvent.kind} to the typed event-log badge. Accepts
+ * both the PascalCase and snake_case spellings that bifrost-rs may emit
+ * (the type definition includes both) by lower-casing before matching.
+ * Unknown kinds fall through to `INFO` so a forward-compatible runtime
+ * never throws on a newly-introduced event.
+ */
+function badgeForRuntimeEvent(event: RuntimeEvent): RuntimeEventLogBadge {
+  switch (String(event.kind).toLowerCase()) {
+    case "initialized":
+      return "READY";
+    case "statuschanged":
+    case "status_changed":
+      return "SYNC";
+    case "policyupdated":
+    case "policy_updated":
+      return "SIGNER_POLICY";
+    case "commandqueued":
+    case "command_queued":
+      return "INFO";
+    case "inboundaccepted":
+    case "inbound_accepted":
+      return "ECHO";
+    case "configupdated":
+    case "config_updated":
+      return "INFO";
+    case "statewiped":
+    case "state_wiped":
+      return "INFO";
+    default:
+      return "INFO";
+  }
+}
+
+/**
+ * Merge `incoming` entries into `previous` and enforce the
+ * {@link RUNTIME_EVENT_LOG_MAX} cap by FIFO-evicting the oldest entries
+ * when the merged length exceeds the cap. Insertion order of `incoming`
+ * is preserved — callers that drain multiple channels must interleave
+ * in the order they want the UI to render (events / completions /
+ * failures).
+ */
+function appendRuntimeEventLogEntries(
+  previous: RuntimeEventLogEntry[],
+  incoming: RuntimeEventLogEntry[],
+): RuntimeEventLogEntry[] {
+  if (incoming.length === 0) return previous;
+  const merged = previous.concat(incoming);
+  if (merged.length > RUNTIME_EVENT_LOG_MAX) {
+    return merged.slice(merged.length - RUNTIME_EVENT_LOG_MAX);
+  }
+  return merged;
+}
+
+/**
  * Serialise a RuntimeCommand into a deterministic string suitable for
  * identity comparison across dispatch calls. Two semantically-identical
  * commands (same verb + payload) must produce the same string so that the
@@ -3751,6 +3942,14 @@ export interface TestObservabilityDebugSurface {
   relayHistory: RelayHistoryEntry[];
   visibilityHistory: VisibilityHistoryEntry[];
   readonly noncePoolSnapshot: NoncePoolSnapshot | null;
+  /**
+   * Live view of the RuntimeEventLog ring buffer (capped at
+   * {@link RUNTIME_EVENT_LOG_MAX}). Getter-backed so every read returns
+   * the latest snapshot without subscribing to React state — agent-browser
+   * validators that `page.evaluate(() => window.__debug.runtimeEventLog.length)`
+   * always observe the current buffer (VAL-EVENTLOG-012 / VAL-EVENTLOG-014).
+   */
+  readonly runtimeEventLog: RuntimeEventLogEntry[];
 }
 
 // Capacity of the ring buffers. Large enough for a multi-minute agent-browser

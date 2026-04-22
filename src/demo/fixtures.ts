@@ -331,6 +331,7 @@ export function createDemoAppState(
     runtimeCompletions: [],
     runtimeFailures: [],
     lifecycleEvents: [],
+    runtimeEventLog: [],
     signDispatchLog: {},
     signLifecycleLog: [],
     pendingDispatchIndex: {},
