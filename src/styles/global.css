@@ -3170,6 +3170,30 @@ button.peer-policy-chip.deny:focus-visible {
   background: var(--ig-border-soft);
 }
 
+/**
+ * Visible marker appended to active-override rows whose peer is no
+ * longer in the current group roster (VAL-POLICIES-024). Uses the
+ * shared faint text token so the marker reads as metadata rather than
+ * a decision pill, preserving the Paper-reference row layout.
+ */
+.policies-removed-marker {
+  color: var(--ig-faint);
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px dashed var(--ig-border-soft);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.policies-rule-row-removed .policies-method,
+.policies-rule-row-removed .policies-domain {
+  opacity: 0.65;
+}
+
 .policies-permission-badge {
   display: inline-flex;
   align-items: center;
@@ -5767,7 +5791,7 @@ button.peer-policy-chip.deny:focus-visible {
 }
 
 /* ========================================
-   Rotate Share Flow
+   Replace Share Flow
    ======================================== */
 
 /* --- Label row with info tooltip --- */

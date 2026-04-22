@@ -57,47 +57,63 @@ interface RuntimePeerPolicyRow {
 function runtimePeerPolicies(
   peers: PeerStatus[],
   peerPermissionStates: PeerPermissionState[],
+  selfPubkey?: string | null,
 ): RuntimePeerPolicyRow[] {
-  return peerPermissionStates.map((state, fallbackIndex) => {
-    const peer = peers.find((entry) => entry.pubkey === state.pubkey);
-    return {
-      index: peer?.idx ?? fallbackIndex,
-      pubkey: state.pubkey,
-      displayId: shortHex(state.pubkey, 8, 4),
-      permissions: {
-        sign: resolveRequestPolicyAllows(state, "sign"),
-        ecdh: resolveRequestPolicyAllows(state, "ecdh"),
-        ping: resolveRequestPolicyAllows(state, "ping"),
-        onboard: resolveRequestPolicyAllows(state, "onboard"),
-      },
-      overrides: {
-        sign: resolveManualOverrideValue(state, "request", "sign"),
-        ecdh: resolveManualOverrideValue(state, "request", "ecdh"),
-        ping: resolveManualOverrideValue(state, "request", "ping"),
-        onboard: resolveManualOverrideValue(state, "request", "onboard"),
-      },
-    };
-  });
+  const normalizedSelf = selfPubkey?.toLowerCase() ?? null;
+  return peerPermissionStates
+    .filter(
+      (state) =>
+        !normalizedSelf || state.pubkey.toLowerCase() !== normalizedSelf,
+    )
+    .map((state, fallbackIndex) => {
+      const peer = peers.find((entry) => entry.pubkey === state.pubkey);
+      return {
+        index: peer?.idx ?? fallbackIndex,
+        pubkey: state.pubkey,
+        displayId: shortHex(state.pubkey, 8, 4),
+        permissions: {
+          sign: resolveRequestPolicyAllows(state, "sign"),
+          ecdh: resolveRequestPolicyAllows(state, "ecdh"),
+          ping: resolveRequestPolicyAllows(state, "ping"),
+          onboard: resolveRequestPolicyAllows(state, "onboard"),
+        },
+        overrides: {
+          sign: resolveManualOverrideValue(state, "request", "sign"),
+          ecdh: resolveManualOverrideValue(state, "request", "ecdh"),
+          ping: resolveManualOverrideValue(state, "request", "ping"),
+          onboard: resolveManualOverrideValue(state, "request", "onboard"),
+        },
+      };
+    });
 }
 
-function fallbackPeerPolicies(peers: PeerStatus[]): RuntimePeerPolicyRow[] {
-  return peers.map((peer) => ({
-    index: peer.idx,
-    pubkey: peer.pubkey,
-    displayId: shortHex(peer.pubkey, 8, 4),
-    permissions: {
-      sign: peer.can_sign,
-      ecdh: peer.should_send_nonces,
-      ping: peer.online,
-      onboard: false,
-    },
-    overrides: {
-      sign: "unset",
-      ecdh: "unset",
-      ping: "unset",
-      onboard: "unset",
-    },
-  }));
+function fallbackPeerPolicies(
+  peers: PeerStatus[],
+  selfPubkey?: string | null,
+): RuntimePeerPolicyRow[] {
+  const normalizedSelf = selfPubkey?.toLowerCase() ?? null;
+  return peers
+    .filter(
+      (peer) =>
+        !normalizedSelf || peer.pubkey.toLowerCase() !== normalizedSelf,
+    )
+    .map((peer) => ({
+      index: peer.idx,
+      pubkey: peer.pubkey,
+      displayId: shortHex(peer.pubkey, 8, 4),
+      permissions: {
+        sign: peer.can_sign,
+        ecdh: peer.should_send_nonces,
+        ping: peer.online,
+        onboard: false,
+      },
+      overrides: {
+        sign: "unset",
+        ecdh: "unset",
+        ping: "unset",
+        onboard: "unset",
+      },
+    }));
 }
 
 /**
@@ -121,10 +137,20 @@ export function PoliciesState({
   peers,
   peerPermissionStates,
   paperPanels,
+  selfPubkey,
 }: {
   peers: PeerStatus[];
   peerPermissionStates: PeerPermissionState[];
   paperPanels: boolean;
+  /**
+   * x-only hex pubkey of the local (self) signer, surfaced from
+   * `runtime_status.metadata.share_public_key`. Rows targeting this
+   * pubkey are filtered out of both the Peer Policies list and the
+   * active-override rows: the user cannot grant or deny a policy
+   * against their own local signer (VAL-POLICIES-025). Optional for
+   * tests / demo fixtures that predate this wiring.
+   */
+  selfPubkey?: string | null;
 }) {
   // Tolerant destructure — some screen-level tests mock `useAppState`
   // with a minimal fixture that predates these fields; defaulting to
@@ -159,17 +185,38 @@ export function PoliciesState({
   // states. The paper branch rows have no `pubkey` / `overrides` so the
   // two shapes are kept in separate bindings for type safety.
   const paperPeerPolicies = paperPanels ? MOCK_PEER_POLICIES : null;
+  const normalizedSelfPubkey = selfPubkey?.toLowerCase() ?? null;
   const runtimePeerRows: RuntimePeerPolicyRow[] = paperPanels
     ? []
     : peerPermissionStates.length > 0
-      ? runtimePeerPolicies(peers, peerPermissionStates)
-      : fallbackPeerPolicies(peers);
+      ? runtimePeerPolicies(peers, peerPermissionStates, selfPubkey)
+      : fallbackPeerPolicies(peers, selfPubkey);
+  // Set of pubkeys that the Peer Policies surface considers "known" on
+  // the current snapshot. Used below to mark stale override rows whose
+  // peer is no longer part of the group (VAL-POLICIES-024). Treats
+  // `peer_permission_states` and `peers[]` as independent sources so a
+  // peer surfaced by either source is considered present — some early
+  // boot / rehydration ticks populate one before the other.
+  const knownPeerSet = new Set<string>();
+  for (const state of peerPermissionStates) {
+    knownPeerSet.add(state.pubkey.toLowerCase());
+  }
+  for (const peer of peers) {
+    knownPeerSet.add(peer.pubkey.toLowerCase());
+  }
   // Stable display order — newest overrides at the top so the user sees
   // what they most recently set without scrolling. `policyOverrides` is
   // already keyed on (peer, direction, method); we only need a sort.
-  const overrideRows: PolicyOverrideEntry[] = [...policyOverrides].sort(
-    (a, b) => b.createdAt - a.createdAt,
-  );
+  // Self-peer overrides are filtered out entirely (VAL-POLICIES-025);
+  // overrides targeting removed peers are retained so the user can
+  // sweep them via the Remove control (VAL-POLICIES-024).
+  const overrideRows: PolicyOverrideEntry[] = [...policyOverrides]
+    .filter(
+      (entry) =>
+        !normalizedSelfPubkey ||
+        entry.peer.toLowerCase() !== normalizedSelfPubkey,
+    )
+    .sort((a, b) => b.createdAt - a.createdAt);
 
   async function handleRemoveOverride(entry: PolicyOverrideEntry) {
     setRemovalError(null);
@@ -213,9 +260,15 @@ export function PoliciesState({
               const label = peerDisplayLabel(entry.peer, peers);
               const pill = resolveDecisionPill(entry);
               const rowKey = `${entry.peer}:${entry.direction}.${entry.method}`;
+              const peerRemoved = !knownPeerSet.has(
+                entry.peer.toLowerCase(),
+              );
+              const rowClassName = peerRemoved
+                ? "policies-rule-row policies-rule-row-removed"
+                : "policies-rule-row";
               return (
                 <div
-                  className="policies-rule-row"
+                  className={rowClassName}
                   key={rowKey}
                   data-testid="policy-override-row"
                   data-override-peer={entry.peer}
@@ -223,11 +276,20 @@ export function PoliciesState({
                   data-override-direction={entry.direction}
                   data-override-source={entry.source}
                   data-override-value={entry.value}
+                  data-peer-removed={peerRemoved ? "true" : undefined}
                 >
                   <span className="policies-method">
                     {entry.method.toUpperCase()}
                   </span>
                   <span className="policies-domain">{label.shortId}</span>
+                  {peerRemoved ? (
+                    <span
+                      className="policies-removed-marker"
+                      title="This peer is no longer in the current group roster."
+                    >
+                      Removed
+                    </span>
+                  ) : null}
                   <span className="policies-rule-divider" />
                   <span
                     className={`policies-permission-badge ${pill.className}`}

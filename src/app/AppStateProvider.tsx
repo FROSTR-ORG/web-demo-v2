@@ -841,6 +841,32 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           "Cannot dispatch policy override: no runtime is active.",
         );
       }
+      // VAL-POLICIES-025: reject self-peer overrides at the bridge
+      // layer so a caller bypassing the Peer Policies UI (e.g. a
+      // dev-tools script) cannot sneak a self-override into the
+      // runtime. `share_public_key` is the x-only local pubkey — the
+      // same format used for peer pubkeys — so a case-insensitive
+      // equality check suffices.
+      try {
+        const metadata = runtime.runtimeStatus()?.metadata;
+        const selfPubkey = metadata?.share_public_key?.toLowerCase();
+        if (selfPubkey && input.peer.toLowerCase() === selfPubkey) {
+          throw new Error(
+            "Cannot set a policy override targeting the local (self) pubkey.",
+          );
+        }
+      } catch (error) {
+        // Let the self-peer guard above throw through; other errors
+        // (e.g. runtime not yet initialised) should not block the
+        // dispatch — the underlying setPolicyOverride will surface
+        // its own errors.
+        if (
+          error instanceof Error &&
+          error.message.includes("Cannot set a policy override targeting the local")
+        ) {
+          throw error;
+        }
+      }
       runtime.setPolicyOverride(input);
     },
     [],

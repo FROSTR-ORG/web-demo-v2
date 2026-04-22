@@ -716,6 +716,7 @@ export function DashboardScreen() {
             peers={runtimeStatus.peers}
             peerPermissionStates={runtimeStatus.peer_permission_states ?? []}
             paperPanels={paperPanels}
+            selfPubkey={runtimeStatus.metadata.share_public_key}
           />
         ) : (
           <>

@@ -63,7 +63,12 @@ const fakeProfile = {
 };
 
 const fakeRuntimeStatus = {
-  metadata: { member_idx: 0, share_public_key: "02a3f8c2d1e2f3a4b5c6d7e8f9a0b1c28f2c4a" },
+  // Distinct from every peer pubkey below — the self-peer exclusion
+  // (VAL-POLICIES-025) filters any peers[] entry whose pubkey equals
+  // `metadata.share_public_key`, so pretending share_public_key ===
+  // peers[0] (the pre-m3-policy-denial fixture) would silently drop
+  // one row from the rendered Peer Policies list.
+  metadata: { member_idx: 0, share_public_key: "01f0000000000000000000000000000000000000000000000000000000000000" },
   readiness: {
     runtime_ready: true,
     degraded_reasons: [],
