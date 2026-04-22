@@ -1,0 +1,80 @@
+{
+  "groupId": "g5-val-cross-009-r2",
+  "testedAt": "2026-04-22T19:38:35.645329+00:00",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "assertionIds": ["VAL-CROSS-009"],
+    "agentBrowserSession": "7904251d35a0__u1"
+  },
+  "toolsUsed": ["agent-browser", "ripgrep"],
+  "assertionResults": [
+    {
+      "id": "VAL-CROSS-009",
+      "title": "Terminology migration: \"Rotate Share\" → \"Replace Share\"",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /demo and run DOM text sweep with case-insensitive rotate/replace checks",
+          "expected": "No rendered \"Rotate Share\" text and at least one rendered \"Replace Share\" occurrence",
+          "observed": "rotateShareCount=0; replaceShareCount=5; hasReplaceShare=true"
+        },
+        {
+          "action": "Open /demo/replace-share-enter-package?chrome=0 and run DOM text sweep",
+          "expected": "No rendered \"Rotate Share\" text and visible \"Replace Share\" label on replace-share scenario",
+          "observed": "rotateShareCount=0; replaceShareCount=1; hasReplaceShare=true"
+        },
+        {
+          "action": "Open /replace-share and run DOM text sweep",
+          "expected": "No rendered \"Rotate Share\" text and \"Replace Share\" present on user-facing route",
+          "observed": "rotateShareCount=0; replaceShareCount=2; hasReplaceShare=true"
+        },
+        {
+          "action": "Run strict source grep: rg -n \"Rotate Share\" src/",
+          "expected": "Zero source matches",
+          "observed": "No output lines; grep output file is empty; rg exit code=1 (no matches)"
+        },
+        {
+          "action": "Run optional supporting grep: rg -in \"rotate[-_ ]?share\" src/",
+          "expected": "Zero source matches for rotate-share variants",
+          "observed": "No output lines; grep output file is empty; rg exit code=1 (no matches)"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m5-settings/g5-val-cross-009-r2/VAL-CROSS-009-demo-index-annotated.png",
+          "m5-settings/g5-val-cross-009-r2/VAL-CROSS-009-demo-replace-share-enter-package-annotated.png",
+          "m5-settings/g5-val-cross-009-r2/VAL-CROSS-009-route-replace-share-annotated.png"
+        ],
+        "domSweepReports": [
+          "m5-settings/g5-val-cross-009-r2/VAL-CROSS-009-demo-index-text-sweep.json",
+          "m5-settings/g5-val-cross-009-r2/VAL-CROSS-009-demo-replace-share-enter-package-text-sweep.json",
+          "m5-settings/g5-val-cross-009-r2/VAL-CROSS-009-route-replace-share-text-sweep.json"
+        ],
+        "consoleErrors": {
+          "perRoute": [
+            "m5-settings/g5-val-cross-009-r2/VAL-CROSS-009-demo-index-console-errors.txt",
+            "m5-settings/g5-val-cross-009-r2/VAL-CROSS-009-demo-replace-share-enter-package-console-errors.txt",
+            "m5-settings/g5-val-cross-009-r2/VAL-CROSS-009-route-replace-share-console-errors.txt"
+          ],
+          "finalSummary": "m5-settings/g5-val-cross-009-r2/VAL-CROSS-009-console-errors-final.json"
+        },
+        "network": "m5-settings/g5-val-cross-009-r2/VAL-CROSS-009-network-requests.json",
+        "sourceGrep": {
+          "command": "rg -n \"Rotate Share\" src/",
+          "output": "m5-settings/g5-val-cross-009-r2/VAL-CROSS-009-rg-rotate-share-src.txt",
+          "exitCode": "m5-settings/g5-val-cross-009-r2/VAL-CROSS-009-rg-rotate-share-src-exit.txt"
+        },
+        "supportingSourceGrep": {
+          "command": "rg -in \"rotate[-_ ]?share\" src/",
+          "output": "m5-settings/g5-val-cross-009-r2/VAL-CROSS-009-rg-rotate-variant-src.txt",
+          "exitCode": "m5-settings/g5-val-cross-009-r2/VAL-CROSS-009-rg-rotate-variant-src-exit.txt"
+        }
+      },
+      "issues": null
+    }
+  ],
+  "summary": "VAL-CROSS-009 retest passed: DOM sweeps across /demo, /demo/replace-share-enter-package, and /replace-share found zero case-insensitive \"Rotate Share\" and confirmed \"Replace Share\" presence; strict source grep `rg -n \"Rotate Share\" src/` returned zero lines.",
+  "blockers": [],
+  "frictions": []
+}
