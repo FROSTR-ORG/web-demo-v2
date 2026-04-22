@@ -49,12 +49,21 @@ afterEach(() => {
   cleanup();
 });
 
+/* Real checksum-valid nsec strings (produced by bifrost_bridge_wasm::
+ * generate_nsec). Structural validation in CreateKeysetScreen now runs
+ * a bech32 decode, so test fixtures MUST be valid nsec1 bech32 rather
+ * than the synthesized-looking `nsec1pastedtestkey00…` placeholders. */
+const VALID_NSEC_A =
+  "nsec12tfx8l4x0pf3pug57hj2mvek32nr9za6lwwm08u7sqmndxpmrm4s7eetqs";
+const VALID_NSEC_B =
+  "nsec1m52qt8wg8fz0rr5h08s5eur84k0xnhnz2vwzekscvhdx2pf02r3sl43fjq";
+
 beforeEach(() => {
   mocks.navigate.mockClear();
   mocks.createKeyset.mockClear();
   mocks.generateNsec.mockReset();
   mocks.generateNsec.mockResolvedValue({
-    nsec: "nsec1generatedtestkey0000000000000000000000000000000000000000000000",
+    nsec: VALID_NSEC_B,
     signing_key_hex: "a".repeat(64),
   });
   mocks.createSession = null;
@@ -77,7 +86,7 @@ describe("CreateKeysetScreen", () => {
     expect(screen.getByRole("button", { name: "Create Keyset" })).toBeInTheDocument();
   });
 
-  it("blocks invalid nsec format and allows valid existing nsec", async () => {
+  it("blocks non-nsec prefix input with the 'must start with nsec1' error", async () => {
     render(
       <MemoryRouter>
         <CreateKeysetScreen />
@@ -97,14 +106,133 @@ describe("CreateKeysetScreen", () => {
     });
 
     expect(nsecInput).toHaveClass("input-error");
+    expect(mocks.createKeyset).not.toHaveBeenCalled();
+  });
 
-    // Valid existing nsec clears the error
-    fireEvent.change(nsecInput, { target: { value: "nsec1validkey123" } });
+  it("blocks structurally malformed nsec1 input with the 'full secret key' error (fix-m6-nsec-structural-validation)", async () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    );
+
+    // `nsec1abc` has the correct prefix but fails bech32 structural
+    // validation (too short, bad checksum). Under the pre-fix behaviour
+    // this would slip past input validation and fail later inside
+    // createKeyset as a generic top-level error. The structural
+    // validator must now block it inline with the more precise copy.
+    fireEvent.change(nsecInput, { target: { value: "nsec1abc" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
+
     await waitFor(() => {
+      expect(
+        screen.getByText(
+          "Invalid nsec — check that you pasted the full secret key.",
+        ),
+      ).toBeInTheDocument();
+    });
+    expect(nsecInput).toHaveClass("input-error");
+    expect(mocks.createKeyset).not.toHaveBeenCalled();
+  });
+
+  it("also blocks 'nsec1' followed by non-bech32 garbage with the structural-error copy", async () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    );
+    fireEvent.change(nsecInput, { target: { value: "nsec1invalid" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "Invalid nsec — check that you pasted the full secret key.",
+        ),
+      ).toBeInTheDocument();
+    });
+    expect(mocks.createKeyset).not.toHaveBeenCalled();
+  });
+
+  it("clears the inline error once the input becomes a valid nsec1", async () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    );
+    fireEvent.change(nsecInput, { target: { value: "nsec1abc" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "Invalid nsec — check that you pasted the full secret key.",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.change(nsecInput, { target: { value: VALID_NSEC_A } });
+    await waitFor(() => {
+      expect(
+        screen.queryByText(
+          "Invalid nsec — check that you pasted the full secret key.",
+        ),
+      ).not.toBeInTheDocument();
       expect(
         screen.queryByText("Invalid nsec format — must start with nsec1."),
       ).not.toBeInTheDocument();
     });
+  });
+
+  it("does not leak any part of the rejected nsec into console output", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      render(
+        <MemoryRouter>
+          <CreateKeysetScreen />
+        </MemoryRouter>,
+      );
+      const nsecInput = screen.getByPlaceholderText(
+        "Paste your existing nsec or generate a new one",
+      );
+      fireEvent.change(nsecInput, {
+        target: { value: "nsec1leakycanaryvaluexyz" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
+      await waitFor(() => {
+        expect(
+          screen.getByText(
+            "Invalid nsec — check that you pasted the full secret key.",
+          ),
+        ).toBeInTheDocument();
+      });
+      const allArgs = [
+        ...consoleSpy.mock.calls.flat(),
+        ...logSpy.mock.calls.flat(),
+        ...warnSpy.mock.calls.flat(),
+      ];
+      for (const arg of allArgs) {
+        expect(String(arg)).not.toContain("leakycanaryvalue");
+      }
+    } finally {
+      consoleSpy.mockRestore();
+      logSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 
   it("navigates to /create/progress on valid submission", async () => {
@@ -130,8 +258,7 @@ describe("CreateKeysetScreen", () => {
   });
 
   it("generates a real nsec into the same input field", async () => {
-    const generated =
-      "nsec1generatedtestkey0000000000000000000000000000000000000000000000";
+    const generated = VALID_NSEC_B;
 
     render(
       <MemoryRouter>
@@ -157,8 +284,7 @@ describe("CreateKeysetScreen", () => {
   });
 
   it("submits a generated nsec without storing it in the create draft", async () => {
-    const generated =
-      "nsec1generatedtestkey0000000000000000000000000000000000000000000000";
+    const generated = VALID_NSEC_B;
 
     render(
       <MemoryRouter>
@@ -342,8 +468,7 @@ describe("CreateKeysetScreen", () => {
   });
 
   it("dispatches createKeyset with existingNsec when a valid nsec is pasted (VAL-BACKUP-020)", async () => {
-    const pasted =
-      "nsec1pastedtestkey000000000000000000000000000000000000000000000000";
+    const pasted = VALID_NSEC_A;
 
     render(
       <MemoryRouter>
@@ -368,8 +493,7 @@ describe("CreateKeysetScreen", () => {
   });
 
   it("trims whitespace/newlines from pasted nsec before validation (VAL-BACKUP-028)", async () => {
-    const pasted =
-      "nsec1pastedtestkey000000000000000000000000000000000000000000000000";
+    const pasted = VALID_NSEC_A;
 
     render(
       <MemoryRouter>
@@ -426,8 +550,7 @@ describe("CreateKeysetScreen", () => {
       </MemoryRouter>,
     );
 
-    const pasted =
-      "nsec1pastedtestkey000000000000000000000000000000000000000000000000";
+    const pasted = VALID_NSEC_A;
     const nsecInput = screen.getByPlaceholderText(
       "Paste your existing nsec or generate a new one",
     );

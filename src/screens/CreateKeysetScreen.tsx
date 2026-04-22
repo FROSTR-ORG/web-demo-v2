@@ -14,6 +14,7 @@ import { ThresholdSelector } from "../components/ThresholdSelector";
 import { useDemoUi } from "../demo/demoUi";
 import { generateNsec } from "../lib/bifrost/packageService";
 import type { GeneratedNsecResult } from "../lib/bifrost/types";
+import { isValidNsec } from "../lib/nsec/validateNsec";
 
 export function CreateKeysetScreen() {
   const navigate = useNavigate();
@@ -84,9 +85,21 @@ export function CreateKeysetScreen() {
       errors.groupName = "Keyset name is required.";
     }
     const generatedValue = generatedNsec?.nsec ?? "";
-    const isExistingNsec = nsec.trim() && nsec.trim() !== generatedValue;
-    if (isExistingNsec && !nsec.trim().startsWith("nsec1")) {
-      errors.nsec = "Invalid nsec format — must start with nsec1.";
+    const trimmedNsec = nsec.trim();
+    const isExistingNsec = trimmedNsec.length > 0 && trimmedNsec !== generatedValue;
+    if (isExistingNsec) {
+      // Two-tier validation: the "must start with nsec1." copy is
+      // preserved for non-nsec prefixes (the typical "I pasted the
+      // wrong thing" case). Inputs that LOOK like an nsec but fail
+      // bech32 structural validation get a more precise message that
+      // hints at truncation / bad paste rather than wrong format.
+      // NEVER log any part of `trimmedNsec` — structural failures must
+      // not leak the pasted value to console / storage.
+      if (!trimmedNsec.toLowerCase().startsWith("nsec1")) {
+        errors.nsec = "Invalid nsec format — must start with nsec1.";
+      } else if (!isValidNsec(trimmedNsec)) {
+        errors.nsec = "Invalid nsec — check that you pasted the full secret key.";
+      }
     }
 
     if (Object.keys(errors).length > 0) {
@@ -102,7 +115,7 @@ export function CreateKeysetScreen() {
         threshold,
         count,
         generatedNsec: generatedNsec?.nsec,
-        existingNsec: isExistingNsec ? nsec.trim() : undefined,
+        existingNsec: isExistingNsec ? trimmedNsec : undefined,
       });
       // Scrub any revealed nsec from component state and the DOM before
       // navigating away (VAL-BACKUP-023 / VAL-BACKUP-029).
