@@ -1,0 +1,117 @@
+import type { StoredProfileRecord, StoredProfileSummary } from "../bifrost/types";
+
+/**
+ * m5-idb-migration — forward-only IndexedDB schema migration.
+ *
+ * Records written by prior-mission builds may be missing fields that the
+ * current UI expects (notably `createdAt` / `updatedAt`, which were
+ * introduced in m5-group-profile-metadata; and in the most defensive
+ * case, other structural fields). This module centralises a pure
+ * migration function `migrateProfileRecord` that:
+ *
+ *   1. Preserves every field present on the legacy record.
+ *   2. Fills in sensible defaults for absent fields so SettingsSidebar
+ *      and `AppStateProvider.activeProfile` can render name, relays,
+ *      and timestamps without throwing or leaking hardcoded fallbacks
+ *      (see VAL-SETTINGS-008 for the rendered "Updated" field).
+ *   3. Returns `null` for records missing the structural spine
+ *      (`summary.id` or `encryptedProfilePackage`), allowing
+ *      `listProfiles` to sweep orphan index entries that no longer
+ *      have a loadable body.
+ *
+ * The migration is deliberately lossless for known fields and
+ * idempotent — migrating an already-migrated record is a no-op.
+ */
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function asString(value: unknown, fallback: string): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function asNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string");
+}
+
+function migrateSummary(
+  raw: Record<string, unknown>,
+  now: number,
+): StoredProfileSummary | null {
+  const id = asString(raw.id, "");
+  if (id.length === 0) {
+    return null;
+  }
+
+  // Timestamp chain: prefer explicit fields; if one is missing, fall
+  // back to the nearest sibling so the "Updated" cell doesn't flip to
+  // Date.now() on every read of a legacy record. `Date.now()` is the
+  // absolute fallback for a truly pristine pre-timestamps record.
+  const explicitCreatedAt = asNumber(raw.createdAt, Number.NaN);
+  const explicitUpdatedAt = asNumber(raw.updatedAt, Number.NaN);
+  const explicitLastUsedAt = asNumber(raw.lastUsedAt, Number.NaN);
+
+  const createdAt = Number.isFinite(explicitCreatedAt)
+    ? explicitCreatedAt
+    : Number.isFinite(explicitLastUsedAt)
+      ? explicitLastUsedAt
+      : Number.isFinite(explicitUpdatedAt)
+        ? explicitUpdatedAt
+        : now;
+
+  const updatedAt = Number.isFinite(explicitUpdatedAt)
+    ? explicitUpdatedAt
+    : createdAt;
+
+  const lastUsedAt = Number.isFinite(explicitLastUsedAt)
+    ? explicitLastUsedAt
+    : createdAt;
+
+  return {
+    id,
+    label: asString(raw.label, ""),
+    deviceName: asString(raw.deviceName, ""),
+    groupName: asString(raw.groupName, ""),
+    threshold: asNumber(raw.threshold, 0),
+    memberCount: asNumber(raw.memberCount, 0),
+    localShareIdx: asNumber(raw.localShareIdx, 0),
+    groupPublicKey: asString(raw.groupPublicKey, ""),
+    relays: asStringArray(raw.relays),
+    createdAt,
+    updatedAt,
+    lastUsedAt,
+  };
+}
+
+/**
+ * Migrate a raw IDB value into the current `StoredProfileRecord` shape.
+ * Returns `null` if the value cannot be coerced into a loadable record
+ * (missing id or encrypted package) — callers should treat `null` as an
+ * orphan and skip it.
+ */
+export function migrateProfileRecord(raw: unknown): StoredProfileRecord | null {
+  if (!isPlainObject(raw)) return null;
+
+  const rawSummary = raw.summary;
+  if (!isPlainObject(rawSummary)) return null;
+
+  const encryptedProfilePackage = raw.encryptedProfilePackage;
+  if (typeof encryptedProfilePackage !== "string" || encryptedProfilePackage.length === 0) {
+    return null;
+  }
+
+  const now = Date.now();
+  const summary = migrateSummary(rawSummary, now);
+  if (!summary) return null;
+
+  return {
+    summary,
+    encryptedProfilePackage,
+  };
+}

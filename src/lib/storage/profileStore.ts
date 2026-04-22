@@ -1,6 +1,7 @@
 import { del, get, set } from "idb-keyval";
 import { assertNoRawShareMaterial } from "../bifrost/format";
 import type { StoredProfileRecord, StoredProfileSummary } from "../bifrost/types";
+import { migrateProfileRecord } from "./profileMigration";
 
 const PROFILE_INDEX_KEY = "igloo.web-demo-v2.profile-index";
 const PROFILE_RECORD_PREFIX = "igloo.web-demo-v2.profile.";
@@ -13,38 +14,36 @@ async function setProfileIds(ids: string[]): Promise<void> {
   await set(PROFILE_INDEX_KEY, Array.from(new Set(ids)));
 }
 
-/**
- * Backfill `summary.updatedAt` from `summary.createdAt` when a record
- * was written before the field existed. Pure function — safe to call
- * every read. See VAL-SETTINGS-008 for the rendered "Updated" field
- * that sources this timestamp.
- */
-function withUpdatedAt(record: StoredProfileRecord): StoredProfileRecord {
-  if (typeof record.summary.updatedAt === "number") {
-    return record;
-  }
-  return {
-    ...record,
-    summary: {
-      ...record.summary,
-      updatedAt: record.summary.createdAt
-    }
-  };
-}
-
 export async function listProfiles(): Promise<StoredProfileSummary[]> {
   const ids = await profileIds();
   const records = await Promise.all(ids.map((id) => getProfile(id)));
-  return records
-    .filter((record): record is StoredProfileRecord => Boolean(record))
+  // m5-idb-migration: any index entry whose record is missing or
+  // unreadable (orphan) is filtered out here AND swept from the index
+  // so `listProfiles` → welcome UI never surfaces a phantom profile.
+  const liveRecords: StoredProfileRecord[] = [];
+  const liveIds: string[] = [];
+  for (let i = 0; i < ids.length; i += 1) {
+    const record = records[i];
+    if (record) {
+      liveRecords.push(record);
+      liveIds.push(ids[i]);
+    }
+  }
+  if (liveIds.length !== ids.length) {
+    await setProfileIds(liveIds);
+  }
+  return liveRecords
     .map((record) => record.summary)
     .sort((a, b) => b.lastUsedAt - a.lastUsedAt);
 }
 
 export async function getProfile(id: string): Promise<StoredProfileRecord | null> {
-  const record = await get<StoredProfileRecord>(`${PROFILE_RECORD_PREFIX}${id}`);
+  const record = await get<unknown>(`${PROFILE_RECORD_PREFIX}${id}`);
   if (!record) return null;
-  return withUpdatedAt(record);
+  // m5-idb-migration: legacy records (pre-createdAt/updatedAt, partial
+  // device/relay shape) are upgraded to the current shape on read. See
+  // `./profileMigration.ts` for the migration contract.
+  return migrateProfileRecord(record);
 }
 
 export async function saveProfile(record: StoredProfileRecord): Promise<void> {
