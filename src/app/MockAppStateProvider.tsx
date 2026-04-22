@@ -529,6 +529,10 @@ export function MockAppStateProvider({
     setSignDispatchLog({});
     setSignLifecycleLog([]);
     setPendingDispatchIndex({});
+    // Match real AppStateProvider semantics (VAL-EVENTLOG-016): flush the
+    // dashboard event-log ring buffer so no stale rows bleed across a
+    // lock/unlock cycle in demo / mock-backed flows.
+    setRuntimeEventLog([]);
   }, [value]);
 
   const clearCredentials = useCallback(async () => {
@@ -550,6 +554,10 @@ export function MockAppStateProvider({
     setSignDispatchLog({});
     setSignLifecycleLog([]);
     setPendingDispatchIndex({});
+    // Match real AppStateProvider semantics (VAL-EVENTLOG-016): flush the
+    // dashboard event-log ring buffer so no stale rows bleed across a
+    // clear-credentials reset in demo / mock-backed flows.
+    setRuntimeEventLog([]);
   }, [value]);
 
   const setSignerPaused = useCallback(
