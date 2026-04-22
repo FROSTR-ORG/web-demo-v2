@@ -260,6 +260,49 @@ describe("migrateProfileRecord — legacy profile shape → current shape", () =
     expect(legacy).toEqual(frozenInput);
   });
 
+  it(
+    "preserves forward-compat unknown summary fields through migration (scrutiny m5 r1)",
+    () => {
+      // A record written by a NEWER build than the current one may
+      // include summary keys we don't know about yet. The migration
+      // must preserve them verbatim so a subsequent save round-trips
+      // the data rather than silently discarding it.
+      const legacyWithFutureField = {
+        summary: {
+          id: "profile-forward",
+          label: "Forward Compat",
+          deviceName: "Future Laptop",
+          groupName: "Forward Compat",
+          threshold: 2,
+          memberCount: 3,
+          localShareIdx: 1,
+          groupPublicKey: "02ffff",
+          relays: ["wss://relay.primal.net"],
+          createdAt: 1_680_000_000_000,
+          updatedAt: 1_685_000_000_000,
+          lastUsedAt: 1_685_000_000_000,
+          // Unknown forward-compat fields:
+          foo: "bar",
+          featureFlags: { signAnimations: true },
+        },
+        encryptedProfilePackage: "bfprofile1forward",
+      };
+      const migrated = migrateProfileRecord(legacyWithFutureField);
+      expect(migrated).not.toBeNull();
+      // Unknown fields survived the round-trip.
+      const migratedSummary = migrated!.summary as unknown as Record<string, unknown>;
+      expect(migratedSummary.foo).toBe("bar");
+      expect(migratedSummary.featureFlags).toEqual({ signAnimations: true });
+      // Canonical / required fields still populated with their
+      // coerced / defaulted values.
+      expect(migrated!.summary.id).toBe("profile-forward");
+      expect(migrated!.summary.deviceName).toBe("Future Laptop");
+      expect(migrated!.summary.createdAt).toBe(1_680_000_000_000);
+      expect(migrated!.summary.updatedAt).toBe(1_685_000_000_000);
+      expect(migrated!.encryptedProfilePackage).toBe("bfprofile1forward");
+    },
+  );
+
   it("is idempotent: migrating an already-migrated record is a no-op", () => {
     const legacy = {
       summary: {

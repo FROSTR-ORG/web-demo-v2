@@ -73,7 +73,14 @@ function migrateSummary(
     ? explicitLastUsedAt
     : createdAt;
 
+  // Spread the raw summary FIRST so any forward-compat unknown fields
+  // (written by a newer build) survive the migration. Canonical fields
+  // are then overwritten with their validated / coerced values so the
+  // defaults-on-missing semantics still hold. Scrutiny m5 r1 flagged
+  // the previous whitelist-only reconstruction as silently dropping
+  // these unknown keys.
   return {
+    ...raw,
     id,
     label: asString(raw.label, ""),
     deviceName: asString(raw.deviceName, ""),
