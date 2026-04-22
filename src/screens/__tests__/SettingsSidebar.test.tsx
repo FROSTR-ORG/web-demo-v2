@@ -5,6 +5,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const mockLockProfile = vi.fn();
 const mockClearCredentials = vi.fn(() => Promise.resolve());
 const mockRefreshRuntime = vi.fn();
+const mockUpdateProfileName = vi.fn((name: string) => {
+  // Mirror the MockAppStateProvider behavior: update the live activeProfile
+  // object so the sidebar's `persistedDeviceName` (sourced from activeProfile)
+  // reflects the write without a full context re-wire.
+  fakeProfile.deviceName = name.trim();
+  return Promise.resolve();
+});
 
 const fakeProfile = {
   id: "test-profile-id",
@@ -69,6 +76,8 @@ vi.mock("../../app/AppState", () => ({
     clearCredentials: mockClearCredentials,
     setSignerPaused: vi.fn(),
     refreshRuntime: mockRefreshRuntime,
+    updateProfileName: mockUpdateProfileName,
+    changeProfilePassword: vi.fn(() => Promise.resolve()),
   }),
 }));
 
@@ -78,6 +87,10 @@ afterEach(() => {
   cleanup();
   mockLockProfile.mockClear();
   mockClearCredentials.mockClear();
+  mockUpdateProfileName.mockClear();
+  // Reset the shared profile so the mutable `deviceName` used by the
+  // inline edit tests below does not leak into the next test.
+  fakeProfile.deviceName = "Igloo Web";
 });
 
 function renderDashboard() {
@@ -198,7 +211,7 @@ describe("Settings Sidebar", () => {
     expect(screen.getByText("wss://nos.lol")).toBeInTheDocument();
   });
 
-  it("edits the profile name inline and opens the Export Share flow", () => {
+  it("edits the profile name inline and opens the Export Share flow", async () => {
     renderDashboard();
     fireEvent.click(screen.getByLabelText("Settings"));
 
@@ -206,8 +219,10 @@ describe("Settings Sidebar", () => {
     const nameInput = screen.getByLabelText("Profile Name") as HTMLInputElement;
     fireEvent.change(nameInput, { target: { value: "Igloo Desk" } });
     fireEvent.keyDown(nameInput, { key: "Enter" });
-    fireEvent.blur(nameInput);
-    expect(screen.getByText("Igloo Desk")).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(mockUpdateProfileName).toHaveBeenCalledWith("Igloo Desk");
+      expect(screen.getByText("Igloo Desk")).toBeInTheDocument();
+    });
 
     const exportShareRow = screen.getByText("Export Share").closest(".settings-action-row");
     expect(exportShareRow).not.toBeNull();

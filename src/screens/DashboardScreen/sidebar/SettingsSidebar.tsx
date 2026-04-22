@@ -1,8 +1,18 @@
 import { X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppState } from "../../../app/AppState";
+import { PROFILE_NAME_MAX_LENGTH } from "../../../app/AppStateTypes";
 import { paperGroupKey } from "../mocks";
+
+/**
+ * Human-readable inline validation messages shown by the Profile Name
+ * edit flow (VAL-SETTINGS-002 / VAL-SETTINGS-025). Exported so component
+ * tests can assert on the exact strings without re-hardcoding them.
+ */
+export const PROFILE_NAME_EMPTY_ERROR = "Name cannot be empty.";
+export const PROFILE_NAME_TOO_LONG_ERROR = `Name must be at most ${PROFILE_NAME_MAX_LENGTH} characters.`;
+export { PROFILE_NAME_MAX_LENGTH };
 
 interface SettingsSidebarProps {
   profile: { groupName: string; deviceName: string };
@@ -40,21 +50,99 @@ export function SettingsSidebar({
   onExportShare,
 }: SettingsSidebarProps) {
   const navigate = useNavigate();
-  const { changeProfilePassword } = useAppState();
+  const { activeProfile, changeProfilePassword, updateProfileName } =
+    useAppState();
   const [relays, setRelays] = useState(() =>
     initialRelays.includes(PAPER_SIDEBAR_RELAY)
       ? initialRelays
       : [...initialRelays, PAPER_SIDEBAR_RELAY]
   );
   const [newRelay, setNewRelay] = useState("");
-  const [deviceName, setDeviceName] = useState(profile.deviceName);
+  // Source-of-truth for the rendered profile name: prefer the live
+  // activeProfile (which is mutated by updateProfileName after a successful
+  // IndexedDB write) and fall back to the prop that the Dashboard threads
+  // through before the context has hydrated.
+  const persistedDeviceName = activeProfile?.deviceName ?? profile.deviceName;
+  const [draftDeviceName, setDraftDeviceName] = useState(persistedDeviceName);
   const [editingDeviceName, setEditingDeviceName] = useState(false);
+  const [deviceNameError, setDeviceNameError] = useState("");
+  const [savingDeviceName, setSavingDeviceName] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
+
+  // Keep the draft in sync with the persisted name whenever the user is
+  // NOT actively editing. Without this, a rename persisted from another
+  // surface (e.g. a different tab, a profile import) would leave the
+  // sidebar showing a stale value until the user opened the field.
+  useEffect(() => {
+    if (!editingDeviceName) {
+      setDraftDeviceName(persistedDeviceName);
+    }
+  }, [persistedDeviceName, editingDeviceName]);
+
+  // Re-validate the current draft whenever it changes so the inline
+  // error + disabled-save state reflect the typed value without waiting
+  // for a click.
+  const trimmedDraft = draftDeviceName.trim();
+  const draftValidationError = (() => {
+    if (trimmedDraft.length === 0) return PROFILE_NAME_EMPTY_ERROR;
+    if (trimmedDraft.length > PROFILE_NAME_MAX_LENGTH)
+      return PROFILE_NAME_TOO_LONG_ERROR;
+    return "";
+  })();
+  // Surface whichever error applies — persistence errors take priority
+  // over live validation messages, but validation takes priority over an
+  // empty "no message yet" state so an invalid draft never silently
+  // leaves Save disabled with no explanation.
+  const inlineNameError = deviceNameError || draftValidationError;
+  const saveDeviceNameDisabled =
+    savingDeviceName || draftValidationError.length > 0;
+
+  function beginEditDeviceName() {
+    setDraftDeviceName(persistedDeviceName);
+    setDeviceNameError("");
+    setEditingDeviceName(true);
+  }
+
+  function cancelEditDeviceName() {
+    setDraftDeviceName(persistedDeviceName);
+    setDeviceNameError("");
+    setEditingDeviceName(false);
+  }
+
+  async function saveDeviceName() {
+    const next = draftDeviceName.trim();
+    if (next.length === 0) {
+      setDeviceNameError(PROFILE_NAME_EMPTY_ERROR);
+      return;
+    }
+    if (next.length > PROFILE_NAME_MAX_LENGTH) {
+      setDeviceNameError(PROFILE_NAME_TOO_LONG_ERROR);
+      return;
+    }
+    if (!updateProfileName) {
+      setDeviceNameError(
+        "Unable to persist profile name: feature unavailable.",
+      );
+      return;
+    }
+    try {
+      setSavingDeviceName(true);
+      setDeviceNameError("");
+      await updateProfileName(next);
+      setEditingDeviceName(false);
+    } catch (err) {
+      setDeviceNameError(
+        err instanceof Error ? err.message : "Unable to save profile name.",
+      );
+    } finally {
+      setSavingDeviceName(false);
+    }
+  }
 
   async function handleChangePassword() {
     setPasswordError("");
@@ -146,36 +234,69 @@ export function SettingsSidebar({
                     <input
                       className="settings-inline-input"
                       aria-label="Profile Name"
-                      value={deviceName}
-                      onChange={(event) => setDeviceName(event.target.value)}
-                      onBlur={() => {
-                        if (!deviceName.trim()) setDeviceName(profile.deviceName);
-                        setEditingDeviceName(false);
+                      value={draftDeviceName}
+                      maxLength={PROFILE_NAME_MAX_LENGTH}
+                      onChange={(event) => {
+                        setDraftDeviceName(event.target.value);
+                        if (deviceNameError) {
+                          setDeviceNameError("");
+                        }
                       }}
                       onKeyDown={(event) => {
                         if (event.key === "Enter") {
-                          event.currentTarget.blur();
+                          event.preventDefault();
+                          void saveDeviceName();
                         }
                         if (event.key === "Escape") {
-                          setDeviceName(profile.deviceName);
-                          setEditingDeviceName(false);
+                          event.preventDefault();
+                          cancelEditDeviceName();
                         }
                       }}
                       autoFocus
                     />
                   ) : (
-                    <span>{deviceName}</span>
+                    <span>{persistedDeviceName}</span>
                   )}
-                  <button
-                    type="button"
-                    className="settings-edit-icon"
-                    aria-label="Edit profile name"
-                    onClick={() => setEditingDeviceName(true)}
-                  >
-                    ✎
-                  </button>
+                  {editingDeviceName ? (
+                    <>
+                      <button
+                        type="button"
+                        className="settings-change-btn"
+                        aria-label="Save profile name"
+                        onClick={() => void saveDeviceName()}
+                        disabled={saveDeviceNameDisabled}
+                      >
+                        {savingDeviceName ? "Saving…" : "Save"}
+                      </button>
+                      <button
+                        type="button"
+                        className="settings-change-btn"
+                        aria-label="Cancel profile name edit"
+                        onClick={cancelEditDeviceName}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="settings-edit-icon"
+                      aria-label="Edit profile name"
+                      onClick={beginEditDeviceName}
+                    >
+                      ✎
+                    </button>
+                  )}
                 </div>
               </div>
+              {editingDeviceName && inlineNameError && (
+                <div
+                  className="settings-row settings-row-error"
+                  role="alert"
+                >
+                  <span className="field-error-text">{inlineNameError}</span>
+                </div>
+              )}
               <div className="settings-row">
                 <span className="settings-row-label">Profile Password</span>
                 <div className="settings-row-value">

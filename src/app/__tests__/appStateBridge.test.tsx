@@ -574,6 +574,7 @@ describe("MockAppStateProvider bridge arming", () => {
     clearRecoverSession: () => undefined,
     expireRecoveredNsec: () => undefined,
     unlockProfile: async () => undefined,
+    updateProfileName: async () => undefined,
     changeProfilePassword: async () => undefined,
     lockProfile: () => undefined,
     clearCredentials: async () => undefined,

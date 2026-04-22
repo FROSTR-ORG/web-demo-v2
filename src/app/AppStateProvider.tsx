@@ -86,7 +86,11 @@ import {
   setupErrorFromOnboardingRelay,
   setupErrorFromPackage,
 } from "./setupFlowErrors";
-import { RUNTIME_EVENT_LOG_MAX, SetupFlowError } from "./AppStateTypes";
+import {
+  PROFILE_NAME_MAX_LENGTH,
+  RUNTIME_EVENT_LOG_MAX,
+  SetupFlowError,
+} from "./AppStateTypes";
 import type {
   AppStateValue,
   CreateDraft,
@@ -2318,6 +2322,72 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [activeProfile, reloadProfiles],
   );
 
+  /**
+   * m5-device-name-persist — persist the edited Device Profile name
+   * through the existing profile-save path so the name change survives
+   * Lock/Unlock/reload (VAL-SETTINGS-001 / VAL-SETTINGS-024 /
+   * VAL-SETTINGS-025 / VAL-CROSS-004).
+   *
+   * Flow:
+   *   1. Trim & validate the input. Empty/whitespace and oversize names
+   *      are rejected before any storage write.
+   *   2. Rebuild the encrypted profile record by running the cached
+   *      `BfProfilePayload` + password through `buildStoredProfileRecord`
+   *      with `device.name` overridden. This keeps normalisation and
+   *      share-idx resolution consistent with the original unlock path.
+   *   3. Persist via `saveProfile` and refresh the in-memory
+   *      `unlockedPayloadRef` so subsequent always-allow / always-deny
+   *      re-encrypts pick up the renamed payload.
+   *   4. Update `activeProfile` in memory so every surface reading it
+   *      (Dashboard header, Settings sidebar, clear-credentials modal,
+   *      Export modals) reflects the new value immediately; reload the
+   *      profile index so the Welcome list also shows the new name.
+   */
+  const updateProfileName = useCallback(
+    async (name: string) => {
+      const trimmed = name.trim();
+      if (trimmed.length === 0) {
+        throw new Error("Profile name cannot be empty.");
+      }
+      if (trimmed.length > PROFILE_NAME_MAX_LENGTH) {
+        throw new Error(
+          `Profile name must be at most ${PROFILE_NAME_MAX_LENGTH} characters.`,
+        );
+      }
+      if (!activeProfile) {
+        throw new Error("No active profile.");
+      }
+      const payload = unlockedPayloadRef.current;
+      const password = unlockedPasswordRef.current;
+      if (!payload || !password) {
+        throw new Error(
+          "Unable to persist profile name: the active profile is locked.",
+        );
+      }
+      const nextPayload: BfProfilePayload = {
+        ...payload,
+        device: {
+          ...payload.device,
+          name: trimmed,
+        },
+      };
+      const { record, normalizedPayload } = await buildStoredProfileRecord(
+        nextPayload,
+        password,
+        {
+          createdAt: activeProfile.createdAt,
+          lastUsedAt: Date.now(),
+          label: activeProfile.label,
+        },
+      );
+      await saveProfile(record);
+      unlockedPayloadRef.current = normalizedPayload;
+      setActiveProfile(record.summary);
+      await reloadProfiles();
+    },
+    [activeProfile, reloadProfiles],
+  );
+
   const lockProfile = useCallback(() => {
     abortOnboardHandshake();
     // VAL-APPROVALS-009: "Allow once" overrides are session-scoped — before
@@ -3165,6 +3235,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       clearRecoverSession,
       expireRecoveredNsec,
       unlockProfile,
+      updateProfileName,
       changeProfilePassword,
       lockProfile,
       clearCredentials,
@@ -3230,6 +3301,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       clearRecoverSession,
       expireRecoveredNsec,
       unlockProfile,
+      updateProfileName,
       changeProfilePassword,
       lockProfile,
       clearCredentials,

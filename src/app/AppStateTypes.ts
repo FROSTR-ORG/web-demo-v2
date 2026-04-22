@@ -490,6 +490,17 @@ export interface RuntimeEventLogEntry {
  */
 export const RUNTIME_EVENT_LOG_MAX = 500;
 
+/**
+ * Maximum accepted length (in UTF-16 code units, as exposed by the DOM
+ * `HTMLInputElement.maxLength` attribute) for the Device Profile name
+ * edited from the Settings sidebar. Enforced at both the UI layer
+ * (HTML `maxLength` + inline validation) and the AppStateProvider
+ * mutator {@link AppStateValue.updateProfileName} so a caller that
+ * bypasses the UI cannot persist an oversize name. Documented contract
+ * in VAL-SETTINGS-025.
+ */
+export const PROFILE_NAME_MAX_LENGTH = 64;
+
 export interface AppStateValue {
   profiles: StoredProfileSummary[];
   activeProfile: StoredProfileSummary | null;
@@ -781,6 +792,35 @@ export interface AppStateValue {
   clearRecoverSession: () => void;
   expireRecoveredNsec: () => void;
   unlockProfile: (id: string, password: string) => Promise<void>;
+  /**
+   * Persist a new Device Profile name to the encrypted profile record
+   * in IndexedDB (via `saveProfile`) and update `activeProfile` in
+   * memory so every surface reading it (Dashboard header, Settings
+   * sidebar, clear-credentials badge, Export / Export-Share modal)
+   * reflects the new value immediately.
+   *
+   * Rules (surface contracts: VAL-SETTINGS-001 / 002 / 024 / 025 and
+   * VAL-CROSS-004):
+   *   - The input is trimmed of leading/trailing whitespace before
+   *     validation and persistence.
+   *   - Empty / whitespace-only names are rejected with an Error so
+   *     the UI can surface an inline validation message; NOTHING is
+   *     written to storage.
+   *   - Names whose trimmed length exceeds
+   *     {@link PROFILE_NAME_MAX_LENGTH} are rejected for the same
+   *     reason. The UI additionally enforces the limit via the
+   *     `<input maxLength>` attribute for normal typing.
+   *   - Unicode / emoji / RTL / angle-bracket payloads are accepted
+   *     verbatim and stored exactly as provided; React's escaping keeps
+   *     them safe when rendered.
+   *   - Requires an unlocked profile (valid `activeProfile` and the
+   *     cached payload/password captured at unlock time). If the
+   *     profile is locked the mutator rejects without writing anything.
+   *
+   * Throws on validation / persistence failures so callers can display
+   * the error inline.
+   */
+  updateProfileName: (name: string) => Promise<void>;
   changeProfilePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   lockProfile: () => void;
   clearCredentials: () => Promise<void>;

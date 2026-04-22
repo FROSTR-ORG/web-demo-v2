@@ -22,6 +22,7 @@ import type {
   RuntimeCommand,
   SignLifecycleEntry,
 } from "./AppStateTypes";
+import { PROFILE_NAME_MAX_LENGTH } from "./AppStateTypes";
 
 export function MockAppStateProvider({
   value,
@@ -510,6 +511,35 @@ export function MockAppStateProvider({
     [value],
   );
 
+  /**
+   * Mock-side `updateProfileName`: mirrors the real AppStateProvider
+   * contract so the Settings sidebar wired against MockAppStateProvider
+   * sees the same validation and active-profile update (VAL-SETTINGS-001 /
+   * 002 / 024 / 025, VAL-CROSS-004). Empty / whitespace-only / oversize
+   * names are rejected at this layer, matching the real mutator. The
+   * caller-supplied `value.updateProfileName` is invoked AFTER local
+   * validation and BEFORE the local `activeProfile` state is mutated so
+   * fixtures can observe or override the dispatch.
+   */
+  const updateProfileName = useCallback(
+    async (name: string) => {
+      const trimmed = name.trim();
+      if (trimmed.length === 0) {
+        throw new Error("Profile name cannot be empty.");
+      }
+      if (trimmed.length > PROFILE_NAME_MAX_LENGTH) {
+        throw new Error(
+          `Profile name must be at most ${PROFILE_NAME_MAX_LENGTH} characters.`,
+        );
+      }
+      await value.updateProfileName(trimmed);
+      setActiveProfile((previous) =>
+        previous ? { ...previous, deviceName: trimmed } : previous,
+      );
+    },
+    [value],
+  );
+
   const lockProfile = useCallback(() => {
     // Forward to any caller-supplied behaviour first (fixtures may observe).
     value.lockProfile();
@@ -700,6 +730,7 @@ export function MockAppStateProvider({
       clearRecoverSession,
       expireRecoveredNsec,
       unlockProfile,
+      updateProfileName,
       changeProfilePassword,
       lockProfile,
       clearCredentials,
@@ -763,6 +794,7 @@ export function MockAppStateProvider({
       clearRecoverSession,
       expireRecoveredNsec,
       unlockProfile,
+      updateProfileName,
       changeProfilePassword,
       lockProfile,
       clearCredentials,
