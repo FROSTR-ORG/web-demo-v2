@@ -279,3 +279,51 @@ and the validation assertion IDs that cover it.
 - **Assertion IDs covered**: VAL-APPROVALS-018 (no proactive/upfront
   prompt); reinforces VAL-APPROVALS-007 (peer_denied → reactive modal
   via enqueuePeerDenial pipeline as the ONLY runtime open path).
+
+### VAL-POLICIES-010 — `peer_denied` RuntimeEvent on A is unobservable (protocol reality)
+
+- **Paper / task source**: The original VAL-POLICIES-010 assertion in
+  `.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/validation-contract.md`
+  required that when peer A's `respond.sign=deny` override rejects an
+  inbound sign from peer B, A's runtime emits exactly one
+  `peer_denied` RuntimeEvent with `peer_pubkey === B.pubkey` and
+  `verb === "sign"`, observable via A's event log.
+- **web-demo-v2 implementation**: `src/e2e/multi-device/policy-denial-roundtrip.spec.ts`
+  (feature `m3-policy-denial-and-persistence`). The scaffold documents
+  the upstream blocker inline and asserts only the B-side
+  OperationFailure surface plus A-side indirect checks (no Sign
+  completion, effective_policy snapshot confirms the override is
+  live).
+- **Protocol / data constraint**: The upstream bifrost-rs signer does
+  NOT emit a local `peer_denied` RuntimeEvent when its policy layer
+  rejects an inbound request. Per
+  `bifrost-rs/crates/bifrost-signer/src/lib.rs` `reject_request`
+  (line ~2233) the rejection path builds a `BridgeEnvelope` whose
+  payload is a NIP-44–encrypted `BridgePayload::Error(PeerErrorWire {
+  code: "peer_denied", message })` addressed to the requesting peer
+  only — it is not surfaced on the local bridge's event stream.
+  Confirming the asymmetry, `bifrost-bridge-wasm/src/lib.rs`
+  enumerates `RuntimeEventKind` as
+  `{ Initialized, StatusChanged, CommandQueued, InboundAccepted,
+  ConfigUpdated, PolicyUpdated, StateWiped }` — there is no
+  `PeerDenied` variant (the task description references
+  `crates/bifrost-core/src/runtime_status.rs` by name; the actual
+  definition lives in the WASM bridge crate, but either way no
+  `PeerDenied` variant exists). The `PeerDeniedEvent` jsdoc in
+  `src/app/AppStateTypes.ts` already acknowledges this:
+  "the upstream bifrost-rs runtime does not currently surface denial
+  notifications as `RuntimeEvent`s … a future `drain_runtime_events`
+  `peer_denied` kind in production". `bifrost-rs` is read-only
+  reference material for this mission.
+- **Narrowing**: the assertion was narrowed to the B-side
+  OperationFailure observability; the A-side `peer_denied` event
+  requirement was removed pending an upstream bifrost-rs change to
+  emit `RuntimeEventKind::PeerDenied` from `reject_request`. The
+  stable ID `VAL-POLICIES-010` is preserved. The revised behavior
+  requires that (a) B receives an `OperationFailure` whose reason
+  matches `/denied|policy/i` within 15 s, (b) A's
+  `pending_operations.length` is unchanged, and (c) no
+  `sign_completed` event fires on either side.
+- **Assertion IDs covered**: VAL-POLICIES-010 (B-side OperationFailure
+  observable; A-side `peer_denied` RuntimeEvent removed from the
+  assertion until upstream exposes it).
