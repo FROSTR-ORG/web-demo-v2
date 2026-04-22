@@ -64,6 +64,16 @@ export function CreateKeysetScreen() {
     setShowNsec(false);
   }
 
+  // Scrub any pasted/generated nsec material from component state so the
+  // revealed value is no longer reachable via the DOM (VAL-BACKUP-029).
+  // Called on Back and after successful submission.
+  function resetNsecField() {
+    setNsec("");
+    setGeneratedNsec(null);
+    setShowNsec(false);
+    setFieldErrors((prev) => ({ ...prev, nsec: undefined }));
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -94,7 +104,9 @@ export function CreateKeysetScreen() {
         generatedNsec: generatedNsec?.nsec,
         existingNsec: isExistingNsec ? nsec.trim() : undefined,
       });
-      clearGeneratedNsec();
+      // Scrub any revealed nsec from component state and the DOM before
+      // navigating away (VAL-BACKUP-023 / VAL-BACKUP-029).
+      resetNsecField();
       navigate("/create/progress");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create keyset.");
@@ -109,7 +121,7 @@ export function CreateKeysetScreen() {
         <Stepper current={1} variant="create" />
         <BackLink
           onClick={() => {
-            clearGeneratedNsec();
+            resetNsecField();
             navigate("/");
           }}
         />

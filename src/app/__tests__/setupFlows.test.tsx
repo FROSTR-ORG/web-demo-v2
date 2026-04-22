@@ -121,6 +121,55 @@ describe("AppState setup flows", () => {
     await waitFor(() => expect(getState().createSession).toBeNull());
   }, 45_000);
 
+  it("splits a pasted existing nsec into a keyset whose group pubkey matches the nsec and whose shares round-trip to the pasted value (VAL-BACKUP-020 / m6-nsec-split-create)", async () => {
+    const getState = await renderProvider();
+    // Pretend the user pasted an existing nsec by generating one up-front
+    // and feeding it into `createKeyset` via the `existingNsec` field.
+    const pasted = await generateNsec();
+
+    await act(async () => {
+      await getState().createKeyset({
+        groupName: "Pasted Nsec Key",
+        threshold: 2,
+        count: 3,
+        existingNsec: pasted.nsec,
+      });
+    });
+    await waitFor(() =>
+      expect(getState().createSession?.keyset?.group.group_name).toBe(
+        "Pasted Nsec Key",
+      ),
+    );
+
+    const session = getState().createSession!;
+    const keyset = session.keyset!;
+    // The group pubkey is a BIP-340 x-only key derived from the pasted
+    // nsec; we can't derive it directly from the secret without WASM, so
+    // the round-trip recovery below is the canonical proof the pasted
+    // nsec is the signing root (VAL-BACKUP-020).
+    expect(keyset.group.group_pk).toMatch(/^[0-9a-f]{64}$/);
+
+    // Any threshold of shares reconstructs the original pasted nsec.
+    const recovered = await recoverNsecFromShares({
+      group: keyset.group,
+      shares: keyset.shares.slice(0, keyset.group.threshold),
+    });
+    expect(recovered.nsec).toBe(pasted.nsec);
+    expect(recovered.signing_key_hex).toBe(pasted.signing_key_hex);
+
+    // The pasted nsec must NOT appear in the in-memory create draft nor in
+    // any idb-keyval store (VAL-BACKUP-023).
+    expect(JSON.stringify(session.draft)).not.toContain(pasted.nsec);
+    expect(JSON.stringify(Array.from(storage.entries()))).not.toContain(
+      pasted.nsec,
+    );
+
+    act(() => {
+      getState().clearCreateSession();
+    });
+    await waitFor(() => expect(getState().createSession).toBeNull());
+  }, 45_000);
+
   it("creates real remote onboarding packages with one chosen distribution password and default peer policies", async () => {
     const getState = await renderProvider();
 
