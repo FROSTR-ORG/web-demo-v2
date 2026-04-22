@@ -170,14 +170,20 @@ describe("dashboard-settings-sidebar-fidelity", () => {
       expect(screen.getByPlaceholderText("wss://...")).toBeInTheDocument();
     });
 
-    it("Group Profile section shows Keyset Name, npub, Threshold, Created/Updated dates and sync note", () => {
+    it("Group Profile section shows Keyset Name, npub, Threshold, Created/Updated rows and sync note", () => {
       renderWith({ dashboard: { settingsOpen: true, paperPanels: true } });
       expect(screen.getByText("Keyset Name")).toBeInTheDocument();
       expect(screen.getByText("Keyset npub")).toBeInTheDocument();
       expect(screen.getByText("Threshold")).toBeInTheDocument();
       expect(screen.getByText("2 of 3")).toBeInTheDocument();
-      expect(screen.getByText("Feb 24, 2026")).toBeInTheDocument();
-      expect(screen.getByText("Mar 8, 2026")).toBeInTheDocument();
+      // Created / Updated rows are sourced from the active profile's real
+      // epoch-ms timestamps (VAL-SETTINGS-008) — the hardcoded Paper
+      // placeholders "Feb 24, 2026" / "Mar 8, 2026" have been removed.
+      expect(screen.getByText("Created")).toBeInTheDocument();
+      expect(screen.getByText("Updated")).toBeInTheDocument();
+      const sidebar = screen.getByTestId("settings-sidebar");
+      expect(sidebar.textContent ?? "").not.toContain("Feb 24, 2026");
+      expect(sidebar.textContent ?? "").not.toContain("Mar 8, 2026");
       expect(
         screen.getByText("Shared across all peers. Synced via Nostr.")
       ).toBeInTheDocument();

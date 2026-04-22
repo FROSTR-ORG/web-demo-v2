@@ -28,6 +28,39 @@ export { PROFILE_NAME_MAX_LENGTH };
  */
 export { RELAY_DUPLICATE_ERROR, RELAY_INVALID_URL_ERROR };
 
+/**
+ * Placeholder shown in the Group Profile "Created" / "Updated" cells
+ * when the active profile lacks a timestamp entirely (e.g. pre-bridge
+ * demo fixtures). Keeps the row layout stable without rendering a
+ * literal "Invalid Date" or "NaN" string (VAL-SETTINGS-008).
+ */
+export const MISSING_PROFILE_DATE_PLACEHOLDER = "—";
+
+/**
+ * Format an epoch-ms timestamp as a human-readable Gregorian date
+ * (e.g. "Feb 24, 2026"). Returns {@link MISSING_PROFILE_DATE_PLACEHOLDER}
+ * when the input is missing or non-finite so the Group Profile rows
+ * never render "NaN" / "Invalid Date" (VAL-SETTINGS-008).
+ *
+ * Uses the runtime's default locale (no forced `en-US`) so copy
+ * respects the user's locale while still displaying a real stored
+ * timestamp. Tests pin the locale via the same formatter to match.
+ */
+export function formatProfileDate(timestampMs: number | undefined): string {
+  if (typeof timestampMs !== "number" || !Number.isFinite(timestampMs)) {
+    return MISSING_PROFILE_DATE_PLACEHOLDER;
+  }
+  const date = new Date(timestampMs);
+  if (Number.isNaN(date.getTime())) {
+    return MISSING_PROFILE_DATE_PLACEHOLDER;
+  }
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 interface SettingsSidebarProps {
   profile: { groupName: string; deviceName: string };
   relays: string[];
@@ -84,6 +117,27 @@ export function SettingsSidebar({
   // IndexedDB write) and fall back to the prop that the Dashboard threads
   // through before the context has hydrated.
   const persistedDeviceName = activeProfile?.deviceName ?? profile.deviceName;
+  // Source-of-truth for every Group Profile row. Prefer the live
+  // activeProfile (VAL-SETTINGS-009 — "sourced from real active
+  // profile") and fall back to the props that DashboardScreen threads
+  // through before the context hydrates, so this component still
+  // renders useful content when mounted from demo fixtures that only
+  // pass the props path.
+  const groupKeysetName = activeProfile?.groupName ?? profile.groupName;
+  const groupPublicKeyDisplay =
+    activeProfile?.groupPublicKey ?? groupPublicKey;
+  const groupThreshold = activeProfile?.threshold ?? threshold;
+  const groupMemberCount = activeProfile?.memberCount ?? memberCount;
+  // VAL-SETTINGS-008 — render Created / Updated from the stored
+  // profile's real epoch-ms timestamps. `updatedAt` is optional on
+  // legacy records written before the field existed; fall back to
+  // `createdAt` so those records still render a sane "Updated" value.
+  // `formatProfileDate` returns an em-dash when the timestamp is
+  // missing entirely so we never print "NaN" / "Invalid Date".
+  const createdAtText = formatProfileDate(activeProfile?.createdAt);
+  const updatedAtText = formatProfileDate(
+    activeProfile?.updatedAt ?? activeProfile?.createdAt,
+  );
   const [draftDeviceName, setDraftDeviceName] = useState(persistedDeviceName);
   const [editingDeviceName, setEditingDeviceName] = useState(false);
   const [deviceNameError, setDeviceNameError] = useState("");
@@ -592,23 +646,23 @@ export function SettingsSidebar({
             <div className="settings-card">
               <div className="settings-row">
                 <span className="settings-row-label">Keyset Name</span>
-                <span className="settings-row-text">{profile.groupName}</span>
+                <span className="settings-row-text">{groupKeysetName}</span>
               </div>
               <div className="settings-row">
                 <span className="settings-row-label">Keyset npub</span>
-                <span className="settings-row-npub">{paperGroupKey(groupPublicKey)}</span>
+                <span className="settings-row-npub">{paperGroupKey(groupPublicKeyDisplay)}</span>
               </div>
               <div className="settings-row">
                 <span className="settings-row-label">Threshold</span>
-                <span className="settings-row-text">{threshold} of {memberCount}</span>
+                <span className="settings-row-text">{groupThreshold} of {groupMemberCount}</span>
               </div>
               <div className="settings-row">
                 <span className="settings-row-label">Created</span>
-                <span className="settings-row-text">Feb 24, 2026</span>
+                <span className="settings-row-text">{createdAtText}</span>
               </div>
               <div className="settings-row settings-row-last">
                 <span className="settings-row-label">Updated</span>
-                <span className="settings-row-text">Mar 8, 2026</span>
+                <span className="settings-row-text">{updatedAtText}</span>
               </div>
             </div>
             <div className="settings-hint">

@@ -6,6 +6,14 @@ import type {
 } from "../lib/bifrost/types";
 
 const now = Date.UTC(2026, 2, 8, 12, 0, 0);
+// Demo fixtures use a pre-existing createdAt / updatedAt pair so the
+// Group Profile section of the Settings sidebar renders two distinct
+// human-readable dates (VAL-SETTINGS-008). `createdAt` lands on
+// Feb 24, 2026 18:00 UTC — well clear of midnight in every IANA zone
+// so the formatted label is stable across test hosts — and `updatedAt`
+// tracks `now` (Mar 8, 2026) so demo screens show both fields exercised.
+const demoCreatedAt = Date.UTC(2026, 1, 24, 18, 0, 0);
+const demoUpdatedAt = now;
 
 export const DEMO_PROFILE_ID = "demo-profile";
 export const DEMO_GROUP_PK = "npub1qe3abcdefghijklmnopqrstuvwx7k4m";
@@ -58,7 +66,8 @@ export const demoProfile: StoredProfileSummary = {
   localShareIdx: 0,
   groupPublicKey: DEMO_GROUP_PK,
   relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
-  createdAt: now,
+  createdAt: demoCreatedAt,
+  updatedAt: demoUpdatedAt,
   lastUsedAt: now,
 };
 

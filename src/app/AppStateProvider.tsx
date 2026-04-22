@@ -1348,6 +1348,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const { record, normalizedPayload: normalizedCreatePayload } =
         await buildStoredProfileRecord(payload, draft.password, {
           createdAt,
+          updatedAt: createdAt,
           lastUsedAt: createdAt,
           label: createSession.draft.groupName,
         });
@@ -1692,6 +1693,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const { record, normalizedPayload: normalizedOnboardPayload } =
         await buildStoredProfileRecord(payload, draft.password, {
           createdAt,
+          updatedAt: createdAt,
           lastUsedAt: createdAt,
           label: group.group_name,
         });

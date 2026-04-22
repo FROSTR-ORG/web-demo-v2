@@ -385,7 +385,17 @@ export interface StoredProfileSummary {
   localShareIdx: number;
   groupPublicKey: string;
   relays: string[];
+  /** Epoch-ms creation timestamp. Set once when the profile is first saved. */
   createdAt: number;
+  /**
+   * Epoch-ms "last mutated" timestamp. Refreshed every time a persisted
+   * profile field is edited (name, relays, password, persistent peer
+   * policies). Optional for backward compatibility with records written
+   * before this field existed; callers rendering "Updated" should fall
+   * back to `createdAt` when this is absent (VAL-SETTINGS-008). Fresh
+   * saves via `buildStoredProfileRecord` always populate it.
+   */
+  updatedAt?: number;
   lastUsedAt: number;
 }
 

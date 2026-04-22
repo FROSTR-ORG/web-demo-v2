@@ -295,10 +295,15 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
       expect(screen.getByText("Change")).toBeInTheDocument();
       expect(screen.getByText("wss://relay.primal.net")).toBeInTheDocument();
       expect(screen.getByText("wss://relay.damus.io")).toBeInTheDocument();
-      // Group Profile content
+      // Group Profile content — Created / Updated rows are now sourced
+      // from the real activeProfile timestamps (VAL-SETTINGS-008), so
+      // assert on the row labels and the absence of the hardcoded Paper
+      // placeholders rather than literal dates.
       expect(screen.getByText("Keyset Name")).toBeInTheDocument();
-      expect(screen.getByText("Feb 24, 2026")).toBeInTheDocument();
-      expect(screen.getByText("Mar 8, 2026")).toBeInTheDocument();
+      expect(screen.getByText("Created")).toBeInTheDocument();
+      expect(screen.getByText("Updated")).toBeInTheDocument();
+      expect(sidebar.textContent ?? "").not.toContain("Feb 24, 2026");
+      expect(sidebar.textContent ?? "").not.toContain("Mar 8, 2026");
       expect(screen.getByText("Shared across all peers. Synced via Nostr.")).toBeInTheDocument();
     });
   });
