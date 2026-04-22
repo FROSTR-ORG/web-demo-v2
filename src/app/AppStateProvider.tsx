@@ -2792,6 +2792,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // outcome — the user's event is already on the relays. On a
       // persistence failure we still bump the in-memory activeProfile
       // so the UI reflects the current session, and log in DEV.
+      //
+      // Stale-state guard (scrutiny m6 r2 — fix-m6-publish-
+      // setactiveprofile-guard): between the `pump.publishEvent` await
+      // and the `setActiveProfile(nextSummary)` call below, the user
+      // may have locked (or switched) profiles — clearing
+      // `activeProfileRef.current` and `runtimeRef.current`.
+      // Unconditionally calling `setActiveProfile(nextSummary)` in that
+      // window would "resurrect" a profile the user just locked. We
+      // mirror the pattern used in other async mutators
+      // (e.g. `startLiveRelayPump`'s `runtimeRef.current === runtime`
+      // guard): only apply the summary when the CURRENT active profile
+      // still matches the in-flight `profile.id` AND a runtime is still
+      // attached. Otherwise skip the state update — the IndexedDB
+      // record (keyed by profile.id) has already been saved below, so
+      // the next `reloadProfiles()` / unlock will pick it up.
       const reachedCount = result.reached.length;
       try {
         const existing = await getProfile(profile.id);
@@ -2805,9 +2820,43 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             ...existing,
             summary: nextSummary,
           });
-          setActiveProfile(nextSummary);
+          const postPublishActive = activeProfileRef.current;
+          const activeStillMatches =
+            postPublishActive !== null &&
+            postPublishActive.id === profile.id &&
+            runtimeRef.current !== null;
+          if (activeStillMatches) {
+            setActiveProfile(nextSummary);
+          }
           await reloadProfiles();
         } else {
+          // Functional updater already guards against profile change
+          // (prev is null after lock; a different profile won't match
+          // `prev.id === profile.id`). We additionally require the
+          // runtime to still be attached so we don't partially re-hydrate
+          // a locked profile's summary into UI state.
+          if (runtimeRef.current !== null) {
+            setActiveProfile((prev) =>
+              prev && prev.id === profile.id
+                ? {
+                    ...prev,
+                    lastBackupPublishedAt: createdAtSeconds,
+                    lastBackupReachedRelayCount: reachedCount,
+                  }
+                : prev,
+            );
+          }
+        }
+      } catch (persistError) {
+        if (import.meta.env.DEV) {
+          console.warn(
+            "publishProfileBackup: failed to persist last-published marker",
+            persistError,
+          );
+        }
+        // Same stale-state guard as the happy path — skip UI update if
+        // the profile was locked/switched during the publish await.
+        if (runtimeRef.current !== null) {
           setActiveProfile((prev) =>
             prev && prev.id === profile.id
               ? {
@@ -2818,22 +2867,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               : prev,
           );
         }
-      } catch (persistError) {
-        if (import.meta.env.DEV) {
-          console.warn(
-            "publishProfileBackup: failed to persist last-published marker",
-            persistError,
-          );
-        }
-        setActiveProfile((prev) =>
-          prev && prev.id === profile.id
-            ? {
-                ...prev,
-                lastBackupPublishedAt: createdAtSeconds,
-                lastBackupReachedRelayCount: reachedCount,
-              }
-            : prev,
-        );
       }
       return { event, reached: result.reached };
     },
