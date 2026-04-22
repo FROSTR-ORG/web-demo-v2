@@ -1,0 +1,26 @@
+{
+  "featureId": "fix-m5-idb-migration-preserve-unknown-fields",
+  "reviewedAt": "2026-04-22T18:47:39Z",
+  "commitId": "c6db5e009660a1a6fe614df78413135abf3cf252",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly addresses the prior blocking finding about silent loss of unknown summary fields: `migrateSummary` now preserves unknown keys via spread-before-canonical-overrides, and a focused regression test now asserts unknown fields round-trip while required/coerced fields remain correct.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Feature assignment continues to use `runtime-worker` for a pure storage/settings migration fix, which conflicts with the skill's own scope guidance.",
+      "evidence": "Mission features metadata sets `skillName: runtime-worker` for `fix-m5-idb-migration-preserve-unknown-fields` (mission `features.json`), while `.factory/skills/runtime-worker/SKILL.md` says: \"Do NOT use for ... pure settings persistence (use ui-screen-worker).\""
+    },
+    {
+      "area": "skills",
+      "observation": "The runtime-worker procedure's optional-skip criteria for agent-browser is still inconsistent with observed practice for pure non-UI fixes.",
+      "evidence": "Transcript skeleton for worker session `de3468cf-947a-4408-a0cd-88b1d68b1888` shows no Playwright demo-gallery run, yet handoff reports `followedProcedure: true`; SKILL.md currently says non-UI fixes may skip agent-browser only if vitest+typecheck cover behavior and demo-gallery Playwright still passes."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m5-settings/scrutiny/reviews/m5-idb-migration.json",
+  "summary": "Reviewed the fix transcript skeleton plus both relevant diffs (`48a4115...` original failure and `c6db5e0...` fix). Result: pass for this fix feature—the unknown-summary-field data-loss issue from the prior review is resolved and covered by an explicit regression test."
+}

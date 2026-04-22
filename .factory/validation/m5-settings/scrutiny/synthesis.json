@@ -1,7 +1,7 @@
 {
   "milestone": "m5-settings",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -20,78 +20,48 @@
     }
   },
   "reviewsSummary": {
-    "total": 10,
-    "passed": 6,
-    "failed": 4,
-    "failedFeatures": [
-      "m5-idb-migration",
-      "m5-lock-and-unsaved-changes",
-      "m5-relay-list-persist",
-      "m5-relay-telemetry"
-    ]
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "failedFeatures": []
   },
-  "blockingIssues": [
+  "blockingIssues": [],
+  "appliedUpdates": [
     {
-      "featureId": "m5-idb-migration",
-      "severity": "blocking",
-      "description": "Storage migration drops unknown record fields by reconstructing a whitelisted object in migrateProfileRecord/migrateSummary, violating the no-silent-loss migration expectation."
-    },
-    {
-      "featureId": "m5-idb-migration",
-      "severity": "blocking",
-      "description": "listProfiles sweeps dead IDs from the profile index but does not delete malformed backing records, leaving orphan rows in IndexedDB."
-    },
-    {
-      "featureId": "m5-lock-and-unsaved-changes",
-      "severity": "blocking",
-      "description": "SettingsSidebar Replace Share CTA navigates directly (`onClose(); navigate('/replace-share')`) and bypasses guardNav, allowing silent loss of unsaved settings edits."
-    },
-    {
-      "featureId": "m5-relay-telemetry",
-      "severity": "blocking",
-      "description": "Offline relay last-seen precedence is wrong in both RelayHealthPanel and relayHealthRowsFromRuntime (lastEventAt selected before lastDisconnectedAt), producing stale 'Last Seen' values after disconnect."
+      "target": "library",
+      "description": "Documented seeded-runtime relay update limitation and the required DEV hook (`__iglooTestUpdateRelays`) in .factory/library/architecture.md.",
+      "sourceFeature": "fix-m5-relay-churn-multidevice-spec"
     }
   ],
-  "appliedUpdates": [],
   "suggestedGuidanceUpdates": [
     {
       "target": "skills",
-      "suggestion": "Align ui-screen-worker verification requirements with feature contracts: clearly define when Playwright may be skipped and require explicit `followedProcedure: false` + deviations whenever required checks are omitted.",
-      "evidence": "Multiple m5-settings reviews reported `followedProcedure: true` while missing the skill-mandated Playwright step, or reported partial deviations only.",
+      "suggestion": "Align feature-assignment guidance with skill scopes: avoid assigning runtime-worker to pure settings persistence / migration fixes; route those to ui-screen-worker unless runtime protocol wiring is central.",
+      "evidence": "Both fix-m5-idb-migration follow-up reviews flagged runtime-worker assignment conflicting with runtime-worker scope text.",
       "isSystemic": true
     },
     {
       "target": "skills",
-      "suggestion": "Strengthen runtime-worker procedure auditing by requiring `skillFeedback` presence in handoff and explicit deviation entries when agent-browser/required verification commands are skipped.",
-      "evidence": "At least one runtime-worker handoff omitted `skillFeedback`; others marked full compliance despite missing required checks.",
+      "suggestion": "Tighten procedure-compliance rules so workers must record deviations when skipping required checks (agent-browser and/or demo-gallery Playwright) even for non-UI or data-wiring fixes.",
+      "evidence": "Multiple m5 fix reviews observed `followedProcedure: true` despite omitted skill-listed verification steps.",
       "isSystemic": true
     },
     {
       "target": "AGENTS.md",
-      "suggestion": "Clarify the 'no .skip additions' rule to explicitly allow or forbid environment-availability conditional skips (e.g., cargo-gated multi-device specs).",
-      "evidence": "Current convention text conflicts with existing conditional `test.skip(...)` guards used in multi-device specs.",
+      "suggestion": "Resolve policy mismatch between mission-level 'agent-browser mandatory for UI validation' and skill-level skip allowances; define precedence and acceptable skip cases explicitly.",
+      "evidence": "fix-m5-replace-share-cta-guardnav review noted contradictory guidance between mission AGENTS.md and ui-screen-worker SKILL.md.",
       "isSystemic": true
-    },
-    {
-      "target": "skills",
-      "suggestion": "Tighten skill-selection guidance so settings-persistence/schema-migration features are assigned to ui-screen-worker unless runtime protocol wiring is the core work.",
-      "evidence": "m5-idb-migration was assigned runtime-worker despite runtime-worker guidance explicitly excluding pure settings persistence.",
-      "isSystemic": false
     }
   ],
   "rejectedObservations": [
     {
-      "observation": "Blocking finding that m5-relay-list-persist omitted relay-churn e2e coverage in commit e95ade9.",
-      "reason": "superseded-by-followup-feature: fix-m5-relay-churn-multidevice-spec adds and validates src/e2e/multi-device/relay-churn.spec.ts in the same milestone."
+      "observation": "Repeated variants of the same procedure-compliance mismatch across multiple fix reviews.",
+      "reason": "duplicate: consolidated under one systemic skills guidance recommendation."
     },
     {
-      "observation": "Repeated variants of the same Playwright/agent-browser procedure-compliance mismatch across several ui-screen-worker reviews.",
-      "reason": "duplicate: consolidated into one systemic suggested guidance update."
-    },
-    {
-      "observation": "Repeated runtime-worker compliance wording variants (missing required checks/skillFeedback).",
-      "reason": "duplicate: consolidated into one systemic suggested guidance update."
+      "observation": "Repeated variants of runtime-worker skill-scope mismatch for storage-oriented fixes.",
+      "reason": "duplicate: consolidated under one systemic skill-assignment recommendation."
     }
   ],
-  "previousRound": null
+  "previousRound": ".factory/validation/m5-settings/scrutiny/synthesis.round1.json"
 }

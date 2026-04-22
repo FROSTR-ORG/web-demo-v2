@@ -135,3 +135,9 @@ Observed shapes (capture with `__debug.runtimeStatus()` or bifrost-devtools):
 - **PING / REFRESH_ALL**: `context` may be empty `{}` or carry `initiated_by: 'self' | 'peer'`.
 
 When the bifrost-rs payload shape is unclear, capture evidence via `__debug.runtimeStatus()` rather than guessing. Vitest coverage for any pending-operation rendering MUST include at least one case using the real nested shape — synthetic flat payloads do not prove the code works against the real runtime.
+
+## Seeded-runtime relay update gotcha (test harness)
+
+`AppStateValue.updateRelays()` is intentionally profile/unlock-gated in `AppStateProvider` (it early-returns if there is no active unlocked profile/runtime context). That means seeded-runtime harnesses using `__iglooTestSeedRuntime` cannot rely on calling the normal `updateRelays()` path directly.
+
+For seeded multi-device/e2e relay-churn tests, use the DEV test hook path (`window.__iglooTestUpdateRelays(...)`) instead of `updateRelays()` so relay updates can be applied deterministically in seeded contexts without requiring a full unlocked profile lifecycle.

@@ -1,0 +1,26 @@
+{
+  "featureId": "fix-m5-idb-migration-delete-orphan-records",
+  "reviewedAt": "2026-04-22T18:47:32Z",
+  "commitId": "9794e17",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "PASS. Comparing the original failing commit (48a4115ada9e18b23f7f8d4adb8f493f37ef687e) with the fix commit (9794e17) shows the targeted orphan-row defect is corrected: listProfiles() now deletes backing IDB keys for every orphan/malformed index entry before rewriting the index, and the new migration test asserts that stale backing rows are actually removed. This directly addresses the prior blocking finding about orphan backing rows persisting after index cleanup.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Feature metadata continues to route a pure settings-persistence storage fix through runtime-worker, which conflicts with that skill's own scope guidance.",
+      "evidence": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/features.json:2798-2800 sets skillName=runtime-worker for this fix; .factory/skills/runtime-worker/SKILL.md:18 says pure settings persistence should use ui-screen-worker."
+    },
+    {
+      "area": "skills",
+      "observation": "Procedure-compliance signaling is inconsistent: handoff marks followedProcedure=true, but logged verification omits the demo-gallery Playwright run that runtime-worker requires even when agent-browser is skipped for non-UI fixes.",
+      "evidence": ".factory/skills/runtime-worker/SKILL.md:22 and :46 require demo-gallery pass for the non-UI skip path; handoff commands list only vitest+tsc (.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/handoffs/2026-04-22T18-33-57-786Z__fix-m5-idb-migration-delete-orphan-records__dca86959-bdc0-4d9a-a86b-df28a01f0c11.json:14-39) while followedProcedure is true at :61."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m5-settings/scrutiny/reviews/m5-idb-migration.json",
+  "summary": "Reviewed fix-m5-idb-migration-delete-orphan-records against the prior failed m5-idb-migration review, including both commit diffs and the fix-session transcript skeleton. Result: pass — the orphan backing-record deletion gap is concretely fixed and covered by an explicit regression test."
+}

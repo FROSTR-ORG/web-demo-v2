@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m5-replace-share-cta-guardnav",
+  "reviewedAt": "2026-04-22T18:47:49Z",
+  "commitId": "9ed246efa3ad3fd692554e8621bb60c3a28cd15f",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Pass. The fix directly addresses the prior blocking failure: Replace Share navigation now routes through the existing unsaved-changes guard path, and added tests cover dirty-name guard, Discard-to-navigate, Keep-editing-no-nav, and clean-state direct navigation. Reviewing both diffs confirms the original bypass (`onClose(); navigate('/replace-share')`) from `c319d752...` is replaced by `guardNav('replaceShare', ...)` in `9ed246ef...`, with `confirmDiscardPending()` handling the new action.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Mission shared-state guidance is still internally inconsistent on agent-browser requirement scope for UI changes.",
+      "evidence": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/AGENTS.md:84 says agent-browser is mandatory for UI validation, while /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/.factory/skills/ui-screen-worker/SKILL.md:23 allows skipping agent-browser for some UI-visible copy/data-wiring changes."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m5-settings/scrutiny/reviews/m5-lock-and-unsaved-changes.json",
+  "summary": "Reviewed fix feature transcript skeleton, handoff, skill, and both commit diffs (`c319d752...` original fail and `9ed246ef...` fix). Result: pass — the Replace Share CTA guardNav gap is corrected and regression coverage is added."
+}

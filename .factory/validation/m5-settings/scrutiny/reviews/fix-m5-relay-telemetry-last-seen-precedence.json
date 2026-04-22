@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m5-relay-telemetry-last-seen-precedence",
+  "reviewedAt": "2026-04-22T18:47:42Z",
+  "commitId": "e798c0d",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Reviewed the prior failed feature diff (8870273), this fix diff (e798c0d), the fix handoff, and the fix transcript skeleton. The fix directly addresses the original blocking defect by centralizing state-aware last-seen precedence in resolveRelayLastSeenSource() and using it in both affected render paths (relayHealthRowsFromRuntime and RelayHealthPanel). Added tests cover online -> disconnect -> reconnect transitions and helper-level precedence branches, including stale-event vs disconnect ordering and reconnect behavior.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "ui-screen-worker's procedure currently requires Playwright demo-gallery verification for changed screens, but this pure data-wiring fix skipped Playwright and only recorded the agent-browser omission. The skill should explicitly document when Playwright can be skipped for non-interaction, test-covered wiring fixes, or workers should record this omission as a deviation too.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md:50 requires `npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop --workers 1`; handoff 2026-04-22T18-44-15-357Z.../fix-m5-relay-telemetry-last-seen-precedence...json `verification.commandsRun` includes vitest/tsc/full-vitest only (lines 14-31) and `skillFeedback.deviations` only mentions agent-browser skip (lines 110-112)."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m5-settings/scrutiny/reviews/m5-relay-telemetry.json",
+  "summary": "Pass. The fix resolves the previously reported last-seen precedence bug in both affected code paths and adds targeted regression coverage that demonstrates correct online/offline/reconnect behavior."
+}
