@@ -174,3 +174,30 @@ All hooks are **DEV-only**. If your validation runs a production build (`vite bu
 - Local `bifrost-devtools` relay (`ws://127.0.0.1:8194`) did not enforce single-winner replaceable semantics for kind `10000` during user-testing validation queries; duplicate/race publish checks returned multiple events for the same author (`VAL-BACKUP-006`, `VAL-BACKUP-031` blocked in this round).
 - Relay-backed restore submission emitted the expected kind `10000` author-filter subscription from the UI, but success-path retrieval returned no matching backup event in this run; this blocked restore-success assertions (`VAL-BACKUP-010`, `VAL-BACKUP-013`, `VAL-BACKUP-030`).
 - Nsec whitespace trimming currently succeeds in submit/validation flow, but the input field value remained whitespace-wrapped before submit (`VAL-BACKUP-028` failed against strict in-field-trim contract wording).
+
+### Validator Harness: `backup-publish-restore-live.spec.ts` (VAL-BACKUP-006 / 010 / 013 / 030 / 031)
+
+The five m6-backup assertions blocked in user-testing round 1 — **VAL-BACKUP-006, VAL-BACKUP-010, VAL-BACKUP-013, VAL-BACKUP-030, VAL-BACKUP-031** — MUST be evidenced by the Playwright harness added in feature `fix-m6-val-backup-restore-live-harness`:
+
+```
+npx playwright test \
+  src/e2e/multi-device/backup-publish-restore-live.spec.ts \
+  --project=desktop --workers 1
+```
+
+The spec self-hosts an isolated `bifrost-devtools` relay on `ws://127.0.0.1:8194`, uses two concurrent browser contexts (A publishes, B queries via raw NIP-01 REQ) on the SAME url/port, and a third fresh context to drive restore + unlock. It asserts, in one run:
+
+- **VAL-BACKUP-006** (app-side contract only — see below deviation): two publishes from the same share produce two distinct kind-10000 events with the same author pubkey and monotonic `created_at`. Both events are observed on an independent raw NIP-01 subscription (the local relay returns both — this is the documented deviation).
+- **VAL-BACKUP-031**: `second.created_at > first.created_at` strictly, even when both fall in the same wall-clock second.
+- **VAL-BACKUP-010**: a fresh context with empty IndexedDB calls `restoreProfileFromRelay` and adds a single `SavedProfile` whose `groupPublicKey` matches the source keyset.
+- **VAL-BACKUP-013**: calling `unlockProfile` on the restored profile boots a runtime whose `runtimeStatus.metadata.group_public_key` equals the source keyset's group pubkey.
+- **VAL-BACKUP-030**: calling `restoreProfileFromRelay` a second time with the same bfshare + password returns `alreadyExisted: true`, preserves the same profile id, and `profiles.length` stays at 1.
+
+**Validator instructions:**
+
+- For VAL-BACKUP-006 / VAL-BACKUP-010 / VAL-BACKUP-013 / VAL-BACKUP-030 / VAL-BACKUP-031, record the pass of the Playwright spec above as the authoritative evidence. Do **NOT** attempt agent-browser live sessions against `ws://127.0.0.1:8194` to verify the single-winner clause of VAL-BACKUP-006 / VAL-BACKUP-031 — the local relay is transport-only and will always return both events. The single-winner clause is a relay-level NIP-16/33 property.
+- For VAL-BACKUP-010 / VAL-BACKUP-013 / VAL-BACKUP-030 the live-browser restore path is blocked in practice by the wss://-only user-facing URL validation; the spec exercises the same `restoreProfileFromRelay` mutator the UI calls, via the DEV-only `__iglooTestAllowInsecureRelayForRestore` opt-in (see `docs/runtime-deviations-from-paper.md`).
+- The spec is robust to repeated runs: it binds a fresh relay in `beforeAll` and kills it in `afterAll`. If port 8194 is already bound the spec fails fast with an actionable error — stop `services.local_relay` (`lsof -ti :8194 | xargs kill`) before running.
+- Console errors inside each page are forwarded to stdout so validators can inspect them in-line if the spec ever regresses.
+
+**Related deviation**: `docs/runtime-deviations-from-paper.md > Local bifrost-devtools relay does NOT enforce NIP-16/33 replaceable semantics (VAL-BACKUP-006 / VAL-BACKUP-031)` covers the NIP-16/33 gap and the rationale for treating the spec as the canonical evidence.

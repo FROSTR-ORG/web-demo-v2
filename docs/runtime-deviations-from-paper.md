@@ -6,6 +6,67 @@ and the validation assertion IDs that cover it.
 
 ## Deviations
 
+### Local `bifrost-devtools` relay does NOT enforce NIP-16/33 replaceable semantics (VAL-BACKUP-006 / VAL-BACKUP-031)
+
+- **Paper / task source**: `validation-contract.md` VAL-BACKUP-006 ("Duplicate publish
+  replaces prior backup event — relays retain only the newer (NIP-16/33 replaceable).
+  Query `{ kinds: [10000], authors: [<share pubkey>] }` returns exactly one event (the
+  second).") and VAL-BACKUP-031 ("Replaceable-event race: only newer backup persists —
+  querying post-race returns the newer.").
+- **web-demo-v2 implementation**: `src/app/AppStateProvider.tsx`
+  (`publishProfileBackup` uses a session-scoped monotonic ref to guarantee a strictly
+  increasing `created_at` between back-to-back publishes, even inside the same
+  wall-clock second) + `src/lib/bifrost/buildProfileBackupEvent.ts` (event build
+  pipeline for kind 10000).
+- **Environment constraint — local relay is transport-only**: the local
+  `bifrost-devtools` relay exposed at `ws://127.0.0.1:8194` per
+  `services.local_relay` in `.factory/services.yaml` is a thin Nostr WebSocket echo
+  implementation. It does NOT implement NIP-16 (replaceable events) nor NIP-33
+  (parameterized replaceable events) — it retains every EVENT frame it observes and
+  returns all of them to any matching `REQ` filter. A raw NIP-01 subscription on
+  `{kinds:[10000], authors:[<share>]}` after two publishes therefore returns BOTH
+  events, not the single "newer" event the contract's single-winner clause calls for.
+  `bifrost-rs` is read-only reference material for this mission and must not be
+  modified to add replaceable-event enforcement.
+- **Validator consequence**: the live-browser user-testing validator CANNOT exercise
+  VAL-BACKUP-006 / VAL-BACKUP-031's single-winner clause against `ws://127.0.0.1:8194`.
+  Attempts produce a legitimate "both events returned" observation that the strict
+  assertion scoring flags as FAIL even though the application-side contract
+  (monotonic `created_at`, distinct event ids, same author pubkey, kind 10000) is
+  correctly satisfied by `publishProfileBackup`.
+- **What the app actually guarantees (and validates)**: the VAL-BACKUP-006 /
+  VAL-BACKUP-031 portion that IS under web-demo-v2's control — monotonic
+  `created_at` across two publishes, distinct event ids, same author pubkey,
+  kind 10000 — is asserted end-to-end by
+  `src/e2e/multi-device/backup-publish-restore-live.spec.ts`
+  (feature `fix-m6-val-backup-restore-live-harness`). The spec spawns its own
+  `bifrost-devtools` relay, opens a raw NIP-01 subscription on a second browser
+  context B, publishes twice from context A, and asserts:
+    - both events appear in the raw subscription (explicitly records the
+      local-relay deviation — >= 2 events returned for the same kind/author),
+    - `secondOutcome.event.created_at > firstOutcome.event.created_at`
+      (strict monotonicity — VAL-BACKUP-031), and
+    - the two event ids differ (distinct publishes).
+  The single-winner NIP-16/33 relay-side clause is pending verification against a
+  real compliant relay (e.g. any public wss relay in `{primal, damus, nos.lol}`);
+  the application code change that would be required if the relay enforced
+  replaceable semantics is ALREADY in place (deterministic monotonic `created_at`),
+  so the observed behaviour on a compliant relay is: "older event is replaced by the
+  newer, query returns exactly the second event".
+- **Validator guidance**: for VAL-BACKUP-006 and VAL-BACKUP-031, validators MUST
+  record the pass of
+  `npx playwright test src/e2e/multi-device/backup-publish-restore-live.spec.ts --project=desktop --workers 1`
+  as the authoritative evidence. Do not attempt live-browser relay queries against
+  `ws://127.0.0.1:8194` for these specific assertions — the local relay is
+  transport-only and will always return both events. See
+  `.factory/library/user-testing.md > Observed Tooling Notes (m6-backup)` for the
+  full guidance table.
+- **Assertion IDs covered**: VAL-BACKUP-006 (app-side contract — monotonic
+  `created_at`, distinct event ids, same author pubkey, kind 10000); VAL-BACKUP-031
+  (strict `second.created_at > first.created_at`). Also corroborates the
+  VAL-BACKUP-010 / VAL-BACKUP-013 / VAL-BACKUP-030 restore path the same spec
+  exercises.
+
 ### `restoreProfileFromRelay` — DEV-only `ws://` opt-in for multi-device e2e
 
 - **Paper / task source**: `igloo-paper/screens/restore-from-relay/screen.html` — the
