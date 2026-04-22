@@ -19,6 +19,7 @@ import {
   createOnboardingRequestBundle,
   decodeBfsharePackage,
   encodeBfsharePackage,
+  encodeOnboardPackage,
   defaultManualPeerPolicyOverrides,
   defaultBifrostEventKind,
   decodeBfonboardPackage,
@@ -148,6 +149,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [recoverSession, setRecoverSession] = useState<RecoverSession | null>(
     null,
   );
+  // m7-onboard-sponsor — transient hand-off state between the Config and
+  // Handoff screens. Populated by `createOnboardSponsorPackage`, cleared
+  // on Cancel / lock / clearCredentials.
+  const [
+    onboardSponsorSession,
+    setOnboardSponsorSession,
+  ] = useState<
+    import("./AppStateTypes").OnboardSponsorSession | null
+  >(null);
   const [runtimeCompletions, setRuntimeCompletions] = useState<
     CompletedOperation[]
   >([]);
@@ -363,6 +373,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setRotateKeysetSession(null);
       setReplaceShareSession(null);
       setRecoverSession(null);
+      setOnboardSponsorSession(null);
       setBridgeHydrated(true);
       return true;
     }
@@ -1768,6 +1779,135 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setOnboardSession(null);
   }, [abortOnboardHandshake]);
 
+  // m7-onboard-sponsor — generate a `bfonboard1…` hand-off package for
+  // a new device and stash it in `onboardSponsorSession`. The package
+  // round-trips through `decode_bfonboard_package` with the supplied
+  // password. Validation mirrors `updateRelays` (wss://-only, no dupes)
+  // for consistency with the Settings relay-list editor so users never
+  // see divergent error copy.
+  const createOnboardSponsorPackage = useCallback(
+    async (input: {
+      deviceLabel: string;
+      password: string;
+      relays: string[];
+    }): Promise<string> => {
+      const label = input.deviceLabel.trim();
+      if (label.length === 0) {
+        throw new Error(
+          (await import("./AppStateTypes"))
+            .ONBOARD_SPONSOR_LABEL_EMPTY_ERROR,
+        );
+      }
+      if (
+        (input.password ?? "").length <
+        (await import("./AppStateTypes"))
+          .ONBOARD_SPONSOR_PASSWORD_MIN_LENGTH
+      ) {
+        throw new Error(
+          (await import("./AppStateTypes"))
+            .ONBOARD_SPONSOR_PASSWORD_TOO_SHORT_ERROR,
+        );
+      }
+      if (signerPausedRef.current) {
+        throw new Error(
+          (await import("./AppStateTypes"))
+            .ONBOARD_SPONSOR_SIGNER_PAUSED_ERROR,
+        );
+      }
+
+      const { validateRelayUrl, normalizeRelayKey } = await import(
+        "../lib/relay/relayUrl"
+      );
+      const validated: string[] = [];
+      const seenKeys = new Set<string>();
+      for (const raw of input.relays ?? []) {
+        const trimmed = (raw ?? "").trim();
+        if (trimmed.length === 0) continue;
+        const ok = validateRelayUrl(trimmed);
+        const key = normalizeRelayKey(ok);
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        validated.push(ok);
+      }
+      if (validated.length === 0) {
+        throw new Error(
+          (await import("./AppStateTypes"))
+            .ONBOARD_SPONSOR_RELAY_EMPTY_ERROR,
+        );
+      }
+
+      const payload = unlockedPayloadRef.current;
+      if (!payload) {
+        throw new Error(
+          "Unlock a profile before sponsoring a new device.",
+        );
+      }
+
+      // VAL-ONBOARD-021 — reject threshold misuse upstream. `0 < t ≤ n`
+      // is the only valid configuration; anything else means the stored
+      // profile is corrupted and we must not generate a package from it.
+      const threshold = payload.group_package.threshold;
+      const memberCount = payload.group_package.members.length;
+      if (
+        !Number.isFinite(threshold) ||
+        !Number.isFinite(memberCount) ||
+        threshold <= 0 ||
+        memberCount <= 0 ||
+        threshold > memberCount
+      ) {
+        throw new Error(
+          (await import("./AppStateTypes"))
+            .ONBOARD_SPONSOR_THRESHOLD_INVALID_ERROR,
+        );
+      }
+
+      const shareSecret = payload.device.share_secret;
+      if (!shareSecret || shareSecret.length !== 64) {
+        throw new Error("Active profile is missing a share secret.");
+      }
+
+      // Derive the sponsor's own x-only pubkey from the share's
+      // member entry in the group package. This matches the identity
+      // used by `build_profile_backup_event` so the requester's
+      // handshake targets the correct peer.
+      const memberIdx = await resolveShareIndex(
+        payload.group_package,
+        shareSecret,
+      );
+      const selfMember = payload.group_package.members.find(
+        (m) => m.idx === memberIdx,
+      );
+      if (!selfMember) {
+        throw new Error(
+          "Active profile's share is not a member of its group.",
+        );
+      }
+      const selfPubkeyXOnly = memberPubkeyXOnly(selfMember);
+
+      const packageText = await encodeOnboardPackage(
+        {
+          share_secret: shareSecret,
+          relays: validated,
+          peer_pk: selfPubkeyXOnly,
+        },
+        input.password,
+      );
+
+      setOnboardSponsorSession({
+        deviceLabel: label,
+        packageText,
+        relays: validated,
+        createdAt: Date.now(),
+      });
+      return packageText;
+    },
+    [],
+  );
+
+  const clearOnboardSponsorSession = useCallback(() => {
+    setOnboardSponsorSession(null);
+  }, []);
+
   const validateRotateKeysetSources = useCallback(
     async (input: {
       profileId: string;
@@ -2635,6 +2775,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setRotateKeysetSession(null);
     setReplaceShareSession(null);
     setRecoverSession(null);
+    setOnboardSponsorSession(null);
     resetDrainSlices();
   }, [abortOnboardHandshake, resetDrainSlices, stopRelayPump]);
 
@@ -2694,6 +2835,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setRotateKeysetSession(null);
     setReplaceShareSession(null);
     setRecoverSession(null);
+    setOnboardSponsorSession(null);
     resetDrainSlices();
     if (id) {
       await removeProfile(id);
@@ -3843,6 +3985,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       rotateKeysetSession,
       replaceShareSession,
       recoverSession,
+      onboardSponsorSession,
       runtimeCompletions,
       runtimeFailures,
       lifecycleEvents,
@@ -3873,6 +4016,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       startOnboardHandshake,
       saveOnboardedProfile,
       clearOnboardSession,
+      createOnboardSponsorPackage,
+      clearOnboardSponsorSession,
       validateRotateKeysetSources,
       generateRotatedKeyset,
       createRotatedProfile,
@@ -3912,6 +4057,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       rotateKeysetSession,
       replaceShareSession,
       recoverSession,
+      onboardSponsorSession,
       runtimeCompletions,
       runtimeFailures,
       lifecycleEvents,
@@ -3942,6 +4088,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       startOnboardHandshake,
       saveOnboardedProfile,
       clearOnboardSession,
+      createOnboardSponsorPackage,
+      clearOnboardSponsorSession,
       validateRotateKeysetSources,
       generateRotatedKeyset,
       createRotatedProfile,

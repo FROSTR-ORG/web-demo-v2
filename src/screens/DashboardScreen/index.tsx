@@ -1029,6 +1029,7 @@ export function DashboardScreen() {
           }}
           onExportShare={() => handleOpenExport("share")}
           onPublishBackup={handleOpenPublishBackup}
+          signerPaused={signerPaused}
         />
       )}
     </AppShell>

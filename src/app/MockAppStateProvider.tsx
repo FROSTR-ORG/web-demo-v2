@@ -61,6 +61,9 @@ export function MockAppStateProvider({
     value.replaceShareSession,
   );
   const [recoverSession, setRecoverSession] = useState(value.recoverSession);
+  const [onboardSponsorSession, setOnboardSponsorSession] = useState<
+    import("./AppStateTypes").OnboardSponsorSession | null
+  >(value.onboardSponsorSession ?? null);
   const [runtimeCompletions, setRuntimeCompletions] = useState(
     value.runtimeCompletions ?? [],
   );
@@ -353,6 +356,29 @@ export function MockAppStateProvider({
   const clearOnboardSession = useCallback(() => {
     value.clearOnboardSession();
     setOnboardSession(null);
+  }, [value]);
+
+  // m7-onboard-sponsor — delegate to the seeded mutator (tests typically
+  // inject a spy via `value.createOnboardSponsorPackage`) but mirror the
+  // generated session locally so UI rendering follows the real
+  // AppStateProvider contract.
+  const createOnboardSponsorPackage = useCallback(
+    async (input: Parameters<AppStateValue["createOnboardSponsorPackage"]>[0]) => {
+      const packageText = await value.createOnboardSponsorPackage(input);
+      setOnboardSponsorSession({
+        deviceLabel: input.deviceLabel.trim(),
+        packageText,
+        relays: input.relays,
+        createdAt: Date.now(),
+      });
+      return packageText;
+    },
+    [value],
+  );
+
+  const clearOnboardSponsorSession = useCallback(() => {
+    value.clearOnboardSponsorSession();
+    setOnboardSponsorSession(null);
   }, [value]);
 
   const validateRotateKeysetSources: AppStateValue["validateRotateKeysetSources"] =
@@ -735,6 +761,7 @@ export function MockAppStateProvider({
       rotateKeysetSession,
       replaceShareSession,
       recoverSession,
+      onboardSponsorSession,
       runtimeCompletions,
       runtimeFailures,
       lifecycleEvents,
@@ -763,6 +790,8 @@ export function MockAppStateProvider({
       startOnboardHandshake,
       saveOnboardedProfile,
       clearOnboardSession,
+      createOnboardSponsorPackage,
+      clearOnboardSponsorSession,
       validateRotateKeysetSources,
       generateRotatedKeyset,
       createRotatedProfile,
@@ -802,6 +831,7 @@ export function MockAppStateProvider({
       rotateKeysetSession,
       replaceShareSession,
       recoverSession,
+      onboardSponsorSession,
       runtimeCompletions,
       runtimeFailures,
       lifecycleEvents,
@@ -830,6 +860,8 @@ export function MockAppStateProvider({
       startOnboardHandshake,
       saveOnboardedProfile,
       clearOnboardSession,
+      createOnboardSponsorPackage,
+      clearOnboardSponsorSession,
       validateRotateKeysetSources,
       generateRotatedKeyset,
       createRotatedProfile,

@@ -146,16 +146,19 @@ function renderWith(demoUi: DemoUi) {
 
 describe("dashboard-settings-sidebar-fidelity", () => {
   describe("VAL-DSH-010: Sidebar section order + Paper-parity rows", () => {
-    it("renders Device Profile, Group Profile, Replace Share, Export & Backup, Profile Security sections in order", () => {
+    it("renders Device Profile, Group Profile, Replace Share, Onboard a Device, Export & Backup, Profile Security sections in order", () => {
       renderWith({ dashboard: { settingsOpen: true, paperPanels: true } });
       const sidebar = screen.getByTestId("settings-sidebar");
       const labels = Array.from(
         sidebar.querySelectorAll(".settings-section-label")
       ).map((el) => el.textContent);
+      // m7-onboard-sponsor-ui — "Onboard a Device" sits between
+      // Replace Share and Export & Backup per VAL-ONBOARD-001.
       expect(labels).toEqual([
         "Device Profile",
         "Group Profile",
         "Replace Share",
+        "Onboard a Device",
         "Export & Backup",
         "Profile Security",
       ]);

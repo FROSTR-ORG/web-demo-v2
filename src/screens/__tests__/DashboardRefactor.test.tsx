@@ -282,10 +282,13 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
       const labels = Array.from(sidebar.querySelectorAll(".settings-section-label")).map(
         (el) => el.textContent
       );
+      // m7-onboard-sponsor-ui — "Onboard a Device" sits between
+      // Replace Share and Export & Backup per VAL-ONBOARD-001.
       expect(labels).toEqual([
         "Device Profile",
         "Group Profile",
         "Replace Share",
+        "Onboard a Device",
         "Export & Backup",
         "Profile Security",
       ]);

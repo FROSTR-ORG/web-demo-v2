@@ -142,6 +142,59 @@ export interface RecoverSession {
   expiresAt?: number;
 }
 
+/**
+ * m7-onboard-sponsor — transient state captured between the
+ * OnboardSponsorConfigScreen (form) and OnboardSponsorHandoffScreen
+ * (Copy / QR / Cancel hand-off). Populated by
+ * {@link AppStateValue.createOnboardSponsorPackage} after a successful
+ * `encode_bfonboard_package` round-trip and cleared by
+ * {@link AppStateValue.clearOnboardSponsorSession} (on Cancel / after
+ * the sponsor completes).
+ *
+ * The package text is a `bfonboard1…` string suitable for hand-off to
+ * the requester device; it round-trips through `decode_bfonboard_package`
+ * with the same password the user supplied. The password itself is
+ * NEVER stored on this session (mirrors the Create/Distribute flow
+ * invariant) — the caller must re-prompt if it is needed again.
+ */
+export interface OnboardSponsorSession {
+  deviceLabel: string;
+  packageText: string;
+  relays: string[];
+  /**
+   * Epoch-ms timestamp of when this package was generated. Used by the
+   * hand-off screen to surface a lightweight "generated just now"
+   * indicator and by future flow features to enforce TTL.
+   */
+  createdAt: number;
+}
+
+/**
+ * m7-onboard-sponsor — inline-validation copy surfaced by the
+ * OnboardSponsorConfigScreen. Re-exported so component tests can assert
+ * on the exact strings without re-hardcoding them. The copy matches the
+ * conventions used by the Settings sidebar relay-list editor and
+ * Change Password flow.
+ */
+export const ONBOARD_SPONSOR_LABEL_EMPTY_ERROR =
+  "Device label cannot be empty.";
+export const ONBOARD_SPONSOR_PASSWORD_TOO_SHORT_ERROR =
+  "Password must be at least 8 characters.";
+export const ONBOARD_SPONSOR_PASSWORD_MISMATCH_ERROR =
+  "Passwords do not match.";
+export const ONBOARD_SPONSOR_RELAY_EMPTY_ERROR =
+  "At least one relay is required.";
+export const ONBOARD_SPONSOR_SIGNER_PAUSED_ERROR =
+  "Signer is paused. Resume the signer to sponsor a new device.";
+export const ONBOARD_SPONSOR_THRESHOLD_INVALID_ERROR =
+  "Invalid threshold — cannot sponsor from this keyset.";
+export const ONBOARD_SPONSOR_DUPLICATE_LABEL_WARNING =
+  "A device with this label already exists. Sponsoring will create a second device with the same name.";
+
+/** Minimum password length for onboard-sponsor hand-off (mirrors
+ *  VAL-ONBOARD-003 ≥ 8 chars). */
+export const ONBOARD_SPONSOR_PASSWORD_MIN_LENGTH = 8;
+
 export type OnboardingPackageStatePatch = Partial<
   Pick<
     OnboardingPackageView,
@@ -567,6 +620,12 @@ export interface AppStateValue {
   rotateKeysetSession: RotateKeysetSession | null;
   replaceShareSession: ReplaceShareSession | null;
   recoverSession: RecoverSession | null;
+  /**
+   * m7-onboard-sponsor — see {@link OnboardSponsorSession}. Non-null
+   * only while the sponsor hand-off screen is active. Cleared by
+   * {@link clearOnboardSponsorSession}.
+   */
+  onboardSponsorSession: OnboardSponsorSession | null;
   /**
    * Successful operation completions drained from the runtime, ordered by
    * ascending `request_id`. Populated each refresh tick by AppStateProvider
@@ -1019,6 +1078,37 @@ export interface AppStateValue {
   setSignerPaused: (paused: boolean) => void;
   refreshRuntime: () => void;
   restartRuntimeConnections: () => Promise<void>;
+  /**
+   * m7-onboard-sponsor — generate a `bfonboard1…` hand-off package for
+   * a new device and stash it in
+   * {@link AppStateValue.onboardSponsorSession} so the handoff screen
+   * can render it.
+   *
+   * Flow:
+   *   1. Validate inputs (label non-empty after trim, password ≥ 8 chars,
+   *      every relay a syntactically valid `wss://` URL with no dupes).
+   *   2. Reject when the signer is paused (VAL-ONBOARD-024).
+   *   3. Reject when the active profile's threshold is misconfigured
+   *      (t=0 or t>n) (VAL-ONBOARD-021).
+   *   4. Encode via `encode_bfonboard_package` using the active share's
+   *      secret + sponsor's own pubkey.
+   *   5. Store the package text + label + relays in the session.
+   *   6. Return the generated package text so callers can navigate to
+   *      the hand-off screen.
+   *
+   * The password itself is NEVER stored on the session (mirrors the
+   * Create/Distribute flow invariant).
+   */
+  createOnboardSponsorPackage: (input: {
+    deviceLabel: string;
+    password: string;
+    relays: string[];
+  }) => Promise<string>;
+  /**
+   * m7-onboard-sponsor — clear any active sponsorship session. Called
+   * by Cancel on the hand-off screen and on profile lock / clear.
+   */
+  clearOnboardSponsorSession: () => void;
   /**
    * Dispatches a runtime command to the underlying
    * `RuntimeClient.handleCommand`. The call is synchronous on the bridge but

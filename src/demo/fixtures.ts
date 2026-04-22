@@ -284,6 +284,7 @@ export function createDemoAppState(
     rotateKeysetSession: null,
     replaceShareSession: null,
     recoverSession: null,
+    onboardSponsorSession: null,
     reloadProfiles: async () => undefined,
     createKeyset: async () => undefined,
     createProfile: async () => DEMO_PROFILE_ID,
@@ -362,6 +363,9 @@ export function createDemoAppState(
     setSignerPaused: () => undefined,
     refreshRuntime: () => undefined,
     restartRuntimeConnections: async () => undefined,
+    createOnboardSponsorPackage: async () =>
+      "bfonboard1demoSponsorPackageFixturePlaceholderStringOnly",
+    clearOnboardSponsorSession: () => undefined,
     runtimeCompletions: [],
     runtimeFailures: [],
     lifecycleEvents: [],

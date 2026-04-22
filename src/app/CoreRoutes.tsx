@@ -8,6 +8,7 @@ import { DistributionCompleteScreen } from "../screens/DistributionCompleteScree
 import { GenerationProgressScreen } from "../screens/GenerationProgressScreen";
 import { LoadBackupScreen, DecryptBackupScreen, ReviewSaveScreen, ImportErrorScreen } from "../screens/ImportScreens";
 import { EnterPackageScreen, HandshakeScreen, OnboardingFailedScreen, OnboardingCompleteScreen } from "../screens/OnboardScreens";
+import { OnboardSponsorConfigScreen, OnboardSponsorHandoffScreen } from "../screens/OnboardSponsorScreens";
 import { CollectSharesScreen, RecoverSuccessScreen } from "../screens/RecoverScreens";
 import {
   RotateKeysetFormScreen,
@@ -54,6 +55,8 @@ export function CoreRoutes({ location, extraRoutes, relative = false }: { locati
       <Route path={pathFor("/onboard/handshake", relative)} element={<HandshakeScreen />} />
       <Route path={pathFor("/onboard/failed", relative)} element={<OnboardingFailedScreen />} />
       <Route path={pathFor("/onboard/complete", relative)} element={<OnboardingCompleteScreen />} />
+      <Route path={pathFor("/onboard-sponsor", relative)} element={<OnboardSponsorConfigScreen />} />
+      <Route path={pathFor("/onboard-sponsor/handoff", relative)} element={<OnboardSponsorHandoffScreen />} />
       <Route path={pathFor("/rotate-keyset", relative)} element={<RotateKeysetFormScreen />} />
       <Route path={pathFor("/rotate-keyset/review", relative)} element={<ReviewGenerateScreen />} />
       <Route path={pathFor("/rotate-keyset/progress", relative)} element={<RotateGenerationProgressScreen />} />

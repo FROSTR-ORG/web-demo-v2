@@ -162,6 +162,12 @@ interface SettingsSidebarProps {
    * handler; callers that OMIT it will hide the action row.
    */
   onPublishBackup?: () => void;
+  /**
+   * m7-onboard-sponsor-ui — disables the "Onboard a Device" entry and
+   * surfaces a tooltip/help hint when the signer is paused
+   * (VAL-ONBOARD-024). Defaults to `false`.
+   */
+  signerPaused?: boolean;
 }
 
 export function SettingsSidebar({
@@ -177,6 +183,7 @@ export function SettingsSidebar({
   onExport,
   onExportShare,
   onPublishBackup,
+  signerPaused = false,
 }: SettingsSidebarProps) {
   const navigate = useNavigate();
   const {
@@ -246,10 +253,14 @@ export function SettingsSidebar({
    * the pending action, clicking "Keep editing" clears it and
    * leaves the sidebar open.
    */
-  const [pendingNavAction, setPendingNavAction] =
-    useState<null | "close" | "lock" | "clearCredentials" | "replaceShare">(
-      null,
-    );
+  const [pendingNavAction, setPendingNavAction] = useState<
+    | null
+    | "close"
+    | "lock"
+    | "clearCredentials"
+    | "replaceShare"
+    | "onboardSponsor"
+  >(null);
 
   // Keep the draft in sync with the persisted name whenever the user is
   // NOT actively editing. Without this, a rename persisted from another
@@ -554,7 +565,12 @@ export function SettingsSidebar({
    * the happy path.
    */
   function guardNav(
-    action: "close" | "lock" | "clearCredentials" | "replaceShare",
+    action:
+      | "close"
+      | "lock"
+      | "clearCredentials"
+      | "replaceShare"
+      | "onboardSponsor",
     run: () => void,
   ): void {
     if (!hasUnsavedChanges()) {
@@ -595,6 +611,11 @@ export function SettingsSidebar({
       // navigate to the Replace Share flow.
       onClose();
       navigate("/replace-share");
+    } else if (action === "onboardSponsor") {
+      // m7-onboard-sponsor-ui — same pattern as replaceShare: dismiss
+      // the sidebar, then hand off to the sponsor configure screen.
+      onClose();
+      navigate("/onboard-sponsor");
     }
   }
 
@@ -1025,6 +1046,54 @@ export function SettingsSidebar({
               </button>
             </div>
 
+          </div>
+
+          {/* ONBOARD A DEVICE (m7-onboard-sponsor-ui) */}
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <span className="settings-section-label">Onboard a Device</span>
+              <span className="settings-section-rule" />
+            </div>
+            <div className="settings-action-row">
+              <div className="settings-action-info">
+                <div className="settings-action-name">Onboard a Device</div>
+                <div className="settings-action-desc">
+                  Sponsor a new device to join this keyset
+                </div>
+              </div>
+              <button
+                type="button"
+                className="settings-btn-blue"
+                data-testid="settings-onboard-sponsor-btn"
+                aria-label="Onboard a Device"
+                aria-describedby={
+                  signerPaused ? "settings-onboard-sponsor-paused" : undefined
+                }
+                disabled={signerPaused}
+                title={
+                  signerPaused
+                    ? "Signer is paused. Resume the signer to sponsor a new device."
+                    : undefined
+                }
+                onClick={() =>
+                  guardNav("onboardSponsor", () => {
+                    onClose();
+                    navigate("/onboard-sponsor");
+                  })
+                }
+              >
+                Onboard Device
+              </button>
+            </div>
+            {signerPaused && (
+              <div
+                className="settings-hint"
+                id="settings-onboard-sponsor-paused"
+                data-testid="settings-onboard-sponsor-paused-hint"
+              >
+                Signer is paused. Resume the signer to sponsor a new device.
+              </div>
+            )}
           </div>
 
           {/* EXPORT & BACKUP */}
