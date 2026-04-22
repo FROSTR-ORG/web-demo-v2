@@ -1,3 +1,4 @@
+import { createRef, useState } from "react";
 import {
   act,
   cleanup,
@@ -16,6 +17,11 @@ import type {
   PeerStatus,
 } from "../../../../lib/bifrost/types";
 import { createDemoAppState } from "../../../../demo/fixtures";
+import {
+  DefaultPolicyDropdown,
+  type DefaultPolicyDropdownHandle,
+  type DefaultPolicyOption,
+} from "../../panels/DefaultPolicyDropdown";
 import { PoliciesState } from "../PoliciesState";
 
 /**
@@ -591,6 +597,220 @@ describe("DefaultPolicyDropdown — semantics + keyboard + ARIA (VAL-POLICIES-01
     expect(allowDenyCalls).toHaveLength(0);
     // All dropdown-emitted dispatches still target `respond.*`.
     assertAllDispatchesTargetRespond(dispatch);
+  });
+
+  it("eager drop: chip write BEFORE snapshot tick survives a subsequent default switch (fix-m3-default-policy-no-clobber-race-eager-drop)", async () => {
+    // Race window reproduction:
+    //   (a) Dropdown applies "Deny by default" — writes respond.{sign,ecdh,
+    //       ping,onboard}=deny to the runtime for peer P and records those
+    //       cells in `defaultAppliedKeys`.
+    //   (b) Runtime snapshot propagates the deny into manual_override.respond.*
+    //       for P.
+    //   (c) The user clicks a (hypothetical future) respond.* chip for P.sign
+    //       that dispatches setPeerPolicyOverride({peer: P, direction: "respond",
+    //       method: "sign", value: "allow"}). The dispatch fires IMMEDIATELY,
+    //       but the runtime has not yet reflected it back through the poller,
+    //       so `peerPermissionStates` still shows respond.sign=deny on the
+    //       next render.
+    //   (d) Before any `peerPermissionStates` tick arrives, the user switches
+    //       the default to "Ask every time". Without the eager-drop fix the
+    //       dropdown still owns (P, respond, sign) in `defaultAppliedKeys`
+    //       and dispatches `unset` for it — clobbering the user-authored
+    //       chip write.
+    //
+    // The fix wires the PeerPolicyChip dispatch path (via PoliciesState's
+    // setPeerPolicyOverride wrapper) to call the DefaultPolicyDropdown
+    // imperative handle's `notifyPeerPolicyWrite(cell)` the MOMENT the
+    // dispatch lands, dropping dropdown ownership of that cell before any
+    // snapshot propagates. This test exercises that handle directly so the
+    // race is reproduced deterministically (no real runtime / poll-tick
+    // timing).
+    const dispatch = vi.fn(async () => undefined);
+    const handleRef = createRef<DefaultPolicyDropdownHandle>();
+    const peer = PEER_A_PUBKEY;
+
+    const initialStates: PeerPermissionState[] = [
+      {
+        pubkey: peer,
+        manual_override: null,
+        remote_observation: { observed_at: Date.now() },
+        effective_policy: {
+          request: {
+            sign: "allow",
+            ecdh: "allow",
+            ping: "allow",
+            onboard: "deny",
+          },
+          respond: {},
+        },
+      } as PeerPermissionState,
+    ];
+
+    function Harness({ states }: { states: PeerPermissionState[] }) {
+      const [value, setValue] = useState<DefaultPolicyOption>("Ask every time");
+      return (
+        <DefaultPolicyDropdown
+          ref={handleRef}
+          value={value}
+          onChange={setValue}
+          peerPermissionStates={states}
+          dispatch={dispatch}
+        />
+      );
+    }
+
+    const view = render(<Harness states={initialStates} />);
+
+    // (a) Apply "Deny by default" — dropdown writes deny to respond.* for peer.
+    const trigger = screen.getByRole("combobox", { name: /default policy/i });
+    await act(async () => {
+      trigger.focus();
+      fireEvent.keyDown(trigger, { key: "Enter" });
+    });
+    const denyOption = screen.getByRole("radio", { name: "Deny by default" });
+    await act(async () => {
+      fireEvent.click(denyOption);
+    });
+    await waitFor(() => {
+      const deniedPeers = dispatchedPeersForValue(dispatch, "deny");
+      expect(deniedPeers.has(peer)).toBe(true);
+    });
+
+    // (b) Propagate the deny into the snapshot so the dropdown sees its
+    // writes reflected in manual_override.respond.*.
+    const afterDeny: PeerPermissionState[] = [
+      {
+        pubkey: peer,
+        manual_override: {
+          request: {},
+          respond: {
+            sign: "deny",
+            ecdh: "deny",
+            ping: "deny",
+            onboard: "deny",
+          },
+        },
+        remote_observation: { observed_at: Date.now() },
+        effective_policy: {
+          request: {
+            sign: "allow",
+            ecdh: "allow",
+            ping: "allow",
+            onboard: "deny",
+          },
+          respond: {
+            sign: "deny",
+            ecdh: "deny",
+            ping: "deny",
+            onboard: "deny",
+          },
+        },
+      } as PeerPermissionState,
+    ];
+    view.rerender(<Harness states={afterDeny} />);
+
+    // (c) Simulate a respond.sign chip click that dispatches but has NOT
+    //     yet propagated through the poller. In production PoliciesState
+    //     wraps setPeerPolicyOverride for the chip path so this notify is
+    //     invoked synchronously when the chip fires — here we invoke the
+    //     imperative handle directly to reproduce that exact moment.
+    //
+    //     Crucially, we do NOT rerender with an updated snapshot — this
+    //     captures the race window where the runtime has not yet echoed
+    //     the chip's write back.
+    act(() => {
+      handleRef.current?.notifyPeerPolicyWrite({
+        peer,
+        direction: "respond",
+        method: "sign",
+      });
+    });
+
+    dispatch.mockClear();
+
+    // (d) IMMEDIATE default switch to "Ask every time" BEFORE any
+    //     peerPermissionStates tick arrives.
+    const trigger2 = screen.getByRole("combobox", { name: /default policy/i });
+    await act(async () => {
+      trigger2.focus();
+      fireEvent.keyDown(trigger2, { key: "Enter" });
+    });
+    const askOption = screen.getByRole("radio", { name: "Ask every time" });
+    await act(async () => {
+      fireEvent.click(askOption);
+    });
+
+    // The three cells the dropdown still owns — respond.{ecdh,ping,onboard} —
+    // get reverted with `unset`. The eagerly-dropped respond.sign cell must
+    // NOT be reverted.
+    await waitFor(() => {
+      for (const method of ["ecdh", "ping", "onboard"] as const) {
+        expect(dispatch).toHaveBeenCalledWith({
+          peer,
+          direction: "respond",
+          method,
+          value: "unset",
+        });
+      }
+    });
+
+    const dispatchLog = (
+      dispatch as unknown as ReturnType<typeof vi.fn>
+    ).mock.calls as unknown as ReadonlyArray<
+      [
+        {
+          peer: string;
+          direction: string;
+          method: string;
+          value: string;
+        },
+      ]
+    >;
+    const signUnsetCalls = dispatchLog.filter((call) => {
+      const arg = call[0];
+      return (
+        arg.peer === peer &&
+        arg.direction === "respond" &&
+        arg.method === "sign" &&
+        arg.value === "unset"
+      );
+    });
+    expect(signUnsetCalls).toHaveLength(0);
+
+    // Ask-every-time must not emit any allow/deny writes.
+    const allowDenyCalls = dispatchLog.filter((call) => {
+      const arg = call[0];
+      return arg.value === "allow" || arg.value === "deny";
+    });
+    expect(allowDenyCalls).toHaveLength(0);
+  });
+
+  it("wrapped setPeerPolicyOverride: PoliciesState forwards chip dispatch through a wrapper that notifies the dropdown handle (fix-m3-default-policy-no-clobber-race-eager-drop)", async () => {
+    // Integration guard: PoliciesState wraps the chip's onDispatch
+    // prop so every chip write synchronously notifies DefaultPolicyDropdown
+    // to drop ownership. We verify the wrapper's call-through (the
+    // underlying setPeerPolicyOverride is still invoked exactly once
+    // per chip click) because the eager-drop logic must not regress
+    // the VAL-POLICIES-008 "one dispatch per click" contract.
+    const dispatch = vi.fn(async () => undefined);
+    renderPolicies({ dispatch });
+
+    // Click a SIGN chip on peer A to cycle unset → allow (writes request.*).
+    const chip = screen.getByTestId(`peer-policy-chip-${PEER_A_PUBKEY}-sign`);
+    await act(async () => {
+      fireEvent.click(chip);
+    });
+
+    await waitFor(() => {
+      expect(dispatch).toHaveBeenCalledWith({
+        peer: PEER_A_PUBKEY,
+        direction: "request",
+        method: "sign",
+        value: "allow",
+      });
+    });
+    // Exactly one dispatch landed (wrapper must not double-call).
+    expect(dispatch).toHaveBeenCalledTimes(1);
   });
 
   it("role=radio with aria-checked: exactly one option checked at a time (VAL-POLICIES-019)", async () => {

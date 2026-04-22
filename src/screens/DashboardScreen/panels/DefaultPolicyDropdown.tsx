@@ -1,7 +1,9 @@
 import {
+  forwardRef,
   useCallback,
   useEffect,
   useId,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -59,6 +61,44 @@ export interface DefaultPolicyDropdownProps {
     method: PolicyMethod;
     value: BfPolicyOverrideValue;
   }) => Promise<void>;
+}
+
+/**
+ * Imperative handle exposed by `DefaultPolicyDropdown` so a parent
+ * (typically `PoliciesState`) can notify the dropdown the MOMENT any
+ * external `setPeerPolicyOverride` call lands for a cell the dropdown
+ * currently owns in `defaultAppliedKeys` — BEFORE the next
+ * `peer_permission_states` snapshot propagates.
+ *
+ * This closes the race window exposed by
+ * `fix-m3-default-policy-no-clobber-race-eager-drop`:
+ *   1. Dropdown applies "Deny by default" — records respond.{sign,ecdh,
+ *      ping,onboard} in `defaultAppliedKeys`.
+ *   2. Snapshot reflects the deny into `manual_override.respond.*`.
+ *   3. User clicks a respond.sign chip that dispatches
+ *      `setPeerPolicyOverride(... value: "allow")`. The runtime has not
+ *      yet echoed the write back.
+ *   4. Before the next poll tick, the user switches the default to
+ *      "Ask every time". Without this eager-drop, the dropdown still
+ *      owns (peer, respond, sign) in `defaultAppliedKeys` and would
+ *      dispatch `unset` for it — clobbering the user-authored write.
+ *
+ * The snapshot-driven `pruneDefaultAppliedMap` remains in place as a
+ * safety net for writes that land outside the wrapped path (e.g.
+ * future non-React dispatches or direct runtime interventions).
+ */
+export interface DefaultPolicyDropdownHandle {
+  /**
+   * Drop dropdown ownership of `(peer, direction, method)` immediately.
+   * A later default-policy switch will NOT dispatch `unset` for this
+   * cell. Idempotent — passing a cell that isn't currently owned is a
+   * no-op.
+   */
+  notifyPeerPolicyWrite: (input: {
+    peer: string;
+    direction: "request" | "respond";
+    method: PolicyMethod;
+  }) => void;
 }
 
 /**
@@ -197,12 +237,13 @@ function pruneDefaultAppliedMap(
  *    selection; outside click (mousedown anywhere outside the wrapper)
  *    closes without selection.
  */
-export function DefaultPolicyDropdown({
-  value,
-  onChange,
-  peerPermissionStates,
-  dispatch,
-}: DefaultPolicyDropdownProps) {
+export const DefaultPolicyDropdown = forwardRef<
+  DefaultPolicyDropdownHandle,
+  DefaultPolicyDropdownProps
+>(function DefaultPolicyDropdown(
+  { value, onChange, peerPermissionStates, dispatch },
+  ref,
+) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(() =>
     Math.max(0, DEFAULT_POLICY_OPTIONS.indexOf(value)),
@@ -222,6 +263,27 @@ export function DefaultPolicyDropdown({
    */
   const defaultAppliedKeysRef = useRef<Map<string, "allow" | "deny">>(
     new Map(),
+  );
+
+  // Eager-drop handle: the parent (`PoliciesState`) wraps the chip's
+  // `setPeerPolicyOverride` path and calls `notifyPeerPolicyWrite` the
+  // MOMENT a chip dispatches a write. We synchronously delete the
+  // matching `defaultAppliedKeys` entry so a subsequent rapid default
+  // switch — arriving BEFORE `peer_permission_states` propagates the
+  // new value — cannot clobber the user-authored cell. See
+  // `fix-m3-default-policy-no-clobber-race-eager-drop`.
+  //
+  // `pruneDefaultAppliedMap` remains the snapshot-driven safety net
+  // for writes that land outside the wrapped path.
+  useImperativeHandle(
+    ref,
+    () => ({
+      notifyPeerPolicyWrite({ peer, direction, method }) {
+        const key = `${peer}:${direction}:${method}`;
+        defaultAppliedKeysRef.current.delete(key);
+      },
+    }),
+    [],
   );
 
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -499,4 +561,4 @@ export function DefaultPolicyDropdown({
       ) : null}
     </div>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useAppState } from "../../../app/AppState";
 import type { PolicyOverrideEntry } from "../../../app/AppStateTypes";
 import { PermissionBadge } from "../../../components/ui";
@@ -12,6 +12,7 @@ import type {
 import { MOCK_PEER_POLICIES } from "../mocks";
 import {
   DefaultPolicyDropdown,
+  type DefaultPolicyDropdownHandle,
   type DefaultPolicyOption,
 } from "../panels/DefaultPolicyDropdown";
 import {
@@ -175,6 +176,48 @@ export function PoliciesState({
     appState.removePolicyOverride ?? (async () => undefined);
   const setPeerPolicyOverride =
     appState.setPeerPolicyOverride ?? (async () => undefined);
+
+  // Imperative handle to DefaultPolicyDropdown so any external
+  // setPeerPolicyOverride call for a cell the dropdown currently owns
+  // can drop that ownership eagerly — BEFORE `peer_permission_states`
+  // echoes the write back. Closes the race window exposed by
+  // `fix-m3-default-policy-no-clobber-race-eager-drop`. The
+  // snapshot-driven prune inside the dropdown remains as a safety net
+  // for writes that land outside this wrapped path.
+  const defaultPolicyDropdownRef = useRef<DefaultPolicyDropdownHandle | null>(
+    null,
+  );
+
+  /**
+   * Chip-path wrapper around `setPeerPolicyOverride`. Synchronously
+   * notifies the DefaultPolicyDropdown that a cell is about to be
+   * written (so dropdown ownership is dropped IMMEDIATELY, before any
+   * snapshot tick), then delegates to the underlying AppState mutator.
+   *
+   * The dropdown's own writes intentionally bypass this wrapper — the
+   * dropdown manages its `defaultAppliedKeys` map internally (populates
+   * it after phase 2 of `applyDefault`), so eagerly deleting keys
+   * mid-apply would break the `hasUserOverride` check in phase 2. Pass
+   * the ORIGINAL `setPeerPolicyOverride` to DefaultPolicyDropdown's
+   * `dispatch` prop below.
+   */
+  const wrappedSetPeerPolicyOverride = useCallback(
+    async (input: {
+      peer: string;
+      direction: "request" | "respond";
+      method: "sign" | "ecdh" | "ping" | "onboard";
+      value: BfPolicyOverrideValue;
+    }): Promise<void> => {
+      defaultPolicyDropdownRef.current?.notifyPeerPolicyWrite({
+        peer: input.peer,
+        direction: input.direction,
+        method: input.method,
+      });
+      await setPeerPolicyOverride(input);
+    },
+    [setPeerPolicyOverride],
+  );
+
   const [defaultPolicy, setDefaultPolicy] =
     useState<DefaultPolicyOption>("Ask every time");
   const [removalError, setRemovalError] = useState<string | null>(null);
@@ -244,6 +287,7 @@ export function PoliciesState({
           <div className="policies-header-right">
             <span className="policies-default-label">Default policy</span>
             <DefaultPolicyDropdown
+              ref={defaultPolicyDropdownRef}
               value={defaultPolicy}
               onChange={setDefaultPolicy}
               peerPermissionStates={peerPermissionStates}
@@ -391,7 +435,7 @@ export function PoliciesState({
                         tone="success"
                         overrideValue={peer.overrides.sign}
                         effectiveAllows={peer.permissions.sign}
-                        onDispatch={setPeerPolicyOverride}
+                        onDispatch={wrappedSetPeerPolicyOverride}
                       >
                         SIGN
                       </PeerPolicyChip>
@@ -401,7 +445,7 @@ export function PoliciesState({
                         tone="info"
                         overrideValue={peer.overrides.ecdh}
                         effectiveAllows={peer.permissions.ecdh}
-                        onDispatch={setPeerPolicyOverride}
+                        onDispatch={wrappedSetPeerPolicyOverride}
                       >
                         ECDH
                       </PeerPolicyChip>
@@ -411,7 +455,7 @@ export function PoliciesState({
                         tone="ping"
                         overrideValue={peer.overrides.ping}
                         effectiveAllows={peer.permissions.ping}
-                        onDispatch={setPeerPolicyOverride}
+                        onDispatch={wrappedSetPeerPolicyOverride}
                       >
                         PING
                       </PeerPolicyChip>
@@ -421,7 +465,7 @@ export function PoliciesState({
                         tone="onboard"
                         overrideValue={peer.overrides.onboard}
                         effectiveAllows={peer.permissions.onboard}
-                        onDispatch={setPeerPolicyOverride}
+                        onDispatch={wrappedSetPeerPolicyOverride}
                       >
                         ONBOARD
                       </PeerPolicyChip>
