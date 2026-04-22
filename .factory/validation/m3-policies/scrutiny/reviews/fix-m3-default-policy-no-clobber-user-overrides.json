@@ -1,0 +1,33 @@
+{
+  "featureId": "fix-m3-default-policy-no-clobber-user-overrides",
+  "reviewedAt": "2026-04-22T02:37:26Z",
+  "commitId": "83898ff55b29a0377374c5618dc795f052bfa917",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The fix improves ownership tracking (Set→Map) and adds a regression test, but it still allows override clobbering in a realistic race: if a user-authored respond override is dispatched and the default is switched before the next runtime snapshot, the dropdown can still emit `unset` for the user-authored cell.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen/panels/DefaultPolicyDropdown.tsx",
+        "line": 245,
+        "severity": "blocking",
+        "description": "Ownership pruning is snapshot-driven only (`useEffect` + pre-apply prune) and removes keys only when `peer_permission_states` already reflects a concrete mismatched value (lines 245, 284, 155). There is no direct ownership drop on user override dispatch. Because `setPeerPolicyOverride` writes to runtime without forcing an immediate status refresh (`src/app/AppStateProvider.tsx:872`) and runtime refresh runs on a 2500ms interval (`src/app/AppStateProvider.tsx:2908`), a quick default switch before snapshot propagation keeps the key in `defaultAppliedKeysRef` and `applyDefault` can still dispatch `unset` for that cell, clobbering the user's explicit override."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Mission shared-state docs still conflict with implementation on PeerPolicyChip direction, which continues to create ambiguity for policy-direction features and manual validation steps.",
+      "evidence": "Mission AGENTS states chips target `respond.*` (`/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/AGENTS.md:108`), but runtime wiring still reads/writes `request.*` (`src/screens/DashboardScreen/states/PoliciesState.tsx:81-84`) and PeerPolicyChip defaults to `direction = \"request\"` (`src/screens/DashboardScreen/panels/PeerPolicyChip.tsx:129`)."
+    },
+    {
+      "area": "skills",
+      "observation": "The ui-screen-worker procedure appears too strict for non-visual logic-only fixes: it requires agent-browser for changed user-visible elements, but this feature was an internal state-invariant change with deterministic test coverage and no UI delta.",
+      "evidence": "Skill requires agent-browser and only documents narrow skip cases (`.factory/skills/ui-screen-worker/SKILL.md:23`), while this handoff had `followedProcedure: false` solely for skipping agent-browser on a non-visual fix (`handoffs/2026-04-22T02-05-36-582Z__fix-m3-default-policy-no-clobber-user-overrides__66ce0b1f-ede6-4e00-90a0-33cd71552038.json:61-66`)."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m3-policies/scrutiny/reviews/m3-default-policy-dropdown.json",
+  "summary": "FAIL: Reviewed the fix transcript skeleton, prior failed review, and both diffs (7d5e7cb and 83898ff). Direction wiring from the original failure is handled elsewhere, and this fix meaningfully improves ownership tracking, but it does not fully guarantee the no-clobber invariant under snapshot-lag races, so the original clobbering failure mode is not fully closed."
+}

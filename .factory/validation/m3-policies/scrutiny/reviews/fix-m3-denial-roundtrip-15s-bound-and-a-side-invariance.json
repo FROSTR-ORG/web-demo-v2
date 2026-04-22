@@ -1,0 +1,26 @@
+{
+  "featureId": "fix-m3-denial-roundtrip-15s-bound-and-a-side-invariance",
+  "reviewedAt": "2026-04-22T02:37:13Z",
+  "commitId": "6b3fbcb",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "This fix directly addresses the two scrutiny gaps from m3-policy-denial-and-persistence's denial round-trip spec: it lowers the OperationFailure wait bound from 60s to 15s and adds explicit A-side invariance coverage (continuous pending-operation sampling keyed by B request_id plus pre/post Sign completion count invariance). Comparing the original failing diff (b1f9835) against the fix diff (6b3fbcb), the previously missing checks are now present and wired with actionable diagnostics.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "knowledge",
+      "observation": "Contract/shared-language drift remains around A-side pending invariance: validation text still cites total pending_operations.length unchanged, while the implemented fix intentionally enforces Sign-typed pending invariance + request_id non-admission because total queue length churns from background Ping traffic.",
+      "evidence": "validation-contract.md (VAL-POLICIES-010 evidence) says \"A's pending_operations.length ... unchanged\"; fix commit at src/e2e/multi-device/policy-denial-roundtrip.spec.ts:875-894 documents/implements Sign-typed pending count invariance with total pending length diagnostic-only."
+    },
+    {
+      "area": "skills",
+      "observation": "runtime-worker's verification carve-out is still awkward for pure e2e-spec hardening tasks: worker correctly marked followedProcedure=false when skipping agent-browser, but this type of change has no UI-surface delta and is already validated by the edited Playwright spec itself plus project checks.",
+      "evidence": "Handoff for session faafc265-d1f8-4b84-92b6-64792a03a51c sets skillFeedback.followedProcedure=false with explicit rationale; .factory/skills/runtime-worker/SKILL.md only carves out pure state-derivation/non-UI logic, not pure test-spec hardening."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m3-policies/scrutiny/reviews/m3-policy-denial-and-persistence.json",
+  "summary": "Reviewed the fix transcript skeleton, prior failed review, and both diffs (b1f9835 and 6b3fbcb). The fix adequately closes the denial-roundtrip timeout and A-side invariance gaps identified in the prior failure, with no new blocking defects found in this scoped change."
+}

@@ -1,0 +1,100 @@
+{
+  "milestone": "m3-policies",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "npx vitest run --config \"/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/vitest.config.ts\" --maxConcurrency 4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "npx tsc --noEmit -p \"/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/tsconfig.json\" --pretty false",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 6,
+    "passed": 3,
+    "failed": 3,
+    "failedFeatures": [
+      "m3-peer-policies-view",
+      "m3-default-policy-dropdown",
+      "m3-policy-denial-and-persistence"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "m3-peer-policies-view",
+      "severity": "blocking",
+      "description": "PeerRow suppresses SIGN/ECDH/PING/ONBOARD badges when peer.online is false while PoliciesState always renders chips from effective_policy, creating deterministic cross-surface parity mismatch for offline peers."
+    },
+    {
+      "featureId": "m3-default-policy-dropdown",
+      "severity": "blocking",
+      "description": "Default policy application dispatches with direction \"request\" instead of the feature-specified inbound policy direction, so \"Deny by default\" cannot enforce the described respond-side semantics."
+    },
+    {
+      "featureId": "m3-default-policy-dropdown",
+      "severity": "blocking",
+      "description": "DefaultPolicyDropdown clears prior dropdown-owned keys on selection changes in a way that can clobber later manual overrides, violating the invariant that explicit user overrides remain unaffected."
+    },
+    {
+      "featureId": "m3-policy-denial-and-persistence",
+      "severity": "blocking",
+      "description": "policy-denial-roundtrip spec does not enforce the narrowed VAL-POLICIES-010 15-second bound (uses 60-second timeout), so slow failures can pass without meeting contract timing."
+    },
+    {
+      "featureId": "m3-policy-denial-and-persistence",
+      "severity": "blocking",
+      "description": "policy-denial-roundtrip spec does not assert that device A receives no pending sign operation for the denied request, leaving a required contract observable unverified."
+    },
+    {
+      "featureId": "m3-policy-denial-and-persistence",
+      "severity": "blocking",
+      "description": "Requested nonce-prepopulation test hook for deterministic denial setup was not implemented; only existing seed hook is exposed."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Add a single mission-level source-of-truth note for policy-direction semantics (request vs respond) and require features/contract/library wording alignment before implementation.",
+      "evidence": "m3-default-policy-dropdown review found conflicting direction semantics across mission artifacts; implementation followed one interpretation while validation expectations referenced another.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "Require non-piped validator commands in worker verification logs (or explicit pipefail usage) so recorded exit codes cannot mask failing validators.",
+      "evidence": "Multiple m3 reviews observed handoff/transcript commands using `| tail`, which can report exitCode 0 while underlying tests are failing.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "Align ui-screen-worker/runtime-worker procedure text with AGENTS guidance for agent-browser requirements and `followedProcedure` reporting so mandatory checks are consistent and auditable.",
+      "evidence": "m3 pass/fail reviews repeatedly flagged mismatch between mission AGENTS 'agent-browser mandatory' language and skill-level skip/omission patterns.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Repeated variants of piped-command exit-code masking observation across multiple reports.",
+      "reason": "duplicate"
+    },
+    {
+      "observation": "Repeated variants of agent-browser policy mismatch between AGENTS and worker skills.",
+      "reason": "duplicate"
+    },
+    {
+      "observation": "RED-first sequencing mismatch report tied to feature-specific interface-expansion flow.",
+      "reason": "ambiguous"
+    }
+  ],
+  "previousRound": null
+}

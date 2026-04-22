@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m3-peerrow-badges-render-for-offline-peers",
+  "reviewedAt": "2026-04-22T02:35:57Z",
+  "commitId": "8633b6f",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly resolves the prior blocking parity bug: PeerRow now renders effective_policy-driven badges for offline peers in runtime mode while preserving Paper-mode offline badge suppression. Added tests cover the offline runtime case in PeerRow and parity assertions now include an offline peer.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-screen-worker procedure expects agent-browser verification of changed UI, but this fix's exact runtime path (PeersPanel with paperPanels=false plus offline peer + permissionState) is not directly exposed by an existing demo scenario, forcing reliance on Vitest for the critical check.",
+      "evidence": "Handoff skillFeedback for session cc7ad1ba-2e46-4f5b-a3cb-0c721e4f410d sets followedProcedure=false and notes no existing demo scenario for runtime-mode PeerRow offline verification; transcript skeleton shows scenario exploration and this limitation."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m3-policies/scrutiny/reviews/m3-peer-policies-view.json",
+  "summary": "Reviewed fix feature plus prior failing feature diff and prior review. The fix commit 8633b6f addresses the original offline-peer badge parity failure from m3-peer-policies-view, and the new/updated tests provide targeted regression coverage for that path."
+}
