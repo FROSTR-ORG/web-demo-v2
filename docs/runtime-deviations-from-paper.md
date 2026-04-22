@@ -6,6 +6,50 @@ and the validation assertion IDs that cover it.
 
 ## Deviations
 
+### `restoreProfileFromRelay` — DEV-only `ws://` opt-in for multi-device e2e
+
+- **Paper / task source**: `igloo-paper/screens/restore-from-relay/screen.html` — the
+  restore form requires the user to paste a relay URL, which the Settings sidebar contract
+  and `validateRelayUrl` constrain to `wss://` (VAL-BACKUP-032). The multi-device e2e for
+  restore (`src/e2e/multi-device/backup-restore.spec.ts`) talks to the local
+  `bifrost-devtools` relay on `ws://127.0.0.1:8194` (no TLS terminator is provisioned for
+  port 8194 per `AGENTS.md > Mission Boundaries > Ports`).
+- **web-demo-v2 implementation**: `src/app/AppStateProvider.tsx` —
+  `restoreProfileFromRelay` reads a DEV-only `window.__iglooTestAllowInsecureRelayForRestore`
+  flag BEFORE validating the input relay list. When the flag is `true` AND
+  `import.meta.env.DEV` is truthy, `ws://` URLs with a valid hostname are accepted *for
+  this mutator only*. The Settings sidebar relay-list editor, `updateRelays`, and
+  `publishProfileBackup` continue to call `validateRelayUrl` directly and remain strict
+  (`wss://`-only) for real users.
+- **What the app exposes instead**: the Playwright spec sets
+  `window.__iglooTestAllowInsecureRelayForRestore = true` on the restore page before
+  calling `restoreProfileFromRelay({ relays: [ws://127.0.0.1:8194] })`. The flag is
+  gated behind `import.meta.env.DEV` and is not read at all in production bundles
+  (`npm run build` output contains no reference to the window property — grep-verifiable).
+  The stricter contract user-facing UI enforces is unchanged; only the relay-fetch step
+  inside the mutator is relaxed and only when DEV and the opt-in flag are both set.
+- **Assertion IDs covered**: VAL-BACKUP-010 / VAL-BACKUP-011 / VAL-BACKUP-012 / VAL-BACKUP-030
+  / VAL-CROSS-007 continue to hold; VAL-BACKUP-032 remains strict for real user input
+  because the UI validator (`validateRelayUrl`) is untouched and the toggle is not exposed
+  in production.
+
+### `restoreProfileFromRelay` — parallel fan-out with per-relay timeout
+
+- **Paper / task source**: `fix-m6-restore-relay-wss-and-parallel` feature description
+  (scrutiny m6 r1, issue B): "relays queried sequentially under a shared 5s timeout — a
+  hung/slow earlier relay can starve later relays and produce a false 'No backup found.'".
+- **web-demo-v2 implementation**: `src/app/fetchProfileBackupEvent.ts` — a small helper
+  that opens a subscription on every supplied relay in parallel, each with its own
+  5s timeout (NOT shared across relays). The first relay that delivers a matching
+  EVENT wins; all other subscriptions and sockets are torn down atomically. When every
+  per-relay timeout has elapsed the helper rejects with the canonical
+  `"No backup found for this share."` copy. Covered by unit tests in
+  `src/app/__tests__/fetchProfileBackupEvent.test.ts` (3-relay hang + all-hang cases
+  with `vi.useFakeTimers`).
+- **Assertion IDs covered**: VAL-BACKUP-010 (restore succeeds given a reachable relay),
+  VAL-BACKUP-012 ("No backup found for this share" on full miss). The change is a
+  correctness fix — it does not relax any user-facing contract.
+
 ### ECDH round-trip — responder side does not emit `CompletedOperation::Ecdh`
 
 - **Paper / task source**: `fix-m1-ecdh-roundtrip-spec-real-dispatch` feature description

@@ -318,6 +318,20 @@ test.describe("multi-device restore-backup (local bifrost-devtools relay)", () =
         ).toBeVisible();
         await waitForHooks(pageB, "B");
 
+        // fix-m6-restore-relay-wss-and-parallel:
+        // restoreProfileFromRelay validates every supplied relay URL
+        // via validateRelayUrl (wss:// only), which matches the
+        // Settings sidebar contract for real users. This e2e talks to
+        // a local bifrost-devtools relay over plain ws://, so we
+        // opt-in to the DEV-only bypass on the restore page BEFORE
+        // invoking the mutator. The toggle is scoped to this mutator
+        // only — Settings UI and updateRelays stay strict.
+        await pageB.evaluate(() => {
+          (window as unknown as {
+            __iglooTestAllowInsecureRelayForRestore?: boolean;
+          }).__iglooTestAllowInsecureRelayForRestore = true;
+        });
+
         // Precondition: page B has no saved profiles.
         const preRestoreProfiles = await pageB.evaluate(() => {
           const w = window as unknown as {

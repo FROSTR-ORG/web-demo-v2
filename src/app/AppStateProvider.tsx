@@ -2879,14 +2879,46 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const { validateRelayUrl, normalizeRelayKey } = await import(
         "../lib/relay/relayUrl"
       );
+      // DEV-only escape hatch: the multi-device Playwright spec for
+      // restore-from-relay talks to a local `bifrost-devtools` relay
+      // exposed over plain `ws://127.0.0.1:8194` (no TLS terminator).
+      // validateRelayUrl enforces wss:// on real user input, so we
+      // provide an opt-in bypass that ONLY applies to this mutator's
+      // internal relay list and leaves every other validation path
+      // (Settings sidebar add-relay, updateRelays, publishProfileBackup)
+      // strict. See `docs/runtime-deviations-from-paper.md` and
+      // `mission AGENTS.md` "Local Relay Caveats" for rationale.
+      const allowInsecureForRestore =
+        import.meta.env.DEV &&
+        typeof window !== "undefined" &&
+        (window as { __iglooTestAllowInsecureRelayForRestore?: boolean })
+          .__iglooTestAllowInsecureRelayForRestore === true;
+      const validateRestoreRelayUrl = (raw: string): string => {
+        if (allowInsecureForRestore && /^ws:\/\//i.test(raw)) {
+          // Minimal structural check so the BrowserRelayClient still gets
+          // a parseable URL. Anything else (missing host, bad scheme) is
+          // still rejected via validateRelayUrl's canonical error.
+          try {
+            const parsed = new URL(raw);
+            if (parsed.protocol.toLowerCase() === "ws:" && parsed.hostname) {
+              return raw;
+            }
+          } catch {
+            /* fall through to strict validator */
+          }
+        }
+        return validateRelayUrl(raw);
+      };
       const normalizedRelays: string[] = [];
       const seenKeys = new Set<string>();
       for (const raw of input.relays ?? []) {
         const trimmed = typeof raw === "string" ? raw.trim() : "";
         if (trimmed.length === 0) continue;
-        // validateRelayUrl throws RelayValidationError with the canonical
-        // "Relay URL must start with wss://" copy on failure.
-        const validated = validateRelayUrl(trimmed);
+        // validateRestoreRelayUrl throws RelayValidationError with the
+        // canonical "Relay URL must start with wss://" copy on failure
+        // (same as validateRelayUrl), unless the DEV-only test toggle
+        // whitelists ws:// for this mutator.
+        const validated = validateRestoreRelayUrl(trimmed);
         const key = normalizeRelayKey(validated);
         if (seenKeys.has(key)) continue;
         seenKeys.add(key);
@@ -2922,7 +2954,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // publisher side, so this pubkey matches the kind-10000 event's
       // `pubkey` field.
       const eventKind = await profileBackupEventKind();
-      const dummyPeer = "0".repeat(64);
+      // `create_onboarding_request_bundle` validates the peer pubkey
+      // against secp256k1 (must be a valid x-only point), so a
+      // throwaway `"0".repeat(64)` is rejected with "invalid peer
+      // pubkey: crypto error". We use the generator point G's
+      // x-coordinate — a universally valid x-only public key — which
+      // the WASM accepts. The peer identity never materialises
+      // anywhere outside the discarded bundle (we only consume
+      // `local_pubkey32`), so any canonical valid point is sound.
+      const dummyPeer =
+        "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
       const bundle = await createOnboardingRequestBundle({
         shareSecret: share.share_secret,
         peerPubkey32Hex: dummyPeer,
@@ -2930,62 +2971,24 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       });
       const authorPubkey32 = bundle.local_pubkey32;
 
-      // Open a parallel REQ on each relay; resolve on the first
-      // matching EVENT or reject with "No backup found" on timeout.
+      // Fan out subscribes on every relay in parallel, each with its
+      // own per-attempt timeout (5s). A hung/slow relay earlier in the
+      // list cannot starve later relays — if any one of them delivers
+      // the EVENT first, the others are torn down immediately. When
+      // every per-relay budget is exhausted we surface the canonical
+      // "No backup found for this share." copy (VAL-BACKUP-012).
       const { BrowserRelayClient } = await import(
         "../lib/relay/browserRelayClient"
       );
+      const { fetchProfileBackupEvent } = await import(
+        "./fetchProfileBackupEvent"
+      );
       const client = new BrowserRelayClient();
-      const connections = normalizedRelays.map((url) => client.connect(url));
-      const cleanup = () => {
-        for (const conn of connections) {
-          try {
-            conn.close();
-          } catch {
-            // best-effort — socket may already be torn down
-          }
-        }
-      };
-
-      const eventJson = await new Promise<string>((resolve, reject) => {
-        const timer = globalThis.setTimeout(() => {
-          cleanup();
-          reject(new Error("No backup found for this share."));
-        }, 5000);
-        let settled = false;
-        const subscriptions: Array<{ close: () => void }> = [];
-        const finish = (json: string) => {
-          if (settled) return;
-          settled = true;
-          globalThis.clearTimeout(timer);
-          for (const sub of subscriptions) {
-            try { sub.close(); } catch { /* noop */ }
-          }
-          cleanup();
-          resolve(json);
-        };
-        (async () => {
-          for (const conn of connections) {
-            try {
-              await conn.connect();
-              const sub = conn.subscribe(
-                {
-                  kinds: [eventKind],
-                  authors: [authorPubkey32],
-                },
-                (event: unknown) => {
-                  if (event && typeof event === "object") {
-                    finish(JSON.stringify(event));
-                  }
-                },
-              );
-              subscriptions.push(sub);
-            } catch {
-              // Per-relay connection failure is non-fatal; the others
-              // may still deliver the event.
-            }
-          }
-        })();
+      const eventJson = await fetchProfileBackupEvent({
+        relays: normalizedRelays,
+        authorPubkey32,
+        eventKind,
+        client,
       });
 
       // Decrypt the backup payload. Errors here mean the share key
@@ -3016,11 +3019,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // Merge the user-specified relay list with the backup's relay
       // list so the restored profile keeps talking to the relays the
       // user just confirmed are reachable for this share.
+      //
+      // The merge re-validates every URL through
+      // `validateRestoreRelayUrl` so the DEV-only
+      // `__iglooTestAllowInsecureRelayForRestore` opt-in (ws:// for
+      // the local bifrost-devtools relay) is honoured here too.
+      // Without this, the multi-device restore e2e would silently drop
+      // its only relay during the merge step and hit
+      // "At least one relay is required" from buildStoredProfileRecord.
       const mergedRelays: string[] = [];
       const mergedKeys = new Set<string>();
       for (const relay of [...normalizedRelays, ...backup.device.relays]) {
         try {
-          const validated = validateRelayUrl(relay);
+          const validated = validateRestoreRelayUrl(relay);
           const key = normalizeRelayKey(validated);
           if (mergedKeys.has(key)) continue;
           mergedKeys.add(key);

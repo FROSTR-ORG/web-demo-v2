@@ -135,4 +135,42 @@ describe("AppStateValue.restoreProfileFromRelay — synchronous guards", () => {
     },
     30_000,
   );
+
+  // fix-m6-restore-relay-wss-and-parallel: the DEV-only
+  // `__iglooTestAllowInsecureRelayForRestore` toggle only relaxes
+  // wss:// enforcement when it is explicitly set to `true` on the
+  // window. Leaving it unset (the production default) must still
+  // reject plain `ws://` URLs with the canonical relay-url error —
+  // pinning this guards against the toggle accidentally leaking into
+  // non-DEV builds.
+  it(
+    "rejects ws:// URLs with the canonical relay-url error when the insecure-relay toggle is NOT set",
+    async () => {
+      const globalWindow = globalThis as unknown as {
+        __iglooTestAllowInsecureRelayForRestore?: boolean;
+      };
+      // Guard: ensure no prior test leaked the toggle into our run.
+      delete globalWindow.__iglooTestAllowInsecureRelayForRestore;
+
+      let latest!: AppStateValue;
+      render(
+        <AppStateProvider>
+          <Capture onState={(state) => (latest = state)} />
+        </AppStateProvider>,
+      );
+      await waitFor(() => expect(latest).toBeTruthy());
+
+      await expect(
+        act(async () => {
+          await latest.restoreProfileFromRelay({
+            bfshare: "bfshare1anything",
+            bfsharePassword: "aLongEnoughPassword",
+            backupPassword: "aLongEnoughPassword",
+            relays: ["ws://127.0.0.1:8194"],
+          });
+        }),
+      ).rejects.toThrowError(/Relay URL must start with wss:\/\//i);
+    },
+    30_000,
+  );
 });
