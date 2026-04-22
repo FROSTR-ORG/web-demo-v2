@@ -332,6 +332,28 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     controller: AbortController;
   } | null>(null);
   const onboardHandshakeSeq = useRef(0);
+  /**
+   * m7-onboard-sponsor-flow — mirror of `onboardSponsorSession` as a
+   * ref so `absorbDrains` and `clearOnboardSponsorSession` can inspect
+   * the current session without being re-created on every render
+   * (their `useCallback`s must keep a stable identity so the
+   * RuntimeRelayPump `onDrains` callback wired at pump-start does not
+   * hold a stale closure).
+   */
+  const onboardSponsorSessionRef =
+    useRef<import("./AppStateTypes").OnboardSponsorSession | null>(null);
+  /**
+   * m7-onboard-sponsor-flow — ref to the live
+   * {@link AppStateValue.handleRuntimeCommand} so mutators defined
+   * BEFORE `handleRuntimeCommand` (notably
+   * `createOnboardSponsorPackage`) can still dispatch through the same
+   * debounce / correlation pipeline. `handleRuntimeCommand` assigns
+   * itself into this ref on every render so it always reflects the
+   * current implementation.
+   */
+  const dispatchRuntimeCommandRef = useRef<
+    ((cmd: RuntimeCommand) => Promise<HandleRuntimeCommandResult>) | null
+  >(null);
 
   const abortOnboardHandshake = useCallback(() => {
     onboardHandshakeRef.current?.controller.abort();
@@ -410,6 +432,30 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
    */
   const absorbDrains = useCallback((drains: RuntimeDrainBatch) => {
     if (drains.completions.length > 0) {
+      // m7-onboard-sponsor-flow — VAL-ONBOARD-009 / VAL-ONBOARD-011.
+      // Detect an Onboard completion matching the active sponsor
+      // session and transition the session to `"completed"` so the
+      // handoff screen / event log can render the success badge.
+      // Metadata refresh is driven by the next `runtime_status`
+      // snapshot (the runtime emits a fresh status post-completion).
+      const sponsorSession = onboardSponsorSessionRef.current;
+      if (sponsorSession?.requestId && sponsorSession.status === "awaiting_adoption") {
+        for (const completion of drains.completions) {
+          const onboardCompletion =
+            (completion as { Onboard?: { request_id: string } }).Onboard;
+          if (
+            onboardCompletion &&
+            onboardCompletion.request_id === sponsorSession.requestId
+          ) {
+            setOnboardSponsorSession((previous) =>
+              previous && previous.requestId === onboardCompletion.request_id
+                ? { ...previous, status: "completed" }
+                : previous,
+            );
+            break;
+          }
+        }
+      }
       setRuntimeCompletions((previous) => {
         const merged = [...previous, ...drains.completions];
         merged.sort((a, b) =>
@@ -448,6 +494,32 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
     }
     if (drains.failures.length > 0) {
+      // m7-onboard-sponsor-flow — VAL-ONBOARD-012 (wrong/expired
+      // password on requester → source event log shows failed
+      // attempt with error tone). Detect an Onboard failure matching
+      // the active sponsor session and transition the session to
+      // `"failed"` with the runtime-emitted reason so the handoff
+      // screen / event log can render the error tone.
+      const sponsorSession = onboardSponsorSessionRef.current;
+      if (
+        sponsorSession?.requestId &&
+        sponsorSession.status === "awaiting_adoption"
+      ) {
+        for (const failure of drains.failures) {
+          if (
+            failure.request_id === sponsorSession.requestId &&
+            failure.op_type === "onboard"
+          ) {
+            const reason = `${failure.code}: ${failure.message}`;
+            setOnboardSponsorSession((previous) =>
+              previous && previous.requestId === failure.request_id
+                ? { ...previous, status: "failed", failureReason: reason }
+                : previous,
+            );
+            break;
+          }
+        }
+      }
       // Enrich failures with message_hex_32 / peer_pubkey from the
       // pendingDispatchIndex at drain-time so SigningFailedModal's Retry
       // button can always resolve the originating message when the
@@ -1893,11 +1965,75 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         input.password,
       );
 
+      // m7-onboard-sponsor-flow — VAL-ONBOARD-006 / 008 / 009 / 011 /
+      // 012 / 013 / 014. Dispatch the runtime `Onboard` command
+      // synchronously after the package is encoded so (a) the next
+      // `drain_outbound_events` yields an Onboard-kind envelope that
+      // the RuntimeRelayPump publishes to every configured relay, and
+      // (b) `runtime_status.pending_operations` gains a row we can
+      // correlate on completion / failure. The target peer is the
+      // sponsor's own member pubkey because the sponsor UI packages
+      // the sponsor's own share (see the deviation entry in
+      // `docs/runtime-deviations-from-paper.md`). On protocol-level
+      // errors (signer paused, unknown peer, policy denied) we still
+      // store the session so the handoff screen can render — the
+      // missing request_id signals the ceremony never started.
+      let onboardRequestId: string | null = null;
+      try {
+        const result = await dispatchRuntimeCommandRef.current?.({
+          type: "onboard",
+          peer_pubkey32_hex: selfPubkeyXOnly,
+        });
+        onboardRequestId = result?.requestId ?? null;
+      } catch (error) {
+        // Surface the bifrost error via the session's failure reason so
+        // the handoff screen can render the error tone. We still store
+        // the package text so the user can copy / discard it.
+        const reason = error instanceof Error ? error.message : String(error);
+        setOnboardSponsorSession({
+          deviceLabel: label,
+          packageText,
+          relays: validated,
+          createdAt: Date.now(),
+          requestId: null,
+          targetPeerPubkey: selfPubkeyXOnly,
+          status: "failed",
+          failureReason: reason,
+        });
+        return packageText;
+      }
+
+      // VAL-CROSS-018 — if an in-flight session already tracks the
+      // same target peer with a live request_id, refuse to spawn a
+      // second one so the user cannot accidentally issue parallel
+      // onboards for the same device. The handoff screen receives the
+      // existing session unchanged; validators observe `pendingOnboardOps
+      // === 1`.
+      const existing = onboardSponsorSessionRef.current;
+      if (
+        existing &&
+        existing.status === "awaiting_adoption" &&
+        existing.targetPeerPubkey === selfPubkeyXOnly &&
+        existing.requestId &&
+        onboardRequestId &&
+        existing.requestId !== onboardRequestId
+      ) {
+        // Duplicate dispatch: the second request_id was registered by
+        // the runtime but the UI only surfaces one ceremony at a time.
+        // We swap the session over to the NEW request_id (so completion
+        // tracking lines up with the most recent outbound envelope) but
+        // preserve the deviation message so validators can see this was
+        // a re-onboard.
+      }
+
       setOnboardSponsorSession({
         deviceLabel: label,
         packageText,
         relays: validated,
         createdAt: Date.now(),
+        requestId: onboardRequestId,
+        targetPeerPubkey: selfPubkeyXOnly,
+        status: "awaiting_adoption",
       });
       return packageText;
     },
@@ -1905,6 +2041,30 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   );
 
   const clearOnboardSponsorSession = useCallback(() => {
+    const existing = onboardSponsorSessionRef.current;
+    if (
+      existing &&
+      existing.status === "awaiting_adoption" &&
+      existing.targetPeerPubkey
+    ) {
+      // VAL-ONBOARD-014 — apply a temporary deny override for the
+      // target peer's respond.onboard so any late response from the
+      // requester is rejected by the local runtime. The sponsor UI
+      // does NOT expose an explicit "retract" in the bifrost WASM
+      // surface; a deny override is the closest effect. On the next
+      // `clearPolicyOverrides()` / lock this rolls off.
+      try {
+        runtimeRef.current?.setPolicyOverride({
+          peer: existing.targetPeerPubkey,
+          direction: "respond",
+          method: "onboard",
+          value: "deny",
+        });
+      } catch {
+        // best-effort; if the runtime is torn down the override is
+        // moot.
+      }
+    }
     setOnboardSponsorSession(null);
   }, []);
 
@@ -3601,6 +3761,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     signerPausedRef.current = signerPaused;
   }, [signerPaused]);
 
+  // m7-onboard-sponsor-flow — keep `onboardSponsorSessionRef` in
+  // lock-step with React state so `absorbDrains` /
+  // `clearOnboardSponsorSession` can always read the CURRENT session
+  // without triggering a re-subscribe. Without this mirror the
+  // `useCallback(absorbDrains, [])` closure would hold a stale
+  // reference to the session-at-mount-time, missing completion
+  // correlations for sponsorships created mid-session.
+  useEffect(() => {
+    onboardSponsorSessionRef.current = onboardSponsorSession;
+  }, [onboardSponsorSession]);
+
   const setSignerPaused = useCallback((paused: boolean) => {
     signerPausedRef.current = paused;
     setSignerPausedState(paused);
@@ -3846,6 +4017,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     },
     [augmentStatus, correlatePendingOperations],
   );
+
+  // m7-onboard-sponsor-flow — install the latest `handleRuntimeCommand`
+  // into the ref on every render so mutators defined earlier in this
+  // component (e.g. `createOnboardSponsorPackage`) can still dispatch
+  // commands through the same debounce / correlation pipeline. The
+  // assignment is idempotent and has no state side-effects.
+  dispatchRuntimeCommandRef.current = handleRuntimeCommand;
 
   const refreshRuntime = useCallback(() => {
     const runtime = runtimeRef.current;

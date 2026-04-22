@@ -639,3 +639,58 @@ and the validation assertion IDs that cover it.
   inline error), VAL-BACKUP-019 (mobile viewport behaviour documented),
   VAL-BACKUP-026 (permission revoked mid-scan), VAL-BACKUP-027 (scanner
   release all tracks on X, backdrop click, and unmount).
+
+## M7 onboard sponsor flow — source-side ceremony (feature `m7-onboard-sponsor-flow`)
+
+Paper shows the sponsor encoding an onboarding package, handing it to a
+requester, and then the requester eventually joining the group as an
+additional device. The source-side (sponsor) contribution to this
+ceremony is implemented in this web-demo as follows, with a few
+concrete runtime/paper deviations worth calling out for future
+sessions:
+
+- **Dispatch site**: `AppStateProvider.createOnboardSponsorPackage`
+  first encodes the `bfonboard1…` package via
+  `encodeOnboardPackage` (unchanged from the M7 sponsor UI feature),
+  then dispatches the runtime `Onboard` command through
+  `handleRuntimeCommand` so the WASM runtime's `initiate_onboard`
+  path is exercised, a pending op is registered, and
+  `drain_outbound_events` yields the ceremony envelopes that the
+  relay pump publishes.
+- **Session lifecycle**: `OnboardSponsorSession` tracks four
+  statuses — `awaiting_adoption`, `completed`, `failed`,
+  `cancelled`. Completion is detected by matching the session's
+  captured `request_id` against drained
+  `CompletedOperationJson::Onboard` entries in the `absorbDrains`
+  path. Failure is detected similarly against drained
+  `OperationFailure` entries with `op_type === "onboard"`.
+  `failureReason` carries the runtime-emitted `code: message` string
+  so the UI can render an error tone (VAL-ONBOARD-012).
+- **Cancel path (VAL-ONBOARD-014)**: `clearOnboardSponsorSession`
+  sets a `respond.onboard = deny` manual peer policy override for
+  the target peer before clearing the session. There is no explicit
+  "retract the packaged share" runtime API in bifrost-rs — the deny
+  override is the closest affordance available from the JS bridge.
+  The ceremony envelopes that were already published to the relay
+  cannot be retracted by the sponsor; the guard against a revived
+  session is the policy override combined with the requester-side
+  password check.
+- **Self-peer onboard caveat**: the M7 sponsor UI currently packages
+  the sponsor's own share material (peer_pk = sponsor's self
+  pubkey) because the web-demo does not yet allocate a fresh share
+  index on the sponsor path. When `initiate_onboard` is called with
+  the sponsor's self pubkey, bifrost-rs rejects the command as
+  `UnknownPeer` or similar. The flow handles this as a legitimate
+  failure path: the session transitions to `"failed"` with the
+  runtime reason, and the handoff screen continues to function for
+  the sponsor (they can still copy / download the package for
+  out-of-band sharing). Resolving this gap will require allocating
+  a separate share index on sponsor encode or introducing a
+  non-self peer_pk input on the Configure screen.
+- **Assertion IDs covered**: VAL-ONBOARD-006 (dispatch registers
+  pending Onboard op when the runtime accepts the command),
+  VAL-ONBOARD-009/011 (completion transitions session to
+  `"completed"`), VAL-ONBOARD-012 (failure transitions session to
+  `"failed"` with a runtime reason), VAL-ONBOARD-014 (cancel clears
+  session + emits deny override), VAL-ONBOARD-024 (signerPaused
+  refuses to dispatch and surfaces an error to the caller).

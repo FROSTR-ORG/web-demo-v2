@@ -167,6 +167,53 @@ export interface OnboardSponsorSession {
    * indicator and by future flow features to enforce TTL.
    */
   createdAt: number;
+  /**
+   * m7-onboard-sponsor-flow — captured runtime `request_id` of the
+   * outbound `Onboard` command dispatched immediately after the
+   * package was encoded (VAL-ONBOARD-006). Used by `absorbDrains` to
+   * match the corresponding `CompletedOperation::Onboard` drain and by
+   * `clearOnboardSponsorSession` to track cancellation. Null when the
+   * runtime was unable to register a pending op (e.g. signer paused).
+   */
+  requestId?: string | null;
+  /**
+   * m7-onboard-sponsor-flow — target peer pubkey (32-byte x-only hex)
+   * the Onboard command was dispatched toward. For the current sponsor
+   * UI (which packages the sponsor's own share) this is the sponsor's
+   * own member pubkey. Surfaced here so the handoff screen can render
+   * a stable identity and so cancel/idempotency checks can compare
+   * across sessions without rebuilding from the payload.
+   */
+  targetPeerPubkey?: string;
+  /**
+   * m7-onboard-sponsor-flow — lifecycle status of the in-flight
+   * Onboard ceremony:
+   *   - `"awaiting_adoption"` — command dispatched, waiting for the
+   *                              requester to complete the handshake.
+   *   - `"completed"` — `CompletedOperationJson::Onboard` drained for
+   *                     this request_id; peer list has been refreshed.
+   *   - `"failed"` — `OperationFailure` drained for this request_id
+   *                  (wrong/expired password on requester, timeout,
+   *                  protocol rejection). The handoff screen renders
+   *                  an error tone in the event log (VAL-ONBOARD-012).
+   *   - `"cancelled"` — user clicked Cancel on the handoff screen; a
+   *                     deny-override was applied so any late response
+   *                     is rejected and no ghost peer is added
+   *                     (VAL-ONBOARD-014).
+   * Defaults to `"awaiting_adoption"` when the session is first
+   * populated by `createOnboardSponsorPackage`.
+   */
+  status?:
+    | "awaiting_adoption"
+    | "completed"
+    | "failed"
+    | "cancelled";
+  /**
+   * m7-onboard-sponsor-flow — human-readable failure reason surfaced
+   * when `status === "failed"`. Populated from the drained
+   * `OperationFailure.code` + `.message`.
+   */
+  failureReason?: string;
 }
 
 /**
