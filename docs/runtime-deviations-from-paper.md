@@ -373,3 +373,37 @@ and the validation assertion IDs that cover it.
 - **Assertion IDs covered**: VAL-POLICIES-010 (B-side OperationFailure
   observable; A-side `peer_denied` RuntimeEvent removed from the
   assertion until upstream exposes it).
+
+### Runtime-mode Relay Health panel on the Running Dashboard (VAL-SETTINGS-010..014)
+
+- **Paper / task source**: `igloo-paper/screens/dashboard/1-signer-dashboard`
+  renders a simple "Connected to wss://…, wss://…" kicker under the
+  Signer Running hero. The Relay Health table (Relay · Status · Latency
+  · Events · Last Seen) appears only on the
+  `2b-all-relays-offline` artboard.
+- **web-demo-v2 implementation**:
+  `src/screens/DashboardScreen/panels/RelayHealthPanel.tsx` rendered by
+  `states/RunningState.tsx` whenever `paperPanels=false` (runtime mode)
+  and at least one runtime relay is configured.
+- **Deviation**: the Running Dashboard now carries a per-relay
+  telemetry table with live Latency (ms), Events counter, and
+  relative Last-Seen copy. Paper's Running artboard does not display
+  this table; we surface it to make the m5 `BrowserRelayClient`
+  telemetry observable end-to-end (VAL-SETTINGS-010 numeric latency
+  within 10 s of connect, VAL-SETTINGS-011 EVENT-counter increments,
+  VAL-SETTINGS-012 relative Last Seen, VAL-SETTINGS-013 amber Slow
+  status above `SLOW_RELAY_THRESHOLD_MS` for 2 consecutive samples,
+  VAL-SETTINGS-014 real Last-Seen on Offline). Without this surface
+  the assertions would not be observable until every relay dropped —
+  which is the exact opposite of what they exercise.
+- **Demo parity**: paper-mode scenarios (`/demo/*` and any
+  fixture-driven Playwright path) render with `paperPanels=true`, which
+  short-circuits the new panel so pixel-parity regressions are
+  avoided. The `DashboardRuntimeStatesFidelity` + `demo-gallery.spec`
+  baselines continue to pass.
+- **Documented constant**:
+  `src/lib/relay/relayTelemetry.ts` exports
+  `SLOW_RELAY_THRESHOLD_MS = 300` with JSDoc explaining the 2-sample
+  hysteresis for VAL-SETTINGS-013.
+- **Assertion IDs covered**: VAL-SETTINGS-010, VAL-SETTINGS-011,
+  VAL-SETTINGS-012, VAL-SETTINGS-013, VAL-SETTINGS-014.

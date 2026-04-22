@@ -13,6 +13,12 @@ import {
   type RelaySocketEvent,
 } from "./browserRelayClient";
 import type { RelayFilter, RelaySubscription } from "./relayPort";
+import {
+  RELAY_PING_INTERVAL_MS,
+  RELAY_PING_TIMEOUT_MS,
+  SLOW_RELAY_CONSECUTIVE_SAMPLES,
+  SLOW_RELAY_THRESHOLD_MS,
+} from "./relayTelemetry";
 
 export type RuntimeRelayState = "connecting" | "online" | "offline";
 
@@ -48,6 +54,44 @@ export interface RuntimeRelayStatus {
    *   - `undefined` — never disconnected
    */
   lastCloseCode?: number | null;
+  /**
+   * m5-relay-telemetry — most-recent REQ→EOSE round-trip time in
+   * milliseconds. `undefined` until the first successful ping sample
+   * completes, or after the pump resets this relay's telemetry on
+   * reconnect. Populated from the `ping_sample` socket event that
+   * {@link BrowserRelayConnection.ping} emits. Powers VAL-SETTINGS-010
+   * (numeric ms Latency column).
+   */
+  latencyMs?: number;
+  /**
+   * Running counter of inbound NIP-01 `EVENT` frames observed on this
+   * relay's socket since the current connection opened. Advances by
+   * `+1` per inbound EVENT regardless of whether the event matched the
+   * runtime filter. Reset to `0` every time the pump successfully
+   * (re)connects this relay (VAL-SETTINGS-011).
+   *
+   * Optional for legacy literal callers (unit-test fixtures that
+   * predate this field); the pump itself always populates it.
+   */
+  eventsReceived?: number;
+  /**
+   * Unix-ms timestamp of the most recent inbound EVENT on this relay.
+   * `undefined` until at least one EVENT has been observed. Used by
+   * the Dashboard's Last-Seen column (VAL-SETTINGS-012) to render the
+   * relative "Xs ago" / "Xm ago" copy against the current clock.
+   */
+  lastEventAt?: number;
+  /**
+   * Count of consecutive latency samples whose RTT exceeded
+   * {@link SLOW_RELAY_THRESHOLD_MS}. A sample at or below the threshold
+   * resets this counter to `0`. When the counter reaches
+   * {@link SLOW_RELAY_CONSECUTIVE_SAMPLES} (2) the relay renders in
+   * the Slow (amber) status per VAL-SETTINGS-013.
+   *
+   * Optional for legacy literal callers (unit-test fixtures that
+   * predate this field); the pump itself always populates it.
+   */
+  consecutiveSlowSamples?: number;
 }
 
 export interface RuntimeDrainBatch {
@@ -78,12 +122,31 @@ interface RuntimeRelayPumpOptions {
    * recorders such as the dev-only `window.__debug.relayHistory` ring.
    */
   onSocketEvent?: (event: RelaySocketEvent) => void;
+  /**
+   * m5-relay-telemetry — override the interval (ms) between per-relay
+   * latency probes. Defaults to {@link RELAY_PING_INTERVAL_MS}. Unit
+   * tests dial this down so the first two samples land within a single
+   * fake-timer advance.
+   */
+  pingIntervalMs?: number;
+  /**
+   * m5-relay-telemetry — override the probe timeout (ms). Defaults to
+   * {@link RELAY_PING_TIMEOUT_MS}.
+   */
+  pingTimeoutMs?: number;
 }
 
 interface RuntimeRelayConnectionState {
   url: string;
   connection: RelayConnection | null;
   subscription: RelaySubscription | null;
+  /**
+   * Handle returned by `setInterval` for the per-relay latency sampler.
+   * `null` until the relay first transitions to `online`; cleared (and
+   * the interval killed) on disconnect, stop, or removal so we never
+   * leak timers across reconnect cycles.
+   */
+  pingTimer: ReturnType<typeof globalThis.setInterval> | null;
 }
 
 function uniqueRelays(relays: string[]): string[] {
@@ -108,6 +171,8 @@ export class RuntimeRelayPump {
 
   private readonly onSocketEventHook?: (event: RelaySocketEvent) => void;
   private readonly lastFilter: { current: RelayFilter | null };
+  private readonly pingIntervalMs: number;
+  private readonly pingTimeoutMs: number;
 
   constructor(options: RuntimeRelayPumpOptions) {
     const relays = uniqueRelays(options.relays);
@@ -126,6 +191,8 @@ export class RuntimeRelayPump {
         onSocketEvent: (event) => this.handleSocketEvent(event),
       });
     this.connectTimeoutMs = options.connectTimeoutMs ?? 8_000;
+    this.pingIntervalMs = options.pingIntervalMs ?? RELAY_PING_INTERVAL_MS;
+    this.pingTimeoutMs = options.pingTimeoutMs ?? RELAY_PING_TIMEOUT_MS;
     this.now = options.now ?? (() => Date.now());
     this.onRelayStatusChange = options.onRelayStatusChange;
     this.onDrains = options.onDrains;
@@ -133,11 +200,14 @@ export class RuntimeRelayPump {
       url,
       connection: null,
       subscription: null,
+      pingTimer: null,
     }));
     this.relayStatusesValue = relays.map((url) => ({
       url,
       state: "connecting",
       reconnectCount: 0,
+      eventsReceived: 0,
+      consecutiveSlowSamples: 0,
     }));
     this.lastFilter = { current: null };
     this.eventKindPromise =
@@ -157,7 +227,14 @@ export class RuntimeRelayPump {
       entry.connection?.close();
       entry.subscription = null;
       entry.connection = null;
-      this.updateRelay(entry.url, { state: "connecting", lastError: undefined });
+      if (entry.pingTimer) {
+        globalThis.clearInterval(entry.pingTimer);
+        entry.pingTimer = null;
+      }
+      this.updateRelay(entry.url, {
+        state: "connecting",
+        lastError: undefined,
+      });
     });
 
     const metadata = this.runtime.metadata();
@@ -192,6 +269,10 @@ export class RuntimeRelayPump {
     this.connections.forEach((entry) => {
       entry.subscription?.close();
       entry.subscription = null;
+      if (entry.pingTimer) {
+        globalThis.clearInterval(entry.pingTimer);
+        entry.pingTimer = null;
+      }
       if (entry.connection) {
         const connection = entry.connection;
         entry.connection = null;
@@ -283,6 +364,10 @@ export class RuntimeRelayPump {
       entry.connection?.close();
       entry.subscription = null;
       entry.connection = null;
+      if (entry.pingTimer) {
+        globalThis.clearInterval(entry.pingTimer);
+        entry.pingTimer = null;
+      }
     });
   }
 
@@ -329,6 +414,10 @@ export class RuntimeRelayPump {
       const entry = this.connections[index];
       entry.subscription?.close();
       entry.subscription = null;
+      if (entry.pingTimer) {
+        globalThis.clearInterval(entry.pingTimer);
+        entry.pingTimer = null;
+      }
       const connection = entry.connection;
       entry.connection = null;
       if (connection) {
@@ -377,10 +466,17 @@ export class RuntimeRelayPump {
           url,
           connection: null,
           subscription: null,
+          pingTimer: null,
         });
         this.relayStatusesValue = [
           ...this.relayStatusesValue,
-          { url, state: "connecting", reconnectCount: 0 },
+          {
+            url,
+            state: "connecting",
+            reconnectCount: 0,
+            eventsReceived: 0,
+            consecutiveSlowSamples: 0,
+          },
         ];
       });
       this.onRelayStatusChange?.(this.relayStatuses());
@@ -427,6 +523,10 @@ export class RuntimeRelayPump {
       const connection = entry.connection;
       entry.subscription?.close();
       entry.subscription = null;
+      if (entry.pingTimer) {
+        globalThis.clearInterval(entry.pingTimer);
+        entry.pingTimer = null;
+      }
       if (!connection) return;
       entry.connection = null;
       if (
@@ -459,6 +559,9 @@ export class RuntimeRelayPump {
     filter: RelayFilter,
     options: { incrementReconnect?: boolean } = {},
   ): Promise<void> {
+    // Always cancel any stale ping timer before we dial — on reconnect
+    // the new connection owns a fresh sampler.
+    this.clearPingTimer(entry.url);
     const connection = this.relayClient.connect(entry.url);
     entry.connection = connection;
     try {
@@ -470,10 +573,17 @@ export class RuntimeRelayPump {
       entry.subscription = connection.subscribe(filter, (event) => {
         this.handleInboundEvent(event);
       });
+      // m5-relay-telemetry: reset per-connection counters on (re)connect
+      // so VAL-SETTINGS-011 sees `eventsReceived = 0` immediately after
+      // a fresh socket opens.
       const patch: Partial<RuntimeRelayStatus> = {
         state: "online",
         lastConnectedAt: this.now(),
         lastError: undefined,
+        eventsReceived: 0,
+        consecutiveSlowSamples: 0,
+        latencyMs: undefined,
+        lastEventAt: undefined,
       };
       if (options.incrementReconnect) {
         const existing = this.relayStatusesValue.find(
@@ -482,12 +592,63 @@ export class RuntimeRelayPump {
         patch.reconnectCount = (existing?.reconnectCount ?? 0) + 1;
       }
       this.updateRelay(entry.url, patch);
+      this.schedulePingTimer(entry);
     } catch (error) {
       connection.close();
       this.updateRelay(entry.url, {
         state: "offline",
         lastError: errorMessage(error),
       });
+    }
+  }
+
+  /**
+   * Start a repeating latency probe for `entry`. Fires a first sample
+   * immediately (so VAL-SETTINGS-010's "≤10 s to numeric Latency"
+   * window is satisfied regardless of the configured interval) and
+   * then schedules additional samples every `pingIntervalMs`. Any
+   * prior timer for this URL is cleared first so this method is
+   * idempotent.
+   */
+  private schedulePingTimer(entry: RuntimeRelayConnectionState): void {
+    this.clearPingTimer(entry.url);
+    // Fire the first sample asynchronously — no reason to hold up
+    // connectOne's return.
+    void this.sampleRelayLatency(entry);
+    entry.pingTimer = globalThis.setInterval(() => {
+      void this.sampleRelayLatency(entry);
+    }, this.pingIntervalMs);
+  }
+
+  private clearPingTimer(url: string): void {
+    const entry = this.connections.find((candidate) => candidate.url === url);
+    if (!entry || !entry.pingTimer) return;
+    globalThis.clearInterval(entry.pingTimer);
+    entry.pingTimer = null;
+  }
+
+  /**
+   * Drive a single REQ→EOSE probe on `entry.connection`. Swallows
+   * all errors so a flaky relay cannot break the sampler schedule;
+   * the connection-level `ping_sample` / `ping_timeout` telemetry
+   * event is the authoritative signal for the UI.
+   */
+  private async sampleRelayLatency(
+    entry: RuntimeRelayConnectionState,
+  ): Promise<void> {
+    const connection = entry.connection;
+    if (!connection || this.stopped) return;
+    const status = this.relayStatusesValue.find(
+      (candidate) => candidate.url === entry.url,
+    );
+    if (!status || status.state !== "online") return;
+    if (typeof connection.ping !== "function") return;
+    try {
+      await connection.ping(this.pingTimeoutMs);
+    } catch {
+      // `ping()` should not throw in practice; if it does the socket
+      // will be marked offline by the close listener and we just
+      // drop the sample.
     }
   }
 
@@ -500,19 +661,47 @@ export class RuntimeRelayPump {
    * (server-side 1011, network 1006, etc.).
    */
   private handleSocketEvent(event: RelaySocketEvent): void {
+    const existing = this.relayStatusesValue.find(
+      (status) => status.url === event.url,
+    );
     if (event.type === "close") {
       // Only update when the url matches a known relay; ignore spurious
       // events from orphaned connections that outlived a stop()/start().
-      const existing = this.relayStatusesValue.find(
-        (status) => status.url === event.url,
-      );
       if (existing) {
         this.updateRelay(event.url, {
           state: "offline",
           lastDisconnectedAt: event.at,
           lastCloseCode: event.code ?? null,
         });
+        this.clearPingTimer(event.url);
       }
+    } else if (event.type === "event_received") {
+      // VAL-SETTINGS-011 / VAL-SETTINGS-012: advance the inbound-EVENT
+      // counter and the last-seen timestamp.
+      if (existing) {
+        this.updateRelay(event.url, {
+          eventsReceived: (existing.eventsReceived ?? 0) + 1,
+          lastEventAt: event.at,
+        });
+      }
+    } else if (event.type === "ping_sample") {
+      // VAL-SETTINGS-010 / VAL-SETTINGS-013: record latency and the
+      // consecutive-slow counter so the UI mapper can render Slow after
+      // `SLOW_RELAY_CONSECUTIVE_SAMPLES` over-threshold samples.
+      if (existing) {
+        const nextCount =
+          event.rtt_ms > SLOW_RELAY_THRESHOLD_MS
+            ? (existing.consecutiveSlowSamples ?? 0) + 1
+            : 0;
+        this.updateRelay(event.url, {
+          latencyMs: event.rtt_ms,
+          consecutiveSlowSamples: nextCount,
+        });
+      }
+    } else if (event.type === "ping_timeout") {
+      // A timed-out probe does not change Online/Slow status (the
+      // socket may still be healthy), but it does freeze the displayed
+      // latency number rather than refreshing to a fresh sample.
     }
     this.onSocketEventHook?.(event);
   }

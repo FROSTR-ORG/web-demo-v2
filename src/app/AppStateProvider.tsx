@@ -4281,6 +4281,18 @@ function hydrateRelayHistoryFromSessionStorage(): void {
 }
 
 function appendRelayHistoryEntry(event: RelaySocketEvent): void {
+  // The relay-history ring buffer only tracks lifecycle transitions
+  // (open/close/error). Telemetry events (event_received / ping_sample
+  // / ping_timeout) are delivered through the pump's own pipeline into
+  // `runtimeRelays[*]` — recording them here would flood the ring
+  // buffer and bury the close-code evidence validators need.
+  if (
+    event.type !== "open" &&
+    event.type !== "close" &&
+    event.type !== "error"
+  ) {
+    return;
+  }
   const iso = new Date(event.at).toISOString();
   let entry: RelayHistoryEntry;
   if (event.type === "close") {

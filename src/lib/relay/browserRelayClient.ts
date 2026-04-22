@@ -26,6 +26,12 @@ export interface RelayConnection {
     onEvent: (event: unknown) => void,
     onNotice?: (message: string) => void,
   ): RelaySubscription;
+  /**
+   * Optional latency probe (m5-relay-telemetry). Implementations that
+   * do not support RTT sampling (test fakes) may omit it — callers
+   * treat the missing method as "no sample".
+   */
+  ping?(timeoutMs: number): Promise<number | null>;
   close(): void;
 }
 
@@ -74,7 +80,27 @@ export type RelaySocketEvent =
       code: number | null;
       wasClean: boolean;
     }
-  | { type: "error"; url: string; at: number };
+  | { type: "error"; url: string; at: number }
+  /**
+   * Emitted once per inbound NIP-01 `EVENT` frame that the connection
+   * observed on the wire, regardless of whether any subscription matched.
+   * Consumed by `RuntimeRelayPump` to drive the per-relay `eventsReceived`
+   * counter (VAL-SETTINGS-011) and to advance `lastEventAt`
+   * (VAL-SETTINGS-012).
+   */
+  | { type: "event_received"; url: string; at: number }
+  /**
+   * Emitted when a `ping()` probe subscription completed its REQ→EOSE
+   * round-trip. `rtt_ms` is the measured elapsed time in milliseconds
+   * (VAL-SETTINGS-010, VAL-SETTINGS-013).
+   */
+  | { type: "ping_sample"; url: string; at: number; rtt_ms: number }
+  /**
+   * Emitted when a `ping()` probe did not receive an EOSE within its
+   * timeout window. The pump uses this to skip a sample (no counter
+   * increment) without marking the relay offline.
+   */
+  | { type: "ping_timeout"; url: string; at: number };
 
 export interface BrowserRelayClientOptions {
   createSocket?: (url: string) => WebSocketLike;
@@ -155,6 +181,13 @@ class BrowserRelayConnection implements RelayConnection {
   private subscriptionSeq = 0;
   private subscriptions = new Map<string, (event: unknown) => void>();
   private noticeListeners = new Set<(message: string) => void>();
+  /**
+   * Per-subscription EOSE listeners. Populated transiently by
+   * {@link ping} so the probe can resolve on the matching EOSE frame;
+   * production subscriptions (`subscribe()`) do not install one because
+   * the runtime consumes EOSE implicitly via its subscription filter.
+   */
+  private eoseListeners = new Map<string, () => void>();
   private messageListener: ((event: Event | MessageEvent) => void) | null =
     null;
   private persistentCloseListener:
@@ -294,6 +327,7 @@ class BrowserRelayConnection implements RelayConnection {
     }
     this.subscriptions.clear();
     this.noticeListeners.clear();
+    this.eoseListeners.clear();
     this.socket = null;
     this.messageListener = null;
     this.persistentCloseListener = null;
@@ -385,6 +419,7 @@ class BrowserRelayConnection implements RelayConnection {
     }
     this.subscriptions.clear();
     this.noticeListeners.clear();
+    this.eoseListeners.clear();
     this.socket?.close();
     this.socket = null;
     this.messageListener = null;
@@ -414,10 +449,123 @@ class BrowserRelayConnection implements RelayConnection {
       this.noticeListeners.forEach((listener) => listener(subscriptionId));
       return;
     }
+    if (kind === "EOSE" && typeof subscriptionId === "string") {
+      // Resolve any probe subscription waiting on its EOSE — used by
+      // `ping()` to compute RTT. We intentionally do NOT fire
+      // `event_received` for EOSE frames (VAL-SETTINGS-011 increments
+      // only on EVENT frames).
+      const listener = this.eoseListeners.get(subscriptionId);
+      listener?.();
+      return;
+    }
     if (kind !== "EVENT" || typeof subscriptionId !== "string") {
       return;
     }
+    // VAL-SETTINGS-011 + VAL-SETTINGS-012: fire telemetry *before*
+    // dispatching to the subscription handler so downstream counters
+    // see the inbound frame even if the handler throws.
+    this.emitSocketEvent({
+      type: "event_received",
+      url: this.url,
+      at: Date.now(),
+    });
     this.subscriptions.get(subscriptionId)?.(payload);
+  }
+
+  /**
+   * m5-relay-telemetry — send a lightweight NIP-01 probe subscription
+   * and resolve with the round-trip time (milliseconds) from REQ to
+   * the first `EOSE` frame. Use case: the {@link RuntimeRelayPump}
+   * latency sampler that powers the dashboard Latency column
+   * (VAL-SETTINGS-010 / VAL-SETTINGS-013).
+   *
+   * The probe uses a filter that returns no events (`limit: 0` with a
+   * guaranteed-empty `kinds` window) so relays respond with EOSE
+   * immediately after acknowledging the subscription. The REQ is
+   * cleaned up with `CLOSE` whether the probe resolves, times out, or
+   * the caller aborts.
+   *
+   * `timeoutMs` defaults to the module-level
+   * `RELAY_PING_TIMEOUT_MS` when unspecified; on timeout the promise
+   * resolves with `null` and a `ping_timeout` telemetry event fires.
+   * Errors thrown before the REQ is sent (socket not open) reject with
+   * an Error; transient protocol errors after REQ don't reject —
+   * they just time out.
+   */
+  ping(timeoutMs: number): Promise<number | null> {
+    const socket = this.requireOpenSocket();
+    const id = `ping-${Date.now()}-${this.subscriptionSeq}`;
+    this.subscriptionSeq += 1;
+    const startedAt =
+      typeof performance !== "undefined" &&
+      typeof performance.now === "function"
+        ? performance.now()
+        : Date.now();
+    return new Promise<number | null>((resolve) => {
+      let settled = false;
+      const cleanup = () => {
+        this.eoseListeners.delete(id);
+        if (this.socket?.readyState === 1) {
+          try {
+            this.socket.send(JSON.stringify(["CLOSE", id]));
+          } catch {
+            // Socket already torn down; nothing to clean up.
+          }
+        }
+      };
+      const timer = globalThis.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        this.emitSocketEvent({
+          type: "ping_timeout",
+          url: this.url,
+          at: Date.now(),
+        });
+        resolve(null);
+      }, timeoutMs);
+      this.eoseListeners.set(id, () => {
+        if (settled) return;
+        settled = true;
+        globalThis.clearTimeout(timer);
+        cleanup();
+        const endedAt =
+          typeof performance !== "undefined" &&
+          typeof performance.now === "function"
+            ? performance.now()
+            : Date.now();
+        const rtt = Math.max(0, Math.round(endedAt - startedAt));
+        this.emitSocketEvent({
+          type: "ping_sample",
+          url: this.url,
+          at: Date.now(),
+          rtt_ms: rtt,
+        });
+        resolve(rtt);
+      });
+      try {
+        // A guaranteed-empty filter: `limit: 0` tells the relay to
+        // skip any stored events and emit EOSE immediately.
+        socket.send(
+          JSON.stringify([
+            "REQ",
+            id,
+            { kinds: [1], limit: 0 },
+          ]),
+        );
+      } catch (error) {
+        if (settled) return;
+        settled = true;
+        globalThis.clearTimeout(timer);
+        cleanup();
+        resolve(null);
+        // Re-throw-equivalent: an outbound send failure is fatal for
+        // this probe but we resolve with null so callers drive the
+        // next sample instead of crashing. The error is non-silent
+        // because the caller will see the null return.
+        void error;
+      }
+    });
   }
 }
 

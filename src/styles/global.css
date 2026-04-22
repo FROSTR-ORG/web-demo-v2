@@ -2997,6 +2997,27 @@ button.peer-policy-chip.deny:focus-visible {
   color: #ef4444;
 }
 
+/*
+ * m5-relay-telemetry (VAL-SETTINGS-013) — amber "Slow" status for
+ * relays whose last 2+ latency samples exceeded SLOW_RELAY_THRESHOLD_MS
+ * while the socket is still OPEN. `#f59e0b` is the design-system
+ * --color-warn token; kept inline here alongside the red (.offline)
+ * and default (online) variants so the relay-health-table styles
+ * stay co-located.
+ */
+.relay-health-status.slow {
+  color: #f59e0b;
+}
+
+/*
+ * Online (connected) status explicitly styled so validators can assert
+ * a green indicator against both the dot and label
+ * (VAL-SETTINGS-010 / VAL-SETTINGS-013).
+ */
+.relay-health-status.online {
+  color: #34d399;
+}
+
 .relay-health-dot {
   width: 6px;
   height: 6px;

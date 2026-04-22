@@ -157,6 +157,9 @@ describe("RuntimeRelayPump", () => {
       authors: ["peer-a", "peer-b"],
       "#p": ["local-pubkey"],
     });
+    // m5-relay-telemetry: online status now carries `eventsReceived`,
+    // `consecutiveSlowSamples`, and undefined `latencyMs` / `lastEventAt`
+    // until the first ping / inbound event arrives.
     expect(statuses.at(-1)).toEqual([
       {
         url: "wss://relay.test",
@@ -164,6 +167,10 @@ describe("RuntimeRelayPump", () => {
         lastConnectedAt: 123,
         lastError: undefined,
         reconnectCount: 0,
+        eventsReceived: 0,
+        consecutiveSlowSamples: 0,
+        latencyMs: undefined,
+        lastEventAt: undefined,
       },
     ]);
 
@@ -200,12 +207,16 @@ describe("RuntimeRelayPump", () => {
     });
 
     await pump.start();
+    // m5-relay-telemetry: telemetry fields are initialized for every
+    // relay, including ones that never reach `online`.
     expect(pump.relayStatuses()).toEqual([
       {
         url: "wss://offline.test",
         state: "offline",
         lastError: "offline",
         reconnectCount: 0,
+        eventsReceived: 0,
+        consecutiveSlowSamples: 0,
       },
       {
         url: "wss://publish.test",
@@ -213,6 +224,10 @@ describe("RuntimeRelayPump", () => {
         lastConnectedAt: 500,
         lastError: undefined,
         reconnectCount: 0,
+        eventsReceived: 0,
+        consecutiveSlowSamples: 0,
+        latencyMs: undefined,
+        lastEventAt: undefined,
       },
     ]);
 

@@ -43,6 +43,10 @@ import {
 } from "./mocks";
 import type { DashboardState, ExportMode, ModalState } from "./types";
 import type { RuntimeRelayStatus } from "../../lib/relay/runtimeRelayPump";
+import {
+  formatRelayLastSeen,
+  isRelaySlow,
+} from "../../lib/relay/relayTelemetry";
 
 export type { DashboardState, ModalState } from "./types";
 
@@ -50,9 +54,27 @@ function mockPackageForMode(mode: ExportMode): string {
   return mode === "profile" ? MOCK_BACKUP_STRING : MOCK_SHARE_PACKAGE_STRING;
 }
 
-function relayHealthRowsFromRuntime(
+/**
+ * Map the runtime's per-relay telemetry snapshot onto the
+ * `DashboardRelayHealthRow` shape consumed by the Paper-fixture Relay
+ * Health table (VAL-SETTINGS-010 through VAL-SETTINGS-014).
+ *
+ * - **status**: derived from `state` + `consecutiveSlowSamples` so an
+ *   `online` relay whose last two RTT samples exceeded
+ *   `SLOW_RELAY_THRESHOLD_MS` renders as Slow (amber) per
+ *   VAL-SETTINGS-013.
+ * - **latency**: numeric "Nms" once a sample is available, "--" before
+ *   the first ping completes.
+ * - **events**: numeric counter sourced from inbound EVENT frames.
+ * - **lastSeen**: relative "Xs ago" / "Xm ago" copy. Online relays
+ *   prefer `lastEventAt`, falling back to `lastConnectedAt` when no
+ *   event has arrived yet; offline relays prefer `lastDisconnectedAt`
+ *   so VAL-SETTINGS-014's "real last-seen, never `--`" holds.
+ */
+export function relayHealthRowsFromRuntime(
   runtimeRelays: RuntimeRelayStatus[],
   configuredRelays: string[],
+  nowMs: number = Date.now(),
 ) {
   const rows =
     runtimeRelays.length > 0
@@ -61,23 +83,54 @@ function relayHealthRowsFromRuntime(
           url,
           state: "offline",
         }));
-  return rows.map((relay) => ({
-    relay: relay.url,
-    status:
+  return rows.map((relay) => {
+    const slow = relay.state === "online" && isRelaySlow(relay.consecutiveSlowSamples);
+    const status: "Online" | "Degraded" | "Offline" =
       relay.state === "online"
-        ? ("Online" as const)
+        ? slow
+          ? ("Degraded" as const)
+          : ("Online" as const)
         : relay.state === "connecting"
           ? ("Degraded" as const)
-          : ("Offline" as const),
-    latency: "--",
-    events: "--",
-    lastSeen:
-      relay.state === "online"
-        ? "now"
-        : relay.lastError
-          ? relay.lastError
-          : "--",
-  }));
+          : ("Offline" as const);
+    // Latency: numeric once we have a sample, "--" otherwise. A relay
+    // that dropped back offline keeps the last numeric reading frozen
+    // so users can still see the final measured ms value
+    // (VAL-SETTINGS-014's "frozen at last measured").
+    const latency =
+      typeof relay.latencyMs === "number"
+        ? `${relay.latencyMs}ms`
+        : "--";
+    // Events: numeric counter. Zero renders as "0" (not "--") so
+    // VAL-SETTINGS-011's "starts at 0" expectation is visible.
+    const events =
+      typeof relay.eventsReceived === "number"
+        ? String(relay.eventsReceived)
+        : "0";
+    // LastSeen: prefer the most recent inbound event, then connection
+    // open, then disconnect (offline). "--" only when a relay has
+    // literally never transitioned past `connecting`.
+    const lastSeenSource =
+      relay.lastEventAt ??
+      (relay.state === "online"
+        ? relay.lastConnectedAt
+        : relay.lastDisconnectedAt ?? relay.lastConnectedAt);
+    const lastSeen = formatRelayLastSeen(lastSeenSource, nowMs);
+    return {
+      relay: relay.url,
+      status,
+      latency,
+      events,
+      lastSeen,
+      /**
+       * Distinguish the Slow-but-online status from a proper Offline
+       * row in the DOM so CSS / validators can target `.slow` amber
+       * tokens independently of `.offline` reds. Consumed by
+       * {@link RelaysOfflineState} when it renders the row className.
+       */
+      slow,
+    };
+  });
 }
 
 export function DashboardScreen() {
@@ -113,6 +166,14 @@ export function DashboardScreen() {
   const [exportResult, setExportResult] = useState<{ mode: ExportMode; packageText: string } | null>(null);
   const [policyPromptRequest, setPolicyPromptRequest] = useState<PolicyPromptRequest>(DEFAULT_POLICY_PROMPT_REQUEST);
   const [settingsOpen, setSettingsOpen] = useState(Boolean(demoUi.dashboard?.settingsOpen));
+  // m5-relay-telemetry — 1 s tick that re-renders so relative lastSeen
+  // copy ("Xs ago" / "Xm ago") keeps advancing in the relay-health
+  // table even when no runtime snapshot churns (VAL-SETTINGS-012).
+  const [relayNowMs, setRelayNowMs] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setRelayNowMs(Date.now()), 1_000);
+    return () => window.clearInterval(id);
+  }, []);
   // Reactive SigningFailedModal state. `activeSignFailure` is set when a new
   // sign-type OperationFailure is drained and we want to surface it to the
   // user. `consumedFailureIds` tracks request_ids we've already shown (or
@@ -583,7 +644,11 @@ export function DashboardScreen() {
     : dashboardState === "stopped"
       ? "Runtime stopped — start the signer to ping peers."
       : null;
-  const relayRows = relayHealthRowsFromRuntime(runtimeRelays, activeProfile.relays);
+  const relayRows = relayHealthRowsFromRuntime(
+    runtimeRelays,
+    activeProfile.relays,
+    relayNowMs,
+  );
   const completionMode = exportResult?.mode ?? exportMode;
   const completionPackage = exportResult?.packageText ?? mockPackageForMode(completionMode);
 
@@ -734,6 +799,7 @@ export function DashboardScreen() {
                 pendingOperations={runtimeStatus.pending_operations}
                 paperPanels={paperPanels}
                 sidebarOpen={settingsOpen}
+                runtimeRelays={paperPanels ? undefined : runtimeRelays}
                 onStop={handleStopSigner}
                 onRefresh={handleRefreshPeers}
                 onOpenPolicyPrompt={

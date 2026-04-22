@@ -5,6 +5,7 @@ import type {
   PendingOperation,
   PeerStatus,
 } from "../../../lib/bifrost/types";
+import type { RuntimeRelayStatus } from "../../../lib/relay/runtimeRelayPump";
 import {
   MOCK_EVENT_LOG_ROWS,
   MOCK_PENDING_APPROVAL_ROWS,
@@ -18,6 +19,7 @@ import {
   deriveApprovalRowsFromRuntime,
   formatApprovalTtl,
 } from "../panels/PendingApprovalsPanel";
+import { RelayHealthPanel } from "../panels/RelayHealthPanel";
 
 /**
  * 1-second tick for TTL countdown refresh. Matches VAL-APPROVALS-002's
@@ -41,6 +43,7 @@ export function RunningState({
   onOpenPolicyPrompt,
   peerRefreshErrors,
   peerPermissionStates,
+  runtimeRelays,
 }: {
   relays: string[];
   onlineCount: number;
@@ -60,6 +63,15 @@ export function RunningState({
    * predate runtime_status.peer_permission_states.
    */
   peerPermissionStates?: PeerPermissionState[];
+  /**
+   * m5-relay-telemetry — per-relay telemetry snapshot sourced from
+   * {@link RuntimeRelayPump}. Rendered by {@link RelayHealthPanel} in
+   * runtime mode (paperPanels=false) so validators and users can
+   * observe live Latency / Events / Last-Seen columns
+   * (VAL-SETTINGS-010 through VAL-SETTINGS-014). Omitted in Paper/demo
+   * mode to preserve pixel-parity.
+   */
+  runtimeRelays?: RuntimeRelayStatus[];
 }) {
   // Drive a 1 s clock so the runtime-mode PendingApprovalsPanel's TTL
   // chips and "Nearest: <ttl>" header update live without requiring any
@@ -145,6 +157,13 @@ export function RunningState({
         onOpenPolicyPrompt={paperPanels ? onOpenPolicyPrompt : undefined}
         nearest={nearestLabel}
       />
+      {/* Runtime-mode Relay Health table (m5-relay-telemetry). Hidden in
+       * Paper/demo mode so pixel-parity scenarios continue to render
+       * identically. Deviation tracked in
+       * `docs/runtime-deviations-from-paper.md`. */}
+      {!paperPanels && runtimeRelays && runtimeRelays.length > 0 ? (
+        <RelayHealthPanel runtimeRelays={runtimeRelays} />
+      ) : null}
     </>
   );
 }
