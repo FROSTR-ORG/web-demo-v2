@@ -1,0 +1,242 @@
+{
+  "groupId": "group-peer-policies-view",
+  "testedAt": "2026-04-22T13:19:39Z",
+  "isolation": {
+    "milestone": "m3-policies",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "appUrl": "http://127.0.0.1:5173",
+    "testingSurface": "vitest component/integration tests"
+  },
+  "toolsUsed": [
+    "vitest"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-POLICIES-001",
+      "title": "Peer Policies card lists exactly the current group's configured peers",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest command against peer policies suites",
+          "expected": "Target tests execute successfully",
+          "observed": "3 test files ran and passed (19/19 tests)."
+        },
+        {
+          "action": "Evaluate src/screens/DashboardScreen/states/__tests__/PoliciesState.peerRowParity.test.tsx case: \"Peer Policies card renders exactly one row per configured peer (VAL-POLICIES-001)\"",
+          "expected": "Rendered .policies-peer-name row count equals runtimeStatus.peer_permission_states length",
+          "observed": "Assertion passed; row count matched configured peer permission states."
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "N/A (vitest surface). One known pre-existing nested <button> warning was emitted to stderr during PeersPanel render.",
+        "network": "N/A",
+        "logs": [
+          "m3-policies/group-peer-policies-view/vitest-peer-policies.log"
+        ],
+        "testCases": [
+          "src/screens/DashboardScreen/states/__tests__/PoliciesState.peerRowParity.test.tsx:222"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-POLICIES-002",
+      "title": "Peer Policies row order tracks PeerRow indices",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Evaluate parity test case: \"both surfaces surface identical allowed-verb state per peer/verb\"",
+          "expected": "Peer Policies rows and PeerRow entries resolve against the same peer idx identity",
+          "observed": "Test iterated peers by idx, located matching \"Peer #idx\" and \"#idx\" rows, and verified parity for each peer/verb without mismatch."
+        },
+        {
+          "action": "Evaluate Dashboard policies view smoke rows",
+          "expected": "Peer Policies list renders indexed peer labels for roster",
+          "observed": "DashboardPolicies test confirmed rows for Peer #0, #1, #2 in the rendered list."
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "N/A (vitest surface).",
+        "network": "N/A",
+        "logs": [
+          "m3-policies/group-peer-policies-view/vitest-peer-policies.log"
+        ],
+        "testCases": [
+          "src/screens/DashboardScreen/states/__tests__/PoliciesState.peerRowParity.test.tsx:36",
+          "src/screens/__tests__/DashboardPolicies.test.tsx:214"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-POLICIES-003",
+      "title": "Granted badge tones match Paper reference",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect Peer Policies runtime rendering in PoliciesState",
+          "expected": "SIGN/ECDH/PING/ONBOARD chips use success/info/ping/onboard tones",
+          "observed": "PoliciesState maps chips to tone=\"success\" (SIGN), tone=\"info\" (ECDH), tone=\"ping\" (PING), tone=\"onboard\" (ONBOARD)."
+        },
+        {
+          "action": "Inspect permission badge tone styles in src/styles/global.css",
+          "expected": "Tone classes resolve to green/cyan/purple/amber styled variants with dedicated border/background values",
+          "observed": ".permission-badge, .permission-badge.info, .permission-badge.ping, and .permission-badge.onboard define distinct tone color/border/background styles."
+        },
+        {
+          "action": "Confirm associated peer policy rendering tests pass",
+          "expected": "No regression in badge render paths",
+          "observed": "All targeted vitest files passed."
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "N/A (vitest surface).",
+        "network": "N/A",
+        "logs": [
+          "m3-policies/group-peer-policies-view/vitest-peer-policies.log"
+        ],
+        "sourceChecks": [
+          "src/screens/DashboardScreen/states/PoliciesState.tsx",
+          "src/styles/global.css:1206-1244"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-POLICIES-004",
+      "title": "Ungranted badges render as muted outline",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Evaluate parity test muted-class assertions",
+          "expected": "PoliciesState chip has .muted when effective policy does not allow",
+          "observed": "Test explicitly asserts chipBadge.classList.contains(\"muted\") === !allowed for each peer/method."
+        },
+        {
+          "action": "Evaluate PeerRow ungranted handling tests",
+          "expected": "ask/unset/deny render as ungranted (muted/omitted) behavior",
+          "observed": "PeerRow tests for deny and ask/unset states passed, confirming ungranted representation behavior."
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "N/A (vitest surface).",
+        "network": "N/A",
+        "logs": [
+          "m3-policies/group-peer-policies-view/vitest-peer-policies.log"
+        ],
+        "testCases": [
+          "src/screens/DashboardScreen/states/__tests__/PoliciesState.peerRowParity.test.tsx:207-208",
+          "src/screens/__tests__/PeerRow.effectivePolicy.test.tsx:84",
+          "src/screens/__tests__/PeerRow.effectivePolicy.test.tsx:124"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-POLICIES-005",
+      "title": "PoliciesState and PeerRow stay in sync via effective_policy",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run cross-surface parity test for PoliciesState + PeersPanel",
+          "expected": "For every peer/method tuple, both surfaces agree on allowed/ungranted state from effective_policy.request",
+          "observed": "Parity test iterated all peers and methods, deriving allowed via resolveRequestPolicyAllows and confirming PoliciesState chip muted state matches PeerRow badge presence."
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "N/A (vitest surface).",
+        "network": "N/A",
+        "logs": [
+          "m3-policies/group-peer-policies-view/vitest-peer-policies.log"
+        ],
+        "testCases": [
+          "src/screens/DashboardScreen/states/__tests__/PoliciesState.peerRowParity.test.tsx:36"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-POLICIES-006",
+      "title": "PeerRow badges derive from effective_policy, not heuristics",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Evaluate PeerRow effective policy tests with heuristic mismatch",
+          "expected": "When effective_policy.request.sign=deny and can_sign=true, SIGN badge remains ungranted",
+          "observed": "Test \"omits SIGN badge when effective_policy.request.sign=deny even though peer.can_sign=true\" passed."
+        },
+        {
+          "action": "Evaluate runtime-mode parity with permissionState present",
+          "expected": "Badge set follows effective_policy grants even for offline peers in runtime mode",
+          "observed": "Offline runtime-mode test passed and shows all effective-policy-granted badges."
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "N/A (vitest surface).",
+        "network": "N/A",
+        "logs": [
+          "m3-policies/group-peer-policies-view/vitest-peer-policies.log"
+        ],
+        "testCases": [
+          "src/screens/__tests__/PeerRow.effectivePolicy.test.tsx:84",
+          "src/screens/__tests__/PeerRow.effectivePolicy.test.tsx:157"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-POLICIES-020",
+      "title": "ONBOARD chip reflects onboarding grant, not hard-coded to peer #1",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Evaluate PeerRow/PoliciesState parity matrix with varied peer indices and onboarding grants",
+          "expected": "ONBOARD display follows effective_policy.request.onboard per peer, independent of idx",
+          "observed": "Parity test includes peers idx 0-3 with mixed onboard allow/deny and asserts badge presence equals resolveRequestPolicyAllows outcome for each peer."
+        },
+        {
+          "action": "Evaluate PeerRow onboarding visibility tests",
+          "expected": "ONBOARD appears only when effective policy grants it",
+          "observed": "PeerRow tests passed for both onboard-allow and onboard-deny/ungranted paths."
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "N/A (vitest surface).",
+        "network": "N/A",
+        "logs": [
+          "m3-policies/group-peer-policies-view/vitest-peer-policies.log"
+        ],
+        "testCases": [
+          "src/screens/DashboardScreen/states/__tests__/PoliciesState.peerRowParity.test.tsx:36",
+          "src/screens/__tests__/PeerRow.effectivePolicy.test.tsx:64",
+          "src/screens/__tests__/PeerRow.effectivePolicy.test.tsx:157"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Targeted vitest run emits a React warning about nested <button> elements from PeersPanel while executing parity tests.",
+      "resolved": true,
+      "resolution": "Treated as known pre-existing issue documented in mission AGENTS.md; continued assertion validation because tests still passed.",
+      "affectedAssertions": [
+        "VAL-POLICIES-001",
+        "VAL-POLICIES-002",
+        "VAL-POLICIES-004",
+        "VAL-POLICIES-005",
+        "VAL-POLICIES-020"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 7 assigned assertions for peer-policies view using the requested vitest suites; all 7 passed based on passing tests plus direct component/style observations, with one known pre-existing nested-button warning captured as non-blocking friction."
+}

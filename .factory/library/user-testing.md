@@ -149,3 +149,12 @@ All hooks are **DEV-only**. If your validation runs a production build (`vite bu
 
 - For policy-prompt queue assertions, sample modal/queue DOM state after a short post-enqueue wait (~250-350ms) to avoid React commit race conditions.
 - Fresh deep-links to `/dashboard/:profileId` can redirect to `/` before bridge hydration in headless runs; seed dashboard context from `/demo` first, then navigate in-session for stable approvals validation.
+
+## Observed Tooling Notes (m3-policies)
+
+- Existing m3 Playwright + Vitest suites provide strong coverage for most policy assertions, but no direct automated proof for:
+  - `VAL-POLICIES-007` strict `<=500ms` propagation bound
+  - `VAL-POLICIES-009` explicit full-matrix `clear_policy_overrides()` reset
+  - `VAL-POLICIES-023` conflicting cross-tab writes (`deny -> allow`) with 2s convergence bound
+  - `VAL-CROSS-003` full allow-once retry-success loop (beyond denial-only round-trip)
+- For future user-testing reruns, prefer dedicated agent-browser flows for the four assertions above, capturing DOM timing snapshots and request-id correlation artifacts directly from `window.__appState`.
