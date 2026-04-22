@@ -1,0 +1,195 @@
+{
+  "groupId": "g3-correlation-policy-relay",
+  "testedAt": "2026-04-22T16:04:45Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "flowValidatorGuidance": "Flow Validator Guidance: test-observability hooks (DEV only)",
+    "assignedCommand": "npx vitest run src/screens/DashboardScreen/panels/__tests__/EventLogPanel.runtime.test.tsx src/lib/relay/runtimeRelayPump.test.ts src/lib/bifrost/eventLogScrub.test.ts --config vitest.config.ts",
+    "commandExitCode": 0
+  },
+  "toolsUsed": [
+    "vitest"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-EVENTLOG-003",
+      "title": "Sign round-trip yields SIGN badge",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run the assigned vitest command and inspect EventLogPanel runtime tests.",
+          "expected": "SIGN badge rendering and expandable payload fields needed for sign correlation are covered by passing tests.",
+          "observed": "Command exited 0 with 20/20 tests passing; EventLogPanel tests include SIGN badge coverage in \"renders entries newest-first with HH:MM:SS timestamps and badges\" and payload rendering in \"expands a row to render 2-space-indented JSON of the payload\"."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g3-correlation-policy-relay/vitest-g3-correlation-policy-relay.log"
+        ],
+        "consoleErrors": "N/A (CLI unit test run)",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-004",
+      "title": "ECDH round-trip yields ECDH badge",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run the assigned vitest command and inspect EventLogPanel runtime tests.",
+          "expected": "ECDH badge rendering is validated by passing tests.",
+          "observed": "Command exited 0; EventLogPanel test \"renders entries newest-first with HH:MM:SS timestamps and badges\" includes an ECDH entry and passed."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g3-correlation-policy-relay/vitest-g3-correlation-policy-relay.log"
+        ],
+        "consoleErrors": "N/A (CLI unit test run)",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-006",
+      "title": "Peer denial surfaces as SIGNER_POLICY or PEER_POLICY entry",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run the assigned vitest command and inspect EventLogPanel typed-badge tests.",
+          "expected": "Policy-denial badge taxonomy includes SIGNER_POLICY/PEER_POLICY and passes.",
+          "observed": "Command exited 0; EventLogPanel test \"applies typed-badge CSS classes matching the Paper taxonomy\" explicitly validates both SIGNER_POLICY and PEER_POLICY badge classes."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g3-correlation-policy-relay/vitest-g3-correlation-policy-relay.log"
+        ],
+        "consoleErrors": "N/A (CLI unit test run)",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-007",
+      "title": "Relay connect/disconnect/reconnect produce INFO/ERROR entries",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run the assigned vitest command and inspect RuntimeRelayPump + EventLogPanel tests.",
+          "expected": "Relay lifecycle transitions and INFO/ERROR badge taxonomy are validated by passing tests.",
+          "observed": "Command exited 0; runtimeRelayPump tests covering connect/offline/reconnect lifecycle and socket events passed, and EventLogPanel taxonomy test passed with INFO and ERROR badge classes."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g3-correlation-policy-relay/vitest-g3-correlation-policy-relay.log"
+        ],
+        "consoleErrors": "N/A (CLI unit test run)",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-017",
+      "title": "Signing failure correlates to SigningFailedModal via request_id",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Review the executed test set from the assigned vitest command for explicit SigningFailedModal-to-EventLog request_id correlation coverage.",
+          "expected": "At least one passing test asserts SigningFailedModal request_id equals Event Log row request_id.",
+          "observed": "No executed test in the three-file run asserted SigningFailedModal request_id correlation; command evidence is insufficient to conclude pass/fail for this assertion."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g3-correlation-policy-relay/vitest-g3-correlation-policy-relay.log"
+        ],
+        "consoleErrors": "N/A (CLI unit test run)",
+        "network": "N/A"
+      },
+      "issues": "Assigned command did not include a direct assertion for SigningFailedModal request_id correlation."
+    },
+    {
+      "id": "VAL-EVENTLOG-019",
+      "title": "No secrets in event log payloads",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run the assigned vitest command and inspect eventLogScrub + EventLogPanel scrub tests.",
+          "expected": "Sensitive fields and bfprofile-like values are redacted in rendered payloads.",
+          "observed": "Command exited 0; all 6 eventLogScrub tests passed (top-level and nested secret redaction, bfprofile redaction, immutability), and EventLogPanel scrub test passed."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g3-correlation-policy-relay/vitest-g3-correlation-policy-relay.log"
+        ],
+        "consoleErrors": "N/A (CLI unit test run)",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-020",
+      "title": "Expand state persists across new event ingestion",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Review the executed test set from the assigned vitest command for expand-state persistence after new event prepends.",
+          "expected": "A passing test demonstrates an expanded row remains expanded after subsequent event ingestion.",
+          "observed": "No executed test in the three-file run covered expansion persistence across new event prepends; command evidence is insufficient to conclude pass/fail for this assertion."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g3-correlation-policy-relay/vitest-g3-correlation-policy-relay.log"
+        ],
+        "consoleErrors": "N/A (CLI unit test run)",
+        "network": "N/A"
+      },
+      "issues": "Assigned command did not include a direct expansion-persistence assertion."
+    },
+    {
+      "id": "VAL-CROSS-015",
+      "title": "Event log + Pending Approvals correlation (M2 + M4)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run the assigned vitest command and inspect EventLogPanel correlation test.",
+          "expected": "Expanded Event Log JSON exposes the same request_id across correlated rows.",
+          "observed": "Command exited 0; explicit test \"correlation: the expanded JSON exposes the same request_id as the source payload (VAL-CROSS-015)\" passed."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g3-correlation-policy-relay/vitest-g3-correlation-policy-relay.log"
+        ],
+        "consoleErrors": "N/A (CLI unit test run)",
+        "network": "N/A"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [
+    {
+      "description": "Executed command evidence does not include a direct SigningFailedModal request_id correlation assertion.",
+      "affectedAssertions": [
+        "VAL-EVENTLOG-017"
+      ],
+      "quickFixAttempted": "Reviewed all executed test files and test names from the run log; no direct matcher found."
+    },
+    {
+      "description": "Executed command evidence does not include a direct expand-state persistence-on-prepend assertion.",
+      "affectedAssertions": [
+        "VAL-EVENTLOG-020"
+      ],
+      "quickFixAttempted": "Reviewed all executed test files and test names from the run log; no direct matcher found."
+    }
+  ],
+  "summary": "Tested 8 assigned assertions from the required vitest command evidence: 6 passed, 0 failed, 2 blocked."
+}

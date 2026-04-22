@@ -1,0 +1,126 @@
+{
+  "groupId": "g1-buffer-lifecycle",
+  "testedAt": "2026-04-22T16:03:42Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "flowGuidance": "Flow Validator Guidance: test-observability hooks (DEV only)",
+    "assignedAssertions": [
+      "VAL-EVENTLOG-005",
+      "VAL-EVENTLOG-012",
+      "VAL-EVENTLOG-014",
+      "VAL-EVENTLOG-016",
+      "VAL-EVENTLOG-024"
+    ]
+  },
+  "toolsUsed": [
+    "vitest"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-EVENTLOG-005",
+      "title": "Ping sweep yields PING entry",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest suite including src/app/__tests__/runtimeEventLog.test.tsx.",
+          "expected": "Test coverage for VAL-EVENTLOG-005 passes.",
+          "observed": "runtimeEventLog.test.tsx passed; badge mapping test includes PING completion mapping in the fulfilled assertion set."
+        }
+      ],
+      "evidence": {
+        "command": "npx vitest run src/app/__tests__/runtimeEventLog.test.tsx src/app/__tests__/clearRuntimeEventLog.test.tsx src/app/__tests__/mockRuntimeEventLogReset.test.tsx --config vitest.config.ts",
+        "exitCode": 0,
+        "logFile": "m4-eventlog/g1-buffer-lifecycle/vitest-g1-buffer-lifecycle.log",
+        "coverageNote": "runtimeEventLog.test.tsx header declares it fulfills VAL-EVENTLOG-005."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-012",
+      "title": "Clear empties display AND buffer",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest suite including src/app/__tests__/clearRuntimeEventLog.test.tsx.",
+          "expected": "Clear mutator empties runtimeEventLog and resets sequence.",
+          "observed": "clearRuntimeEventLog.test.tsx passed; assertion verifies empty buffer, debug mirror length 0, and seq restart at 1."
+        }
+      ],
+      "evidence": {
+        "command": "npx vitest run src/app/__tests__/runtimeEventLog.test.tsx src/app/__tests__/clearRuntimeEventLog.test.tsx src/app/__tests__/mockRuntimeEventLogReset.test.tsx --config vitest.config.ts",
+        "exitCode": 0,
+        "logFile": "m4-eventlog/g1-buffer-lifecycle/vitest-g1-buffer-lifecycle.log",
+        "coverageNote": "clearRuntimeEventLog.test.tsx test title explicitly covers VAL-EVENTLOG-012."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-014",
+      "title": "Ring buffer is bounded to 500",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest suite including src/app/__tests__/runtimeEventLog.test.tsx ring-buffer test.",
+          "expected": "After 600 inserts, buffer capped at 500 with FIFO eviction.",
+          "observed": "runtimeEventLog.test.tsx passed; ring-buffer test asserts max 500, oldest evicted, newest retained."
+        }
+      ],
+      "evidence": {
+        "command": "npx vitest run src/app/__tests__/runtimeEventLog.test.tsx src/app/__tests__/clearRuntimeEventLog.test.tsx src/app/__tests__/mockRuntimeEventLogReset.test.tsx --config vitest.config.ts",
+        "exitCode": 0,
+        "logFile": "m4-eventlog/g1-buffer-lifecycle/vitest-g1-buffer-lifecycle.log",
+        "coverageNote": "runtimeEventLog.test.tsx ring-buffer case names VAL-EVENTLOG-014."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-016",
+      "title": "Resets on Lock and on Clear Credentials",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest suite including src/app/__tests__/runtimeEventLog.test.tsx and src/app/__tests__/mockRuntimeEventLogReset.test.tsx.",
+          "expected": "Lock and clear credentials reset runtimeEventLog to empty.",
+          "observed": "Both test files passed; real and mock providers verify runtimeEventLog flushes on lockProfile and clearCredentials."
+        }
+      ],
+      "evidence": {
+        "command": "npx vitest run src/app/__tests__/runtimeEventLog.test.tsx src/app/__tests__/clearRuntimeEventLog.test.tsx src/app/__tests__/mockRuntimeEventLogReset.test.tsx --config vitest.config.ts",
+        "exitCode": 0,
+        "logFile": "m4-eventlog/g1-buffer-lifecycle/vitest-g1-buffer-lifecycle.log",
+        "coverageNote": "runtimeEventLog.test.tsx and mockRuntimeEventLogReset.test.tsx include VAL-EVENTLOG-016 semantics."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-024",
+      "title": "High-rate ingestion: no drops or reorder within buffer",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest suite including src/app/__tests__/runtimeEventLog.test.tsx high-volume ingestion assertions.",
+          "expected": "Injected sequence remains strictly ordered with no duplicates/missing sequence continuity in retained buffer.",
+          "observed": "runtimeEventLog.test.tsx passed; sequence assertions enforce monotonic contiguous seq values and unique entries under high-volume insertions."
+        }
+      ],
+      "evidence": {
+        "command": "npx vitest run src/app/__tests__/runtimeEventLog.test.tsx src/app/__tests__/clearRuntimeEventLog.test.tsx src/app/__tests__/mockRuntimeEventLogReset.test.tsx --config vitest.config.ts",
+        "exitCode": 0,
+        "logFile": "m4-eventlog/g1-buffer-lifecycle/vitest-g1-buffer-lifecycle.log",
+        "coverageNote": "runtimeEventLog.test.tsx header and ring-buffer case include VAL-EVENTLOG-024."
+      },
+      "issues": null
+    }
+  ],
+  "summary": {
+    "total": 5,
+    "pass": 5,
+    "fail": 0,
+    "blocked": 0,
+    "skipped": 0
+  },
+  "frictions": [],
+  "blockers": []
+}

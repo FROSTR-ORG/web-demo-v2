@@ -1,0 +1,146 @@
+{
+  "groupId": "g5-gap-closure-rerun",
+  "testedAt": "2026-04-22T16:12:41Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "flowGuidance": "Flow Validator Guidance: test-observability hooks (DEV only)",
+    "blockedAssertionsRetested": [
+      "VAL-EVENTLOG-008",
+      "VAL-EVENTLOG-017",
+      "VAL-EVENTLOG-018",
+      "VAL-EVENTLOG-020",
+      "VAL-EVENTLOG-022"
+    ],
+    "baselineCommand": "npx vitest run src/screens/DashboardScreen/panels/__tests__/EventLogPanel.runtime.test.tsx src/screens/DashboardScreen/panels/__tests__/EventLogPanel.filterAndScroll.test.tsx src/screens/DashboardScreen/modals/__tests__/SigningFailedModal.test.tsx --config vitest.config.ts",
+    "baselineCommandExitCode": 0,
+    "temporaryCommand": "npx vitest run .factory/validation/m4-eventlog/user-testing/tmp/g5-gap-closure.validation.test.tsx --config vitest.config.ts",
+    "temporaryCommandExitCode": 0,
+    "temporaryFileCleanup": "Removed .factory/validation/m4-eventlog/user-testing/tmp/g5-gap-closure.validation.test.tsx after execution"
+  },
+  "toolsUsed": [
+    "vitest"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-EVENTLOG-008",
+      "title": "Timestamp format matches Paper",
+      "status": "pass",
+      "reason": "Temporary executable test verified rendered .event-log-time text matches HH:MM:SS and validated the .event-log-time CSS declaration includes a monospace font stack.",
+      "steps": [
+        {
+          "action": "Run required baseline vitest suites",
+          "expected": "Baseline suites pass before direct gap-closure checks",
+          "observed": "Baseline command exited 0 with 30/30 tests passing"
+        },
+        {
+          "action": "Run temporary gap-closure vitest test for VAL-EVENTLOG-008",
+          "expected": "HH:MM:SS row rendering and monospace declaration evidence both pass",
+          "observed": "Temporary command exited 0; VAL-EVENTLOG-008 test passed"
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g5-gap-closure/vitest-baseline.log",
+          "m4-eventlog/g5-gap-closure/vitest-gap-closure-temp.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-017",
+      "title": "Signing failure correlates to SigningFailedModal via request_id",
+      "status": "pass",
+      "reason": "Temporary executable integration test confirmed the modal round request id and the Event Log expanded JSON request_id match for the same failure.",
+      "steps": [
+        {
+          "action": "Seed Dashboard state with one sign failure and one corresponding failure log row using request_id deadbeef",
+          "expected": "Modal and expanded row both expose the same request_id",
+          "observed": "Round field rendered r-deadbeef and expanded JSON contained \"request_id\": \"deadbeef\""
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g5-gap-closure/vitest-gap-closure-temp.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-018",
+      "title": "Nonce pool balancing events surface as SYNC",
+      "status": "pass",
+      "reason": "Temporary executable test validated a SYNC row expands to payload JSON containing pool_size, delta, and peers keys.",
+      "steps": [
+        {
+          "action": "Render EventLogPanel with SYNC runtime row and expand it",
+          "expected": "Expanded JSON contains pool_size, delta, peers",
+          "observed": "Expanded payload contained \"pool_size\", \"delta\", and \"peers\" fields"
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g5-gap-closure/vitest-gap-closure-temp.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-020",
+      "title": "Expand state persists across new event ingestion",
+      "status": "pass",
+      "reason": "Temporary executable test verified an expanded target row stayed expanded after prepending newer rows and that a newly prepended row remained collapsed by default.",
+      "steps": [
+        {
+          "action": "Expand target row then rerender with newer prepended events",
+          "expected": "Target remains expanded and new row defaults collapsed",
+          "observed": "Target row aria-expanded stayed true; newest prepended row aria-expanded was false"
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g5-gap-closure/vitest-gap-closure-temp.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-022",
+      "title": "Keyboard can expand / collapse rows",
+      "status": "pass",
+      "reason": "Temporary executable test verified the expand control is a native keyboard-focusable button and aria-expanded toggles across Enter/Space activation semantics.",
+      "steps": [
+        {
+          "action": "Focus row expand control and execute Enter/Space activation flow",
+          "expected": "aria-expanded toggles true then false while focus remains on control",
+          "observed": "Control remained focused and aria-expanded toggled from false->true->false"
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g5-gap-closure/vitest-gap-closure-temp.log"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "summary": {
+    "total": 5,
+    "pass": 5,
+    "fail": 0,
+    "blocked": 0,
+    "skipped": 0
+  },
+  "blockers": [],
+  "frictions": [
+    {
+      "description": "The temporary keyboard assertion for VAL-EVENTLOG-022 runs in jsdom, which does not synthesize native click events from Enter/Space automatically, so activation semantics were exercised with explicit key events plus activation trigger in the test harness.",
+      "resolved": true,
+      "resolution": "Recorded the jsdom constraint in evidence notes while still validating native button focusability and aria-expanded state transitions.",
+      "affectedAssertions": [
+        "VAL-EVENTLOG-022"
+      ]
+    }
+  ]
+}

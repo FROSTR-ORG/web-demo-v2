@@ -1,0 +1,156 @@
+{
+  "groupId": "g2-panel-core",
+  "testedAt": "2026-04-22T16:04:06Z",
+  "isolation": {
+    "milestone": "m4-eventlog",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "appUrl": "http://127.0.0.1:5173",
+    "tool": "vitest"
+  },
+  "toolsUsed": [
+    "vitest"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-EVENTLOG-001",
+      "title": "Empty state after fresh unlock",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest suite EventLogPanel.runtime.test.tsx",
+          "expected": "Empty state test for runtime buffer passes",
+          "observed": "PASS: \"shows empty state when the runtime buffer is empty\""
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g2-panel-core/vitest-eventlog-panel-core.log"
+        ],
+        "command": "npx vitest run src/screens/DashboardScreen/panels/__tests__/EventLogPanel.runtime.test.tsx --config vitest.config.ts",
+        "result": "1 test file passed, 9 tests passed",
+        "testCases": [
+          "src/screens/DashboardScreen/panels/__tests__/EventLogPanel.runtime.test.tsx:63"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-002",
+      "title": "Log populates as runtime events arrive",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest suite EventLogPanel.runtime.test.tsx",
+          "expected": "Non-empty runtime event log renders rows and increments count",
+          "observed": "PASS: \"renders entries newest-first with HH:MM:SS timestamps and badges\" confirms 3 rows and \"3 events\" count"
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g2-panel-core/vitest-eventlog-panel-core.log"
+        ],
+        "testCases": [
+          "src/screens/DashboardScreen/panels/__tests__/EventLogPanel.runtime.test.tsx:69"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-008",
+      "title": "Timestamp format matches Paper",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Run assigned vitest suite EventLogPanel.runtime.test.tsx",
+          "expected": "Verify HH:MM:SS regex and monospace computed font-family on every row",
+          "observed": "Suite validates HH:MM:SS regex but contains no computed-style assertion for monospace font-family"
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g2-panel-core/vitest-eventlog-panel-core.log"
+        ],
+        "testCases": [
+          "src/screens/DashboardScreen/panels/__tests__/EventLogPanel.runtime.test.tsx:69"
+        ]
+      },
+      "issues": "Assigned command evidence is insufficient to confirm the computed font-family requirement."
+    },
+    {
+      "id": "VAL-EVENTLOG-009",
+      "title": "Newest-first ordering is consistent",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest suite EventLogPanel.runtime.test.tsx",
+          "expected": "Rows should render in newest-first order",
+          "observed": "PASS: newest-first assertion validates badges order [\"PING\", \"ECDH\", \"SIGN\"] for descending timestamps"
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g2-panel-core/vitest-eventlog-panel-core.log"
+        ],
+        "testCases": [
+          "src/screens/DashboardScreen/panels/__tests__/EventLogPanel.runtime.test.tsx:69"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-011",
+      "title": "Expand renders formatted JSON payload",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest suite EventLogPanel.runtime.test.tsx",
+          "expected": "Expand control renders 2-space-indented multiline JSON payload",
+          "observed": "PASS: \"expands a row to render 2-space-indented JSON of the payload\" with newline + two-space indentation checks"
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g2-panel-core/vitest-eventlog-panel-core.log"
+        ],
+        "testCases": [
+          "src/screens/DashboardScreen/panels/__tests__/EventLogPanel.runtime.test.tsx:130"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-022",
+      "title": "Keyboard can expand / collapse rows",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Run assigned vitest suite EventLogPanel.runtime.test.tsx",
+          "expected": "Verify Tab reachability, Enter/Space toggle behavior, aria-expanded updates, and focus return",
+          "observed": "No keyboard interaction test (Tab/Enter/Space/focus ring) is present in the executed suite; only mouse click expansion is covered"
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g2-panel-core/vitest-eventlog-panel-core.log"
+        ],
+        "testCases": [
+          "src/screens/DashboardScreen/panels/__tests__/EventLogPanel.runtime.test.tsx:130"
+        ]
+      },
+      "issues": "Assigned command evidence is insufficient to confirm keyboard accessibility behavior for row expand/collapse."
+    }
+  ],
+  "frictions": [],
+  "blockers": [
+    {
+      "description": "Assigned vitest command provides no direct assertion coverage for keyboard expand/collapse interactions and no computed-style check for timestamp font family.",
+      "affectedAssertions": [
+        "VAL-EVENTLOG-008",
+        "VAL-EVENTLOG-022"
+      ],
+      "quickFixAttempted": "Reviewed all 9 executed tests in EventLogPanel.runtime.test.tsx to confirm whether those checks were present; they were not."
+    }
+  ],
+  "summary": "Executed the assigned vitest command successfully (exit code 0; 1 file, 9 tests passed). Based on command evidence, VAL-EVENTLOG-001, 002, 009, and 011 pass; VAL-EVENTLOG-008 and VAL-EVENTLOG-022 are blocked due missing required coverage in the executed test suite."
+}
