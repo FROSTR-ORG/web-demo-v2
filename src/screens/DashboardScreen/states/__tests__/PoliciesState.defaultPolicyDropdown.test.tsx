@@ -24,10 +24,13 @@ import { PoliciesState } from "../PoliciesState";
  *
  * Covers:
  *  - "Deny by default" sets every override-free peer's
- *    `effective_policy.request.*` cells to `deny` via
- *    `setPeerPolicyOverride({direction: "request", value: "deny"})`,
+ *    `effective_policy.respond.*` cells to `deny` via
+ *    `setPeerPolicyOverride({direction: "respond", value: "deny"})`,
  *    while peers with a manual override are untouched
- *    (VAL-POLICIES-011).
+ *    (VAL-POLICIES-011). The dropdown governs THIS signer's inbound
+ *    response permission — see
+ *    `docs/runtime-deviations-from-paper.md` → "Default Policy dropdown
+ *    writes to `respond.*`, not `request.*`".
  *  - "Allow known peers" dispatches `value: "allow"` only for peers
  *    whose `remote_observation` is present (known in-roster peers);
  *    unknown peers are skipped (VAL-POLICIES-012).
@@ -104,9 +107,14 @@ function makePermissionStates(): PeerPermissionState[] {
     } as PeerPermissionState,
     {
       pubkey: PEER_C_PUBKEY,
+      // User-authored `respond.*` override (e.g. from a Signer Policies
+      // "Always allow" row). The Default Policy dropdown must leave
+      // this peer alone (VAL-POLICIES-011 "peers with overrides are
+      // unaffected") because the dropdown itself owns only the cells
+      // tracked in `defaultAppliedKeys`.
       manual_override: {
-        request: { sign: "allow" },
-        respond: {},
+        request: {},
+        respond: { sign: "allow" },
       },
       remote_observation: { observed_at: Date.now() },
       effective_policy: {
@@ -173,11 +181,27 @@ function dispatchedPeersForValue(
       method: string;
       value: string;
     };
-    if (arg.value === value && arg.direction === "request") {
+    if (arg.value === value && arg.direction === "respond") {
       peers.add(arg.peer);
     }
   }
   return peers;
+}
+
+/**
+ * Every `setPeerPolicyOverride` call made by the Default Policy
+ * dropdown MUST target `direction: "respond"` (VAL-POLICIES-011/012/013
+ * direction correction — see `docs/runtime-deviations-from-paper.md`).
+ * This helper asserts that invariant across the whole spy log so
+ * individual tests can guard against accidental `request.*` writes.
+ */
+function assertAllDispatchesTargetRespond(
+  dispatch: ReturnType<typeof vi.fn>,
+) {
+  for (const call of dispatch.mock.calls) {
+    const arg = call[0] as { direction?: string };
+    expect(arg.direction).toBe("respond");
+  }
 }
 
 describe("DefaultPolicyDropdown — semantics + keyboard + ARIA (VAL-POLICIES-011/012/013/019/022)", () => {
@@ -206,12 +230,14 @@ describe("DefaultPolicyDropdown — semantics + keyboard + ARIA (VAL-POLICIES-01
       for (const method of METHODS) {
         expect(dispatch).toHaveBeenCalledWith({
           peer,
-          direction: "request",
+          direction: "respond",
           method,
           value: "deny",
         });
       }
     }
+    // All dropdown dispatches target `respond.*` (never `request.*`).
+    assertAllDispatchesTargetRespond(dispatch);
 
     // Trigger label updates; dropdown closes.
     expect(getTrigger()).toHaveTextContent("Deny by default");
@@ -243,11 +269,13 @@ describe("DefaultPolicyDropdown — semantics + keyboard + ARIA (VAL-POLICIES-01
     for (const method of METHODS) {
       expect(dispatch).toHaveBeenCalledWith({
         peer: PEER_A_PUBKEY,
-        direction: "request",
+        direction: "respond",
         method,
         value: "allow",
       });
     }
+    // All dropdown dispatches target `respond.*` (never `request.*`).
+    assertAllDispatchesTargetRespond(dispatch);
   });
 
   it("'Ask every time' does not dispatch any overrides (VAL-POLICIES-013)", async () => {
@@ -276,6 +304,8 @@ describe("DefaultPolicyDropdown — semantics + keyboard + ARIA (VAL-POLICIES-01
     // overrides the dropdown itself applied (if any).
     expect(dispatchedPeersForValue(dispatch, "allow").size).toBe(0);
     expect(dispatchedPeersForValue(dispatch, "deny").size).toBe(0);
+    // Any unset-cleanup dispatches emitted here also target respond.*.
+    assertAllDispatchesTargetRespond(dispatch);
     expect(getTrigger()).toHaveTextContent("Ask every time");
   });
 
@@ -325,6 +355,8 @@ describe("DefaultPolicyDropdown — semantics + keyboard + ARIA (VAL-POLICIES-01
       expect(dispatch).toHaveBeenCalled();
     });
     expect(dispatchedPeersForValue(dispatch, "deny").size).toBe(2);
+    // Keyboard-driven selection must also target respond.*.
+    assertAllDispatchesTargetRespond(dispatch);
     expect(getTrigger()).toHaveTextContent("Deny by default");
   });
 

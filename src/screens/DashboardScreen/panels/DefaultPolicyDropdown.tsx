@@ -62,43 +62,52 @@ export interface DefaultPolicyDropdownProps {
 }
 
 /**
- * Read the existing manual-override cell for (peer, request, method)
+ * Read the existing manual-override cell for (peer, respond, method)
  * from the current `peer_permission_states` snapshot. Returns `null`
  * when no override is set so callers can distinguish "not overridden"
  * from an explicit `unset` value.
+ *
+ * The dropdown operates exclusively in the `respond.*` direction (see
+ * `docs/runtime-deviations-from-paper.md` — the Default Policy dropdown
+ * governs whether A responds to peer-initiated requests), so we only
+ * inspect the `respond` sub-object here.
  */
-function currentRequestOverride(
+function currentRespondOverride(
   state: PeerPermissionState,
   method: PolicyMethod,
 ): "allow" | "deny" | null {
   const override = state.manual_override as
     | null
     | {
-        request?: Record<string, unknown>;
+        respond?: Record<string, unknown>;
       }
     | undefined;
   if (!override) return null;
-  const value = override.request?.[method];
+  const value = override.respond?.[method];
   return value === "allow" || value === "deny" ? value : null;
 }
 
 /**
- * Has the user explicitly overridden ANY of the four request cells for
- * this peer? Matches the VAL-POLICIES-011 "peers with overrides are
- * unaffected" rule — we treat presence of ANY user-set request override
- * as evidence the default-policy dropdown should leave that peer alone.
+ * Has the user explicitly overridden ANY of the four `respond.*` cells
+ * for this peer? Matches the VAL-POLICIES-011 "peers with overrides are
+ * unaffected" rule — we treat presence of ANY user-set respond override
+ * (e.g. a persisted Signer Policies row from PolicyPromptModal
+ * `Always allow` / `Always deny`) as evidence the default-policy
+ * dropdown should leave that peer alone.
  *
  * The check subtracts cells we previously wrote from the default-policy
  * itself (tracked in `defaultAppliedKeys`) so switching defaults does
- * not treat our prior writes as user overrides.
+ * not treat our prior writes as user overrides. Peer Policies chip
+ * overrides are tracked under `request.*` today and therefore do NOT
+ * block the dropdown (the two directions are orthogonal).
  */
 function hasUserOverride(
   state: PeerPermissionState,
   defaultAppliedKeys: Set<string>,
 ): boolean {
   for (const method of METHODS) {
-    if (currentRequestOverride(state, method) !== null) {
-      const key = `${state.pubkey}:request:${method}`;
+    if (currentRespondOverride(state, method) !== null) {
+      const key = `${state.pubkey}:respond:${method}`;
       if (!defaultAppliedKeys.has(key)) return true;
     }
   }
@@ -108,15 +117,26 @@ function hasUserOverride(
 /**
  * Signer Policies card "Default policy" dropdown.
  *
+ * Direction semantics: all three options dispatch
+ * `set_policy_override({ direction: "respond", ... })` — the dropdown
+ * governs THIS device's inbound response permission (does A sign / ecdh
+ * / ping / onboard FOR peers that drive requests at A). See
+ * `docs/runtime-deviations-from-paper.md` →
+ * "Default Policy dropdown writes to `respond.*`, not `request.*`" for
+ * the full rationale and the VAL-POLICIES-011/012/013 contract
+ * correction. `request.*` is the outbound-intent direction and is NOT
+ * user-controlled via this dropdown.
+ *
  * Semantics (VAL-POLICIES-011 / VAL-POLICIES-012 / VAL-POLICIES-013):
- *  - `Ask every time`   → no overrides applied. Peers without manual
- *                         overrides keep chips `unset` so the reactive
- *                         `PolicyPromptModal` handles denials.
+ *  - `Ask every time`   → no overrides applied; unset any `respond.*`
+ *                         entries the dropdown itself previously wrote
+ *                         so override-free peers fall through to the
+ *                         reactive `PolicyPromptModal` denial path.
  *  - `Allow known peers`→ for every peer with `remote_observation`
  *                         present AND no user manual override, dispatch
- *                         `request.{method}` → `allow` per method.
+ *                         `respond.{method}` → `allow` per method.
  *  - `Deny by default`  → for every peer without a user manual
- *                         override, dispatch `request.{method}` → `deny`
+ *                         override, dispatch `respond.{method}` → `deny`
  *                         per method (chips render muted).
  *
  * Accessibility (VAL-POLICIES-019 / VAL-POLICIES-022):
@@ -217,6 +237,7 @@ export function DefaultPolicyDropdown({
       );
 
       // 2. Apply the new default to eligible peers.
+      //    All writes target `respond.*` — see class-level comment.
       if (next === "Ask every time") {
         // No overrides applied — all peer cells we previously wrote
         // have been reverted above, leaving override-free peers with
@@ -228,10 +249,10 @@ export function DefaultPolicyDropdown({
               return [] as Array<Promise<void>>;
             }
             return METHODS.map(async (method) => {
-              newKeys.add(`${state.pubkey}:request:${method}`);
+              newKeys.add(`${state.pubkey}:respond:${method}`);
               await dispatch({
                 peer: state.pubkey,
-                direction: "request",
+                direction: "respond",
                 method,
                 value: "deny",
               });
@@ -248,10 +269,10 @@ export function DefaultPolicyDropdown({
               return [] as Array<Promise<void>>;
             }
             return METHODS.map(async (method) => {
-              newKeys.add(`${state.pubkey}:request:${method}`);
+              newKeys.add(`${state.pubkey}:respond:${method}`);
               await dispatch({
                 peer: state.pubkey,
-                direction: "request",
+                direction: "respond",
                 method,
                 value: "allow",
               });

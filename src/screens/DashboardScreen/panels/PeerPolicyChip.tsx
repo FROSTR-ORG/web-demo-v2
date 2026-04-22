@@ -9,6 +9,22 @@ import type { BfPolicyOverrideValue } from "../../../lib/bifrost/types";
  * (VAL-POLICIES-005 / VAL-POLICIES-006 / VAL-POLICIES-020). Kept
  * configurable so future surfaces (e.g. "inbound" chip) can target
  * `respond` without forking this component.
+ *
+ * Direction audit (see `docs/runtime-deviations-from-paper.md` →
+ * "Default Policy dropdown writes to `respond.*`"): the Peer Policies
+ * chips and the Default Policy dropdown operate on DIFFERENT policy
+ * directions by design.
+ *   - Per-peer chips write to `request.*` — the user statement is
+ *     "I (this signer) want to DRIVE this method at THIS peer" — which
+ *     matches the top-PeerRow inline badge visual that reads
+ *     `effective_policy.request.<method>`.
+ *   - Default Policy dropdown writes to `respond.*` — the user
+ *     statement is "by default, do I respond to peer-initiated requests
+ *     at all".
+ * The two directions are orthogonal so the dropdown does not clobber
+ * user-authored chip overrides and vice-versa. If/when a future feature
+ * adds an "inbound chip" surface (edit respond.* per-peer) it should
+ * reuse this component with `direction="respond"`.
  */
 export type PeerPolicyChipDirection = "request" | "respond";
 
