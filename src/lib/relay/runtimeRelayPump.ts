@@ -287,6 +287,124 @@ export class RuntimeRelayPump {
   }
 
   /**
+   * Hot-reload the relay list: connect newly-added URLs, close removed
+   * URLs with a clean close frame (default `1000 "relay-removed"`), and
+   * leave URLs present on both sides untouched. Counters and subscription
+   * state survive for untouched relays so the UI's per-relay telemetry
+   * (events received, last-seen, reconnectCount) is preserved across a
+   * relay-list edit (VAL-SETTINGS-005 / VAL-SETTINGS-006 /
+   * VAL-SETTINGS-022).
+   *
+   * De-dup rules:
+   *   - Trim + drop empty strings.
+   *   - Exact case-sensitive equality against existing connection urls;
+   *     callers should normalise before dispatch if they want
+   *     case-insensitive de-dup (AppStateProvider.updateRelays already
+   *     does so via `normalizeRelayKey`).
+   *
+   * The pump must be started (i.e. have a live filter) before the first
+   * call; if not, newly-added relays are registered with `connecting`
+   * telemetry but are not dialed until `start()` runs.
+   */
+  async updateRelays(
+    nextRelays: string[],
+    closeCode: number = 1000,
+    closeReason: string = "relay-removed",
+  ): Promise<void> {
+    if (this.stopped) return;
+    const next = uniqueRelays(nextRelays);
+    const nextSet = new Set(next);
+    const currentUrls = this.connections.map((entry) => entry.url);
+    const removed = currentUrls.filter((url) => !nextSet.has(url));
+    const added = next.filter((url) => !currentUrls.includes(url));
+
+    // Close removed relays with a clean close frame. For each removed
+    // entry we drop the subscription first (so no inbound relay event
+    // arrives after the socket is gone), then close cleanly when the
+    // underlying connection supports it, or fall back to plain `close()`
+    // for test fakes.
+    removed.forEach((url) => {
+      const index = this.connections.findIndex((entry) => entry.url === url);
+      if (index === -1) return;
+      const entry = this.connections[index];
+      entry.subscription?.close();
+      entry.subscription = null;
+      const connection = entry.connection;
+      entry.connection = null;
+      if (connection) {
+        if (
+          "closeCleanly" in connection &&
+          typeof (connection as { closeCleanly?: unknown }).closeCleanly ===
+            "function"
+        ) {
+          try {
+            (
+              connection as unknown as {
+                closeCleanly: (c: number, r: string) => void;
+              }
+            ).closeCleanly(closeCode, closeReason);
+          } catch {
+            try {
+              connection.close();
+            } catch {
+              // already closed
+            }
+          }
+        } else {
+          try {
+            connection.close();
+          } catch {
+            // already closed
+          }
+        }
+      }
+      // Drop from the ordered connection list + telemetry in lock-step.
+      this.connections.splice(index, 1);
+      this.relayStatusesValue = this.relayStatusesValue.filter(
+        (status) => status.url !== url,
+      );
+    });
+
+    // Register new relays optimistically (so the UI shows `connecting`
+    // immediately) before dialing them. If the filter is not yet known
+    // (pump started but connect handshake never finished — the typical
+    // case is test setups that skip start()), we short-circuit the dial
+    // and leave them in `connecting` so a subsequent `start()` picks
+    // them up.
+    if (added.length > 0) {
+      added.forEach((url) => {
+        this.connections.push({
+          url,
+          connection: null,
+          subscription: null,
+        });
+        this.relayStatusesValue = [
+          ...this.relayStatusesValue,
+          { url, state: "connecting", reconnectCount: 0 },
+        ];
+      });
+      this.onRelayStatusChange?.(this.relayStatuses());
+      const filter = this.lastFilter.current;
+      if (filter) {
+        await Promise.all(
+          added.map((url) => {
+            const entry = this.connections.find(
+              (candidate) => candidate.url === url,
+            );
+            if (!entry) return Promise.resolve();
+            return this.connectOne(entry, filter);
+          }),
+        );
+      }
+    }
+
+    // Emit a final status snapshot so subscribers see the converged list
+    // even if only removals happened (connectOne already pings the
+    // subscriber for each added relay).
+    this.onRelayStatusChange?.(this.relayStatuses());
+  }
+
+  /**
    * VAL-OPS-028 — close every currently-open relay socket with a
    * well-formed close frame (default `1001 'going-away'`). Intended for
    * `AppStateProvider`'s `beforeunload` handler so the relay observes a

@@ -821,6 +821,46 @@ export interface AppStateValue {
    * the error inline.
    */
   updateProfileName: (name: string) => Promise<void>;
+  /**
+   * Persist a new relay list to the encrypted profile record in
+   * IndexedDB, update `activeProfile.relays` in memory, and hot-reload
+   * the live `RuntimeRelayPump` so removed sockets close cleanly and
+   * newly-added sockets open — all without tearing down the runtime
+   * itself.
+   *
+   * Rules (surface contracts: VAL-SETTINGS-003 / 004 / 005 / 006 / 007 /
+   * 022 / 023 / VAL-CROSS-005):
+   *   - Each URL is trimmed before validation. Empty strings are
+   *     dropped silently (convenience for the Settings sidebar inline
+   *     input path).
+   *   - Every remaining entry must be a syntactically valid
+   *     `wss://` URL; malformed entries reject with an Error carrying
+   *     the canonical inline message (see
+   *     {@link RelayValidationError}). Nothing is written when the
+   *     input is invalid.
+   *   - Duplicates are rejected via case-insensitive, trailing-slash-
+   *     normalised comparison — matching the contract for both Add and
+   *     Edit paths in the sidebar.
+   *   - After validation, the encrypted stored profile record is
+   *     rebuilt with the new relay list via
+   *     `buildStoredProfileRecord` (so normalisation stays in lock-
+   *     step with the unlock path) and saved to IndexedDB via
+   *     `saveProfile`.
+   *   - The live relay pump is hot-reloaded via
+   *     `RuntimeRelayPump.updateRelays` — removed sockets close
+   *     cleanly with code 1000, added sockets acquire fresh
+   *     subscriptions, untouched sockets preserve their counters /
+   *     subscription identity (so validators detecting "no duplicate
+   *     REQ on edit" stay green).
+   *   - Requires an unlocked profile (valid `activeProfile` and the
+   *     cached payload/password captured at unlock time). If the
+   *     profile is locked the mutator rejects without writing.
+   *
+   * Throws on validation or persistence failures so callers can display
+   * the error inline; the in-memory `activeProfile.relays` is updated
+   * only after a successful persistence round-trip.
+   */
+  updateRelays: (relays: string[]) => Promise<void>;
   changeProfilePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   lockProfile: () => void;
   clearCredentials: () => Promise<void>;

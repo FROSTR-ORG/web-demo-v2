@@ -364,6 +364,98 @@ describe("RuntimeRelayPump", () => {
   });
 
   /**
+   * m5-relay-list-persist — hot-reload the relay list:
+   *   - Removed relays close cleanly with code 1000.
+   *   - Added relays acquire a fresh subscription.
+   *   - Relays present on both sides are untouched (counter/subscription
+   *     identity preserved for VAL-SETTINGS-022 "no duplicate REQ").
+   */
+  it("updateRelays closes removed sockets cleanly, opens added sockets, preserves untouched ones", async () => {
+    const runtime = new FakeRuntime();
+    class CleanCloseRelay extends FakeRelayConnection {
+      cleanCloseCalls: Array<{ code: number; reason: string }> = [];
+      closeCleanly(code: number, reason: string) {
+        this.cleanCloseCalls.push({ code, reason });
+        this.closed = true;
+      }
+    }
+    const keep = new CleanCloseRelay("wss://keep.test");
+    const remove = new CleanCloseRelay("wss://remove.test");
+    const add = new CleanCloseRelay("wss://added.test");
+    const pump = new RuntimeRelayPump({
+      runtime: runtime as never,
+      relays: ["wss://keep.test", "wss://remove.test"],
+      relayClient: new FakeRelayClient([keep, remove, add]),
+      eventKind: 27000,
+      now: () => 100,
+    });
+
+    await pump.start();
+    // Initial subscribe: each of the two starting relays has exactly one
+    // live subscription; the un-added relay has none.
+    expect(keep.subscriptions.length).toBe(1);
+    expect(remove.subscriptions.length).toBe(1);
+    expect(add.subscriptions.length).toBe(0);
+    const keepSubscription = keep.subscriptions[0];
+
+    await pump.updateRelays(["wss://keep.test", "wss://added.test"]);
+
+    // Removed relay socket is closed via `closeCleanly(1000, ...)` and its
+    // subscription is shut down.
+    expect(remove.cleanCloseCalls).toEqual([
+      { code: 1000, reason: "relay-removed" },
+    ]);
+    expect(remove.subscriptions[0].closed).toBe(true);
+
+    // Added relay got exactly one fresh subscription.
+    expect(add.subscriptions.length).toBe(1);
+    expect(add.subscriptions[0].filter).toEqual({
+      kinds: [27000],
+      authors: ["peer-a", "peer-b"],
+      "#p": ["local-pubkey"],
+    });
+
+    // Kept relay's SAME subscription survived — no new REQ landed, so
+    // validators asserting "no duplicate REQ on edit" (VAL-SETTINGS-022)
+    // see a stable subscription identity.
+    expect(keep.subscriptions.length).toBe(1);
+    expect(keep.subscriptions[0]).toBe(keepSubscription);
+    expect(keepSubscription.closed).toBe(false);
+
+    // Final status list reflects the new membership, in order.
+    expect(pump.relayStatuses().map((status) => status.url)).toEqual([
+      "wss://keep.test",
+      "wss://added.test",
+    ]);
+    expect(pump.relayStatuses()[0].state).toBe("online");
+    expect(pump.relayStatuses()[1].state).toBe("online");
+  });
+
+  it("updateRelays treats duplicate / whitespace entries as a no-op (idempotent)", async () => {
+    const runtime = new FakeRuntime();
+    const relay = new FakeRelayConnection("wss://relay.test");
+    const pump = new RuntimeRelayPump({
+      runtime: runtime as never,
+      relays: ["wss://relay.test"],
+      relayClient: new FakeRelayClient([relay]),
+      eventKind: 27000,
+      now: () => 100,
+    });
+    await pump.start();
+    const subscriptionsBefore = relay.subscriptions.length;
+    await pump.updateRelays([
+      "wss://relay.test",
+      "  wss://relay.test  ",
+      "",
+    ]);
+    // No new subscription was opened.
+    expect(relay.subscriptions.length).toBe(subscriptionsBefore);
+    expect(pump.relayStatuses().map((status) => status.url)).toEqual([
+      "wss://relay.test",
+    ]);
+  });
+
+  /**
    * VAL-OPS-028 — page unload must tell each open relay socket to close
    * with a well-formed close frame (default 1001 "going-away") so the
    * eventual close reported post-reopen is clean, not the default 1006

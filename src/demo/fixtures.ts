@@ -307,6 +307,7 @@ export function createDemoAppState(
     expireRecoveredNsec: () => undefined,
     unlockProfile: async () => undefined,
     updateProfileName: async () => undefined,
+    updateRelays: async () => undefined,
     changeProfilePassword: async () => undefined,
     lockProfile: () => undefined,
     clearCredentials: async () => undefined,

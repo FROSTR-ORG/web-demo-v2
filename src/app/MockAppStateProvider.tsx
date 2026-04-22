@@ -540,6 +540,42 @@ export function MockAppStateProvider({
     [value],
   );
 
+  /**
+   * Mock-side `updateRelays`: mirrors AppStateProvider validation so
+   * demo + test paths see the same rejections (VAL-SETTINGS-004 /
+   * VAL-SETTINGS-023). On success the caller-supplied
+   * `value.updateRelays` is invoked, then the local `activeProfile`
+   * mirror is updated so every surface reading it reflects the new
+   * list without waiting for a parent re-render.
+   */
+  const updateRelays = useCallback(
+    async (relays: string[]) => {
+      const { validateRelayUrl, normalizeRelayKey, RELAY_DUPLICATE_ERROR } =
+        await import("../lib/relay/relayUrl");
+      const normalized: string[] = [];
+      const seenKeys = new Set<string>();
+      for (const raw of relays) {
+        const trimmed = typeof raw === "string" ? raw.trim() : "";
+        if (trimmed.length === 0) continue;
+        const validated = validateRelayUrl(trimmed);
+        const key = normalizeRelayKey(validated);
+        if (seenKeys.has(key)) {
+          throw new Error(RELAY_DUPLICATE_ERROR);
+        }
+        seenKeys.add(key);
+        normalized.push(validated);
+      }
+      if (normalized.length === 0) {
+        throw new Error("At least one relay is required.");
+      }
+      await value.updateRelays(normalized);
+      setActiveProfile((previous) =>
+        previous ? { ...previous, relays: normalized } : previous,
+      );
+    },
+    [value],
+  );
+
   const lockProfile = useCallback(() => {
     // Forward to any caller-supplied behaviour first (fixtures may observe).
     value.lockProfile();
@@ -731,6 +767,7 @@ export function MockAppStateProvider({
       expireRecoveredNsec,
       unlockProfile,
       updateProfileName,
+      updateRelays,
       changeProfilePassword,
       lockProfile,
       clearCredentials,
@@ -795,6 +832,7 @@ export function MockAppStateProvider({
       expireRecoveredNsec,
       unlockProfile,
       updateProfileName,
+      updateRelays,
       changeProfilePassword,
       lockProfile,
       clearCredentials,

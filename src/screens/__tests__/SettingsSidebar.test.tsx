@@ -12,8 +12,28 @@ const mockUpdateProfileName = vi.fn((name: string) => {
   fakeProfile.deviceName = name.trim();
   return Promise.resolve();
 });
+const mockUpdateRelays = vi.fn((next: string[]) => {
+  // Mirror the real provider contract: update the shared `fakeProfile.relays`
+  // reference so the sidebar re-renders with the new list after the mutator
+  // settles. Tests that need to assert on intermediate states can reset the
+  // mock via `beforeEach`.
+  fakeProfile.relays = next.slice();
+  return Promise.resolve();
+});
 
-const fakeProfile = {
+const fakeProfile: {
+  id: string;
+  label: string;
+  deviceName: string;
+  groupName: string;
+  threshold: number;
+  memberCount: number;
+  localShareIdx: number;
+  groupPublicKey: string;
+  relays: string[];
+  createdAt: number;
+  lastUsedAt: number;
+} = {
   id: "test-profile-id",
   label: "Test Key",
   deviceName: "Igloo Web",
@@ -77,6 +97,7 @@ vi.mock("../../app/AppState", () => ({
     setSignerPaused: vi.fn(),
     refreshRuntime: mockRefreshRuntime,
     updateProfileName: mockUpdateProfileName,
+    updateRelays: mockUpdateRelays,
     changeProfilePassword: vi.fn(() => Promise.resolve()),
   }),
 }));
@@ -88,9 +109,11 @@ afterEach(() => {
   mockLockProfile.mockClear();
   mockClearCredentials.mockClear();
   mockUpdateProfileName.mockClear();
-  // Reset the shared profile so the mutable `deviceName` used by the
-  // inline edit tests below does not leak into the next test.
+  mockUpdateRelays.mockClear();
+  // Reset the shared profile so the mutable `deviceName` / `relays`
+  // used by the inline edit tests below do not leak into the next test.
   fakeProfile.deviceName = "Igloo Web";
+  fakeProfile.relays = ["wss://relay.primal.net", "wss://relay.damus.io"];
 });
 
 function renderDashboard() {

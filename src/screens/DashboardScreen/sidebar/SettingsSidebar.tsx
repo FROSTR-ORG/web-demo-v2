@@ -1,8 +1,15 @@
 import { X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppState } from "../../../app/AppState";
 import { PROFILE_NAME_MAX_LENGTH } from "../../../app/AppStateTypes";
+import {
+  RELAY_DUPLICATE_ERROR,
+  RELAY_INVALID_URL_ERROR,
+  isValidRelayUrl,
+  normalizeRelayKey,
+  validateRelayUrl,
+} from "../../../lib/relay/relayUrl";
 import { paperGroupKey } from "../mocks";
 
 /**
@@ -13,6 +20,13 @@ import { paperGroupKey } from "../mocks";
 export const PROFILE_NAME_EMPTY_ERROR = "Name cannot be empty.";
 export const PROFILE_NAME_TOO_LONG_ERROR = `Name must be at most ${PROFILE_NAME_MAX_LENGTH} characters.`;
 export { PROFILE_NAME_MAX_LENGTH };
+
+/**
+ * Canonical inline-validation copy surfaced by the relay list editor.
+ * Re-exported so component tests can assert on the exact strings without
+ * re-hardcoding them (VAL-SETTINGS-004 / VAL-SETTINGS-023).
+ */
+export { RELAY_DUPLICATE_ERROR, RELAY_INVALID_URL_ERROR };
 
 interface SettingsSidebarProps {
   profile: { groupName: string; deviceName: string };
@@ -28,14 +42,6 @@ interface SettingsSidebarProps {
   onExportShare: () => void;
 }
 
-// Paper-parity relay hint appended to the sidebar so that the Settings view
-// matches `igloo-paper/screens/dashboard/3-settings-lock-profile/screen.html`
-// which lists three relays including `wss://nos.lol`. The hint is only
-// applied to the Settings sidebar UI — the underlying `activeProfile.relays`
-// (and therefore the Running/Connecting/Export copy) stays at two entries to
-// preserve VAL-DSH-001, VAL-DSH-004, and VAL-DSH-015 content parity.
-const PAPER_SIDEBAR_RELAY = "wss://nos.lol";
-
 export function SettingsSidebar({
   profile,
   relays: initialRelays,
@@ -50,14 +56,29 @@ export function SettingsSidebar({
   onExportShare,
 }: SettingsSidebarProps) {
   const navigate = useNavigate();
-  const { activeProfile, changeProfilePassword, updateProfileName } =
-    useAppState();
-  const [relays, setRelays] = useState(() =>
-    initialRelays.includes(PAPER_SIDEBAR_RELAY)
-      ? initialRelays
-      : [...initialRelays, PAPER_SIDEBAR_RELAY]
+  const {
+    activeProfile,
+    changeProfilePassword,
+    updateProfileName,
+    updateRelays,
+  } = useAppState();
+  // Source of truth for the rendered relay list: prefer the live
+  // activeProfile (which the AppStateProvider mutator mirrors after a
+  // successful persistence round-trip) and fall back to the prop
+  // threaded from DashboardScreen before context hydrates. Local edit
+  // state (`newRelay`, `editingIndex`, error strings) layers on top.
+  const relays = useMemo(
+    () => activeProfile?.relays ?? initialRelays ?? [],
+    [activeProfile?.relays, initialRelays],
   );
   const [newRelay, setNewRelay] = useState("");
+  const [addError, setAddError] = useState("");
+  const [addSaving, setAddSaving] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingDraft, setEditingDraft] = useState("");
+  const [editingError, setEditingError] = useState("");
+  const [editingSaving, setEditingSaving] = useState(false);
+  const [removingIndex, setRemovingIndex] = useState<number | null>(null);
   // Source-of-truth for the rendered profile name: prefer the live
   // activeProfile (which is mutated by updateProfileName after a successful
   // IndexedDB write) and fall back to the prop that the Dashboard threads
@@ -167,15 +188,111 @@ export function SettingsSidebar({
     }
   }
 
-  function handleRemoveRelay(index: number) {
-    setRelays((prev) => prev.filter((_, i) => i !== index));
+  /**
+   * Shared persistence helper used by Add / Remove / Edit flows. Wraps
+   * the AppState mutator with an error-surfacing hook so every caller
+   * can route both validation errors (invalid URL / duplicate) and
+   * persistence errors (IDB write failure) into the right inline slot.
+   * Returns `true` on a successful round-trip so callers can reset
+   * their local edit state.
+   */
+  async function persistRelayList(
+    next: string[],
+    onError: (message: string) => void,
+  ): Promise<boolean> {
+    if (!updateRelays) {
+      onError("Relay list persistence is unavailable.");
+      return false;
+    }
+    try {
+      await updateRelays(next);
+      return true;
+    } catch (error) {
+      onError(
+        error instanceof Error ? error.message : "Unable to save relay list.",
+      );
+      return false;
+    }
   }
 
-  function handleAddRelay() {
+  async function handleAddRelay() {
     const trimmed = newRelay.trim();
-    if (trimmed && !relays.includes(trimmed)) {
-      setRelays((prev) => [...prev, trimmed]);
+    if (trimmed.length === 0) {
+      setAddError(RELAY_INVALID_URL_ERROR);
+      return;
+    }
+    if (!isValidRelayUrl(trimmed)) {
+      setAddError(RELAY_INVALID_URL_ERROR);
+      return;
+    }
+    const newKey = normalizeRelayKey(trimmed);
+    if (relays.some((existing) => normalizeRelayKey(existing) === newKey)) {
+      setAddError(RELAY_DUPLICATE_ERROR);
+      return;
+    }
+    const next = [...relays, trimmed];
+    setAddSaving(true);
+    setAddError("");
+    const ok = await persistRelayList(next, setAddError);
+    setAddSaving(false);
+    if (ok) {
       setNewRelay("");
+    }
+  }
+
+  async function handleRemoveRelay(index: number) {
+    if (index < 0 || index >= relays.length) return;
+    if (relays.length <= 1) {
+      setAddError("At least one relay is required.");
+      return;
+    }
+    const next = relays.filter((_, i) => i !== index);
+    setRemovingIndex(index);
+    const ok = await persistRelayList(next, setAddError);
+    setRemovingIndex(null);
+    if (ok && editingIndex === index) {
+      setEditingIndex(null);
+      setEditingDraft("");
+      setEditingError("");
+    }
+  }
+
+  function beginEditRelay(index: number) {
+    setEditingIndex(index);
+    setEditingDraft(relays[index] ?? "");
+    setEditingError("");
+  }
+
+  function cancelEditRelay() {
+    setEditingIndex(null);
+    setEditingDraft("");
+    setEditingError("");
+  }
+
+  async function saveEditRelay() {
+    if (editingIndex === null) return;
+    const trimmed = editingDraft.trim();
+    if (trimmed.length === 0 || !isValidRelayUrl(trimmed)) {
+      setEditingError(RELAY_INVALID_URL_ERROR);
+      return;
+    }
+    const newKey = normalizeRelayKey(trimmed);
+    const conflict = relays.some(
+      (existing, i) =>
+        i !== editingIndex && normalizeRelayKey(existing) === newKey,
+    );
+    if (conflict) {
+      setEditingError(RELAY_DUPLICATE_ERROR);
+      return;
+    }
+    const next = relays.map((relay, i) => (i === editingIndex ? trimmed : relay));
+    setEditingSaving(true);
+    setEditingError("");
+    const ok = await persistRelayList(next, setEditingError);
+    setEditingSaving(false);
+    if (ok) {
+      setEditingIndex(null);
+      setEditingDraft("");
     }
   }
 
@@ -338,38 +455,127 @@ export function SettingsSidebar({
               )}
               {/* Relays */}
               <div className="settings-relays">
-                {relays.map((relay, idx) => (
-                  <div className="settings-relay-row" key={relay}>
-                    <div className="settings-relay-url">{relay}</div>
-                    <button
-                      type="button"
-                      className="settings-relay-remove"
-                      aria-label={`Remove ${relay}`}
-                      onClick={() => handleRemoveRelay(idx)}
+                {relays.map((relay, idx) => {
+                  const isEditing = editingIndex === idx;
+                  const isRemoving = removingIndex === idx;
+                  return (
+                    <div
+                      className="settings-relay-row"
+                      key={`${relay}-${idx}`}
+                      data-testid={`settings-relay-row-${idx}`}
                     >
-                      ×
-                    </button>
+                      {isEditing ? (
+                        <>
+                          <input
+                            className="settings-relay-input"
+                            type="text"
+                            aria-label={`Edit ${relay}`}
+                            value={editingDraft}
+                            onChange={(event) => {
+                              setEditingDraft(event.target.value);
+                              if (editingError) setEditingError("");
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                void saveEditRelay();
+                              }
+                              if (event.key === "Escape") {
+                                event.preventDefault();
+                                cancelEditRelay();
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            className="settings-relay-add"
+                            aria-label={`Save ${relay}`}
+                            onClick={() => void saveEditRelay()}
+                            disabled={editingSaving}
+                          >
+                            {editingSaving ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            className="settings-relay-remove"
+                            aria-label={`Cancel edit of ${relay}`}
+                            onClick={cancelEditRelay}
+                            disabled={editingSaving}
+                          >
+                            ×
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="settings-relay-url">{relay}</div>
+                          <button
+                            type="button"
+                            className="settings-relay-add"
+                            aria-label={`Edit ${relay}`}
+                            onClick={() => beginEditRelay(idx)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="settings-relay-remove"
+                            aria-label={`Remove ${relay}`}
+                            onClick={() => void handleRemoveRelay(idx)}
+                            disabled={isRemoving || relays.length <= 1}
+                          >
+                            ×
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+                {editingError && (
+                  <div
+                    className="settings-row settings-row-error"
+                    role="alert"
+                    data-testid="settings-relay-edit-error"
+                  >
+                    <span className="field-error-text">{editingError}</span>
                   </div>
-                ))}
+                )}
                 <div className="settings-relay-row">
                   <input
                     className="settings-relay-input"
                     type="text"
+                    aria-label="Add relay URL"
                     placeholder="wss://..."
                     value={newRelay}
-                    onChange={(e) => setNewRelay(e.target.value)}
+                    onChange={(e) => {
+                      setNewRelay(e.target.value);
+                      if (addError) setAddError("");
+                    }}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") handleAddRelay();
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void handleAddRelay();
+                      }
                     }}
                   />
                   <button
                     type="button"
                     className="settings-relay-add"
-                    onClick={handleAddRelay}
+                    onClick={() => void handleAddRelay()}
+                    disabled={addSaving}
                   >
-                    Add
+                    {addSaving ? "Adding…" : "Add"}
                   </button>
                 </div>
+                {addError && (
+                  <div
+                    className="settings-row settings-row-error"
+                    role="alert"
+                    data-testid="settings-relay-add-error"
+                  >
+                    <span className="field-error-text">{addError}</span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="settings-hint">

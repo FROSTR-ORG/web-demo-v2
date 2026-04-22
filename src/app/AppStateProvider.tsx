@@ -2343,6 +2343,101 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
    *      Export modals) reflects the new value immediately; reload the
    *      profile index so the Welcome list also shows the new name.
    */
+  /**
+   * m5-relay-list-persist — persist the edited relay list through the
+   * profile-save path so changes survive Lock/Unlock/reload (VAL-
+   * SETTINGS-003 / 004 / 005 / 006 / 007 / 022 / 023 / VAL-CROSS-005),
+   * then hot-reload the RuntimeRelayPump so new sockets open and
+   * removed sockets close cleanly without tearing down the runtime.
+   *
+   * Flow:
+   *   1. Trim each URL, drop empty entries, validate every remaining
+   *      entry through `validateRelayUrl` (canonical wss:// rule).
+   *      Reject with the canonical inline-error message on the first
+   *      malformed entry; the stored profile is never mutated on a
+   *      rejected input.
+   *   2. Reject duplicates using case-insensitive, trailing-slash-
+   *      normalised keys so `wss://Relay.test` and `wss://relay.test/`
+   *      collapse.
+   *   3. Rebuild the encrypted profile record via
+   *      `buildStoredProfileRecord` (so normalisation is identical to
+   *      the unlock path) and persist via `saveProfile`.
+   *   4. Update the cached payload / active profile / live relay URL
+   *      ref so subsequent mutators (changeProfilePassword,
+   *      updateProfileName) re-encrypt against the new relay list.
+   *   5. Call `RuntimeRelayPump.updateRelays(...)` to close removed
+   *      sockets with code 1000 and open new ones — untouched sockets
+   *      keep their counters and subscription identity.
+   */
+  const updateRelays = useCallback(
+    async (nextRelays: string[]) => {
+      const { validateRelayUrl, normalizeRelayKey, RELAY_DUPLICATE_ERROR } =
+        await import("../lib/relay/relayUrl");
+      const normalized: string[] = [];
+      const seenKeys = new Set<string>();
+      for (const raw of nextRelays) {
+        const trimmed = typeof raw === "string" ? raw.trim() : "";
+        if (trimmed.length === 0) continue;
+        const validated = validateRelayUrl(trimmed);
+        const key = normalizeRelayKey(validated);
+        if (seenKeys.has(key)) {
+          throw new Error(RELAY_DUPLICATE_ERROR);
+        }
+        seenKeys.add(key);
+        normalized.push(validated);
+      }
+      if (normalized.length === 0) {
+        throw new Error("At least one relay is required.");
+      }
+      if (!activeProfile) {
+        throw new Error("No active profile.");
+      }
+      const payload = unlockedPayloadRef.current;
+      const password = unlockedPasswordRef.current;
+      if (!payload || !password) {
+        throw new Error(
+          "Unable to persist relays: the active profile is locked.",
+        );
+      }
+      const nextPayload: BfProfilePayload = {
+        ...payload,
+        device: {
+          ...payload.device,
+          relays: normalized,
+        },
+      };
+      const { record, normalizedPayload } = await buildStoredProfileRecord(
+        nextPayload,
+        password,
+        {
+          createdAt: activeProfile.createdAt,
+          lastUsedAt: Date.now(),
+          label: activeProfile.label,
+        },
+      );
+      await saveProfile(record);
+      unlockedPayloadRef.current = normalizedPayload;
+      setActiveProfile(record.summary);
+      liveRelayUrlsRef.current = record.summary.relays;
+      // Hot-reload the live pump (if any). When no pump is active — e.g.
+      // a demo-only state or an in-memory simulator — we silently skip
+      // the socket update. Errors here must not block the IDB write, so
+      // we log (DEV only) and continue.
+      const pump = relayPumpRef.current;
+      if (pump) {
+        try {
+          await pump.updateRelays(record.summary.relays);
+        } catch (error) {
+          if (import.meta.env.DEV) {
+            console.warn("relay hot-reload failed", error);
+          }
+        }
+      }
+      await reloadProfiles();
+    },
+    [activeProfile, reloadProfiles],
+  );
+
   const updateProfileName = useCallback(
     async (name: string) => {
       const trimmed = name.trim();
@@ -3236,6 +3331,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       expireRecoveredNsec,
       unlockProfile,
       updateProfileName,
+      updateRelays,
       changeProfilePassword,
       lockProfile,
       clearCredentials,
@@ -3302,6 +3398,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       expireRecoveredNsec,
       unlockProfile,
       updateProfileName,
+      updateRelays,
       changeProfilePassword,
       lockProfile,
       clearCredentials,

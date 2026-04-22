@@ -5,11 +5,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // Paper content-parity tests for the Settings sidebar variant at
 // /demo/dashboard-settings-lock-profile (VAL-DSH-010..013 + VAL-DSH-021).
 //
-// The AppState mock below pins activeProfile.relays to the two-entry list
-// that all other dashboard assertions depend on; the third relay row
-// (`wss://nos.lol`) is added by the SettingsSidebar component itself as a
-// paper-parity hint so VAL-DSH-001 / VAL-DSH-004 / VAL-DSH-015 (which key off
-// `activeProfile.relays.length`) remain green.
+// As of `m5-relay-list-persist` the Settings sidebar no longer auto-
+// appends a paper-parity `wss://nos.lol` hint — the relay list now
+// reflects the active profile exactly (so Add/Remove/Edit persist the
+// real IDB record without smuggling fake rows into the write). This
+// test fixture therefore seeds the active profile with the three Paper
+// reference relays directly; every other test file in this repo still
+// pins its own two-entry activeProfile.relays to preserve VAL-DSH-001 /
+// VAL-DSH-004 / VAL-DSH-015 content parity.
 
 const mockLockProfile = vi.fn();
 const mockClearCredentials = vi.fn(() => Promise.resolve());
@@ -27,7 +30,11 @@ const fakeProfile = {
   // flag it; value starts with "npub1qe3" so paperGroupKey() collapses it to
   // the paper-reference short form "npub1qe3...7k4m".
   ["group" + "PublicKey"]: ["npub1", "qe3", "abc", "def", "123", "456", "789", "0abc", "def7", "k4m"].join(""),
-  relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
+  relays: [
+    "wss://relay.primal.net",
+    "wss://relay.damus.io",
+    "wss://nos.lol",
+  ],
   createdAt: Date.now(),
   lastUsedAt: Date.now(),
 } as const as unknown as {
