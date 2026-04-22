@@ -355,7 +355,7 @@ function ApplyingShareUpdateContent({
           {steps.map((step, i) => (
             <div key={step.label} className="onboard-timeline-step">
               <div className="onboard-timeline-indicator">
-                <RotateShareTimelineDot state={step.state} />
+                <ReplaceShareTimelineDot state={step.state} />
                 {i < steps.length - 1 && (
                   <div className="onboard-timeline-line" />
                 )}
@@ -401,7 +401,7 @@ function ApplyingShareUpdateContent({
   );
 }
 
-function RotateShareTimelineDot({ state }: { state: TimelineState }) {
+function ReplaceShareTimelineDot({ state }: { state: TimelineState }) {
   if (state === "done") {
     return (
       <div className="onboard-dot done">

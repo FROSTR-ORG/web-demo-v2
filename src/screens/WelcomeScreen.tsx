@@ -32,7 +32,7 @@ export function WelcomeScreen() {
   const returning = profiles.length > 0;
   const isMulti = profiles.length >= 2;
   const isMany = profiles.length >= 4;
-  const showRotateShareFirst = !returning && variant === "replace-share-first";
+  const showReplaceShareFirst = !returning && variant === "replace-share-first";
 
   /* --- Scrollable list overflow tracking for 4+ profiles --- */
   const listRef = useRef<HTMLDivElement>(null);
@@ -177,7 +177,7 @@ export function WelcomeScreen() {
   }
 
   /** Chip-pair entry shown when no profiles yet and the user wants the replace-share entry path. */
-  function renderRotateShareFirstActions() {
+  function renderReplaceShareFirstActions() {
     return (
       <div className="returning-chip-actions">
         <span>or</span>
@@ -221,7 +221,7 @@ export function WelcomeScreen() {
         ) : null}
 
         {/* ---- First-time welcome (no profiles) ---- */}
-        {!returning && !showRotateShareFirst && (
+        {!returning && !showReplaceShareFirst && (
           <div className="panel welcome-card">
             <div className="welcome-card-body">
               <div className="welcome-card-title">
@@ -267,8 +267,8 @@ export function WelcomeScreen() {
           </div>
         )}
 
-        {/* ---- Rotate-share-first entry (no profiles, chip-pair entry) ---- */}
-        {showRotateShareFirst && (
+        {/* ---- Replace-share-first entry (no profiles, chip-pair entry) ---- */}
+        {showReplaceShareFirst && (
           <div className="panel welcome-card welcome-replace-share-card">
             <div className="welcome-card-body">
               <div className="welcome-card-title">
@@ -285,7 +285,7 @@ export function WelcomeScreen() {
                 this browser to an existing keyset.
               </p>
             </div>
-            {renderRotateShareFirstActions()}
+            {renderReplaceShareFirstActions()}
           </div>
         )}
 

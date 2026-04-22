@@ -836,7 +836,7 @@ export function SettingsSidebar({
             </div>
           </div>
 
-          {/* ROTATE SHARE */}
+          {/* REPLACE SHARE */}
           <div className="settings-section">
             <div className="settings-section-header">
               <span className="settings-section-label">Replace Share</span>

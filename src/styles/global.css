@@ -5817,13 +5817,13 @@ button.peer-policy-chip.deny:focus-visible {
 
 /* --- Label row with info tooltip --- */
 
-.rotate-share-label-row {
+.replace-share-label-row {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.rotate-share-info-tooltip {
+.replace-share-info-tooltip {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5837,7 +5837,7 @@ button.peer-policy-chip.deny:focus-visible {
 
 /* --- Amber warning callout (Share Update Failed) --- */
 
-.rotate-share-warning-callout {
+.replace-share-warning-callout {
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -5847,7 +5847,7 @@ button.peer-policy-chip.deny:focus-visible {
   border: 1px solid rgba(251, 191, 36, 0.35);
 }
 
-.rotate-share-warning-icon {
+.replace-share-warning-icon {
   width: 20px;
   height: 20px;
   display: flex;
@@ -5859,20 +5859,20 @@ button.peer-policy-chip.deny:focus-visible {
   color: #fbbf24;
 }
 
-.rotate-share-warning-body {
+.replace-share-warning-body {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.rotate-share-warning-title {
+.replace-share-warning-title {
   color: #fbbf24;
   font-weight: 600;
   font-size: 14px;
   line-height: 20px;
 }
 
-.rotate-share-warning-description {
+.replace-share-warning-description {
   color: #fde68a;
   font-size: 13px;
   line-height: 18px;
@@ -5880,7 +5880,7 @@ button.peer-policy-chip.deny:focus-visible {
 
 /* --- Green success banner (Local Share Updated) --- */
 
-.rotate-share-success-banner {
+.replace-share-success-banner {
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -5890,7 +5890,7 @@ button.peer-policy-chip.deny:focus-visible {
   border: 1px solid rgba(34, 197, 94, 0.25);
 }
 
-.rotate-share-success-icon {
+.replace-share-success-icon {
   width: 24px;
   height: 24px;
   display: flex;
@@ -5902,20 +5902,20 @@ button.peer-policy-chip.deny:focus-visible {
   color: #4ade80;
 }
 
-.rotate-share-success-body {
+.replace-share-success-body {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.rotate-share-success-title {
+.replace-share-success-title {
   color: #4ade80;
   font-weight: 600;
   font-size: 14px;
   line-height: 20px;
 }
 
-.rotate-share-success-description {
+.replace-share-success-description {
   color: #86efac;
   font-size: 12px;
   line-height: 18px;
@@ -5923,7 +5923,7 @@ button.peer-policy-chip.deny:focus-visible {
 
 /* --- Identity Changes card --- */
 
-.rotate-share-identity-card {
+.replace-share-identity-card {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -5933,7 +5933,7 @@ button.peer-policy-chip.deny:focus-visible {
   border: 1px solid var(--ig-border);
 }
 
-.rotate-share-identity-header {
+.replace-share-identity-header {
   color: rgba(147, 197, 253, 0.8);
   font-family: var(--font-inter, Inter, system-ui, sans-serif);
   font-weight: 500;
@@ -5942,7 +5942,7 @@ button.peer-policy-chip.deny:focus-visible {
   letter-spacing: 0.08em;
 }
 
-.rotate-share-identity-row {
+.replace-share-identity-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5950,33 +5950,33 @@ button.peer-policy-chip.deny:focus-visible {
   border-bottom: 1px solid rgba(30, 58, 138, 0.15);
 }
 
-.rotate-share-identity-row-last {
+.replace-share-identity-row-last {
   border-bottom: none;
 }
 
-.rotate-share-identity-label {
+.replace-share-identity-label {
   color: var(--ig-subtle);
   font-size: 12px;
   line-height: 16px;
 }
 
-.rotate-share-identity-value-group {
+.replace-share-identity-value-group {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.rotate-share-identity-value-mono {
+.replace-share-identity-value-mono {
   font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
   font-size: 12px;
   line-height: 16px;
 }
 
-.rotate-share-identity-value-mono.blue {
+.replace-share-identity-value-mono.blue {
   color: var(--ig-blue);
 }
 
-.rotate-share-identity-unchanged-badge {
+.replace-share-identity-unchanged-badge {
   display: inline-flex;
   align-items: center;
   padding: 2px 6px;
@@ -5987,21 +5987,21 @@ button.peer-policy-chip.deny:focus-visible {
   line-height: 12px;
 }
 
-.rotate-share-identity-diff {
+.replace-share-identity-diff {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 4px;
 }
 
-.rotate-share-identity-old-row,
-.rotate-share-identity-new-row {
+.replace-share-identity-old-row,
+.replace-share-identity-new-row {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.rotate-share-identity-old-value {
+.replace-share-identity-old-value {
   color: rgba(239, 68, 68, 0.7);
   font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
   font-size: 11px;
@@ -6009,20 +6009,20 @@ button.peer-policy-chip.deny:focus-visible {
   text-decoration: line-through;
 }
 
-.rotate-share-identity-old-label {
+.replace-share-identity-old-label {
   color: #ef4444;
   font-size: 11px;
   line-height: 14px;
 }
 
-.rotate-share-identity-new-value {
+.replace-share-identity-new-value {
   color: #4ade80;
   font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
   font-size: 11px;
   line-height: 14px;
 }
 
-.rotate-share-identity-new-label {
+.replace-share-identity-new-label {
   color: #4ade80;
   font-size: 11px;
   line-height: 14px;

@@ -37,4 +37,4 @@ Import, Onboard, Rotate Keyset, Recover, and distribution handoff.
   requires every remote package to have package handoff plus password accounting.
 - Still-deferred work is explicit: web-dashboard source sponsorship over relays,
   existing pasted-`nsec` splitting into a new keyset, dashboard/runtime behavior,
-  camera QR scanning, and inside-runtime Rotate Share.
+  camera QR scanning, and inside-runtime Replace Share.

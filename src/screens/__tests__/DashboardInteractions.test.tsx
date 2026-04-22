@@ -150,7 +150,7 @@ function renderAt(demoUi: DemoUi) {
         />
         <Route
           path="/replace-share"
-          element={<div data-testid="replace-share-screen">RotateShare</div>}
+          element={<div data-testid="replace-share-screen">ReplaceShare</div>}
         />
         <Route
           path="/recover/:profileId"
