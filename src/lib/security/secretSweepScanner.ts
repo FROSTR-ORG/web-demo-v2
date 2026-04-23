@@ -146,11 +146,17 @@ const ENCRYPTED_BFPROFILE_WRAPPER_KEYS = new Set<string>([
  * of the scan. Errors carry their `message` (not just `"{}"`).
  *
  * Additionally, string values held at a
- * {@link ENCRYPTED_BFPROFILE_WRAPPER_KEYS} key are replaced with a
- * non-bfprofile sentinel (`"[encrypted-bfprofile]"`) BEFORE being
- * emitted into the serialised form — so the bfprofile regex does not
- * match them. This keeps the scanner from flagging the profile record
- * that AGENTS.md explicitly permits in IndexedDB.
+ * {@link ENCRYPTED_BFPROFILE_WRAPPER_KEYS} key have ONLY their
+ * `bfprofile1…` bech32 matches replaced with the non-bfprofile
+ * sentinel (`"[redacted-bfprofile]"`) — not the entire string. This
+ * tightens the allow-list introduced in the initial m7 security
+ * sweep (fix-m7-scrutiny-r1-security-sweep-snapshot-cloning): at
+ * wrapper keys we only exempt the bfprofile1 regex, leaving every
+ * other scan pattern (nsec1, structural partial_signature /
+ * share_secret / nonce_secret / passphrase via {@link scanObject},
+ * etc.) active. Prior behaviour replaced the ENTIRE string with
+ * `"[encrypted-bfprofile]"`, which suppressed ALL regex scanning at
+ * those keys and created a false-negative path for nested secrets.
  */
 function safeStringify(value: unknown): string {
   const seen = new WeakSet<object>();
@@ -159,12 +165,16 @@ function safeStringify(value: unknown): string {
       typeof val === "string" &&
       ENCRYPTED_BFPROFILE_WRAPPER_KEYS.has(key)
     ) {
-      // Even though the value IS bfprofile1-prefixed, at this key it is
-      // contractually encrypted. Replace with a neutral sentinel so the
-      // `bfprofile1` regex below does not flag it. Non-bfprofile values
-      // at this key (legacy / corrupted rows) fall through to the regex
-      // and ARE flagged — which is the desired conservative default.
-      return "[encrypted-bfprofile]";
+      // Replace ONLY the bfprofile1 bech32 matches with the redaction
+      // sentinel. Any other content in the same string (e.g. a nested
+      // nsec1 token that accidentally leaked into an encrypted
+      // wrapper field in a bug scenario) remains intact so the
+      // regex + structured scans downstream can still flag it. A
+      // legitimate encrypted profile package is JUST the bfprofile1
+      // bech32 payload — so this ordinarily collapses the whole value
+      // to the sentinel, matching the previous behaviour for the
+      // happy path.
+      return val.replace(BFPROFILE_RE, REDACTED_BFPROFILE_SENTINEL);
     }
     if (typeof val === "bigint") return val.toString();
     if (typeof val === "function") return `[fn ${val.name || "anonymous"}]`;

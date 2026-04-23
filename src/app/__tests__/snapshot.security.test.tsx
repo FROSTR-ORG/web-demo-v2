@@ -223,9 +223,44 @@ afterEach(() => {
 
 /* ---------------------- Snapshot helpers --------------------------------- */
 /**
+ * Circular-safe structured clone. The snapshot surfaces (notably
+ * `window.__appState` and `window.__debug`) can contain React fibres,
+ * function closures, circular parent/child refs, and other non-JSON
+ * leaves. A naive `JSON.parse(JSON.stringify(...))` would throw on
+ * cycles. This helper mirrors the scanner's own safeStringify
+ * behaviour for exotic leaves so the snapshot is a pure point-in-
+ * time JSON tree, safe to scan later regardless of how the live
+ * state mutates in the interim.
+ *
+ * fix-m7-scrutiny-r1-security-sweep-snapshot-cloning — without this,
+ * the snapshot object retained live references to the mutable
+ * AppState / __debug / outbound envelope array, so by the time
+ * `scanSnapshotSet` ran after all 5 captures, every snapshot had
+ * collapsed to the final state and transient mid-sign / mid-ECDH /
+ * mid-onboard secrets could have been missed.
+ */
+function freezeSnapshot(value: unknown): unknown {
+  const seen = new WeakSet<object>();
+  const serialised = JSON.stringify(value, (_key, val) => {
+    if (typeof val === "bigint") return val.toString();
+    if (typeof val === "function") return `[fn ${val.name || "anonymous"}]`;
+    if (typeof val === "symbol") return val.toString();
+    if (val instanceof Error) return `${val.name}: ${val.message}`;
+    if (val !== null && typeof val === "object") {
+      if (seen.has(val as object)) return "[circular]";
+      seen.add(val as object);
+    }
+    return val;
+  });
+  return serialised === undefined ? null : JSON.parse(serialised);
+}
+
+/**
  * Build one snapshot object — a frozen-in-time reading of every
  * observable surface at the moment the caller invokes it. The
- * returned value is safe to feed directly to `scanSnapshotSet`.
+ * returned value is a deep clone of the underlying surfaces so it
+ * cannot collapse to a later state before scanning. Safe to feed
+ * directly to `scanSnapshotSet`.
  */
 function buildSnapshot(label: string): {
   context: string;
@@ -265,20 +300,26 @@ function buildSnapshot(label: string): {
     __debug?: unknown;
     __appState?: unknown;
   };
+  const raw = {
+    sessionStorage: sessionStorageContents,
+    localStorage: localStorageContents,
+    indexedDb: indexedDbContents,
+    windowDebug: globalWindow.__debug ?? null,
+    windowAppState: globalWindow.__appState ?? null,
+    consoleTranscript: consoleEntries.map((entry) => ({
+      level: entry.level,
+      args: entry.args,
+    })),
+    // Copy of the outbound envelope array as-of-now; the underlying
+    // module-local array continues to grow on subsequent drains.
+    outboundEnvelopes: [...recordedOutbound],
+  };
+  // Structured clone so the snapshot is a point-in-time JSON tree
+  // that cannot collapse to a later state before scanning. See
+  // freezeSnapshot docstring for the rationale.
   return {
     context: label,
-    value: {
-      sessionStorage: sessionStorageContents,
-      localStorage: localStorageContents,
-      indexedDb: indexedDbContents,
-      windowDebug: globalWindow.__debug ?? null,
-      windowAppState: globalWindow.__appState ?? null,
-      consoleTranscript: consoleEntries.map((entry) => ({
-        level: entry.level,
-        args: entry.args,
-      })),
-      outboundEnvelopes: recordedOutbound,
-    },
+    value: freezeSnapshot(raw),
   };
 }
 

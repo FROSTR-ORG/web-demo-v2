@@ -209,6 +209,59 @@ describe("scanSnapshot — pattern detection", () => {
     expect(findings).toHaveLength(1);
     expect(findings[0].kind).toBe("plaintext_bfprofile");
   });
+
+  it("still flags partial_signature nested inside profilePackage (tightened allow-list)", () => {
+    // fix-m7-scrutiny-r1-security-sweep-snapshot-cloning — the wrapper
+    // allow-list must only exempt the bfprofile1 regex at the named
+    // keys. Structural sensitive keys (partial_signature, share_secret,
+    // etc.) nested under a wrapper key MUST still be flagged.
+    const findings = scanSnapshot(
+      {
+        profilePackage: {
+          partial_signature: "ab".repeat(32),
+        },
+      },
+      "leak",
+    );
+    expect(findings).toHaveLength(1);
+    expect(findings[0].kind).toBe("partial_signature");
+    expect(findings[0].context).toBe(
+      "leak.profilePackage.partial_signature",
+    );
+  });
+
+  it("flags nsec1 embedded inside a wrapper-key string value", () => {
+    // fix-m7-scrutiny-r1-security-sweep-snapshot-cloning — previously
+    // safeStringify replaced the entire string at a wrapper key with
+    // `[encrypted-bfprofile]`, which masked any embedded nsec1 hit.
+    // Now only bfprofile1 matches are stripped; other regex scans still
+    // apply to the remaining string content.
+    const findings = scanSnapshot(
+      {
+        encryptedProfilePackage:
+          "bfprofile1" + "q".repeat(200) + " nsec1" + "q".repeat(58),
+      },
+      "leak",
+    );
+    expect(findings.some((f) => f.kind === "nsec_bech32")).toBe(true);
+    // And — the bfprofile hit itself MUST NOT be flagged (that's the
+    // contract for wrapper keys in the first place).
+    expect(findings.some((f) => f.kind === "plaintext_bfprofile")).toBe(false);
+  });
+
+  it("still flags share_secret nested inside encryptedProfileBackup", () => {
+    // Structured walk applies regardless of wrapper-key membership.
+    const findings = scanSnapshot(
+      {
+        encryptedProfileBackup: {
+          share_secret: "ff".repeat(32),
+        },
+      },
+      "leak",
+    );
+    expect(findings).toHaveLength(1);
+    expect(findings[0].kind).toBe("share_secret");
+  });
 });
 
 describe("scanSnapshot — resilience", () => {
