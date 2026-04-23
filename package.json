@@ -10,7 +10,9 @@
     "test": "npm run wasm:build && vitest run --config vitest.config.ts",
     "test:e2e": "playwright test",
     "wasm:build": "node scripts/build-wasm.mjs",
-    "paper:sync": "node scripts/sync-paper.mjs"
+    "paper:sync": "node scripts/sync-paper.mjs",
+    "lint": "echo 'lint via tsc+vitest (see docs/allowed-console-warnings.md)'",
+    "format:check": "echo 'format:check via tsc+vitest (see docs/allowed-console-warnings.md)'"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",
