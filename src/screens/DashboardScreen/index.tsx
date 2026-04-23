@@ -1,4 +1,9 @@
-import { Download, FileText, Settings, SlidersHorizontal } from "lucide-react";
+import {
+  FileText,
+  LayoutDashboard,
+  Settings,
+  SlidersHorizontal,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAppState } from "../../app/AppState";
@@ -15,11 +20,8 @@ import { ClearCredentialsModal } from "./modals/ClearCredentialsModal";
 import { ExportCompleteModal } from "./modals/ExportCompleteModal";
 import { ExportProfileModal } from "./modals/ExportProfileModal";
 import { PolicyPromptModal } from "./modals/PolicyPromptModal";
-import {
-  PublishBackupModal,
-  type PublishBackupResult,
-} from "./modals/PublishBackupModal";
 import { SigningFailedModal } from "./modals/SigningFailedModal";
+import { DashboardRecoverPanel } from "./panels/DashboardRecoverPanel";
 import { DashboardStateAnnouncer } from "./panels/DashboardStateAnnouncer";
 import { DashboardSummaryBar } from "./panels/DashboardSummaryBar";
 import { MockStateToggle } from "./panels/MockStateToggle";
@@ -47,7 +49,13 @@ import {
   MOCK_SHARE_PACKAGE_STRING,
   type PolicyPromptRequest,
 } from "./mocks";
-import type { DashboardState, ExportMode, ModalState } from "./types";
+import type {
+  DashboardRecoverStep,
+  DashboardState,
+  DashboardView,
+  ExportMode,
+  ModalState,
+} from "./types";
 import type { RuntimeRelayStatus } from "../../lib/relay/runtimeRelayPump";
 import {
   formatRelayLastSeen,
@@ -152,15 +160,11 @@ export function DashboardScreen() {
     signerPaused = false,
     lockProfile,
     clearCredentials,
+    clearRecoverSession = () => undefined,
     setSignerPaused = () => undefined,
     refreshRuntime,
     exportRuntimePackages = async () => {
       throw new Error("Export is unavailable for this profile.");
-    },
-    publishProfileBackup = async () => {
-      throw new Error(
-        "Publish Backup is unavailable for this profile.",
-      );
     },
     restartRuntimeConnections = async () => undefined,
     runtimeFailures = [],
@@ -174,8 +178,11 @@ export function DashboardScreen() {
   } = useAppState();
   const demoUi = useDemoUi();
   const hasDemoDashboardState = Boolean(demoUi.dashboard?.state || demoUi.dashboard?.showMockControls);
+  const initialDashboardView: DashboardView =
+    demoUi.dashboard?.view ?? (demoUi.dashboard?.showPolicies ? "policies" : "dashboard");
   const [mockState, setMockState] = useState<DashboardState>(demoUi.dashboard?.state ?? "running");
-  const [showPolicies, setShowPolicies] = useState(Boolean(demoUi.dashboard?.showPolicies));
+  const [dashboardView, setDashboardView] = useState<DashboardView>(initialDashboardView);
+  const [recoverStep, setRecoverStep] = useState<DashboardRecoverStep>(demoUi.dashboard?.recoverStep ?? "collect");
   const [activeModal, setActiveModal] = useState<ModalState>(demoUi.dashboard?.modal ?? "none");
   const [exportMode, setExportMode] = useState<ExportMode>(demoUi.dashboard?.exportMode ?? "profile");
   const [exportResult, setExportResult] = useState<{ mode: ExportMode; packageText: string } | null>(null);
@@ -737,27 +744,6 @@ export function DashboardScreen() {
     setActiveModal("export-profile");
   }
 
-  /**
-   * m6-backup-publish — open the PublishBackupModal. Dev/demo surfaces
-   * render the modal in the standard mock flow but the runtime publish
-   * path below short-circuits the actual pump publish for mocks (see
-   * `handlePublishBackup`). VAL-BACKUP-001.
-   */
-  function handleOpenPublishBackup() {
-    setActiveModal("publish-backup");
-  }
-
-  async function handlePublishBackup(
-    password: string,
-  ): Promise<PublishBackupResult> {
-    const outcome = await publishProfileBackup(password);
-    return {
-      reached: outcome.reached,
-      eventId: outcome.event.id,
-      createdAt: outcome.event.created_at,
-    };
-  }
-
   async function handleExport(password: string) {
     if (paperPanels) {
       setExportResult({ mode: exportMode, packageText: mockPackageForMode(exportMode) });
@@ -777,28 +763,72 @@ export function DashboardScreen() {
     setActiveModal("none");
   }
 
+  const recoverActive = dashboardView === "recover";
+  const policiesActive = dashboardView === "policies";
+
+  function resetRecoverState() {
+    clearRecoverSession();
+    setRecoverStep("collect");
+  }
+
+  function handleOpenRecover() {
+    setRecoverStep("collect");
+    setDashboardView("recover");
+  }
+
+  function handleReturnToDashboard() {
+    if (recoverActive) {
+      resetRecoverState();
+    }
+    setDashboardView("dashboard");
+  }
+
+  function handleOpenPolicies() {
+    if (recoverActive) {
+      resetRecoverState();
+    }
+    setDashboardView("policies");
+  }
+
+  const recoverHeaderLabel = recoverActive ? "Dashboard" : "Recover";
+  const recoverHeaderAriaLabel = recoverActive ? "Back to dashboard" : undefined;
+  const policiesHeaderLabel = policiesActive ? "Dashboard" : "Policies";
+  const policiesHeaderAriaLabel = policiesActive ? "Back to dashboard" : undefined;
+
   return (
     <AppShell
       mainVariant="dashboard"
       headerActions={
         <>
-          <Button type="button" variant="header" onClick={() => navigate(`/recover/${profileId}`)}>
-            <FileText size={14} />
-            Recover
-          </Button>
-          <Button type="button" variant="header" onClick={() => handleOpenExport("profile")}>
-            <Download size={14} />
-            Export
+          <Button
+            type="button"
+            variant="header"
+            className={recoverActive ? "button-header-active" : undefined}
+            aria-label={recoverHeaderAriaLabel}
+            aria-pressed={recoverActive}
+            onClick={recoverActive ? handleReturnToDashboard : handleOpenRecover}
+          >
+            {recoverActive ? (
+              <LayoutDashboard size={14} color="#93C5FD" />
+            ) : (
+              <FileText size={14} />
+            )}
+            {recoverHeaderLabel}
           </Button>
           <Button
             type="button"
             variant="header"
-            className={showPolicies ? "button-header-active" : undefined}
-            aria-pressed={showPolicies}
-            onClick={() => setShowPolicies((v) => !v)}
+            className={policiesActive ? "button-header-active" : undefined}
+            aria-label={policiesHeaderAriaLabel}
+            aria-pressed={policiesActive}
+            onClick={policiesActive ? handleReturnToDashboard : handleOpenPolicies}
           >
-            <SlidersHorizontal size={14} color={showPolicies ? "#93C5FD" : undefined} />
-            Policies
+            {policiesActive ? (
+              <LayoutDashboard size={14} color="#93C5FD" />
+            ) : (
+              <SlidersHorizontal size={14} />
+            )}
+            {policiesHeaderLabel}
           </Button>
         </>
       }
@@ -849,7 +879,15 @@ export function DashboardScreen() {
           sharePublicKey={runtimeStatus.metadata.share_public_key}
         />
 
-        {showPolicies ? (
+        {dashboardView === "recover" ? (
+          <DashboardRecoverPanel
+            profileId={profileId}
+            paperPanels={paperPanels}
+            recoverStep={recoverStep}
+            onRecovered={() => setRecoverStep("success")}
+            onExit={handleReturnToDashboard}
+          />
+        ) : policiesActive ? (
           <PoliciesState
             peers={runtimeStatus.peers}
             peerPermissionStates={runtimeStatus.peer_permission_states ?? []}
@@ -919,7 +957,7 @@ export function DashboardScreen() {
             {dashboardState === "signing-blocked" && (
               <SigningBlockedState
                 onStop={handleStopSigner}
-                onOpenPolicies={() => setShowPolicies(true)}
+                onOpenPolicies={handleOpenPolicies}
                 onReviewApprovals={
                   // VAL-APPROVALS-018 / fix-m2-policy-prompt-never-proactive-open:
                   // "Review Approvals" is a Paper-parity affordance from
@@ -955,7 +993,7 @@ export function DashboardScreen() {
          * adjacent to the Activity surface below. When empty the container
          * stays mounted so SR announcements on newly-added banners fire
          * without the whole region remounting. */}
-        {!paperPanels ? (
+        {dashboardView === "dashboard" && !paperPanels ? (
           <NonSignFailureBannerStack
             banners={nonSignFailureBanners}
             onDismiss={handleDismissNonSignFailureBanner}
@@ -966,7 +1004,7 @@ export function DashboardScreen() {
          * `import.meta.env.DEV` so `vite build` dead-code-eliminates them
          * from the production bundle. Also hidden when Paper reference
          * panels are active so pixel-parity demo scenarios are unaffected. */}
-        {import.meta.env.DEV && !paperPanels ? (
+        {dashboardView === "dashboard" && import.meta.env.DEV && !paperPanels ? (
           <>
             <TestSignPanel signingBlocked={signingBlocked} />
             <TestEcdhPanel ecdhBlocked={ecdhBlocked} />
@@ -1077,16 +1115,6 @@ export function DashboardScreen() {
           onDone={closeExportModal}
         />
       )}
-      {activeModal === "publish-backup" && (
-        <PublishBackupModal
-          groupName={activeProfile.groupName}
-          shareIdx={runtimeStatus.metadata.member_idx}
-          relayCount={activeProfile.relays.length}
-          onCancel={() => setActiveModal("none")}
-          onPublish={handlePublishBackup}
-        />
-      )}
-
       {settingsOpen && (
         <SettingsSidebar
           profile={activeProfile}
@@ -1107,7 +1135,6 @@ export function DashboardScreen() {
             handleOpenExport("profile");
           }}
           onExportShare={() => handleOpenExport("share")}
-          onPublishBackup={handleOpenPublishBackup}
           signerPaused={signerPaused}
         />
       )}

@@ -63,9 +63,9 @@ exists only for deterministic `/demo/:scenarioId` Paper-review routes.
 ## Product Routes And Demo Routes
 
 Product routes are mounted under the real `AppStateProvider`: welcome, create,
-restore-from-relay, import, onboard requester, onboard sponsor, rotate keyset,
-replace share, recover, and dashboard. They should use real package/session,
-storage, and runtime methods for success paths.
+import, onboard requester, onboard sponsor, rotate keyset, replace share,
+recover, and dashboard. They should use real package/session, storage, and
+runtime methods for success paths.
 
 The `/demo` and `/demo/:scenarioId` routes are mock Paper-review surfaces.
 Scenarios in `src/demo/scenarios.ts` seed `MockAppStateProvider` with the exact
@@ -81,7 +81,6 @@ variant behavior, and bridge safety.
 | Welcome/unlock | `/` | `src/screens/WelcomeScreen.tsx` | Saved profile summaries, active profile, runtime unlock in `AppStateProvider` | `welcome-*` scenarios | `src/screens/__tests__/WelcomeScreen.test.tsx`, demo gallery |
 | Create keyset | `/create`, `/create/progress` | `CreateKeysetScreen.tsx`, `GenerationProgressScreen.tsx` | `createSession` and WASM package helpers | `create-*` scenarios | `src/screens/__tests__/CreateFlow.test.tsx`, `src/app/__tests__/setupFlows.test.tsx` |
 | Create profile/distribute | `/create/profile`, `/create/distribute`, `/create/complete` | `CreateProfileScreen.tsx`, `DistributeSharesScreen.tsx`, `DistributionCompleteScreen.tsx` | `createSession`, distribution package helpers, optional onboard dispatch state | `shared-*` scenarios | `DistributeSharesScreen.test.tsx`, `DistributionCompleteScreen.test.tsx`, `src/e2e/visual/followup-paper-parity.spec.ts` |
-| Restore from relay | `/restore-from-relay` | `RestoreFromRelayScreen.tsx`, `fetchProfileBackupEvent.ts` | `restoreProfileFromRelay`, IndexedDB profile store | No dedicated Paper scenario | `src/app/__tests__/restoreProfileFromRelay.test.tsx`, `src/e2e/multi-device/backup-publish-restore-live.spec.ts` |
 | Import profile | `/import`, `/import/decrypt`, `/import/review`, `/import/error` | `ImportScreens.tsx` | `importSession`, encrypted `bfprofile` decode/save | `import-*` scenarios | `src/screens/__tests__/ImportScreens.test.tsx`, setup-flow tests |
 | Onboard requester | `/onboard`, `/onboard/handshake`, `/onboard/failed`, `/onboard/complete` | `OnboardScreens.tsx` | `onboardSession`, relay request lifecycle | `onboard-*` scenarios | `src/app/__tests__/onboardFlow.test.tsx`, multi-device onboard specs |
 | Onboard sponsor | `/onboard-sponsor`, `/onboard-sponsor/handoff` | `OnboardSponsorScreens.tsx`, source-share helpers | Sponsor package session and runtime relay pump | No dedicated Paper scenario | `src/app/__tests__/onboardSponsorFlow.test.tsx`, `src/e2e/multi-device/onboard-sponsorship.spec.ts` |
@@ -93,10 +92,13 @@ variant behavior, and bridge safety.
 ## Setup Sessions
 
 Create, import, onboard requester, onboard sponsor, rotate-keyset,
-replace-share, recover, encrypted backup, and relay restore all run before or
-around the live signer runtime. Decoded package material stays in React memory
-only and must be cleared on cancel, finish, lock, credential clearing, or
-invalid direct navigation.
+replace-share, and recover all run before or around the live signer runtime.
+Decoded package material stays in React memory only and must be cleared on
+cancel, finish, lock, credential clearing, or invalid direct navigation.
+
+Relay backup publish/restore is intentionally not surfaced in the web demo.
+Profile transfer uses local `bfprofile` import/export, and device onboarding
+uses `bfonboard` packages.
 
 Browser code may coordinate WASM calls and relay requests, but Nostr private-key
 operations, secp256k1 validation, and FROST key material handling stay behind

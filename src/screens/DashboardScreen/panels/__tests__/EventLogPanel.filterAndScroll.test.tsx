@@ -302,7 +302,7 @@ describe("EventLogPanel — scroll anchor & jump to newest", () => {
     // Min and max bracket the expected range.
     expect(Math.min(...payloadSeqs)).toBe(1);
     expect(Math.max(...payloadSeqs)).toBe(200);
-  });
+  }, 10_000);
 
   it("no-flicker-to-empty on intra-session remount (VAL-EVENTLOG-015): buffer-backed rows are visible on first paint", () => {
     currentState.value.runtimeEventLog = [

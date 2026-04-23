@@ -11,9 +11,19 @@ import { RecoveryWarning } from "./RecoveryWarning";
 import { ShareBlock } from "./ShareBlock";
 import { maskNsec, shortPubkey } from "./recoverUtils";
 
-export function ProductRecoverSuccessScreen() {
-  const { profileId } = useParams();
-  const navigate = useNavigate();
+interface ProductRecoverSuccessContentProps {
+  profileId: string;
+  showBackLink?: boolean;
+  onExit: () => void;
+  onExpired: () => void;
+}
+
+export function ProductRecoverSuccessContent({
+  profileId,
+  showBackLink = false,
+  onExit,
+  onExpired,
+}: ProductRecoverSuccessContentProps) {
   const {
     activeProfile,
     recoverSession,
@@ -46,7 +56,7 @@ export function ProductRecoverSuccessScreen() {
         window.clearInterval(timer);
         setExiting(true);
         expireRecoveredNsec();
-        navigate(`/dashboard/${profileId}`, { replace: true });
+        onExpired();
       }
     }, 250);
 
@@ -56,7 +66,7 @@ export function ProductRecoverSuccessScreen() {
         window.clearInterval(timer);
         setExiting(true);
         expireRecoveredNsec();
-        navigate(`/dashboard/${profileId}`, { replace: true });
+        onExpired();
       }
     }
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -65,10 +75,10 @@ export function ProductRecoverSuccessScreen() {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [expireRecoveredNsec, expiresAt, navigate, profileId]);
+  }, [expireRecoveredNsec, expiresAt, onExpired, profileId]);
 
   if (!profileId || !activeProfile || activeProfile.id !== profileId) {
-    return <Navigate to="/" replace />;
+    return null;
   }
 
   if (exiting) {
@@ -76,7 +86,7 @@ export function ProductRecoverSuccessScreen() {
   }
 
   if (!session || !recovered) {
-    return <Navigate to={`/recover/${profileId}`} replace />;
+    return null;
   }
 
   const recoveredNsec = recovered.nsec;
@@ -103,102 +113,137 @@ export function ProductRecoverSuccessScreen() {
   function handleBack() {
     setExiting(true);
     clearRecoverSession();
-    navigate(`/dashboard/${profileId}`);
+    onExit();
   }
 
   function handleClear() {
     setExiting(true);
     clearRecoverSession();
-    navigate(`/dashboard/${profileId}`);
+    onExit();
   }
+
+  return (
+    <div className="screen-column">
+      {showBackLink ? (
+        <button type="button" className="back-link" onClick={handleBack}>
+          <ChevronLeft size={14} />
+          Back to Signer
+        </button>
+      ) : null}
+
+      <div className="screen-heading">
+        <h1 className="page-title">Recover NSEC</h1>
+        <p className="page-copy">
+          Recovering your nsec requires {threshold} of your {totalShares}{" "}
+          shares.
+        </p>
+      </div>
+
+      {sources.map((source, index) => (
+        <ShareBlock
+          label={`Source Share #${index + 1} — ${index === 0 ? "This Browser" : "bfshare"}`}
+          loaded
+          mono={index !== 0}
+          key={`${source.idx}-${index}`}
+        >
+          <LoadedShareDisplay>
+            {shortPubkey(source.memberPubkey)}
+          </LoadedShareDisplay>
+        </ShareBlock>
+      ))}
+
+      <Button type="button" variant="primary" size="full" disabled>
+        Recover NSEC
+      </Button>
+
+      <div className="recover-divider" />
+
+      <RecoveryWarning secondsRemaining={secondsRemaining} />
+
+      <RecoveredNsecBlock
+        label="Recovered NSEC:"
+        valueClassName="recover-nsec-masked"
+      >
+        {maskNsec(recoveredNsec)}
+      </RecoveredNsecBlock>
+
+      <RecoveredNsecBlock
+        label="Recovered NSEC (revealed):"
+        valueClassName="recover-nsec-revealed"
+      >
+        {revealed ? recoveredNsec : maskNsec(recoveredNsec)}
+      </RecoveredNsecBlock>
+
+      <div className="recover-actions">
+        <button
+          type="button"
+          className="recover-btn-copy"
+          onClick={handleCopy}
+          disabled={!revealed}
+        >
+          <Copy size={14} />
+          Copy to Clipboard
+        </button>
+        <button
+          type="button"
+          className="recover-btn-reveal"
+          onClick={() => setRevealed((prev) => !prev)}
+        >
+          <Eye size={14} />
+          {revealed ? "Hide" : "Reveal"}
+        </button>
+        <button
+          type="button"
+          className="recover-btn-clear"
+          onClick={handleClear}
+        >
+          Clear
+        </button>
+        {copied ? (
+          <span className="recover-copied-badge">
+            <Check size={14} strokeWidth={2.5} />
+            Copied!
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export function ProductRecoverSuccessScreen() {
+  const { profileId } = useParams();
+  const navigate = useNavigate();
+  const { activeProfile, recoverSession } = useAppState();
+  const session =
+    profileId &&
+    recoverSession?.sourceProfile.id === profileId &&
+    recoverSession.recovered
+      ? recoverSession
+      : null;
+
+  if (!profileId || !activeProfile || activeProfile.id !== profileId) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (!session || !session.recovered) {
+    return <Navigate to={`/recover/${profileId}`} replace />;
+  }
+
+  const currentProfileId = profileId;
 
   return (
     <AppShell
       mainVariant="flow"
       headerMeta={<RecoverHeader keysetName={activeProfile.groupName} />}
     >
-      <div className="screen-column">
-        <button type="button" className="back-link" onClick={handleBack}>
-          <ChevronLeft size={14} />
-          Back to Signer
-        </button>
-
-        <div className="screen-heading">
-          <h1 className="page-title">Recover NSEC</h1>
-          <p className="page-copy">
-            Recovering your nsec requires {threshold} of your {totalShares}{" "}
-            shares.
-          </p>
-        </div>
-
-        {sources.map((source, index) => (
-          <ShareBlock
-            label={`Source Share #${index + 1} — ${index === 0 ? "This Browser" : "bfshare"}`}
-            loaded
-            mono={index !== 0}
-            key={`${source.idx}-${index}`}
-          >
-            <LoadedShareDisplay>
-              {shortPubkey(source.memberPubkey)}
-            </LoadedShareDisplay>
-          </ShareBlock>
-        ))}
-
-        <Button type="button" variant="primary" size="full" disabled>
-          Recover NSEC
-        </Button>
-
-        <div className="recover-divider" />
-
-        <RecoveryWarning secondsRemaining={secondsRemaining} />
-
-        <RecoveredNsecBlock
-          label="Recovered NSEC:"
-          valueClassName="recover-nsec-masked"
-        >
-          {maskNsec(recoveredNsec)}
-        </RecoveredNsecBlock>
-
-        <RecoveredNsecBlock
-          label="Recovered NSEC (revealed):"
-          valueClassName="recover-nsec-revealed"
-        >
-          {revealed ? recoveredNsec : maskNsec(recoveredNsec)}
-        </RecoveredNsecBlock>
-
-        <div className="recover-actions">
-          <button
-            type="button"
-            className="recover-btn-copy"
-            onClick={handleCopy}
-            disabled={!revealed}
-          >
-            <Copy size={14} />
-            Copy to Clipboard
-          </button>
-          <button
-            type="button"
-            className="recover-btn-reveal"
-            onClick={() => setRevealed((prev) => !prev)}
-          >
-            <Eye size={14} />
-            {revealed ? "Hide" : "Reveal"}
-          </button>
-          <button
-            type="button"
-            className="recover-btn-clear"
-            onClick={handleClear}
-          >
-            Clear
-          </button>
-          {copied ? (
-            <span className="recover-copied-badge">
-              <Check size={14} strokeWidth={2.5} />
-              Copied!
-            </span>
-          ) : null}
-        </div>
-      </div>
+      <ProductRecoverSuccessContent
+        profileId={currentProfileId}
+        showBackLink
+        onExit={() => navigate(`/dashboard/${currentProfileId}`)}
+        onExpired={() =>
+          navigate(`/dashboard/${currentProfileId}`, { replace: true })
+        }
+      />
     </AppShell>
   );
 }

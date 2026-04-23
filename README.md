@@ -3,7 +3,7 @@
 A FROST threshold signing web application for Nostr — Paper-parity prototype UI
 plus a fully wired `bifrost-bridge-wasm` signer runtime for multi-device key
 management, keyset creation, rotation, replace-share, source-side onboarding
-sponsorship, recovery, and encrypted profile backup/restore.
+sponsorship, recovery, and encrypted profile file import/export.
 
 ## Current State
 
@@ -12,8 +12,8 @@ reference content parity (`igloo-paper`) across 10 flows. The `bifrost-rs` WASM
 bridge is fully integrated — the app runs real FROST key generation, real
 multi-device sign / ECDH / ping / onboard round-trips over Nostr relays
 (`wss://relay.primal.net` / `wss://relay.damus.io` / `wss://nos.lol` by default,
-plus an optional local `bifrost-devtools` relay for e2e), real encrypted
-profile backup/restore via NIP-16/33 replaceable events, and persistent
+plus an optional local `bifrost-devtools` relay for e2e), encrypted
+`bfprofile` file import/export, and persistent
 IndexedDB-backed profile storage. The Dashboard, Policies, Approvals, Event
 Log, and Settings surfaces all read from the live runtime; the deterministic
 `/demo/:scenarioId` gallery is the only mocked rendering path. The validation
@@ -38,10 +38,8 @@ Playwright demo-gallery + multi-device e2e suites.
     --host 127.0.0.1 --port 8194
   ```
   This listens on `ws://127.0.0.1:8194` (NOT `wss://`) — transport-only, so it
-  is suitable for publish/subscribe/sign/ECDH/ping/onboard tests but NOT for
-  the `wss://`-only relay-restore UI form (see
-  `.factory/library/user-testing.md` for the DEV-only opt-in used by the
-  restore-from-relay spec). Most multi-device specs self-host the relay in
+  is suitable for publish/subscribe/sign/ECDH/ping/onboard tests. Most
+  multi-device specs self-host the relay in
   `beforeAll` / kill it in `afterAll`, so you usually do not need to start it
   manually; starting it by hand will cause port 8194 contention with those
   specs.
@@ -86,12 +84,6 @@ package). Wired in `src/app/AppStateProvider.tsx > createOnboardSponsorPackage`.
 3-phase progress (generate keyset, derive shares, publish metadata), shared
 profile screen, distribution, completion.
 
-### Restore From Relay — `/restore-from-relay`
-Query `wss://` Nostr relays for encrypted kind-10000 profile backups, decrypt
-and save the restored profile, then unlock into the live runtime. Local
-`ws://127.0.0.1:8194` restore coverage uses a DEV-only test opt-in documented
-in `docs/runtime-deviations-from-paper.md`.
-
 ### Recover NSEC — `/recover/:profileId` → `/recover/:profileId/success`
 Paste share packages, collect across peers, reveal recovered `nsec` via WASM.
 
@@ -110,7 +102,9 @@ per-peer permission badges SIGN/ECDH/PING/ONBOARD), policies view, pending
 approvals, event log, modals (clear credentials, export profile, export
 complete, policy prompt, signing failed), and Settings sidebar with Device
 Profile / Group Profile / Replace Share + Rotate Keyset / Export & Backup /
-Profile Security sections. Source is organized under
+Profile Security sections. Relay backup publish/restore is intentionally not
+surfaced in this web demo; onboarding happens through `bfonboard` packages and
+profile transfer happens through `bfprofile` import/export. Source is organized under
 `src/screens/DashboardScreen/` (index, states/, panels/, modals/, sidebar/,
 mocks.ts, types.ts).
 

@@ -17,7 +17,6 @@ import {
   createKeysetBundle,
   createKeysetBundleFromNsec,
   createOnboardingRequestBundle,
-  decodeBfsharePackage,
   encodeBfsharePackage,
   encodeOnboardPackage,
   defaultManualPeerPolicyOverrides,
@@ -27,9 +26,7 @@ import {
   decodeProfilePackage,
   deriveProfileIdFromShareSecret,
   onboardPayloadForRemoteShare,
-  parseProfileBackupEvent,
   peerPolicyOverridesFromPermissions,
-  profileBackupEventKind,
   profilePayloadForShare,
   recoverNsecFromShares,
   resolveShareIndex,
@@ -116,7 +113,6 @@ import {
 import type {
   AppStateValue,
   CreateDraft,
-  BackupPublishLocalMutationPayload,
   CreateKeysetDraft,
   CreateProfileDraft,
   CreateSession,
@@ -327,14 +323,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const simulatorRef = useRef<LocalRuntimeSimulator | null>(null);
   const relayPumpRef = useRef<RuntimeRelayPump | null>(null);
   const liveRelayUrlsRef = useRef<string[]>([]);
-  /**
-   * m6-backup-publish — most-recent `created_at` (seconds) emitted by
-   * {@link publishProfileBackup} in this session. Used to bump the
-   * next publish's timestamp monotonically so two rapid-fire publishes
-   * always produce strictly newer replaceable events (VAL-BACKUP-031).
-   * `null` until the first publish.
-   */
-  const lastBackupPublishSecondsRef = useRef<number | null>(null);
   /**
    * Serialised shape of the most-recent command dispatched via
    * `handleRuntimeCommand`. Used to debounce rapid-fire identical dispatches
@@ -1821,11 +1809,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // validator that the Settings sidebar uses. Validation failures
       // are rethrown with the verbatim inline-validation copy
       // ("Relay URL must start with wss://") so the /create/profile
-      // form can render the message without re-mapping. The DEV-only
-      // `__iglooTestAllowInsecureRelayForRestore` opt-in (gated behind
-      // `import.meta.env.DEV`) whitelists `ws://127.0.0.1:*` for the
-      // multi-device e2e that targets the local `bifrost-devtools`
-      // relay (plain ws://). See VAL-FOLLOWUP-001 / VAL-FOLLOWUP-010.
+      // form can render the message without re-mapping. The existing
+      // DEV-only `__iglooTestAllowInsecureRelayForRestore` opt-in
+      // (gated behind `import.meta.env.DEV`) whitelists
+      // `ws://127.0.0.1:*` for the multi-device e2e that targets the
+      // local `bifrost-devtools` relay (plain ws://). See
+      // VAL-FOLLOWUP-001 / VAL-FOLLOWUP-010.
       //
       // fix-scrutiny-r1-bootstrap-narrow-dev-allowlist — the allowlist
       // is narrowed to the literal IPv4 `127.0.0.1` ONLY. `localhost`
@@ -4180,424 +4169,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return { backup, event };
   }, [activeProfile]);
 
-  /**
-   * m6-backup-publish — build + publish an encrypted profile backup as
-   * a signed kind-10000 Nostr event to every configured relay. See
-   * `AppStateValue.publishProfileBackup` JSDoc for the full contract.
-   *
-   * Password is validated here for defense-in-depth even though the
-   * PublishBackupModal gates the CTA upstream (VAL-BACKUP-024 /
-   * VAL-BACKUP-025). We throw the same user-facing copy as the modal
-   * so a direct call from a test or a future alternative surface
-   * surfaces the same message.
-   *
-   * Monotonic `created_at`: if this device has already published a
-   * backup in the current session, the next publish is bumped by at
-   * least one second so relays (and the user's own "last publish"
-   * timestamp) see a strictly newer replaceable event — even if two
-   * calls race within the same wall-clock second (VAL-BACKUP-031).
-   */
-  const publishProfileBackup = useCallback(
-    async (password: string) => {
-      if (typeof password !== "string" || password.length < 8) {
-        throw new Error("Password must be at least 8 characters.");
-      }
-      const runtime = runtimeRef.current;
-      const profile = activeProfileRef.current ?? activeProfile;
-      if (!runtime || !profile) {
-        throw new Error(
-          "No unlocked runtime is available to publish a backup.",
-        );
-      }
-      const pump = relayPumpRef.current;
-      const configuredRelays = profile.relays ?? [];
-      if (configuredRelays.length === 0 || !pump) {
-        // VAL-BACKUP-007 — surface the failure in the runtime event
-        // log in addition to the inline error so the failure is
-        // observable via the EventLogPanel stream. Payload is a
-        // literal, credential-free record by construction (see
-        // `BackupPublishLocalMutationPayload` in AppStateTypes).
-        appendLocalMutationRuntimeEventLogEntry({
-          badge: "BACKUP_PUBLISH",
-          payload: {
-            kind: "backup_publish_failed",
-            reason: "no-relays",
-            attemptedRelayCount: configuredRelays.length,
-          } satisfies BackupPublishLocalMutationPayload,
-        });
-        throw new Error("No relays available to publish to.");
-      }
-      const snapshot = runtime.snapshot();
-      const payload = profilePayloadForShare({
-        profileId: profile.id,
-        deviceName: profile.deviceName,
-        share: snapshot.bootstrap.share,
-        group: snapshot.bootstrap.group,
-        relays: profile.relays,
-        manualPeerPolicyOverrides: defaultManualPeerPolicyOverrides(
-          snapshot.bootstrap.group,
-          snapshot.bootstrap.share.idx,
-        ),
-      });
-      const backup = await createEncryptedProfileBackup(payload);
-      // Bump created_at monotonically vs the most recent publish from
-      // this session so rapid duplicates surface as strictly newer
-      // replaceable events (VAL-BACKUP-031).
-      const nowSeconds = Math.floor(Date.now() / 1000);
-      const lastSeconds = lastBackupPublishSecondsRef.current;
-      const createdAtSeconds =
-        typeof lastSeconds === "number" && nowSeconds <= lastSeconds
-          ? lastSeconds + 1
-          : nowSeconds;
-      lastBackupPublishSecondsRef.current = createdAtSeconds;
-      const event = await buildProfileBackupEvent({
-        shareSecret: snapshot.bootstrap.share.seckey,
-        backup,
-        createdAtSeconds,
-      });
-      const result = await pump.publishEvent(event);
-      if (result.reached.length === 0) {
-        // VAL-BACKUP-007 — distinguish "all relays offline" from the
-        // pre-flight "no relays configured" case by reason tag so
-        // operators can tell at a glance from EventLogPanel which
-        // branch tripped. Payload stays credential-free by
-        // construction.
-        appendLocalMutationRuntimeEventLogEntry({
-          badge: "BACKUP_PUBLISH",
-          payload: {
-            kind: "backup_publish_failed",
-            reason: "all-offline",
-            attemptedRelayCount: configuredRelays.length,
-          } satisfies BackupPublishLocalMutationPayload,
-        });
-        throw new Error("No relays available to publish to.");
-      }
-      // VAL-BACKUP-005 / VAL-BACKUP-031 — persist a "last published"
-      // marker on the stored profile so SettingsSidebar can surface
-      // "Last published: <relative time> — reached N/M relays" below
-      // the Publish Backup row and the value survives lock/unlock.
-      // We update the existing record's summary in-place (no
-      // re-encryption) via saveProfile so the encryptedProfilePackage
-      // is preserved verbatim. Errors here MUST NOT block the publish
-      // outcome — the user's event is already on the relays. On a
-      // persistence failure we still bump the in-memory activeProfile
-      // so the UI reflects the current session, and log in DEV.
-      //
-      // Stale-state guard (scrutiny m6 r2 — fix-m6-publish-
-      // setactiveprofile-guard): between the `pump.publishEvent` await
-      // and the `setActiveProfile(nextSummary)` call below, the user
-      // may have locked (or switched) profiles — clearing
-      // `activeProfileRef.current` and `runtimeRef.current`.
-      // Unconditionally calling `setActiveProfile(nextSummary)` in that
-      // window would "resurrect" a profile the user just locked. We
-      // mirror the pattern used in other async mutators
-      // (e.g. `startLiveRelayPump`'s `runtimeRef.current === runtime`
-      // guard): only apply the summary when the CURRENT active profile
-      // still matches the in-flight `profile.id` AND a runtime is still
-      // attached. Otherwise skip the state update — the IndexedDB
-      // record (keyed by profile.id) has already been saved below, so
-      // the next `reloadProfiles()` / unlock will pick it up.
-      const reachedCount = result.reached.length;
-      try {
-        const existing = await getProfile(profile.id);
-        if (existing) {
-          const nextSummary = {
-            ...existing.summary,
-            lastBackupPublishedAt: createdAtSeconds,
-            lastBackupReachedRelayCount: reachedCount,
-          };
-          await saveProfile({
-            ...existing,
-            summary: nextSummary,
-          });
-          const postPublishActive = activeProfileRef.current;
-          const activeStillMatches =
-            postPublishActive !== null &&
-            postPublishActive.id === profile.id &&
-            runtimeRef.current !== null;
-          if (activeStillMatches) {
-            setActiveProfile(nextSummary);
-          }
-          await reloadProfiles();
-        } else {
-          // Functional updater already guards against profile change
-          // (prev is null after lock; a different profile won't match
-          // `prev.id === profile.id`). We additionally require the
-          // runtime to still be attached so we don't partially re-hydrate
-          // a locked profile's summary into UI state.
-          if (runtimeRef.current !== null) {
-            setActiveProfile((prev) =>
-              prev && prev.id === profile.id
-                ? {
-                    ...prev,
-                    lastBackupPublishedAt: createdAtSeconds,
-                    lastBackupReachedRelayCount: reachedCount,
-                  }
-                : prev,
-            );
-          }
-        }
-      } catch (persistError) {
-        if (import.meta.env.DEV) {
-          console.warn(
-            "publishProfileBackup: failed to persist last-published marker",
-            persistError,
-          );
-        }
-        // Same stale-state guard as the happy path — skip UI update if
-        // the profile was locked/switched during the publish await.
-        if (runtimeRef.current !== null) {
-          setActiveProfile((prev) =>
-            prev && prev.id === profile.id
-              ? {
-                  ...prev,
-                  lastBackupPublishedAt: createdAtSeconds,
-                  lastBackupReachedRelayCount: reachedCount,
-                }
-              : prev,
-          );
-        }
-      }
-      return { event, reached: result.reached };
-    },
-    [activeProfile, reloadProfiles, appendLocalMutationRuntimeEventLogEntry],
-  );
-
-  /**
-   * m6-backup-restore — fetch an encrypted profile-backup event from a
-   * user-supplied relay list + bfshare package, decrypt with the share
-   * secret, and persist as a new SavedProfile (without starting the
-   * runtime).
-   *
-   * See `AppStateValue.restoreProfileFromRelay` JSDoc for the full
-   * contract. User input model:
-   *   - `input.bfshare`           bfshare1… package text
-   *   - `input.bfsharePassword`   unlocks the bfshare AND is used as
-   *                               the new profile's save password
-   *   - `input.backupPassword`    currently same as bfsharePassword
-   *                               (reserved for a future two-password
-   *                               flow — not yet wired in the UI)
-   *   - `input.relays`            must all pass validateRelayUrl
-   *
-   * Error copy is stable and matches the validation contract so the
-   * restore screen can render the user-facing message verbatim:
-   *   - "Relay URL must start with wss://"  (VAL-BACKUP-032)
-   *   - "Invalid password — could not decrypt this backup."
-   *                                         (VAL-BACKUP-011)
-   *   - "No backup found for this share."   (VAL-BACKUP-012)
-   */
-  const restoreProfileFromRelay = useCallback(
-    async (input: {
-      bfshare: string;
-      bfsharePassword: string;
-      backupPassword: string;
-      relays: string[];
-    }) => {
-      if (typeof input.bfsharePassword !== "string" ||
-          input.bfsharePassword.length < 8) {
-        throw new Error(
-          "Invalid password — could not decrypt this backup.",
-        );
-      }
-      const { validateRelayUrl, normalizeRelayList } = await import(
-        "../lib/relay/relayUrl"
-      );
-      const { RELAY_EMPTY_ERROR } = await import("./AppStateTypes");
-      // DEV-only escape hatch: the multi-device Playwright spec for
-      // restore-from-relay talks to a local `bifrost-devtools` relay
-      // exposed over plain `ws://127.0.0.1:8194` (no TLS terminator).
-      // validateRelayUrl enforces wss:// on real user input, so we
-      // provide an opt-in bypass that ONLY applies to this mutator's
-      // internal relay list and leaves every other validation path
-      // (Settings sidebar add-relay, updateRelays, publishProfileBackup)
-      // strict. See `docs/runtime-deviations-from-paper.md` and
-      // `mission AGENTS.md` "Local Relay Caveats" for rationale.
-      const allowInsecureForRestore =
-        import.meta.env.DEV &&
-        typeof window !== "undefined" &&
-        (window as { __iglooTestAllowInsecureRelayForRestore?: boolean })
-          .__iglooTestAllowInsecureRelayForRestore === true;
-      const validateRestoreRelayUrl = (raw: string): string => {
-        if (allowInsecureForRestore && /^ws:\/\//i.test(raw)) {
-          // Minimal structural check so the BrowserRelayClient still gets
-          // a parseable URL. Anything else (missing host, bad scheme) is
-          // still rejected via validateRelayUrl's canonical error.
-          try {
-            const parsed = new URL(raw);
-            if (parsed.protocol.toLowerCase() === "ws:" && parsed.hostname) {
-              return raw;
-            }
-          } catch {
-            /* fall through to strict validator */
-          }
-        }
-        return validateRelayUrl(raw);
-      };
-      // validateRestoreRelayUrl throws RelayValidationError with the
-      // canonical "Relay URL must start with wss://" copy on failure
-      // (same as validateRelayUrl), unless the DEV-only test toggle
-      // whitelists ws:// for this mutator.
-      const normalizedRelays = normalizeRelayList(input.relays ?? [], {
-        validator: validateRestoreRelayUrl,
-      });
-      if (normalizedRelays.length === 0) {
-        throw new Error(RELAY_EMPTY_ERROR);
-      }
-
-      // Decrypt the bfshare package. A wrong password surfaces as a
-      // BifrostPackageError (`wrong_password`) from the WASM bridge;
-      // we re-map it to the canonical invalid-password copy so the
-      // UI can render it verbatim (VAL-BACKUP-011).
-      let share: Awaited<ReturnType<typeof decodeBfsharePackage>>;
-      try {
-        share = await decodeBfsharePackage(
-          input.bfshare.trim(),
-          input.bfsharePassword,
-        );
-      } catch (err) {
-        if (err instanceof BifrostPackageError) {
-          throw new Error(
-            "Invalid password — could not decrypt this backup.",
-          );
-        }
-        throw err;
-      }
-
-      // Derive the share's nostr author pubkey by generating a
-      // throwaway onboarding-request bundle. `local_pubkey32` in the
-      // bundle is computed from the share secret via the exact same
-      // derivation path used by `build_profile_backup_event` on the
-      // publisher side, so this pubkey matches the kind-10000 event's
-      // `pubkey` field.
-      const eventKind = await profileBackupEventKind();
-      // `create_onboarding_request_bundle` validates the peer pubkey
-      // against secp256k1 (must be a valid x-only point), so a
-      // throwaway `"0".repeat(64)` is rejected with "invalid peer
-      // pubkey: crypto error". We use the generator point G's
-      // x-coordinate — a universally valid x-only public key — which
-      // the WASM accepts. The peer identity never materialises
-      // anywhere outside the discarded bundle (we only consume
-      // `local_pubkey32`), so any canonical valid point is sound.
-      const dummyPeer =
-        "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
-      const bundle = await createOnboardingRequestBundle({
-        shareSecret: share.share_secret,
-        peerPubkey32Hex: dummyPeer,
-        eventKind,
-      });
-      const authorPubkey32 = bundle.local_pubkey32;
-
-      // Fan out subscribes on every relay in parallel, each with its
-      // own per-attempt timeout (5s). A hung/slow relay earlier in the
-      // list cannot starve later relays — if any one of them delivers
-      // the EVENT first, the others are torn down immediately. When
-      // every per-relay budget is exhausted we surface the canonical
-      // "No backup found for this share." copy (VAL-BACKUP-012).
-      const { BrowserRelayClient } = await import(
-        "../lib/relay/browserRelayClient"
-      );
-      const { fetchProfileBackupEvent } = await import(
-        "./fetchProfileBackupEvent"
-      );
-      const client = new BrowserRelayClient();
-      const eventJson = await fetchProfileBackupEvent({
-        relays: normalizedRelays,
-        authorPubkey32,
-        eventKind,
-        client,
-      });
-
-      // Decrypt the backup payload. Errors here mean the share key
-      // doesn't match the event author (user pasted a bfshare for a
-      // different device) — surface the same invalid-password copy
-      // because from the user's perspective the restore can't proceed.
-      let backup: Awaited<ReturnType<typeof parseProfileBackupEvent>>;
-      try {
-        backup = await parseProfileBackupEvent({
-          eventJson,
-          shareSecret: share.share_secret,
-        });
-      } catch (err) {
-        throw new Error(
-          "Invalid password — could not decrypt this backup.",
-        );
-      }
-
-      // Build a BfProfilePayload from the decrypted backup. The share
-      // secret comes from the local bfshare (never the relay event).
-      const localShareIdx = await resolveShareIndex(
-        backup.group_package,
-        share.share_secret,
-      );
-      const profileId = await deriveProfileIdFromShareSecret(
-        share.share_secret,
-      );
-      // Merge the user-specified relay list with the backup's relay
-      // list so the restored profile keeps talking to the relays the
-      // user just confirmed are reachable for this share.
-      //
-      // The merge re-validates every URL through
-      // `validateRestoreRelayUrl` so the DEV-only
-      // `__iglooTestAllowInsecureRelayForRestore` opt-in (ws:// for
-      // the local bifrost-devtools relay) is honoured here too.
-      // Without this, the multi-device restore e2e would silently drop
-      // its only relay during the merge step and hit
-      // "At least one relay is required" from buildStoredProfileRecord.
-      //
-      // Invalid legacy backup relays are skipped silently so the
-      // restore does not fail when only the backup list is malformed —
-      // the user's freshly-validated list is already in the merge set.
-      const mergedRelays = normalizeRelayList(
-        [...normalizedRelays, ...backup.device.relays],
-        {
-          validator: validateRestoreRelayUrl,
-          onValidatorError: "skip",
-        },
-      );
-      const payload: BfProfilePayload = {
-        profile_id: profileId,
-        version: backup.version,
-        device: {
-          name: backup.device.name,
-          share_secret: share.share_secret,
-          manual_peer_policy_overrides:
-            backup.device.manual_peer_policy_overrides ?? [],
-          relays: mergedRelays,
-        },
-        group_package: backup.group_package,
-      };
-
-      // Idempotence: deriveProfileIdFromShareSecret yields the same id
-      // for the same share, and saveProfile keys by that id, so a
-      // repeat restore updates the existing record in place.
-      const existing = await getProfile(profileId);
-      const alreadyExisted = existing !== null;
-
-      const { record } = await buildStoredProfileRecord(
-        payload,
-        input.bfsharePassword,
-        {
-          label: backup.group_package.group_name,
-          createdAt: existing?.summary.createdAt,
-          // fix-m7-onboard-distinct-share-allocation — preserve any
-          // pool already associated with the pre-existing record on
-          // re-restore. Fresh restores won't carry one (the backup
-          // envelope doesn't include remote shares).
-          unadoptedSharesCiphertext: existing?.unadoptedSharesCiphertext,
-          shareAllocations: existing?.shareAllocations,
-        },
-      );
-      await saveProfile(record);
-      void localShareIdx; // already captured inside buildStoredProfileRecord
-      await reloadProfiles();
-      return {
-        profile: record.summary,
-        alreadyExisted,
-      };
-    },
-    [reloadProfiles],
-  );
-
   const restartRuntimeConnections = useCallback(async () => {
     const runtime = runtimeRef.current;
     if (!runtime) {
@@ -5460,8 +5031,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       clearCredentials,
       exportRuntimePackages,
       createProfileBackup,
-      publishProfileBackup,
-      restoreProfileFromRelay,
       setSignerPaused,
       refreshRuntime,
       restartRuntimeConnections,
@@ -5542,8 +5111,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       clearCredentials,
       exportRuntimePackages,
       createProfileBackup,
-      publishProfileBackup,
-      restoreProfileFromRelay,
       setSignerPaused,
       refreshRuntime,
       restartRuntimeConnections,
@@ -5592,7 +5159,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           nonces: DerivedPublicNonceWire[];
         }>;
         // Multi-device e2e specs that exercise profile-bound mutators
-        // (e.g. publishProfileBackup, updateRelays) need an
+        // (e.g. updateRelays) need an
         // `activeProfile` record alongside the live runtime. Supplying
         // `persistProfile: { password }` drives the normal
         // `savePayloadAsProfile` path so IndexedDB contains an
@@ -5616,12 +5183,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // no AppState side-effects; DEV-only like every other
       // `__iglooTest*` hook.
       __iglooTestDecodeBfonboardPackage?: typeof decodeBfonboardPackage;
-      // m6-backup-restore — expose the WASM bfshare encoder so the
-      // restore-from-relay multi-device e2e can convert a share secret
-      // + relays + password into the `bfshare1…` package string that
-      // the restore screen consumes. Encodes via
-      // `encode_bfshare_package` on the bridge; no AppState side-
-      // effects. Test-only, DEV-gated like the other hooks.
+      // Expose the WASM bfshare encoder so multi-device e2e specs can
+      // convert a share secret + relays + password into a `bfshare1…`
+      // package string without routing through an unrelated UI flow.
+      // Encodes via `encode_bfshare_package` on the bridge; no AppState
+      // side-effects. Test-only, DEV-gated like the other hooks.
       __iglooTestEncodeBfshare?: (input: {
         shareSecret: string;
         relays: string[];
@@ -5854,8 +5420,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       };
       if (input.persistProfile) {
         // Drive the real save-and-activate path so `activeProfile` is
-        // populated alongside the runtime — required for mutators
-        // like `publishProfileBackup` and `updateRelays`.
+        // populated alongside the runtime — required for mutators like
+        // `updateRelays`.
         await savePayloadAsProfile(payload, input.persistProfile.password, {
           label: input.persistProfile.label,
         });
@@ -5878,9 +5444,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       return memberPubkeyXOnly(member);
     };
-    // m6-backup-restore — encode a bfshare1… package so the
-    // multi-device e2e can feed it into the restore screen without
-    // running the full Create flow on a second context.
+    // Encode a bfshare1… package for multi-device e2e flows that need
+    // an external source share without running the full Create flow in
+    // another context.
     globalWindow.__iglooTestEncodeBfshare = async (input) => {
       return encodeBfsharePackage(
         {

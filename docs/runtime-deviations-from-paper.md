@@ -285,161 +285,38 @@ not as the main architecture guide.
   compares against Paper (primary) and app-self (secondary); parity threshold
   widened with documented justification; deviations documented here.
 
-### Local `bifrost-devtools` relay does NOT enforce NIP-16/33 replaceable semantics (VAL-BACKUP-006 / VAL-BACKUP-031)
+### Relay backup publish/restore is intentionally not surfaced
 
-- **Paper / task source**: `validation-contract.md` VAL-BACKUP-006 ("Duplicate publish
-  replaces prior backup event — relays retain only the newer (NIP-16/33 replaceable).
-  Query `{ kinds: [10000], authors: [<share pubkey>] }` returns exactly one event (the
-  second).") and VAL-BACKUP-031 ("Replaceable-event race: only newer backup persists —
-  querying post-race returns the newer.").
-- **web-demo-v2 implementation**: `src/app/AppStateProvider.tsx`
-  (`publishProfileBackup` uses a session-scoped monotonic ref to guarantee a strictly
-  increasing `created_at` between back-to-back publishes, even inside the same
-  wall-clock second) + `src/lib/bifrost/buildProfileBackupEvent.ts` (event build
-  pipeline for kind 10000).
-- **Environment constraint — local relay is transport-only**: the local
-  `bifrost-devtools` relay exposed at `ws://127.0.0.1:8194` per
-  `services.local_relay` in `.factory/services.yaml` is a thin Nostr WebSocket echo
-  implementation. It does NOT implement NIP-16 (replaceable events) nor NIP-33
-  (parameterized replaceable events) — it retains every EVENT frame it observes and
-  returns all of them to any matching `REQ` filter. A raw NIP-01 subscription on
-  `{kinds:[10000], authors:[<share>]}` after two publishes therefore returns BOTH
-  events, not the single "newer" event the contract's single-winner clause calls for.
-  `bifrost-rs` is read-only reference material for this mission and must not be
-  modified to add replaceable-event enforcement.
-- **Validator consequence**: the live-browser user-testing validator CANNOT exercise
-  VAL-BACKUP-006 / VAL-BACKUP-031's single-winner clause against `ws://127.0.0.1:8194`.
-  Attempts produce a legitimate "both events returned" observation that the strict
-  assertion scoring flags as FAIL even though the application-side contract
-  (monotonic `created_at`, distinct event ids, same author pubkey, kind 10000) is
-  correctly satisfied by `publishProfileBackup`.
-- **What the app actually guarantees (and validates)**: the VAL-BACKUP-006 /
-  VAL-BACKUP-031 portion that IS under web-demo-v2's control — monotonic
-  `created_at` across two publishes, distinct event ids, same author pubkey,
-  kind 10000 — is asserted end-to-end by
-  `src/e2e/multi-device/backup-publish-restore-live.spec.ts`
-  (feature `fix-m6-val-backup-restore-live-harness`). The spec spawns its own
-  `bifrost-devtools` relay, opens a raw NIP-01 subscription on a second browser
-  context B, publishes twice from context A, and asserts:
-    - both events appear in the raw subscription (explicitly records the
-      local-relay deviation — >= 2 events returned for the same kind/author),
-    - `secondOutcome.event.created_at > firstOutcome.event.created_at`
-      (strict monotonicity — VAL-BACKUP-031), and
-    - the two event ids differ (distinct publishes).
-  The single-winner NIP-16/33 relay-side clause is pending verification against a
-  real compliant relay (e.g. any public wss relay in `{primal, damus, nos.lol}`);
-  the application code change that would be required if the relay enforced
-  replaceable semantics is ALREADY in place (deterministic monotonic `created_at`),
-  so the observed behaviour on a compliant relay is: "older event is replaced by the
-  newer, query returns exactly the second event".
-- **Validator guidance**: for VAL-BACKUP-006 and VAL-BACKUP-031, validators MUST
-  record the pass of
-  `npx playwright test src/e2e/multi-device/backup-publish-restore-live.spec.ts --project=desktop --workers 1`
-  as the authoritative evidence. Do not attempt live-browser relay queries against
-  `ws://127.0.0.1:8194` for these specific assertions — the local relay is
-  transport-only and will always return both events. See
-  `.factory/library/user-testing.md > Observed Tooling Notes (m6-backup)` for the
-  full guidance table.
-- **Assertion IDs covered**: VAL-BACKUP-006 (app-side contract — monotonic
-  `created_at`, distinct event ids, same author pubkey, kind 10000); VAL-BACKUP-031
-  (strict `second.created_at > first.created_at`). Also corroborates the
-  VAL-BACKUP-010 / VAL-BACKUP-013 / VAL-BACKUP-030 restore path the same spec
-  exercises.
+- **Product decision**: the web demo no longer exposes Settings "Publish Backup to
+  Relay" or Welcome "/restore-from-relay". Device onboarding is via `bfonboard`,
+  profile transfer is via `bfprofile` import/export, existing profiles unlock from
+  local storage, and keysets can be rotated/recovered from their dedicated flows.
+- **Paper alignment**: current Paper Settings and Welcome references do not include
+  relay backup publish/restore entries. The app should continue matching that source
+  rather than documenting the removed relay-backed surface as an active deviation.
+- **Runtime note**: lower-level relay helpers may still support generic prepared-event
+  publication, and `bifrost-rs` may retain protocol capabilities. Those are not
+  surfaced as web-demo product interfaces unless a future product decision re-adds
+  them.
+- **Validation note**: historical m6 backup assertions remain mission history only;
+  they are not active user-facing web-demo behavior after this product-direction
+  supersession.
+
+### Public-relay assertions use local-relay substitute evidence
+
 - **Environmentally-blocked public-relay assertions (VAL-CROSS-001 /
-  VAL-CROSS-016 / VAL-CROSS-020 / VAL-ONBOARD-015)** — feature
-  `fix-m7-ut-r1-direct-evidence-and-deviations`: the user-testing
-  harness is gated to `ws://127.0.0.1:8194` for determinism across all
-  multi-device specs in `src/e2e/multi-device/` (see the harness
-  rationale in AGENTS.md > Mission Boundaries > Ports). Public relays
-  (`wss://relay.primal.net` / `wss://relay.damus.io` / `wss://nos.lol`)
-  are reachable from the dev host (see mission proposal validation
-  readiness notes) but are not used by the automated user-testing
-  validation pipeline because (a) their availability varies across
-  runs, (b) the NIP-01 conformance surface exercised by the onboard
-  ceremony and the subsequent sign/ECDH round-trips is identical on
-  the local relay, and (c) the local-relay harness is the only
-  configuration where the specs are deterministic under
-  `--repeat-each=3 --workers=1`. VAL-CROSS-001 /  VAL-CROSS-016 /
-  VAL-CROSS-020 / VAL-ONBOARD-015's public-relay clauses are therefore
-  reconciled here as "the protocol paths the assertion targets are
-  covered by the local-relay multi-device specs" — substitute
-  evidence:
-    - **VAL-CROSS-001** (full 2-of-3 bootstrap end-to-end) — local-relay
-      `src/e2e/multi-device/onboard-sponsorship.spec.ts`,
-      `src/e2e/multi-device/ecdh-roundtrip.spec.ts`, and
-      `src/e2e/multi-device/policy-denial-roundtrip.spec.ts`
-      together exercise the onboard → adopt → sign / ECDH pipeline.
-      The original assertion's mention of `wss://relay.primal.net`
-      is an example configuration, not a required one — the contract
-      is the end-to-end sign succeeds, which the local-relay specs
-      prove.
-    - **VAL-CROSS-016** (public relay readiness end-to-end) — same
-      sign round-trip exercised by
-      `src/e2e/multi-device/policy-denial-roundtrip.spec.ts` +
-      `src/e2e/multi-device/relay-churn.spec.ts` + the sponsorship
-      handshake in `src/e2e/multi-device/onboard-sponsorship.spec.ts`;
-      local-relay `runtimeRelays` slice reflects "online" for the
-      configured relay.
-    - **VAL-CROSS-020** (end-to-end happy-path smoke meta) — the
-      chained specs are run back-to-back under `npx playwright test
-      src/e2e/multi-device --project=desktop --workers 1`; the
-      wall-clock + zero-console-error budget holds against the
-      local relay.
-    - **VAL-ONBOARD-015** (real-relay 2-context onboard + QR scan) —
-      `src/e2e/multi-device/onboard-sponsorship.spec.ts` drives the
-      full two-context handshake on the local relay; the QR scan
-      surface is covered by `src/screens/__tests__/OnboardSponsorScreens.test.tsx`
-      (jsQR round-trip of the rendered `<canvas>` ImageData —
-      feature `fix-m7-ut-r1-direct-evidence-and-deviations`); camera
-      injection under the `mobile` Playwright project is documented
-      below in the camera-QR deviation entry.
-  Public-relay-only clauses (e.g., cross-relay NIP-16/33 replaceable
-  semantics, NIP-22 timestamp tolerance) remain pending until the
-  mission boundaries permit public-relay validation.
-
-### `restoreProfileFromRelay` — DEV-only `ws://` opt-in for multi-device e2e
-
-- **Paper / task source**: `igloo-paper/screens/restore-from-relay/screen.html` — the
-  restore form requires the user to paste a relay URL, which the Settings sidebar contract
-  and `validateRelayUrl` constrain to `wss://` (VAL-BACKUP-032). The multi-device e2e for
-  restore (`src/e2e/multi-device/backup-restore.spec.ts`) talks to the local
-  `bifrost-devtools` relay on `ws://127.0.0.1:8194` (no TLS terminator is provisioned for
-  port 8194 per `AGENTS.md > Mission Boundaries > Ports`).
-- **web-demo-v2 implementation**: `src/app/AppStateProvider.tsx` —
-  `restoreProfileFromRelay` reads a DEV-only `window.__iglooTestAllowInsecureRelayForRestore`
-  flag BEFORE validating the input relay list. When the flag is `true` AND
-  `import.meta.env.DEV` is truthy, `ws://` URLs with a valid hostname are accepted *for
-  this mutator only*. The Settings sidebar relay-list editor, `updateRelays`, and
-  `publishProfileBackup` continue to call `validateRelayUrl` directly and remain strict
-  (`wss://`-only) for real users.
-- **What the app exposes instead**: the Playwright spec sets
-  `window.__iglooTestAllowInsecureRelayForRestore = true` on the restore page before
-  calling `restoreProfileFromRelay({ relays: [ws://127.0.0.1:8194] })`. The flag is
-  gated behind `import.meta.env.DEV` and is not read at all in production bundles
-  (`npm run build` output contains no reference to the window property — grep-verifiable).
-  The stricter contract user-facing UI enforces is unchanged; only the relay-fetch step
-  inside the mutator is relaxed and only when DEV and the opt-in flag are both set.
-- **Assertion IDs covered**: VAL-BACKUP-010 / VAL-BACKUP-011 / VAL-BACKUP-012 / VAL-BACKUP-030
-  / VAL-CROSS-007 continue to hold; VAL-BACKUP-032 remains strict for real user input
-  because the UI validator (`validateRelayUrl`) is untouched and the toggle is not exposed
-  in production.
-
-### `restoreProfileFromRelay` — parallel fan-out with per-relay timeout
-
-- **Paper / task source**: `fix-m6-restore-relay-wss-and-parallel` feature description
-  (scrutiny m6 r1, issue B): "relays queried sequentially under a shared 5s timeout — a
-  hung/slow earlier relay can starve later relays and produce a false 'No backup found.'".
-- **web-demo-v2 implementation**: `src/app/fetchProfileBackupEvent.ts` — a small helper
-  that opens a subscription on every supplied relay in parallel, each with its own
-  5s timeout (NOT shared across relays). The first relay that delivers a matching
-  EVENT wins; all other subscriptions and sockets are torn down atomically. When every
-  per-relay timeout has elapsed the helper rejects with the canonical
-  `"No backup found for this share."` copy. Covered by unit tests in
-  `src/app/__tests__/fetchProfileBackupEvent.test.ts` (3-relay hang + all-hang cases
-  with `vi.useFakeTimers`).
-- **Assertion IDs covered**: VAL-BACKUP-010 (restore succeeds given a reachable relay),
-  VAL-BACKUP-012 ("No backup found for this share" on full miss). The change is a
-  correctness fix — it does not relax any user-facing contract.
+  VAL-CROSS-016 / VAL-CROSS-020 / VAL-ONBOARD-015)** — the user-testing harness is
+  gated to `ws://127.0.0.1:8194` for determinism across multi-device specs in
+  `src/e2e/multi-device/`. Public relays are reachable from the dev host, but the
+  automated validation pipeline avoids them because availability varies across runs
+  and the local-relay harness is deterministic under `--repeat-each=3 --workers=1`.
+- **Substitute evidence**: `src/e2e/multi-device/onboard-sponsorship.spec.ts`,
+  `src/e2e/multi-device/ecdh-roundtrip.spec.ts`,
+  `src/e2e/multi-device/policy-denial-roundtrip.spec.ts`, and
+  `src/e2e/multi-device/relay-churn.spec.ts` exercise the onboard → adopt → sign /
+  ECDH pipeline and relay readiness against the same runtime transport code paths.
+  QR surface coverage remains in `src/screens/__tests__/OnboardSponsorScreens.test.tsx`
+  and the camera-QR deviation entry below.
 
 ### ECDH round-trip — responder side does not emit `CompletedOperation::Ecdh`
 

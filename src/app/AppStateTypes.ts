@@ -239,8 +239,7 @@ export const ONBOARD_SPONSOR_PASSWORD_MISMATCH_ERROR =
  * relay list is empty after trim. Shared across: Settings sidebar
  * relay-list editor, AppStateProvider.updateRelays, createProfile,
  * createOnboardSponsorPackage, createRotatedProfile,
- * restoreProfileFromRelay, fetchProfileBackupEvent, profileRuntime,
- * RestoreFromRelayScreen, and MockAppStateProvider.
+ * profileRuntime, and MockAppStateProvider.
  *
  * Any UI surface that renders this copy should import this constant
  * rather than re-hardcoding the string literal so copy changes remain
@@ -554,12 +553,8 @@ export interface NoncePoolSnapshot {
  *                       state_wiped, Onboard completion)
  *   - `ERROR`        — drained user-facing `OperationFailure`s
  *                       (background refresh Ping probes are quiet)
- *   - `BACKUP_PUBLISH` — local-mutation marker emitted by
- *                       {@link AppStateValue.publishProfileBackup} when a
- *                       publish attempt fails pre-flight (no relays
- *                       configured) or post-fan-out (all relays offline).
- *                       Surfaced so operators can correlate the inline
- *                       error with the event stream (VAL-BACKUP-007).
+ *   - `ONBOARD`      — onboarding lifecycle entries emitted by local
+ *                       sponsor/requester handoff flows.
  */
 export type RuntimeEventLogBadge =
   | "SYNC"
@@ -572,7 +567,6 @@ export type RuntimeEventLogBadge =
   | "READY"
   | "INFO"
   | "ERROR"
-  | "BACKUP_PUBLISH"
   | "ONBOARD";
 
 /**
@@ -584,12 +578,8 @@ export type RuntimeEventLogBadge =
  *  - `failure`       — drained from `RuntimeClient.drainFailures()`
  *  - `local_mutation` — synthesised by an AppStateProvider mutator to
  *                       record a notable local action that has no
- *                       direct WASM drain correlate. Currently used by
- *                       {@link AppStateValue.publishProfileBackup} to
- *                       record backup-publish pre-flight/post-fan-out
- *                       failures so operators can correlate the inline
- *                       error surface with the event stream
- *                       (VAL-BACKUP-007).
+ *                       direct WASM drain correlate, such as onboarding
+ *                       lifecycle markers.
  */
 export type RuntimeEventLogSource =
   | "runtime_event"
@@ -626,47 +616,14 @@ export interface RuntimeEventLogEntry {
    *  - `completion`      → {@link CompletedOperation}
    *  - `failure`         → {@link EnrichedOperationFailure}
    *  - `local_mutation`  → a minimal, scrub-safe record describing the
-   *                        local action. For BACKUP_PUBLISH entries
-   *                        see {@link BackupPublishLocalMutationPayload}.
-   *                        By construction this path NEVER includes
-   *                        ciphertext, password, or share material
-   *                        (VAL-BACKUP-007 security invariant).
+   *                        local action. By construction this path NEVER
+   *                        includes passwords, share secrets, or other
+   *                        credential-bearing material.
    *
    * Kept as `unknown` at this layer to avoid coupling consumers to the
    * discriminated shape — `EventLogPanel` narrows by `source`.
    */
   payload: unknown;
-}
-
-/**
- * Payload shape for the `local_mutation` / `BACKUP_PUBLISH` runtime
- * event-log entry emitted by
- * {@link AppStateValue.publishProfileBackup} when a publish attempt
- * fails. Contract:
- *
- *  - `kind`: always `"backup_publish_failed"` so the entry is easily
- *    filterable/searchable in the JSON body even though the typed
- *    `badge`/`source` are the primary narrowing channels.
- *  - `reason`: why the publish could not succeed.
- *      - `"no-relays"`  — relays.length === 0 OR the relay pump is
- *                         not attached (pre-flight guard).
- *      - `"all-offline"` — relay fan-out completed but no relay
- *                          accepted the event (all attempts failed).
- *  - `attemptedRelayCount`: how many configured relays were attempted
- *    at the point of failure. Zero for `no-relays`; matches the
- *    profile's `relays.length` for `all-offline`.
- *
- * SECURITY INVARIANT: this payload MUST NOT include the encrypted
- * backup ciphertext, the user's password, the share secret, or any
- * other credential-bearing field. The publish mutator enforces this
- * by construction — the payload is built from literal, typed fields
- * only. See VAL-BACKUP-007 contract clause "no ciphertext/password
- * leak in event-log payload".
- */
-export interface BackupPublishLocalMutationPayload {
-  readonly kind: "backup_publish_failed";
-  readonly reason: "no-relays" | "all-offline";
-  readonly attemptedRelayCount: number;
 }
 
 /**
@@ -1185,91 +1142,6 @@ export interface AppStateValue {
       content: string;
       sig: string;
     };
-  }>;
-  /**
-   * m6-backup-publish — build an encrypted profile-backup event and
-   * publish it to every configured relay.
-   *
-   * The event is built via `create_encrypted_profile_backup` +
-   * `build_profile_backup_event` using the active share's secret key so
-   * the author `pubkey` is deterministic per share
-   * (VAL-BACKUP-004). Kind is `profile_backup_event_kind()` (10000),
-   * a NIP-16/33 replaceable event: duplicate publishes from the same
-   * share replace the prior backup on each relay (VAL-BACKUP-006 /
-   * VAL-BACKUP-031).
-   *
-   * The `password` argument is a UI-level gate enforced upstream (the
-   * modal requires `password.length >= 8` with a matching confirm —
-   * VAL-BACKUP-002 / VAL-BACKUP-024 / VAL-BACKUP-025). The password
-   * itself is NOT sent to relays, persisted, or logged
-   * (VAL-BACKUP-003 forbids plaintext in `content`). The mutator
-   * mirrors the modal's policy for defense-in-depth and throws
-   * synchronously when the invariant is violated.
-   *
-   * Throws when:
-   *   - `password.length < 8` (policy threshold mirrored from the modal)
-   *   - No active runtime / profile (locked or wiped)
-   *   - No relays are configured or reachable (VAL-BACKUP-007)
-   *
-   * Returns `{ event, reached }` — the signed event and the list of
-   * relay URLs that accepted the publish. `reached.length === 0` is
-   * treated as an error state inside the mutator.
-   */
-  publishProfileBackup: (password: string) => Promise<{
-    event: {
-      id: string;
-      pubkey: string;
-      created_at: number;
-      kind: number;
-      tags: string[][];
-      content: string;
-      sig: string;
-    };
-    reached: string[];
-  }>;
-  /**
-   * m6-backup-restore — fetch an encrypted profile-backup event from
-   * one or more relays and persist the decrypted backup as a new
-   * `SavedProfile` in IndexedDB (without starting the runtime).
-   *
-   * The caller supplies the shareholding bfshare package text + its
-   * package password — this is the "equivalent derivation flow" from
-   * VAL-BACKUP-009 because `parse_profile_backup_event` needs the
-   * share secret (not just the pubkey) to decrypt the ciphertext.
-   * The share secret is derived from the decoded bfshare locally; it
-   * is NEVER transmitted. The author pubkey of the replaceable
-   * kind-10000 event is derived from the share secret and used as
-   * the `authors` filter so relays return only this share's backup.
-   *
-   * Relay URLs must all pass `validateRelayUrl` — the restore screen
-   * disables submit on any invalid entry (VAL-BACKUP-032) but the
-   * mutator also rejects defensively.
-   *
-   * Behaviour:
-   *   - Opens a REQ subscription `{ kinds: [profile_backup_event_kind()],
-   *     authors: [<derivedAuthor>] }` on each relay in parallel.
-   *   - Resolves on the first matching EVENT (wins race across relays).
-   *   - If no EVENT arrives within `NO_BACKUP_FOUND_TIMEOUT_MS` (≥3 s
-   *     per VAL-BACKUP-012), rejects with `"No backup found"` so the
-   *     screen can surface the dedicated empty state.
-   *   - Decrypts via `parseProfileBackupEvent`. If the wrong share
-   *     secret / password is supplied, the WASM bridge surfaces an
-   *     error that this mutator remaps to the canonical
-   *     `"Invalid password"` copy (VAL-BACKUP-011).
-   *   - Persists via `saveProfile` — profile id is derived from the
-   *     share secret so repeat restores of the same backup idempotently
-   *     update the single existing record (VAL-BACKUP-030). Runtime is
-   *     NOT started; the user unlocks the profile from Welcome
-   *     (VAL-BACKUP-013).
-   */
-  restoreProfileFromRelay: (input: {
-    bfshare: string;
-    bfsharePassword: string;
-    backupPassword: string;
-    relays: string[];
-  }) => Promise<{
-    profile: StoredProfileSummary;
-    alreadyExisted: boolean;
   }>;
   setSignerPaused: (paused: boolean) => void;
   refreshRuntime: () => void;

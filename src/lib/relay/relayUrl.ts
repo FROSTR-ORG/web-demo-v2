@@ -112,9 +112,8 @@ export interface NormalizeRelayListOptions {
    * on failure). Defaults to {@link validateRelayUrl} which enforces the
    * strict `wss://` contract.
    *
-   * The DEV-only `restoreProfileFromRelay` mutator supplies a custom
-   * validator that opts into `ws://` for the local bifrost-devtools relay
-   * — see `AGENTS.md > Local-Relay Caveats` for rationale.
+   * Optional custom validator used by callers that need to preserve the
+   * normalise/deduplicate behaviour while applying a narrower URL policy.
    */
   validator?: (url: string) => string;
 
@@ -123,10 +122,9 @@ export interface NormalizeRelayListOptions {
    *
    *  - `"throw"` (default): propagate the validator's Error to the caller
    *    so the canonical inline-validation copy renders verbatim.
-   *  - `"skip"`: silently drop the offending entry. Used by the
-   *    `restoreProfileFromRelay` merge step where the backup envelope
-   *    may carry legacy or malformed relay URLs that must not fail the
-   *    restore as long as the user-supplied list is valid.
+   *  - `"skip"`: silently drop the offending entry when importing a
+   *    trusted or legacy relay list where malformed entries should not
+   *    block the rest of the list.
    */
   onValidatorError?: "throw" | "skip";
 }

@@ -622,13 +622,6 @@ describe("MockAppStateProvider bridge arming", () => {
       },
       event: { id: "mock", pubkey: "mock", created_at: 0, kind: 30078, tags: [], content: "mock", sig: "mock" },
     }),
-    publishProfileBackup: async () => ({
-      event: { id: "mock", pubkey: "mock", created_at: 0, kind: 10000, tags: [], content: "mock", sig: "mock" },
-      reached: [],
-    }),
-    restoreProfileFromRelay: async () => {
-      throw new Error("mock");
-    },
     setSignerPaused: () => undefined,
     refreshRuntime: () => undefined,
     restartRuntimeConnections: async () => undefined,

@@ -1,6 +1,13 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { RecoverSession } from "../../app/AppState";
 
 /**
  * DashboardInteractions — End-to-end interaction tests for the Dashboard
@@ -13,7 +20,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *  • VAL-DSH-034 — Policies header toggle on/off
  *  • VAL-CROSS-008 — Sidebar does NOT show Rotate Keyset (runtime-only)
  *  • VAL-CROSS-009 — Sidebar Replace Share → /replace-share
- *  • VAL-CROSS-010 — Header Recover → /recover/{profileId}
+ *  • VAL-CROSS-010 — Header Recover opens inline dashboard Recover view
  *  • VAL-CROSS-011 — Dashboard Export flow end-to-end (URL remains /dashboard/{id})
  *  • VAL-CROSS-012 — Clear Credentials confirm → Welcome no-profiles
  *  • VAL-CROSS-013 — Lock → Welcome returning ("Welcome back.")
@@ -25,6 +32,27 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const mockLockProfile = vi.fn();
 const mockClearCredentials = vi.fn(() => Promise.resolve());
 const mockRefreshRuntime = vi.fn();
+const mockValidateRecoverSources = vi.fn(async () => {
+  mockRecoverSession = makeRecoverSession();
+});
+const mockRecoverNsec = vi.fn(async () => {
+  const recovered = {
+    nsec: "nsec1realrecoveredprivatekey0000000000000000000000000000000000",
+    signing_key_hex: "f".repeat(64),
+  };
+  mockRecoverSession = makeRecoverSession({
+    recovered,
+    expiresAt: Date.now() + 60_000,
+  });
+  return recovered;
+});
+const mockClearRecoverSession = vi.fn(() => {
+  mockRecoverSession = null;
+});
+const mockExpireRecoveredNsec = vi.fn(() => {
+  mockRecoverSession = null;
+});
+let mockRecoverSession: RecoverSession | null = null;
 
 // Build fake profile/peer objects via computed-property concatenation so the
 // pre-commit secret-detection scanner doesn't rewrite the literal values.
@@ -103,10 +131,50 @@ const fakeRuntimeStatus = {
   pending_operations: [],
 };
 
+function makeRecoverSession(
+  overrides: Partial<RecoverSession> = {}
+): RecoverSession {
+  return {
+    sourceProfile: fakeProfile,
+    sourcePayload: {
+      profile_id: fakeProfile.id,
+      version: 1,
+      device: {
+        name: fakeProfile.deviceName,
+        share_secret: "a".repeat(64),
+        manual_peer_policy_overrides: [],
+        relays: fakeProfile.relays,
+      },
+      group_package: {
+        group_name: fakeProfile.groupName,
+        group_pk: "b".repeat(64),
+        threshold: fakeProfile.threshold,
+        members: [
+          { idx: 1, pubkey: `02${"c".repeat(64)}` },
+          { idx: 2, pubkey: `02${"d".repeat(64)}` },
+          { idx: 3, pubkey: `02${"e".repeat(64)}` },
+        ],
+      },
+    },
+    localShare: { idx: 1, seckey: "a".repeat(64) },
+    externalShares: [{ idx: 2, seckey: "b".repeat(64) }],
+    sources: [
+      { idx: 1, memberPubkey: "c".repeat(64), relays: fakeProfile.relays },
+      { idx: 2, memberPubkey: "d".repeat(64), relays: fakeProfile.relays },
+    ],
+    ...overrides,
+  };
+}
+
 vi.mock("../../app/AppState", () => ({
   useAppState: () => ({
     activeProfile: fakeProfile,
     runtimeStatus: fakeRuntimeStatus,
+    recoverSession: mockRecoverSession,
+    validateRecoverSources: mockValidateRecoverSources,
+    recoverNsec: mockRecoverNsec,
+    clearRecoverSession: mockClearRecoverSession,
+    expireRecoveredNsec: mockExpireRecoveredNsec,
     signerPaused: false,
     lockProfile: mockLockProfile,
     clearCredentials: mockClearCredentials,
@@ -119,8 +187,14 @@ import { DashboardScreen } from "../DashboardScreen";
 
 afterEach(() => {
   cleanup();
+  mockRecoverSession = null;
   mockLockProfile.mockClear();
   mockClearCredentials.mockClear();
+  mockRefreshRuntime.mockClear();
+  mockValidateRecoverSources.mockClear();
+  mockRecoverNsec.mockClear();
+  mockClearRecoverSession.mockClear();
+  mockExpireRecoveredNsec.mockClear();
 });
 
 type DemoUi = { dashboard?: Record<string, unknown> };
@@ -338,20 +412,22 @@ describe("VAL-CROSS-012 — Clear Credentials confirm navigates to Welcome", () 
 // ---------------------------------------------------------------------------
 
 describe("VAL-DSH-034 — Policies header toggle", () => {
-  it("Policies button toggles Policies view on, then off (back to running)", () => {
+  it("Policies button opens policies and Dashboard button returns to running", () => {
     renderAt({ dashboard: { state: "running", paperPanels: true } });
     // Initial: running state visible, policies not
     expect(screen.getByText("Signer Running")).toBeInTheDocument();
     expect(screen.queryByText("Signer Policies")).not.toBeInTheDocument();
 
     // Toggle on
-    const policiesBtn = screen.getByText("Policies");
+    const policiesBtn = screen.getByRole("button", { name: "Policies" });
     fireEvent.click(policiesBtn);
     expect(screen.getByText("Signer Policies")).toBeInTheDocument();
     expect(screen.getByText("Peer Policies")).toBeInTheDocument();
+    const dashboardBtn = screen.getByRole("button", { name: /back to dashboard/i });
+    expect(dashboardBtn).toHaveTextContent("Dashboard");
 
-    // Toggle off
-    fireEvent.click(policiesBtn);
+    // Return to dashboard
+    fireEvent.click(dashboardBtn);
     expect(screen.queryByText("Signer Policies")).not.toBeInTheDocument();
     expect(screen.queryByText("Peer Policies")).not.toBeInTheDocument();
     expect(screen.getByText("Signer Running")).toBeInTheDocument();
@@ -448,15 +524,108 @@ describe("VAL-CROSS-009 — Sidebar Replace Share navigates to /replace-share", 
 });
 
 // ---------------------------------------------------------------------------
-// VAL-CROSS-010 — Dashboard Recover → /recover/{profileId}
+// VAL-CROSS-010 — Dashboard Recover stays inline
 // ---------------------------------------------------------------------------
 
-describe("VAL-CROSS-010 — Header Recover navigates to /recover/{profileId}", () => {
-  it("Clicking Recover in the header navigates to /recover/{profileId}", () => {
+describe("VAL-CROSS-010 — Header Recover opens inline dashboard recovery", () => {
+  it("opens Recover inside the dashboard and Dashboard returns to the signer view", () => {
     renderAt({ dashboard: { state: "running", paperPanels: true } });
-    const recoverBtn = screen.getByText("Recover");
+    expect(screen.getByText("Signer Running")).toBeInTheDocument();
+
+    const recoverBtn = screen.getByRole("button", { name: "Recover" });
     fireEvent.click(recoverBtn);
-    expect(screen.getByTestId("recover-screen")).toBeInTheDocument();
+
+    expect(screen.queryByTestId("recover-screen")).not.toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-recover-panel")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Recover NSEC" })
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Back to Signer")).not.toBeInTheDocument();
+
+    const dashboardBtn = screen.getByRole("button", {
+      name: /back to dashboard/i,
+    });
+    expect(dashboardBtn).toHaveTextContent("Dashboard");
+    expect(dashboardBtn).toHaveClass("button-header-active");
+
+    fireEvent.click(dashboardBtn);
+    expect(mockClearRecoverSession).toHaveBeenCalled();
+    expect(screen.queryByTestId("dashboard-recover-panel")).not.toBeInTheDocument();
+    expect(screen.getByText("Signer Running")).toBeInTheDocument();
+  });
+
+  it("opens Policies from Recover without routing away and clears recovery state", () => {
+    renderAt({ dashboard: { state: "running", paperPanels: true } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Recover" }));
+    expect(screen.getByTestId("dashboard-recover-panel")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Policies" }));
+
+    expect(mockClearRecoverSession).toHaveBeenCalled();
+    expect(screen.queryByTestId("recover-screen")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-recover-panel")).not.toBeInTheDocument();
+    expect(screen.getByText("Signer Policies")).toBeInTheDocument();
+    expect(screen.getByText("Peer Policies")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /back to dashboard/i })
+    ).toHaveTextContent("Dashboard");
+  });
+
+  it("runs product recovery through inline success, reveal, copy, and clear", async () => {
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn(() => Promise.resolve()) },
+    });
+    renderAt({ dashboard: { state: "running", paperPanels: false } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Recover" }));
+    fireEvent.change(screen.getByLabelText("Saved profile password"), {
+      target: { value: "local-password" },
+    });
+    fireEvent.change(screen.getByLabelText("Source Share #2 bfshare package"), {
+      target: { value: "bfshare1package" },
+    });
+    fireEvent.change(
+      screen.getByLabelText("Source Share #2 package password"),
+      { target: { value: "source-password" } }
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Validate Sources" }));
+    await waitFor(() =>
+      expect(mockValidateRecoverSources).toHaveBeenCalledWith({
+        profileId: "test-profile-id",
+        profilePassword: "local-password",
+        sourcePackages: [
+          { packageText: "bfshare1package", password: "source-password" },
+        ],
+      })
+    );
+    await waitFor(() => expect(screen.getAllByText("Loaded")).toHaveLength(2));
+
+    fireEvent.click(screen.getByRole("button", { name: "Recover NSEC" }));
+    await waitFor(() => expect(mockRecoverNsec).toHaveBeenCalled());
+    expect(screen.queryByTestId("recover-screen")).not.toBeInTheDocument();
+    expect(screen.getByText("Security Warning")).toBeInTheDocument();
+    expect(screen.getByText("Recovered NSEC:")).toBeInTheDocument();
+
+    const copyButton = screen.getByRole("button", {
+      name: /Copy to Clipboard/,
+    });
+    expect(copyButton).toBeDisabled();
+    fireEvent.click(screen.getByText("Reveal"));
+    expect(copyButton).not.toBeDisabled();
+    fireEvent.click(copyButton);
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        "nsec1realrecoveredprivatekey0000000000000000000000000000000000"
+      )
+    );
+    expect(screen.getByText("Copied!")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Clear"));
+    expect(mockClearRecoverSession).toHaveBeenCalled();
+    expect(screen.queryByTestId("dashboard-recover-panel")).not.toBeInTheDocument();
+    expect(screen.getByText("Signer Running")).toBeInTheDocument();
   });
 });
 

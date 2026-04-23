@@ -3,6 +3,8 @@ import { useLocation } from "react-router-dom";
 export type DashboardDemoState = "running" | "connecting" | "stopped" | "relays-offline" | "signing-blocked";
 export type DashboardDemoModal = "policy-prompt" | "signing-failed" | "clear-credentials" | "export-profile" | "export-complete";
 export type DashboardDemoExportMode = "profile" | "share";
+export type DashboardDemoView = "dashboard" | "policies" | "recover";
+export type DashboardDemoRecoverStep = "collect" | "success";
 
 export interface DemoUiState {
   welcome?: {
@@ -48,7 +50,11 @@ export interface DemoUiState {
   };
   dashboard?: {
     state?: DashboardDemoState;
+    view?: DashboardDemoView;
     showPolicies?: boolean;
+    recoverStep?: DashboardDemoRecoverStep;
+    recoverVariant?: "incompatible-shares";
+    recoverCopied?: boolean;
     modal?: DashboardDemoModal;
     settingsOpen?: boolean;
     exportMode?: DashboardDemoExportMode;

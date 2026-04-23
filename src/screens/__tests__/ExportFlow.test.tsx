@@ -1,4 +1,4 @@
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -103,37 +103,40 @@ function renderDashboard() {
   );
 }
 
+function openSettingsExportProfile() {
+  fireEvent.click(screen.getByLabelText("Settings"));
+  const exportProfileRow = screen.getByText("Export Profile").closest(".settings-action-row");
+  expect(exportProfileRow).not.toBeNull();
+  const exportButton = exportProfileRow!.querySelector(".settings-btn-blue") as HTMLButtonElement;
+  fireEvent.click(exportButton);
+}
+
 describe("Export Profile Modal", () => {
-  it("opens when header Export button is clicked", () => {
+  it("does not expose Export in the dashboard header", () => {
     renderDashboard();
-    expect(screen.queryByTestId("export-profile-modal")).not.toBeInTheDocument();
-    // Find the Export button in the header
-    const exportButtons = screen.getAllByText("Export");
-    fireEvent.click(exportButtons[0]);
-    expect(screen.getByTestId("export-profile-modal")).toBeInTheDocument();
+    const header = screen.getByRole("banner");
+    expect(within(header).queryByRole("button", { name: /export/i })).not.toBeInTheDocument();
   });
 
   it("renders title, description, summary, password inputs, strength bar, Cancel and Export buttons", () => {
     renderDashboard();
-    fireEvent.click(screen.getAllByText("Export")[0]);
+    openSettingsExportProfile();
 
-    expect(screen.getByText("Export Profile")).toBeInTheDocument();
-    expect(screen.getByText(/encrypted backup/i)).toBeInTheDocument();
-    // Summary line appears both in dashboard bar and modal
     const modal = screen.getByTestId("export-profile-modal");
+    expect(within(modal).getByText("Export Profile")).toBeInTheDocument();
+    expect(within(modal).getByText(/encrypted backup/i)).toBeInTheDocument();
+    // Summary line appears both in dashboard bar and modal
     expect(modal.querySelector(".export-modal-summary")?.textContent).toContain("Share #0");
     expect(screen.getByLabelText("Export Password")).toBeInTheDocument();
     expect(screen.getByLabelText("Confirm Password")).toBeInTheDocument();
     expect(screen.getByTestId("password-strength-bar")).toBeInTheDocument();
     expect(screen.getByText("Cancel")).toBeInTheDocument();
-    // The Export submit button
-    const exportBtns = screen.getAllByText("Export");
-    expect(exportBtns.length).toBeGreaterThanOrEqual(2); // header + modal
+    expect(screen.getByTestId("export-profile-modal").querySelector(".export-btn-submit")).toHaveTextContent("Export");
   });
 
   it("Cancel button dismisses the modal", () => {
     renderDashboard();
-    fireEvent.click(screen.getAllByText("Export")[0]);
+    openSettingsExportProfile();
     expect(screen.getByTestId("export-profile-modal")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Cancel"));
@@ -142,7 +145,7 @@ describe("Export Profile Modal", () => {
 
   it("close X button dismisses the modal", () => {
     renderDashboard();
-    fireEvent.click(screen.getAllByText("Export")[0]);
+    openSettingsExportProfile();
     expect(screen.getByTestId("export-profile-modal")).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("Close modal"));
@@ -151,7 +154,7 @@ describe("Export Profile Modal", () => {
 
   it("Export button is disabled until passwords match", () => {
     renderDashboard();
-    fireEvent.click(screen.getAllByText("Export")[0]);
+    openSettingsExportProfile();
 
     // Find the submit Export button inside the modal
     const modalExportBtns = screen.getByTestId("export-profile-modal").querySelectorAll("button");
@@ -168,7 +171,7 @@ describe("Export Profile Modal", () => {
 
   it("shows match indicator when passwords match", () => {
     renderDashboard();
-    fireEvent.click(screen.getAllByText("Export")[0]);
+    openSettingsExportProfile();
 
     fireEvent.change(screen.getByLabelText("Export Password"), { target: { value: "test123" } });
     fireEvent.change(screen.getByLabelText("Confirm Password"), { target: { value: "test123" } });
@@ -180,7 +183,7 @@ describe("Export Profile Modal", () => {
 
   it("Export button transitions to Export Complete modal", async () => {
     renderDashboard();
-    fireEvent.click(screen.getAllByText("Export")[0]);
+    openSettingsExportProfile();
 
     fireEvent.change(screen.getByLabelText("Export Password"), { target: { value: "StrongPass1" } });
     fireEvent.change(screen.getByLabelText("Confirm Password"), { target: { value: "StrongPass1" } });
@@ -202,7 +205,7 @@ describe("Export Complete Modal", () => {
   async function openExportComplete() {
     renderDashboard();
     // Open export profile
-    fireEvent.click(screen.getAllByText("Export")[0]);
+    openSettingsExportProfile();
     // Fill passwords
     fireEvent.change(screen.getByLabelText("Export Password"), { target: { value: "StrongPass1" } });
     fireEvent.change(screen.getByLabelText("Confirm Password"), { target: { value: "StrongPass1" } });

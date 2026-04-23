@@ -205,6 +205,7 @@ describe("Cross-area final gate — every canonical scenario", () => {
     ["/no-such-route"],
     ["/dashboard"],
     ["/create/bogus"],
+    ["/restore-from-relay"],
     ["/rotate-keyset/not-a-step"],
     ["/replace-share/bogus"],
     ["/recover"]

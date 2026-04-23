@@ -643,13 +643,11 @@ describe("RuntimeRelayPump", () => {
   );
 
   /**
-   * m6-backup-publish — `publishEvent` is the direct-publish API used
-   * by `AppStateProvider.publishProfileBackup`. It publishes a prepared
-   * Nostr event to every online relay in parallel with independent
-   * error handling so one relay failing does not short-circuit the
-   * others (VAL-BACKUP-002 / VAL-BACKUP-006 / VAL-BACKUP-007).
+   * `publishEvent` publishes a prepared Nostr event to every online
+   * relay in parallel with independent error handling so one relay
+   * failing does not short-circuit the others.
    */
-  describe("publishEvent (m6-backup-publish)", () => {
+  describe("publishEvent", () => {
     it("publishes a prepared event to every online relay and returns `reached`", async () => {
       const runtime = new FakeRuntime();
       const relayA = new FakeRelayConnection("wss://relay-a.test");

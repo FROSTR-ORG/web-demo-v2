@@ -2,7 +2,7 @@
 
 These flows run before (or outside) the live signer/runtime: Welcome, Create,
 Import, Onboard (requester AND source-side sponsor), Rotate Keyset, Replace
-Share, Recover, encrypted profile backup/restore, and distribution handoff.
+Share, Recover, and distribution handoff.
 They are currently all implemented end-to-end against `bifrost-bridge-wasm`;
 this document captures the invariants the browser-side code must preserve so
 that private-key material never leaves the WASM bridge or React memory.
@@ -24,11 +24,9 @@ that private-key material never leaves the WASM bridge or React memory.
 - IndexedDB (`idb-keyval`, `src/lib/storage/profileStore.ts` +
   `profileMigration.ts`) stores profile summaries plus encrypted `bfprofile`
   package strings. Raw shares and recovered keys must not be stored outside
-  those encrypted package strings. NIP-16/33 replaceable profile backups
-  published to relays via
-  `src/app/AppStateProvider.tsx > publishProfileBackup` carry only the same
-  encrypted `bfprofile` payload (kind 10000, wrapped by the WASM
-  `publish_profile_backup_event` helper) — the relay never sees plaintext.
+  those encrypted package strings. The web demo intentionally does not surface
+  relay backup publish/restore; profile transfer uses explicit `bfprofile`
+  import/export.
 - Router state may carry safe retry context (package text, profile ids). It
   must NOT carry passwords, decoded payloads, raw share secrets, or
   recovered keys.
@@ -42,11 +40,10 @@ that private-key material never leaves the WASM bridge or React memory.
 | Import profile | Encrypted `bfprofile`, decrypt password, decoded profile payload | Encrypted package may be persisted; decoded payload/password stay in memory | Review save, import error retry/cancel, credential clear, lock |
 | Onboard requester | `bfonboard`, package password, decoded source response, new profile password | `onboardSession` memory and relay transport driven by WASM-verified events | Success save, failure, cancel, timeout, credential clear |
 | Onboard sponsor | Source share selection, minted onboarding package, package password, source ceremony state | `onboardSponsorSessions` memory and runtime relay pump; package text is visible only for user handoff while the session is active | Handoff success/failure, cancel, timeout, credential clear |
-| Restore from relay | `bfshare`, backup password, decrypted restored profile | Relay events contain encrypted backup only; decrypted profile stays in memory until saved | Save, error, cancel, credential clear |
 | Rotate keyset | Source profile password, rotated keyset, new local share, remote packages/passwords | `rotateKeysetSession` memory and WASM helpers | Completion, cancel, wrong-password/group-mismatch/generation failure retry, credential clear |
 | Replace share | Replacement package/password and decoded replacement payload | Replace-share session memory, runtime operation state | Success, failure, cancel, credential clear |
 | Recover NSEC | Collected share packages, recovered `nsec` | Recover session/UI memory only; reveal/copy affordances must not persist it | Leaving success, cancel, credential clear, lock |
-| Backup export/publish | Profile export password and encrypted `bfprofile` | Encrypted package string may be saved/published; password stays in memory | Modal close, publish/export finish, credential clear |
+| Profile export | Profile export password and encrypted `bfprofile` | Encrypted package string may be saved locally; password stays in memory | Modal close, export finish, credential clear |
 
 ## Private-key locus — always behind the bridge
 
@@ -118,21 +115,16 @@ or share arithmetic directly.
   `src/components/__tests__/QrScanner.test.tsx` and the flow specs that
   consume it.
 
-## Encrypted backup + relay-driven restore
+## Profile transfer
 
-- Encrypted profile backups (VAL-BACKUP-*) are published as NIP-16/33
-  kind-10000 replaceable events via `packageService.publishProfileBackup`.
-  Restore reads those events on a fresh device with empty IndexedDB via
-  `restoreProfileFromRelay`, which validates each relay URL with
-  `validateRelayUrl` (wss://-only) and fans out parallel subscriptions
-  with per-relay 5 s timeouts (`src/app/fetchProfileBackupEvent.ts`).
-- The canonical evidence harness is
-  `src/e2e/multi-device/backup-publish-restore-live.spec.ts`: it self-hosts
-  an isolated `bifrost-devtools` relay on `ws://127.0.0.1:8194`, publishes
-  from one context, and queries / restores / unlocks from fresh contexts
-  sharing the same relay. See
-  `.factory/library/user-testing.md > Validator Harness:
-  backup-publish-restore-live.spec.ts`.
+- The web demo exposes two profile-transfer paths: import a local `bfprofile`
+  package at `/import`, or export a local encrypted profile package from
+  Dashboard Settings. Relay backup publish/restore is intentionally not part
+  of the surfaced web-demo product flow.
+- New devices join through `bfonboard` packages (`/onboard` requester flow or
+  `/onboard-sponsor` from an unlocked profile). Existing local profiles are
+  opened through Welcome unlock, and keysets can be rotated from an unlocked
+  profile.
 
 ## Inside-runtime interactions
 

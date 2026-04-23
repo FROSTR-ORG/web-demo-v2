@@ -5,6 +5,7 @@ import type {
   PeerPermissionState,
   PeerStatus,
 } from "../../../lib/bifrost/types";
+import { paperLatencyMs } from "../mocks";
 import { PeerRow, type PeerRefreshErrorInfo } from "./PeerRow";
 
 export function PeersPanel({
@@ -65,6 +66,15 @@ export function PeersPanel({
   // `misc-peers-panel-nested-button`.
   const [open, setOpen] = useState(true);
   const toggle = () => setOpen((prev) => !prev);
+  const averageLatencyLabel = useMemo(() => {
+    const onlinePeers = peers.filter((peer) => peer.online);
+    if (onlinePeers.length === 0) return "Avg: --";
+    const total = onlinePeers.reduce(
+      (sum, peer) => sum + paperLatencyMs(peer.idx),
+      0,
+    );
+    return `Avg: ${Math.round(total / onlinePeers.length)}ms`;
+  }, [peers]);
 
   return (
     <div className="collapsible peers-panel-collapsible">
@@ -97,7 +107,7 @@ export function PeersPanel({
           <StatusPill tone="info">
             {paperPanels ? "~186 ready" : signReadyLabel}
           </StatusPill>
-          <StatusPill>{paperPanels ? "Avg: 31ms" : "Avg: --"}</StatusPill>
+          <StatusPill>{averageLatencyLabel}</StatusPill>
           <Button
             type="button"
             variant="header"

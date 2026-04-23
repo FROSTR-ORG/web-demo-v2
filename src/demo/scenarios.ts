@@ -258,6 +258,8 @@ export const demoScenarios: DemoScenario[] = [
   scenario("dashboard-running", "dashboard", "Dashboard - 1. Signer Dashboard", "screens/dashboard/1-signer-dashboard", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Signer Running", { demoUi: { dashboard: { state: "running", hideMockControls: true, paperPanels: true } } }),
   scenario("dashboard-connecting", "dashboard", "Dashboard - 1b. Connecting", "screens/dashboard/1b-connecting", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Signer Connecting", { demoUi: { dashboard: { state: "connecting", hideMockControls: true } } }),
   scenario("dashboard-policies", "dashboard", "Dashboard - 1c. Policies", "screens/dashboard/1c-policies", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Signer Policies", { demoUi: { dashboard: { showPolicies: true, hideMockControls: true } } }),
+  scenario("dashboard-recover", "dashboard", "Dashboard - 1d. Recover", "screens/dashboard/1d-recover", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Recover NSEC", { demoUi: { dashboard: { state: "running", view: "recover", recoverVariant: "incompatible-shares", hideMockControls: true, paperPanels: true } } }),
+  scenario("dashboard-recover-success", "dashboard", "Dashboard - 1e. Recover Success", "screens/dashboard/1e-recover-success", `/dashboard/${DEMO_PROFILE_ID}`, dashboardState, "Security Warning", { demoUi: { dashboard: { state: "running", view: "recover", recoverStep: "success", recoverCopied: true, hideMockControls: true, paperPanels: true } } }),
   // Runtime-only testing shim: exercises PoliciesState + PeerRow in
   // "paperPanels=false" mode (effective_policy-driven chips and badges).
   // Visually aligned with the canonical "dashboard-policies" screen, so

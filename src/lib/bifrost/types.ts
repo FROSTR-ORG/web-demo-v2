@@ -431,24 +431,6 @@ export interface StoredProfileSummary {
    */
   updatedAt?: number;
   lastUsedAt: number;
-  /**
-   * m6-backup-publish — unix-seconds timestamp of the most recent
-   * successful `publishProfileBackup` from this profile. Written to
-   * the stored record after each publish so the SettingsSidebar can
-   * render a "Last published" indicator that survives lock/unlock
-   * (VAL-BACKUP-005 / VAL-BACKUP-031). `undefined` until the first
-   * successful publish; the SettingsSidebar renders nothing when
-   * absent.
-   */
-  lastBackupPublishedAt?: number;
-  /**
-   * m6-backup-publish — number of relays that acknowledged the most
-   * recent successful `publishProfileBackup` (the length of
-   * `PublishEventOutcome.reached`). Mirrored into the rendered "Last
-   * published" row as `reached N/M relays`. `undefined` until the
-   * first successful publish.
-   */
-  lastBackupReachedRelayCount?: number;
 }
 
 export interface StoredProfileRecord {

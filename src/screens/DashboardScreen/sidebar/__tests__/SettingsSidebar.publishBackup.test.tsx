@@ -1,19 +1,10 @@
-/**
- * m6-backup-publish — SettingsSidebar renders the
- * "Publish Backup to Relay" action row and wires its click handler
- * (VAL-BACKUP-001). The row is only present when the parent supplies
- * `onPublishBackup` so demo/test callers that predate the feature
- * keep working unchanged.
- */
-
 import {
   cleanup,
-  fireEvent,
   render,
   screen,
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SettingsSidebar } from "../SettingsSidebar";
 
@@ -66,24 +57,12 @@ function renderSidebar(
   );
 }
 
-beforeEach(() => {});
-
 afterEach(() => {
   cleanup();
 });
 
-describe("SettingsSidebar — Publish Backup action row (VAL-BACKUP-001)", () => {
-  it("renders the Publish Backup row when onPublishBackup is supplied", () => {
-    renderSidebar({ onPublishBackup: () => undefined });
-    expect(
-      screen.getByText("Publish Backup to Relay"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("settings-publish-backup-btn"),
-    ).toBeInTheDocument();
-  });
-
-  it("omits the Publish Backup row when no handler is supplied", () => {
+describe("SettingsSidebar — relay backup publish removal", () => {
+  it("does not render the Publish Backup to Relay action or last-published indicator", () => {
     renderSidebar();
     expect(
       screen.queryByText("Publish Backup to Relay"),
@@ -91,12 +70,9 @@ describe("SettingsSidebar — Publish Backup action row (VAL-BACKUP-001)", () =>
     expect(
       screen.queryByTestId("settings-publish-backup-btn"),
     ).not.toBeInTheDocument();
-  });
-
-  it("fires onPublishBackup when the Publish button is clicked", () => {
-    const spy = vi.fn();
-    renderSidebar({ onPublishBackup: spy });
-    fireEvent.click(screen.getByTestId("settings-publish-backup-btn"));
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByTestId("settings-publish-backup-last-published"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Last published:/i)).not.toBeInTheDocument();
   });
 });

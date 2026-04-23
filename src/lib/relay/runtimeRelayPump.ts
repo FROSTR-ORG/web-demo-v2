@@ -716,20 +716,13 @@ export class RuntimeRelayPump {
   }
 
   /**
-   * m6-backup-publish — publish a single prepared Nostr event to every
-   * relay that is currently `online`. Each relay is dialed in parallel
-   * with independent error handling so one relay failing does not
-   * short-circuit the others. Returns the list of relay URLs that
-   * accepted the publish (`reached`) and the list that rejected or
-   * threw (`failed`). A pump that is stopped, has no online relays, or
-   * was never started resolves to empty arrays. The caller is
-   * responsible for treating "no relays reached" as a user-visible
-   * error state (VAL-BACKUP-007).
-   *
-   * This helper does NOT route through `runtime.drainOutboundEvents()`
-   * because the backup event is constructed in userspace (via
-   * `build_profile_backup_event`) and signed with the share-secret-
-   * derived keypair — it never enters the runtime's outbound queue.
+   * Publish a single prepared Nostr event to every relay that is currently
+   * `online`. Each relay is dialed in parallel with independent error
+   * handling so one relay failing does not short-circuit the others.
+   * Returns the list of relay URLs that accepted the publish (`reached`)
+   * and the list that rejected or threw (`failed`). A pump that is
+   * stopped, has no online relays, or was never started resolves to empty
+   * arrays. Callers decide whether "no relays reached" is user-visible.
    */
   async publishEvent(
     event: unknown,

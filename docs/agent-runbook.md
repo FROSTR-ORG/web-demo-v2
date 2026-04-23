@@ -94,7 +94,6 @@ Real product routes are mounted by `src/app/CoreRoutes.tsx` under the real
 
 - `/` for welcome/unlock.
 - `/create/*` for keyset creation and distribution.
-- `/restore-from-relay` for encrypted profile restore from Nostr relays.
 - `/import/*` for encrypted `bfprofile` package import.
 - `/onboard/*` for requester-side onboarding.
 - `/onboard-sponsor/*` for source-side sponsorship.
@@ -138,7 +137,7 @@ Append `?chrome=0` to a demo scenario URL for clean visual capture.
 For docs-only changes, use source sanity checks instead of app rebuilds:
 
 ```bash
-rg -n "restore-from-relay|docs/agent-runbook|docs/README" README.md docs/*.md
+rg -n "Publish Backup|Restore from Relay|restore-from-relay" README.md docs/*.md
 rg -n "src/vendor/bifrost-bridge-wasm|bifrost-rs|igloo-paper|8194|5173" README.md docs/*.md
 rg -n "T[O]DO|T[B]D|F[I]XME" README.md docs/*.md
 git diff --stat

@@ -447,12 +447,12 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
   });
 
   describe("Policies header toggle preserves state-to-policies switch (VAL-DSH-034)", () => {
-    it("clicking Policies switches to policies view; clicking again returns to running state", () => {
+    it("clicking Policies switches to policies view; clicking Dashboard returns to running state", () => {
       renderAt({ dashboard: { state: "running", paperPanels: true } });
-      const policiesBtn = screen.getByText("Policies");
+      const policiesBtn = screen.getByRole("button", { name: "Policies" });
       fireEvent.click(policiesBtn);
       expect(screen.getByText("Signer Policies")).toBeInTheDocument();
-      fireEvent.click(policiesBtn);
+      fireEvent.click(screen.getByRole("button", { name: /back to dashboard/i }));
       expect(screen.queryByText("Signer Policies")).not.toBeInTheDocument();
       expect(screen.getByText("Signer Running")).toBeInTheDocument();
     });

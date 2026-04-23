@@ -66,6 +66,21 @@ function renderPeersPanel(onRefresh = vi.fn()) {
   };
 }
 
+function renderPeersPanelWithPeers(peers: PeerStatus[], onRefresh = vi.fn()) {
+  return {
+    onRefresh,
+    ...render(
+      <PeersPanel
+        peers={peers}
+        onlineCount={peers.filter((peer) => peer.online).length}
+        signReadyLabel="sign ready"
+        paperPanels={false}
+        onRefresh={onRefresh}
+      />,
+    ),
+  };
+}
+
 describe("PeersPanel — nested-button regression", () => {
   it("does not nest any <button> inside another <button>", () => {
     const { container } = renderPeersPanel();
@@ -97,6 +112,14 @@ describe("PeersPanel — nested-button regression", () => {
     const refreshBtn = screen.getByRole("button", { name: "Refresh peers" });
     fireEvent.click(refreshBtn);
     expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders numeric latency for higher-index online peers and mirrors it in the average badge", () => {
+    renderPeersPanelWithPeers([makePeer(2, true), makePeer(3, false)]);
+
+    expect(screen.getByTestId("peer-latency-2").textContent).toBe("31ms");
+    expect(screen.getByText("Avg: 31ms")).toBeInTheDocument();
+    expect(screen.queryByText("Avg: --")).not.toBeInTheDocument();
   });
 
   it("clicking the refresh button does not collapse the peers panel", () => {

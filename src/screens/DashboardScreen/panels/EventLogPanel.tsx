@@ -37,7 +37,6 @@ const RUNTIME_BADGES: RuntimeEventLogBadge[] = [
   "READY",
   "INFO",
   "ERROR",
-  "BACKUP_PUBLISH",
   // fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — the
   // VAL-ONBOARD-011 contract requires onboarding lifecycle entries
   // (completion + failure) to carry a distinct ONBOARD badge so
@@ -74,8 +73,6 @@ function runtimeBadgeClassName(badge: RuntimeEventLogBadge): string {
       return "info";
     case "ERROR":
       return "error";
-    case "BACKUP_PUBLISH":
-      return "backup-publish";
     case "ONBOARD":
       return "onboard";
   }
@@ -148,26 +145,6 @@ function summarizeEntry(entry: RuntimeEventLogEntry): string {
     return `${op} failed${code}${payload?.message ? ` — ${payload.message}` : ""}`;
   }
   if (entry.source === "local_mutation") {
-    // Today the only local_mutation producer is publishProfileBackup's
-    // BACKUP_PUBLISH entry — see `BackupPublishLocalMutationPayload`
-    // in `AppStateTypes.ts`. Surface a terse one-liner that matches
-    // the inline error copy on the Publish Backup modal so users can
-    // correlate the two surfaces at a glance (VAL-BACKUP-007).
-    const payload = entry.payload as {
-      kind?: string;
-      reason?: "no-relays" | "all-offline";
-      attemptedRelayCount?: number;
-    } | null;
-    if (payload?.kind === "backup_publish_failed") {
-      const count = payload.attemptedRelayCount ?? 0;
-      if (payload.reason === "no-relays") {
-        return "Backup publish failed — no relays configured";
-      }
-      if (payload.reason === "all-offline") {
-        return `Backup publish failed — all ${count} relays offline`;
-      }
-      return "Backup publish failed";
-    }
     // fix-m7-scrutiny-r1-sponsor-concurrency-and-badge —
     // VAL-ONBOARD-011 ONBOARD badge summaries. Truncate
     // request_id to 10 chars like the completion-channel copy for
