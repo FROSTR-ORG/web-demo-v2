@@ -1,0 +1,34 @@
+{
+  "featureId": "m7-rotate-keyset-live-sign",
+  "reviewedAt": "2026-04-23T03:08:08Z",
+  "commitId": "11d999b",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The new multi-device spec verifies rotated key material and a successful sign round-trip on rotated shares, but it does not cover the full rotate→distribute→adopt path and does not directly verify rejection of old shares after rotation.",
+    "issues": [
+      {
+        "file": "src/e2e/multi-device/rotate-keyset-live-sign.spec.ts",
+        "line": 15,
+        "severity": "blocking",
+        "description": "The test explicitly models adoption by direct runtime seeding (`__iglooTestSeedRuntime`) instead of driving rotated-share distribution/adoption. This misses regressions in the required rotate→distribute→adopt integration path and therefore does not fully satisfy the expected behavior."
+      },
+      {
+        "file": "src/e2e/multi-device/rotate-keyset-live-sign.spec.ts",
+        "line": 467,
+        "severity": "blocking",
+        "description": "Expected behavior requires proving old shares are no longer valid after rotation. The spec only checks rotated share/member material differs from originals and never performs a protocol attempt with old shares against the rotated keyset to assert failure, so old-share invalidation is inferred rather than verified."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The assigned `protocol-flow-worker` skill is scoped to source-side onboarding sponsorship and mandates agent-browser ceremony verification, but this feature implemented a rotate-keyset regression gate via Playwright-only workflow. Skill scope/procedure appears mismatched for this feature type.",
+      "evidence": ".factory/skills/protocol-flow-worker/SKILL.md:3,21,42,58 compared with transcript skeleton for workerSessionId 32c527f3-401e-471d-b0fa-b049bba56d4a (protocol-flow-worker invoked; validation done with tsc/vitest/playwright commands, no agent-browser step)."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Fail. The implementation adds valuable rotated-keyset signing coverage, but it leaves two blocking gaps relative to the feature expectations: no direct distribution/adoption-path validation and no explicit old-share invalidation assertion."
+}

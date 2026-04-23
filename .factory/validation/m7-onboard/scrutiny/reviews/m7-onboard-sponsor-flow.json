@@ -1,0 +1,50 @@
+{
+  "featureId": "m7-onboard-sponsor-flow",
+  "reviewedAt": "2026-04-23T03:09:31Z",
+  "commitId": "7b8283190ec252d02f62d6870452992b55c301b1",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "Implementation dispatches onboard and tracks a sponsor-session lifecycle, but it does not satisfy core contract behaviors for successful sponsorship, concurrent isolation, or ONBOARD event-log badging.",
+    "issues": [
+      {
+        "file": "src/app/AppStateProvider.tsx",
+        "line": 1985,
+        "severity": "blocking",
+        "description": "`createOnboardSponsorPackage` dispatches `handleRuntimeCommand({ type: 'onboard' })` to `selfPubkeyXOnly` (the sponsor's own pubkey). Combined with encoding the sponsor's own share (`share_secret: shareSecret` at lines 1961-1964), this prevents successful source-sponsored onboarding of a new device and conflicts with required peer-list growth / bootstrap outcomes (VAL-ONBOARD-008/009/013, VAL-CROSS-001/018/020)."
+      },
+      {
+        "file": "src/app/AppStateProvider.tsx",
+        "line": 2012,
+        "severity": "blocking",
+        "description": "Two simultaneous onboarding ceremonies are not isolated per request_id. State is modeled as a single `onboardSponsorSession`, and the duplicate-request guard block is empty; the subsequent `setOnboardSponsorSession` call (line 2029) overwrites prior in-flight tracking instead of maintaining independent sessions. This misses VAL-ONBOARD-013 / expected concurrent-onboard behavior."
+      },
+      {
+        "file": "src/app/AppStateProvider.tsx",
+        "line": 4869,
+        "severity": "blocking",
+        "description": "Onboard completions are mapped to `INFO` (`badgeForCompletion` returns `INFO` for non Sign/Ecdh/Ping). The contract requires ONBOARD-tagged event-log entries on both sides (VAL-ONBOARD-011), but this implementation cannot emit an ONBOARD badge."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "`protocol-flow-worker` marks `agent-browser` as mandatory and requires multi-device Playwright verification for this ceremony, but this worker session skipped those steps while still reporting `followedProcedure: true`.",
+      "evidence": "SKILL.md lines 21, 42-43, 53-56, 58-62; handoff file line 12 ('Multi-device e2e ... NOT authored') and lines 80-83 (`followedProcedure: true`); transcript skeleton for session d3e2cf47-cd9a-482d-93c6-032f6271bf47 shows no agent-browser usage."
+    },
+    {
+      "area": "conventions",
+      "observation": "Validation contract expects ONBOARD event-log badges, but runtime badge taxonomy/documented mapping does not support ONBOARD and routes Onboard completions to INFO. This contract-vs-implementation mismatch is not captured in shared guidance.",
+      "evidence": "validation-contract.md VAL-ONBOARD-011 section (ONBOARD badge required); src/app/AppStateTypes.ts lines 532-543 (no `ONBOARD` badge type); src/app/AppStateProvider.tsx lines 4859-4869 (`Onboard` falls through to `INFO`)."
+    },
+    {
+      "area": "knowledge",
+      "observation": "A major sponsor-flow constraint (self-peer onboarding rejection) is documented only in feature handoff/deviation doc context, not in `.factory/library`, so future workers can easily repeat the same dead-end implementation assumption.",
+      "evidence": "handoff file lines 66-68 describe self-peer `UnknownPeer` caveat; `.factory/library` search contains no entries for self-peer/UnknownPeer sponsor-flow constraints."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Fail: the commit adds dispatch/lifecycle plumbing, but core feature requirements remain unmet for successful onboarding behavior, concurrent request isolation, and ONBOARD event-log representation."
+}

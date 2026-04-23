@@ -5,6 +5,8 @@ commands:
   build: npm run build
   wasm_build: npm run wasm:build
   test: npx vitest run --config vitest.config.ts --maxConcurrency 2
+  lint: npm run lint
+  format_check: npm run format:check
   test_e2e: npx playwright test --workers 1
   test_e2e_gallery: npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop --workers 1
   test_e2e_multi_device: npx playwright test src/e2e/multi-device --project=desktop --workers 1

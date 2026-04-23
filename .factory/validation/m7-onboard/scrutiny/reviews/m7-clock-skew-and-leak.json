@@ -1,0 +1,45 @@
+{
+  "featureId": "m7-clock-skew-and-leak",
+  "reviewedAt": "2026-04-23T03:08:43Z",
+  "commitId": "e93c09b",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature adds substantial multi-device Playwright coverage, but two requirement-critical gaps remain: asymmetric ±120s peer skew is not tested, and the long-session loop can pass even when most periodic sign/ECDH cycles fail.",
+    "issues": [
+      {
+        "file": "src/e2e/multi-device/clock-skew.spec.ts",
+        "line": 93,
+        "severity": "blocking",
+        "description": "The spec does not verify the required asymmetric case \"device B \u00b1120s clock vs A\". It hardcodes asymmetric skew to \u00b125s (`ASYMMETRIC_SKEW_MS = 25_000`) and only runs \u00b1120s in symmetric mode (both devices shifted equally), so the feature's stated behavior is unproven."
+      },
+      {
+        "file": "src/e2e/multi-device/long-session.spec.ts",
+        "line": 762,
+        "severity": "blocking",
+        "description": "Periodic-activity success criteria are too weak: the test only requires `successfulSigns >= 1` and `successfulEcdhs >= 1` across all iterations. This allows most sign/ECDH cycles to fail while still passing, which does not adequately validate stability for a sustained periodic session."
+      },
+      {
+        "file": "src/e2e/multi-device/long-session.spec.ts",
+        "line": 904,
+        "severity": "non_blocking",
+        "description": "Heap-leak assertion samples only page A baseline/final (`baselineA`/`finalA`) and does not evaluate page B memory. This leaves a blind spot for leaks that manifest only on the responder device."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The runtime-worker procedure requires manual agent-browser verification for fulfilled assertions, but this worker transcript shows only `mission-worker-base` and `runtime-worker` skills and no `agent-browser` invocation while handoff still reports `followedProcedure: true`.",
+      "evidence": "runtime-worker SKILL.md lines 49-50 require agent-browser checks; transcript entry for workerSessionId ed09be73-668f-40b5-9d2b-790a7c656eb3 (worker-transcripts.jsonl line 119) lists tool flow without agent-browser skill calls."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Key constraints discovered here (bifrost `max_future_skew_secs=30` impact on skew tests and duration-compressed long-session strategy) are documented in `docs/runtime-deviations-from-paper.md` but not in `.factory/library`, so future workers may re-discover the same constraints during planning.",
+      "evidence": "New deviation entries exist in docs/runtime-deviations-from-paper.md around lines 790 and 846, while grep over `.factory/library/*` finds no matches for `max_future_skew_secs`, `clock skew`, or `LONG_SESSION_ITERATIONS`."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review failed: the implementation provides useful tests but does not fully satisfy the feature's asymmetric clock-skew requirement and uses permissive long-session success thresholds that can mask repeated operation failures."
+}

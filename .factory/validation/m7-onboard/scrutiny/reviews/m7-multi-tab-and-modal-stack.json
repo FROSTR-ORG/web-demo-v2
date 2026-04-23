@@ -1,0 +1,33 @@
+{
+  "featureId": "m7-multi-tab-and-modal-stack",
+  "reviewedAt": "2026-04-23T03:09:34Z",
+  "commitId": "cb0b18630bc987ad4c1557f32d52ff1a68724452",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Implementation covers the requested feature scope: cross-tab profile lifecycle propagation (lock/clear), deterministic modal precedence (ClearCredentials > SigningFailed > PolicyPrompt), and no regressions introduced in setup-route safety guards (already present, no feature code changes required).",
+    "issues": [
+      {
+        "file": "src/e2e/multi-device/multi-tab.spec.ts",
+        "line": 162,
+        "severity": "non_blocking",
+        "description": "The console-error filter allows any message matching /WebSocket connection to /, which can mask unexpected websocket regressions beyond the intended loopback refusal noise for this test. Narrowing the filter to the specific expected URL/error combination would keep signal quality higher."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Skill procedure and handoff metadata are out of sync in practice: the worker skipped agent-browser verification but still reported followedProcedure=true.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md:23 requires followedProcedure=false when agent-browser is omitted; handoff 2026-04-23T01-13-21-100Z__m7-multi-tab-and-modal-stack__3ea1c98c-1511-4b44-b149-a3221516ebd3.json:105 shows followedProcedure=true and :108-110 documents skipping agent-browser."
+    },
+    {
+      "area": "conventions",
+      "observation": "Known pre-existing issue reporting guidance was not followed in the handoff, suggesting enforcement/checklist drift.",
+      "evidence": "AGENTS.md:97-99 says known pre-existing issues must not be re-reported in discoveredIssues; handoff file line 97 includes a discoveredIssues entry for the known nested-button warning."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review result: pass. Feature behavior is implemented as intended and commit changes are coherent; one non-blocking test robustness issue was noted, plus two shared-state observations around procedure/convention adherence."
+}

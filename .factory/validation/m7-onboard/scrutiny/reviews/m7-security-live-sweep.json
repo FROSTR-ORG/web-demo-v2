@@ -1,0 +1,45 @@
+{
+  "featureId": "m7-security-live-sweep",
+  "reviewedAt": "2026-04-23T03:08:00Z",
+  "commitId": "ee74c2e",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature adds meaningful scanner + integration coverage, but two blocking false-negative risks remain: snapshots are not actually frozen at each checkpoint, and the bfprofile wrapper exemption suppresses all string content at allow-listed keys instead of only bfprofile-prefixed wrappers.",
+    "issues": [
+      {
+        "file": "src/app/__tests__/snapshot.security.test.tsx",
+        "line": 273,
+        "severity": "blocking",
+        "description": "buildSnapshot claims a frozen point-in-time capture, but it stores live references for `window.__debug`, `window.__appState`, and `recordedOutbound` (`outboundEnvelopes`). Because scanning happens later at line 460, all five snapshots can reflect the final mutated state and miss transient mid-sign/mid-ECDH/mid-onboard leaks."
+      },
+      {
+        "file": "src/lib/security/secretSweepScanner.ts",
+        "line": 159,
+        "severity": "blocking",
+        "description": "The allow-list branch replaces *any* string under `encryptedProfilePackage/profilePackage/profile_string/encryptedProfileBackup` with `[encrypted-bfprofile]`, which suppresses regex scanning for all content at those keys. The comment says non-bfprofile values should still be flagged, but current logic cannot flag them, creating a false-negative path (including potential `nsec1` content)."
+      },
+      {
+        "file": "src/app/__tests__/snapshot.security.test.tsx",
+        "line": 427,
+        "severity": "non_blocking",
+        "description": "The onboard phase is wrapped in a broad try/catch and the test does not assert that onboard dispatch actually occurred. If `createOnboardSponsorPackage` throws before dispatch (e.g., empty unadopted-share pool), the sweep can still pass while not validating the onboard leg."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Mission security invariant wording is broader than actual behavior at the time of this feature: AGENTS says setup session state is cleared on finish, but the feature test had to manually call `clearCreateSession()` to emulate finish semantics.",
+      "evidence": "AGENTS.md:58 states setup sessions are cleared on finish; snapshot.security.test.tsx (commit ee74c2e) lines 338-352 manually call `latest.clearCreateSession()` with explanatory comment."
+    },
+    {
+      "area": "skills",
+      "observation": "runtime-worker has ambiguous guidance on skipping agent-browser: one section requires demo-gallery 'still passes', another explicitly allows known pre-existing gallery failures. This can lead to inconsistent `followedProcedure` judgments.",
+      "evidence": ".factory/skills/runtime-worker/SKILL.md:22 requires demo-gallery pass for skip exemption; SKILL.md:46 allows known pre-existing failures. Handoff shows gallery exitCode 1 but `followedProcedure: true` (handoff lines 41-42, 146)."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review failed due to blocking false-negative risks in the security sweep harness: snapshots are not immutable at capture time, and scanner allow-listing masks all string payloads at wrapper keys. Shared-state docs/skill wording also show ambiguity around finish semantics and agent-browser skip criteria."
+}

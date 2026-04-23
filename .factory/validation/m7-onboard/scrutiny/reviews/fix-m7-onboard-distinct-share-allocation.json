@@ -1,0 +1,45 @@
+{
+  "featureId": "fix-m7-onboard-distinct-share-allocation",
+  "reviewedAt": "2026-04-23T03:11:25Z",
+  "commitId": "1349a2e0aef150f61ac2cc3ed02e7b5a293953bf",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The core pool-allocation implementation is substantial (encrypted unadopted-share pool, allocation ledger, and sponsor-flow password gate), but the feature does not fully satisfy its own expected behavior: the multi-device evidence path still does not exercise a real sponsor->requester handshake completion, and the updated e2e path is inconsistent with the new pool preconditions.",
+    "issues": [
+      {
+        "file": "src/e2e/multi-device/onboard-sponsorship.spec.ts",
+        "line": 470,
+        "severity": "blocking",
+        "description": "The required full handshake coverage is still missing. The spec explicitly says it \"simulate[s] successful adoption\" by seeding tab B directly and asserts tab A remains `awaiting_adoption` (`expect(finalSession?.status).toBe(\"awaiting_adoption\")` at line 546), rather than asserting sponsor-side completion + peer growth/event-log outcomes required by this feature."
+      },
+      {
+        "file": "src/e2e/multi-device/onboard-sponsorship.spec.ts",
+        "line": 426,
+        "severity": "blocking",
+        "description": "The updated e2e call path is incompatible with the new pool-gated sponsor mutator. The spec seeds tab A via `__iglooTestSeedRuntime(...persistProfile...)` (lines 348-356), but that seed path saves a plain profile via `savePayloadAsProfile` (`src/app/AppStateProvider.tsx:1494`) and does not initialize `unadoptedSharesCiphertext`; `createOnboardSponsorPackage` now hard-fails when that ciphertext is absent (`src/app/AppStateProvider.tsx:2222-2224`). It also passes `profilePassword: \"profile-password\"` (line 426) while the seeded profile password is `\"sponsor-password-1234\"` (line 354)."
+      },
+      {
+        "file": "docs/runtime-deviations-from-paper.md",
+        "line": 686,
+        "severity": "non_blocking",
+        "description": "Feature-required shared-state docs were not refreshed: this section still documents the prior residual that full sponsor adoption cannot complete without a new share-slot primitive, which conflicts with this feature's distinct-share-pool architecture and expected behavior."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Skill/procedure mismatch: protocol-flow-worker marks agent-browser as mandatory for multi-device validation, but this worker run used no agent-browser step while still reporting followedProcedure=true.",
+      "evidence": ".factory/skills/protocol-flow-worker/SKILL.md: \"Required Skills - agent-browser — mandatory for multi-device validation\"; worker-transcripts.jsonl entry for session fa97d1a7-5b53-4bfc-a20f-7d938d788af1 contains no `Skill {\"skill\":\"agent-browser\"}` invocation and handoff.skillFeedback says followedProcedure=true."
+    },
+    {
+      "area": "conventions",
+      "observation": "Mission shared guidance was not updated for the new encrypted unadopted-share pool model despite the feature description explicitly requiring AGENTS/doc updates.",
+      "evidence": "No `unadopted`/`share pool` guidance appears in mission AGENTS (`/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/AGENTS.md`) or `.factory/library` (repo-wide grep has no matches)."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "FAIL: commit 1349a2e0 implements encrypted distinct-share allocation mechanics, but required end-to-end sponsor onboarding validation remains incomplete and the updated multi-device spec is inconsistent with pool-gated prerequisites, leaving blocking requirement gaps."
+}

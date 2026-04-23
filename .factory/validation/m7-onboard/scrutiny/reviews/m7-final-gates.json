@@ -1,0 +1,33 @@
+{
+  "featureId": "m7-final-gates",
+  "reviewedAt": "2026-04-23T03:06:59Z",
+  "commitId": "85d9500",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The commit satisfies the feature intent: it adds explicit lint/format gate scripts and a console-warning policy document, while the handoff and transcript provide evidence that the required final gates (tsc main/node, full vitest, demo-gallery desktop e2e, dev boot/HMR/deeplink checks) were executed successfully. No blocking implementation defects were found in this feature scope.",
+    "issues": [
+      {
+        "file": "docs/allowed-console-warnings.md",
+        "line": 6,
+        "severity": "non_blocking",
+        "description": "The document references `collectConsoleNoise` and `allowedConsoleWarnPatterns` in `src/e2e/demo-gallery.spec.ts`, but those identifiers are not present in the current spec. This creates documentation drift and can mislead future gate updates."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The assigned `ui-screen-worker` skill is not a good fit for gate-only verification features like `m7-final-gates` because its required TDD/UI-implementation procedure does not apply, leading to avoidable deviation notes in otherwise-correct runs.",
+      "evidence": "Handoff `skillFeedback.deviations` for worker session `549ee949-0fae-4156-83f9-759bcc2592bf` explicitly says the `ui-screen-worker` TDD step was skipped for this verification-only feature; `.factory/skills/ui-screen-worker/SKILL.md` mandates RED-first tests and UI build flow."
+    },
+    {
+      "area": "services",
+      "observation": "The shared command catalog does not include the new `npm run lint` and `npm run format:check` gates introduced by this feature, so validators that rely on `.factory/services.yaml` do not have canonical entries for the final-gates scripts.",
+      "evidence": "New scripts were added in `package.json` lines 14-15, but `.factory/services.yaml` `commands:` section has no `lint`/`format:check` entries."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review result: PASS. `m7-final-gates` commit 85d9500 meets the feature’s final-gate objective with clear evidence of passing checks and the expected lint/format script surface. One non-blocking documentation drift item and two shared-state observations (skill fit, services command catalog completeness) were recorded."
+}
