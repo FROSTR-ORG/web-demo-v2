@@ -1,5 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
 
+/**
+ * Outside-runtime workflow coverage.
+ *
+ * These tests exercise import, rotate, recover, and returning-user flows with
+ * packages generated directly through the WASM bridge and a synthetic relay
+ * URL (`wss://relay.example.test`). They intentionally assert successful app
+ * navigation and persisted profile state rather than live relay convergence;
+ * multi-device relay behavior is covered by the dedicated live-relay specs.
+ */
+
 const DB_NAME = "keyval-store";
 const STORE_NAME = "keyval";
 const PROFILE_INDEX_KEY = "igloo.web-demo-v2.profile-index";
@@ -9,6 +19,14 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await clearIdb(page);
 });
+
+async function expectDashboardReady(page: Page, expectedLabel: string) {
+  await expect(page).toHaveURL(/\/dashboard\//, { timeout: 30_000 });
+  await expect(page.locator(".app-header")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(expectedLabel).first()).toBeVisible({
+    timeout: 30_000,
+  });
+}
 
 test("generate nsec, create keyset, reload to returning welcome, and unlock", async ({ page }) => {
   await page.goto("/");
@@ -53,14 +71,14 @@ test("generate nsec, create keyset, reload to returning welcome, and unlock", as
 
   await page.getByRole("button", { name: "Continue to Completion" }).click();
   await page.getByRole("button", { name: "Finish Distribution" }).click();
-  await expect(page.getByText(/Peers:/i).first()).toBeVisible({ timeout: 30_000 });
+  await expectDashboardReady(page, "Returning Flow Key");
 
   await page.reload();
   await expect(page.getByText("Welcome back.")).toBeVisible();
   await page.getByRole("button", { name: "Unlock" }).first().click();
   await page.getByLabel("Profile Password").fill("test-password");
   await page.getByRole("button", { name: "Unlock" }).last().click();
-  await expect(page.getByText(/Peers:/i).first()).toBeVisible({ timeout: 30_000 });
+  await expectDashboardReady(page, "Returning Flow Key");
 });
 
 test("manual pasted nsec remains unsupported", async ({ page }) => {
@@ -71,7 +89,7 @@ test("manual pasted nsec remains unsupported", async ({ page }) => {
   await expect(page.getByText("Invalid nsec format — must start with nsec1.")).toBeVisible();
 });
 
-test.fixme("imports a generated bfprofile through decrypt and review", async ({ page }) => {
+test("imports a generated bfprofile through decrypt and review", async ({ page }) => {
   const fixture = await createProtocolFixture(page, { storeProfile: false });
   await page.goto("/");
   await page.getByRole("button", { name: "Import Device Profile" }).click();
@@ -86,11 +104,10 @@ test.fixme("imports a generated bfprofile through decrypt and review", async ({ 
   await page.getByRole("textbox", { name: "Confirm Password", exact: true }).fill("import-local-password");
   await page.getByRole("button", { name: "Import & Launch Signer" }).click();
 
-  await expect(page.getByText(/Peers:/i).first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("Outside Flow Key").first()).toBeVisible();
+  await expectDashboardReady(page, "Outside Flow Key");
 });
 
-test.fixme("rotates a returning profile from a generated bfshare source", async ({ page }) => {
+test("rotates a returning profile from a generated bfshare source", async ({ page }) => {
   const fixture = await createProtocolFixture(page, { storeProfile: true });
   await page.goto("/");
   await expect(page.getByText("Welcome back.")).toBeVisible();
@@ -102,8 +119,6 @@ test.fixme("rotates a returning profile from a generated bfshare source", async 
   await page.getByRole("button", { name: "Validate & Continue" }).click();
 
   await expect(page.getByRole("heading", { name: "Review & Generate" })).toBeVisible();
-  await page.getByRole("textbox", { name: "Password", exact: true }).fill("rotate-dist-password");
-  await page.getByRole("textbox", { name: "Confirm Password", exact: true }).fill("rotate-dist-password");
   await page.getByRole("button", { name: "Rotate & Generate Keyset" }).click();
 
   await expect(page.getByRole("heading", { name: "Create Profile" })).toBeVisible({ timeout: 30_000 });
@@ -112,29 +127,34 @@ test.fixme("rotates a returning profile from a generated bfshare source", async 
   await page.getByRole("textbox", { name: "Confirm Password", exact: true }).fill("rotated-local-password");
   await page.getByRole("button", { name: "Continue to Distribute Shares" }).click();
 
-  // The rotate-keyset flow still uses the legacy Copy-Package /
-  // Copy-Password distribute screen (distinct from the 2B Paper 8GU-0
-  // rewrite which only applied to /create/distribute). Per-share
-  // encoding is driven by the preceding Review & Generate screen's
-  // single distribution password, not per share.
   await expect(page.getByRole("heading", { name: "Distribute Shares" })).toBeVisible();
-  const copyPackageButtons = page.getByRole("button", { name: /Copy Package/i });
-  const copyPasswordButtons = page.getByRole("button", { name: /Copy Password/i });
-  const remotePackageCount = await copyPackageButtons.count();
+  const packagePasswordInputs = page.locator("input.password-input");
+  const remotePackageCount = await packagePasswordInputs.count();
   expect(remotePackageCount).toBeGreaterThan(0);
+
+  const createPackageButtons = page.getByRole("button", { name: "Create package" });
   for (let index = 0; index < remotePackageCount; index += 1) {
-    await copyPackageButtons.nth(index).click();
-    await copyPasswordButtons.nth(index).click();
+    await packagePasswordInputs.first().fill(`rotate-package-password-${index + 1}`);
+    await createPackageButtons.first().click();
+    await expect(createPackageButtons).toHaveCount(
+      remotePackageCount - index - 1,
+      { timeout: 10_000 },
+    );
+  }
+
+  const markDistributedButtons = page.getByRole("button", { name: /^Mark distributed$/ });
+  await expect(markDistributedButtons).toHaveCount(remotePackageCount);
+  for (let index = 0; index < remotePackageCount; index += 1) {
+    await markDistributedButtons.nth(index).click();
   }
 
   await page.getByRole("button", { name: "Continue to Completion" }).click();
   await page.getByRole("button", { name: "Finish Distribution" }).click();
 
-  await expect(page.getByText(/Peers:/i).first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("Outside Flow Key").first()).toBeVisible();
+  await expectDashboardReady(page, "Outside Flow Key");
 });
 
-test.fixme("recovers a real nsec from a returning profile and generated bfshare source", async ({ page }) => {
+test("recovers a real nsec from a returning profile and generated bfshare source", async ({ page }) => {
   const fixture = await createProtocolFixture(page, { storeProfile: true, fromGeneratedNsec: true });
   expect(fixture.recoveredNsec).toBe(fixture.generatedNsec);
   await page.goto("/");
@@ -142,7 +162,7 @@ test.fixme("recovers a real nsec from a returning profile and generated bfshare 
   await page.getByRole("button", { name: "Unlock" }).first().click();
   await page.getByLabel("Profile Password").fill(fixture.profilePassword);
   await page.getByRole("button", { name: "Unlock" }).last().click();
-  await expect(page.getByText(/Peers:/i).first()).toBeVisible({ timeout: 30_000 });
+  await expectDashboardReady(page, "Outside Flow Key");
 
   await page.getByRole("button", { name: "Recover" }).click();
   await expect(page.getByRole("heading", { name: "Recover NSEC" })).toBeVisible();
@@ -160,7 +180,7 @@ test.fixme("recovers a real nsec from a returning profile and generated bfshare 
   await page.getByRole("button", { name: "Copy to Clipboard" }).click();
   await expect(page.getByText("Copied!")).toBeVisible();
   await page.getByRole("button", { name: "Clear" }).click();
-  await expect(page.getByText(/Peers:/i).first()).toBeVisible({ timeout: 30_000 });
+  await expectDashboardReady(page, "Outside Flow Key");
 });
 
 async function clearIdb(page: Page) {
