@@ -123,6 +123,15 @@ describe("AppStateProvider — signer resume restores readiness (VAL-OPS-017)", 
     });
     await waitFor(() => expect(latest.createSession?.keyset).toBeTruthy());
 
+    // fix-followup-create-bootstrap-live-relay-pump — capture the
+    // plaintext keyset BEFORE createProfile redacts `share.seckey`.
+    const capturedGroupResume = latest.createSession!.keyset!.group;
+    const capturedLocalShareResume = latest.createSession!.localShare!;
+    const capturedRemoteSharesResume =
+      latest.createSession!.keyset!.shares.filter(
+        (share) => share.idx !== capturedLocalShareResume.idx,
+      );
+
     await act(async () => {
       await latest.createProfile({
         deviceName: "Igloo Web",
@@ -136,6 +145,27 @@ describe("AppStateProvider — signer resume restores readiness (VAL-OPS-017)", 
     await waitFor(() =>
       expect(latest.runtimeStatus).toBeTruthy(),
     );
+
+    // Attach a simulator so the "simulator path" of this test
+    // continues to exercise virtual-peer-driven readiness. createProfile
+    // no longer bootstraps a simulator (VAL-FOLLOWUP-001).
+    const attachSimulatorHook = (
+      window as typeof window & {
+        __iglooTestAttachSimulator?: (input: {
+          group: typeof capturedGroupResume;
+          localShare: typeof capturedLocalShareResume;
+          remoteShares: typeof capturedRemoteSharesResume;
+        }) => Promise<void>;
+      }
+    ).__iglooTestAttachSimulator;
+    expect(typeof attachSimulatorHook).toBe("function");
+    await act(async () => {
+      await attachSimulatorHook!({
+        group: capturedGroupResume,
+        localShare: capturedLocalShareResume,
+        remoteShares: capturedRemoteSharesResume,
+      });
+    });
 
     // Tick the simulator once so the virtual peer ECDH round-trip
     // completes and the runtime reports the healthy baseline.

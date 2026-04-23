@@ -595,6 +595,15 @@ export class RuntimeRelayPump {
       this.schedulePingTimer(entry);
     } catch (error) {
       connection.close();
+      // fix-followup-create-bootstrap-live-relay-pump — if the pump was
+      // stopped (e.g. the AppStateProvider swapped in a
+      // `LocalRuntimeSimulator` via the DEV `__iglooTestAttachSimulator`
+      // hook) while the `connect()` promise was still pending, the
+      // resulting `offline` status must NOT leak back into the host's
+      // `onRelayStatusChange` callback — the host has already cleared
+      // `runtimeRelays` on the strength of the synchronous `stop()` and
+      // does not expect a post-stop status emission.
+      if (this.stopped) return;
       this.updateRelay(entry.url, {
         state: "offline",
         lastError: errorMessage(error),

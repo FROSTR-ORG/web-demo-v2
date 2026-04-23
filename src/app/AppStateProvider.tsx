@@ -27,6 +27,7 @@ import {
   decodeProfilePackage,
   deriveProfileIdFromShareSecret,
   parseProfileBackupEvent,
+  peerPolicyOverridesFromPermissions,
   profileBackupEventKind,
   profilePayloadForShare,
   recoverNsecFromShares,
@@ -1676,6 +1677,54 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         throw new Error(RELAY_EMPTY_ERROR);
       }
 
+      // fix-followup-create-bootstrap-live-relay-pump — validate every
+      // supplied relay URL through the same canonical wss://-only
+      // validator that the Settings sidebar uses. Validation failures
+      // are rethrown with the verbatim inline-validation copy
+      // ("Relay URL must start with wss://") so the /create/profile
+      // form can render the message without re-mapping. The DEV-only
+      // `__iglooTestAllowInsecureRelayForRestore` opt-in (gated behind
+      // `import.meta.env.DEV`) whitelists `ws://127.0.0.1:*` for the
+      // multi-device e2e that targets the local `bifrost-devtools`
+      // relay (plain ws://). See VAL-FOLLOWUP-001 / VAL-FOLLOWUP-010.
+      const { validateRelayUrl, normalizeRelayList } = await import(
+        "../lib/relay/relayUrl"
+      );
+      const allowInsecureForLocalRelay =
+        import.meta.env.DEV &&
+        typeof window !== "undefined" &&
+        (window as { __iglooTestAllowInsecureRelayForRestore?: boolean })
+          .__iglooTestAllowInsecureRelayForRestore === true;
+      const validateCreateBootstrapRelayUrl = (raw: string): string => {
+        if (allowInsecureForLocalRelay && /^ws:\/\//i.test(raw)) {
+          try {
+            const parsed = new URL(raw);
+            if (
+              parsed.protocol.toLowerCase() === "ws:" &&
+              (parsed.hostname === "127.0.0.1" ||
+                parsed.hostname === "localhost")
+            ) {
+              return raw;
+            }
+          } catch {
+            /* fall through to strict validator */
+          }
+        }
+        return validateRelayUrl(raw);
+      };
+      // Propagates a `RelayValidationError` (Error subclass) with the
+      // canonical "Relay URL must start with wss://" message on the
+      // first offending entry; CreateProfileScreen's `catch` renders
+      // `err.message` verbatim as the form-level error. No simulator
+      // fallback path exists — validation failure aborts before any
+      // runtime is instantiated.
+      const validatedRelays = normalizeRelayList(relays, {
+        validator: validateCreateBootstrapRelayUrl,
+      });
+      if (validatedRelays.length === 0) {
+        throw new Error(RELAY_EMPTY_ERROR);
+      }
+
       const { group } = createSession.keyset;
       const localShare = createSession.localShare;
       const profileId = await deriveProfileIdFromShareSecret(localShare.seckey);
@@ -1684,10 +1733,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         deviceName,
         share: localShare,
         group,
-        relays,
-        manualPeerPolicyOverrides: defaultManualPeerPolicyOverrides(
+        relays: validatedRelays,
+        manualPeerPolicyOverrides: peerPolicyOverridesFromPermissions(
           group,
           localShare.idx,
+          draft.peerPermissions,
         ),
       });
       const createdAt = Date.now();
@@ -1737,21 +1787,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         remoteShares,
         localShare,
         group,
-        relays,
+        relays: validatedRelays,
         password: distributionPassword,
       });
 
+      // fix-followup-create-bootstrap-live-relay-pump — the createProfile
+      // boundary now bootstraps the real `RuntimeRelayPump` via
+      // `setRuntime(runtime, undefined, validatedRelays)`. The previous
+      // `LocalRuntimeSimulator` bootstrap has been removed — relay
+      // validation above guarantees `validatedRelays.length > 0` and
+      // every entry passes the Settings-parity validator, so no
+      // simulator fallback is reachable once we get here
+      // (VAL-FOLLOWUP-001). No onboard commands are dispatched here;
+      // per-share onboard dispatch is deferred to
+      // `encodeDistributionPackage` (feature 3 in this batch).
       const runtime = await createRuntimeFromProfilePayload(
         payload,
         localShare.idx,
       );
-      const simulator = new LocalRuntimeSimulator(runtime);
-      await simulator.attachVirtualPeers({ group, localShare, remoteShares });
-      simulator.start();
-      simulator.refreshAll();
-      setRuntime(runtime, simulator);
+      setRuntime(runtime, undefined, validatedRelays);
       // Preserve any active dev-only nonce-depletion override (VAL-OPS-024).
-      setRuntimeStatus(augmentStatus(simulator.pump(4)));
+      setRuntimeStatus(augmentStatus(runtime.runtimeStatus()));
       setActiveProfile(record.summary);
       setSignerPausedState(false);
 
@@ -5162,6 +5218,30 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         peerPk: string;
         password: string;
       }) => Promise<string>;
+      // fix-followup-create-bootstrap-live-relay-pump (VAL-FOLLOWUP-001)
+      // — reports which runtime source is currently attached to the
+      // AppStateProvider so unit tests and Playwright specs can assert
+      // the createProfile boundary bootstraps the live relay pump (NOT
+      // the LocalRuntimeSimulator). DEV-only; tree-shaken from
+      // production bundles via the surrounding `import.meta.env.DEV`
+      // gate on this installer effect.
+      __iglooTestGetRuntimeSource?: () =>
+        | "relay_pump"
+        | "simulator"
+        | null;
+      // fix-followup-create-bootstrap-live-relay-pump — DEV-only helper
+      // that attaches a {@link LocalRuntimeSimulator} to the currently
+      // active runtime (replacing the live relay pump for the
+      // remainder of the test). Used by the pre-existing unit-test
+      // suites (pendingDispatchIndex / operations / snapshot.security
+      // / signerResume / noncePoolOverlay.integration) that were
+      // originally written against the simulator-backed createProfile
+      // path. Pure test surface; never exposed to production UI.
+      __iglooTestAttachSimulator?: (input: {
+        group: GroupPackageWire;
+        localShare: SharePackageWire;
+        remoteShares: SharePackageWire[];
+      }) => Promise<void>;
     };
     globalWindow.__appState = value;
     // Initialise the dev-only `__debug` surface once per provider mount.
@@ -5564,6 +5644,59 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         applyRuntimeStatus(runtimeRef.current.runtimeStatus());
       }
     };
+    // fix-followup-create-bootstrap-live-relay-pump (VAL-FOLLOWUP-001) —
+    // expose the active runtime source so both unit tests and the
+    // Playwright multi-device spec can assert which runtime is backing
+    // the AppState during /create/distribute and /create/complete.
+    //   - `'relay_pump'` when `RuntimeRelayPump` is attached (the
+    //     production path after a successful createProfile / unlock).
+    //   - `'simulator'` when `LocalRuntimeSimulator` is attached
+    //     (legacy paths only — must NOT surface after createProfile).
+    //   - `null` when no runtime is active (fresh mount, lock, clear).
+    // Tree-shaken out of production bundles via the `import.meta.env.DEV`
+    // gate on this installer effect.
+    globalWindow.__iglooTestGetRuntimeSource = () => {
+      if (relayPumpRef.current) return "relay_pump";
+      if (simulatorRef.current) return "simulator";
+      return null;
+    };
+    // fix-followup-create-bootstrap-live-relay-pump — DEV-only helper
+    // used by unit-test suites that were originally written against
+    // the simulator-backed createProfile path. Attaches a fresh
+    // {@link LocalRuntimeSimulator} to the currently-active runtime,
+    // tears down the live relay pump (since we're simulating peers
+    // locally), and drives a few pump iterations so sign_ready
+    // transitions to true. Test-only; not reachable from production
+    // UI code.
+    globalWindow.__iglooTestAttachSimulator = async (input) => {
+      const runtime = runtimeRef.current;
+      if (!runtime) {
+        throw new Error(
+          "__iglooTestAttachSimulator: no runtime is currently active.",
+        );
+      }
+      // Tear down the live relay pump AND clear `runtimeRelays` —
+      // a stale "connecting" / "online" entry would force
+      // `deriveDashboardState` into the connecting / running branch
+      // and suppress the simulator-driven `signing-blocked` overlay
+      // that these legacy tests rely on.
+      stopRelayPump(true);
+      if (simulatorRef.current) {
+        simulatorRef.current.stop();
+        simulatorRef.current.setOnDrains(undefined);
+      }
+      const simulator = new LocalRuntimeSimulator(runtime);
+      await simulator.attachVirtualPeers({
+        group: input.group,
+        localShare: input.localShare,
+        remoteShares: input.remoteShares,
+      });
+      simulator.start();
+      simulator.refreshAll();
+      simulator.setOnDrains(absorbDrains);
+      simulatorRef.current = simulator;
+      applyRuntimeStatus(simulator.pump(4));
+    };
     return () => {
       if (globalWindow.__appState === value) {
         delete globalWindow.__appState;
@@ -5575,6 +5708,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     applyRuntimeStatus,
     setRuntime,
     savePayloadAsProfile,
+    stopRelayPump,
+    absorbDrains,
   ]);
 
   return (

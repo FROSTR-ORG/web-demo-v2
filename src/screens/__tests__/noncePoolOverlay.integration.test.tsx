@@ -134,6 +134,17 @@ describe("Dashboard nonce-pool overlay — __iglooTestSimulateNonceDepletion end
         expect(latest.createSession?.keyset).toBeTruthy(),
       );
 
+      // fix-followup-create-bootstrap-live-relay-pump (VAL-FOLLOWUP-001)
+      // — capture the plaintext keyset BEFORE createProfile redacts the
+      // share secrets so the simulator attach below can stand up
+      // virtual peers.
+      const capturedGroup = latest.createSession!.keyset!.group;
+      const capturedLocalShare = latest.createSession!.localShare!;
+      const capturedRemoteShares =
+        latest.createSession!.keyset!.shares.filter(
+          (share) => share.idx !== capturedLocalShare.idx,
+        );
+
       let profileId: string | null = null;
       await act(async () => {
         profileId = await latest.createProfile({
@@ -150,6 +161,30 @@ describe("Dashboard nonce-pool overlay — __iglooTestSimulateNonceDepletion end
         expect(latest.activeProfile?.id).toBe(profileId),
       );
       expect(profileId).toBeTruthy();
+
+      // Swap the live relay pump out for a LocalRuntimeSimulator so the
+      // dashboard settles in "running" state with virtual peers. The
+      // nonce-depletion hook augments `runtime.runtimeStatus()` with
+      // `noncePoolDepleted=true`, which the overlay reads via
+      // `applyRuntimeStatus`; the simulator ensures the surrounding
+      // status has sign_ready=true so the overlay can render on top.
+      const attachSimulatorHook = (
+        window as typeof window & {
+          __iglooTestAttachSimulator?: (input: {
+            group: typeof capturedGroup;
+            localShare: typeof capturedLocalShare;
+            remoteShares: typeof capturedRemoteShares;
+          }) => Promise<void>;
+        }
+      ).__iglooTestAttachSimulator;
+      expect(typeof attachSimulatorHook).toBe("function");
+      await act(async () => {
+        await attachSimulatorHook!({
+          group: capturedGroup,
+          localShare: capturedLocalShare,
+          remoteShares: capturedRemoteShares,
+        });
+      });
 
       // Navigate to the dashboard for the just-created profile — stays
       // inside the SAME provider so runtime state is preserved.

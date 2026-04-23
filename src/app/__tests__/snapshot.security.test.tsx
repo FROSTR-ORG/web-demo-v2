@@ -365,6 +365,16 @@ describe("m7-security-live-sweep — snapshot.security", () => {
       await waitFor(() =>
         expect(latest.createSession?.keyset).toBeTruthy(),
       );
+      // fix-followup-create-bootstrap-live-relay-pump — capture the
+      // plaintext keyset BEFORE createProfile redacts its
+      // `share.seckey` fields so the simulator attach below can
+      // stand up virtual peers.
+      const capturedGroup = latest.createSession!.keyset!.group;
+      const capturedLocalShare = latest.createSession!.localShare!;
+      const capturedRemoteShares = latest.createSession!.keyset!.shares.filter(
+        (share) => share.idx !== capturedLocalShare.idx,
+      );
+
       await act(async () => {
         await latest.createProfile({
           deviceName: "Igloo Web",
@@ -376,6 +386,29 @@ describe("m7-security-live-sweep — snapshot.security", () => {
         });
       });
       await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());
+
+      // Attach a LocalRuntimeSimulator so the downstream sign / ECDH /
+      // onboard dispatches produce real completions the security sweep
+      // can scan. createProfile no longer attaches a simulator —
+      // VAL-FOLLOWUP-001 — so we opt into simulator semantics here
+      // via the DEV-only hook.
+      const attachSimulatorHook = (
+        window as typeof window & {
+          __iglooTestAttachSimulator?: (input: {
+            group: typeof capturedGroup;
+            localShare: typeof capturedLocalShare;
+            remoteShares: typeof capturedRemoteShares;
+          }) => Promise<void>;
+        }
+      ).__iglooTestAttachSimulator;
+      expect(typeof attachSimulatorHook).toBe("function");
+      await act(async () => {
+        await attachSimulatorHook!({
+          group: capturedGroup,
+          localShare: capturedLocalShare,
+          remoteShares: capturedRemoteShares,
+        });
+      });
 
       // fix-m7-createsession-redact-secrets-on-finalize —
       // `createProfile` now REDACTS every sensitive field in

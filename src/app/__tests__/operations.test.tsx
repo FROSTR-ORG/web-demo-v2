@@ -24,15 +24,67 @@ import { RuntimeRelayPump } from "../../lib/relay/runtimeRelayPump";
 import { LocalRuntimeSimulator } from "../../lib/relay/localSimulator";
 import type {
   CompletedOperation,
+  GroupPackageWire,
   OperationFailure,
   RuntimeEvent,
   RuntimeStatusSummary,
+  SharePackageWire,
 } from "../../lib/bifrost/types";
 import type {
   RelayClient,
   RelayConnection,
 } from "../../lib/relay/browserRelayClient";
 import type { RelayFilter, RelaySubscription } from "../../lib/relay/relayPort";
+
+/**
+ * fix-followup-create-bootstrap-live-relay-pump — `createProfile` now
+ * bootstraps the live {@link RuntimeRelayPump} (NOT the
+ * `LocalRuntimeSimulator`). Tests that need virtual-peer-driven
+ * sign / ECDH / ping completions swap the relay pump for a fresh
+ * simulator via the DEV-only `__iglooTestAttachSimulator` hook.
+ */
+async function attachSimulator(input: {
+  group: GroupPackageWire;
+  localShare: SharePackageWire;
+  remoteShares: SharePackageWire[];
+}): Promise<void> {
+  const hook = (
+    window as typeof window & {
+      __iglooTestAttachSimulator?: (input: {
+        group: GroupPackageWire;
+        localShare: SharePackageWire;
+        remoteShares: SharePackageWire[];
+      }) => Promise<void>;
+    }
+  ).__iglooTestAttachSimulator;
+  if (typeof hook !== "function") {
+    throw new Error(
+      "window.__iglooTestAttachSimulator is not installed — DEV hook missing.",
+    );
+  }
+  await hook(input);
+}
+
+function captureCreateSessionKeyset(latest: AppStateValue): {
+  group: GroupPackageWire;
+  localShare: SharePackageWire;
+  remoteShares: SharePackageWire[];
+} {
+  const session = latest.createSession;
+  if (!session?.keyset || !session.localShare) {
+    throw new Error(
+      "captureCreateSessionKeyset: createSession.keyset is not ready.",
+    );
+  }
+  const localShare = session.localShare;
+  return {
+    group: session.keyset.group,
+    localShare,
+    remoteShares: session.keyset.shares.filter(
+      (share) => share.idx !== localShare.idx,
+    ),
+  };
+}
 
 /**
  * Hoisted storage mock for `idb-keyval` — mirrors the pattern used by the
@@ -562,6 +614,8 @@ describe("MockAppStateProvider — runtime command API shape", () => {
     });
     await waitFor(() => expect(latest.createSession?.keyset).toBeTruthy());
 
+    const capturedEcdh = captureCreateSessionKeyset(latest);
+
     await act(async () => {
       await latest.createProfile({
         deviceName: "Igloo Web",
@@ -573,6 +627,12 @@ describe("MockAppStateProvider — runtime command API shape", () => {
       });
     });
     await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());
+
+    // Swap the live relay pump out for the simulator so virtual peers
+    // respond to the sign / ECDH round-trips below.
+    await act(async () => {
+      await attachSimulator(capturedEcdh);
+    });
 
     const remotePeerPubkey = latest.runtimeStatus!.peers[0]?.pubkey;
     expect(remotePeerPubkey).toBeTruthy();
@@ -687,6 +747,8 @@ describe("MockAppStateProvider — runtime command API shape", () => {
     });
     await waitFor(() => expect(latest.createSession?.keyset).toBeTruthy());
 
+    const capturedOps = captureCreateSessionKeyset(latest);
+
     await act(async () => {
       await latest.createProfile({
         deviceName: "Igloo Web",
@@ -698,6 +760,12 @@ describe("MockAppStateProvider — runtime command API shape", () => {
       });
     });
     await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());
+
+    // Swap the live relay pump out for the simulator so virtual peers
+    // respond to the ping round-trip below.
+    await act(async () => {
+      await attachSimulator(capturedOps);
+    });
 
     // Dispatch a ping against a known peer — this will exercise the pending
     // ops + simulator drain path. The simulator pumps virtual peers that
@@ -829,6 +897,8 @@ describe("MockAppStateProvider — runtime command API shape", () => {
     });
     await waitFor(() => expect(latest.createSession?.keyset).toBeTruthy());
 
+    const capturedPaused = captureCreateSessionKeyset(latest);
+
     await act(async () => {
       await latest.createProfile({
         deviceName: "Igloo Web",
@@ -840,6 +910,12 @@ describe("MockAppStateProvider — runtime command API shape", () => {
       });
     });
     await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());
+
+    // Swap the live relay pump out for the simulator so the resumed
+    // dispatch below captures a real request_id via virtual peers.
+    await act(async () => {
+      await attachSimulator(capturedPaused);
+    });
 
     // Pause the signer and record the current pending_operations length so
     // we can prove nothing was enqueued during the rejected dispatch.

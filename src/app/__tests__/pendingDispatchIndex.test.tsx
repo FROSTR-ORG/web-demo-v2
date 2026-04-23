@@ -14,6 +14,41 @@ import {
   defaultManualPeerPolicyOverrides,
   profilePayloadForShare,
 } from "../../lib/bifrost/packageService";
+import type {
+  GroupPackageWire,
+  SharePackageWire,
+} from "../../lib/bifrost/types";
+
+/**
+ * fix-followup-create-bootstrap-live-relay-pump — `createProfile` now
+ * bootstraps the live {@link RuntimeRelayPump} (NOT the
+ * `LocalRuntimeSimulator`). Tests in this file still need simulator-
+ * driven virtual-peer semantics so sign / ECDH round-trips produce
+ * completions; the DEV-only `__iglooTestAttachSimulator` hook swaps
+ * the relay pump out for a fresh `LocalRuntimeSimulator` tied to the
+ * caller's explicit keyset view.
+ */
+async function attachSimulator(input: {
+  group: GroupPackageWire;
+  localShare: SharePackageWire;
+  remoteShares: SharePackageWire[];
+}): Promise<void> {
+  const hook = (
+    window as typeof window & {
+      __iglooTestAttachSimulator?: (input: {
+        group: GroupPackageWire;
+        localShare: SharePackageWire;
+        remoteShares: SharePackageWire[];
+      }) => Promise<void>;
+    }
+  ).__iglooTestAttachSimulator;
+  if (typeof hook !== "function") {
+    throw new Error(
+      "window.__iglooTestAttachSimulator is not installed — DEV hook missing.",
+    );
+  }
+  await hook(input);
+}
 
 /**
  * Tests for feature
@@ -97,6 +132,16 @@ describe("AppStateProvider — pendingDispatchIndex", () => {
     });
     await waitFor(() => expect(latest.createSession?.keyset).toBeTruthy());
 
+    // Capture the keyset snapshot BEFORE createProfile redacts the
+    // share secrets — the simulator attach below needs the plaintext
+    // shares to stand up virtual peers.
+    const session = latest.createSession!;
+    const capturedGroup = session.keyset!.group;
+    const capturedLocalShare = session.localShare!;
+    const capturedRemoteShares = session.keyset!.shares.filter(
+      (share) => share.idx !== capturedLocalShare.idx,
+    );
+
     await act(async () => {
       await latest.createProfile({
         deviceName: "Igloo Web",
@@ -108,6 +153,18 @@ describe("AppStateProvider — pendingDispatchIndex", () => {
       });
     });
     await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());
+
+    // Swap the live relay pump out for a simulator so this test
+    // exercises the virtual-peer-driven sign round-trip semantics
+    // that pre-date the fix-followup-create-bootstrap-live-relay-pump
+    // change.
+    await act(async () => {
+      await attachSimulator({
+        group: capturedGroup,
+        localShare: capturedLocalShare,
+        remoteShares: capturedRemoteShares,
+      });
+    });
 
     const message = "a".repeat(64);
     let result: { requestId: string | null; debounced: boolean } = {
@@ -169,6 +226,14 @@ describe("AppStateProvider — pendingDispatchIndex", () => {
     });
     await waitFor(() => expect(latest.createSession?.keyset).toBeTruthy());
 
+    // Capture the keyset snapshot BEFORE createProfile redacts it.
+    const session = latest.createSession!;
+    const capturedGroup = session.keyset!.group;
+    const capturedLocalShare = session.localShare!;
+    const capturedRemoteShares = session.keyset!.shares.filter(
+      (share) => share.idx !== capturedLocalShare.idx,
+    );
+
     await act(async () => {
       await latest.createProfile({
         deviceName: "Igloo Web",
@@ -180,6 +245,18 @@ describe("AppStateProvider — pendingDispatchIndex", () => {
       });
     });
     await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());
+
+    // Swap the live relay pump out for a simulator so this test
+    // exercises the virtual-peer-driven failure-enrichment semantics
+    // that pre-date the fix-followup-create-bootstrap-live-relay-pump
+    // change.
+    await act(async () => {
+      await attachSimulator({
+        group: capturedGroup,
+        localShare: capturedLocalShare,
+        remoteShares: capturedRemoteShares,
+      });
+    });
 
     const message = "f".repeat(64);
     let result: { requestId: string | null; debounced: boolean } = {
