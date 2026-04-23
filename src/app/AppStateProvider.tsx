@@ -2142,11 +2142,32 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       unlockedPasswordRef.current = draft.password;
       setActiveProfile(record.summary);
       setSignerPausedState(false);
+      // fix-m7-scrutiny-r1-onboard-distinct-share-full-handshake —
+      // emit an ONBOARD `local_mutation` entry on the requester side
+      // so both sponsor and requester surface an ONBOARD-tagged event
+      // log row for the same ceremony (VAL-ONBOARD-011). Payload is
+      // literal, scrub-safe metadata only — no share secrets, no
+      // passwords, no decoded payload copies (VAL-CROSS-011 /
+      // VAL-CROSS-024).
+      appendLocalMutationRuntimeEventLogEntry({
+        badge: "ONBOARD",
+        payload: {
+          kind: "onboard_adopted",
+          profile_id: profileId,
+          share_idx: share.idx,
+          peer_pubkey32: onboardSession.payload.peer_pk,
+        },
+      });
       setOnboardSession(null);
       await reloadProfiles();
       return profileId;
     },
-    [onboardSession, reloadProfiles, startRuntimeFromSnapshot],
+    [
+      onboardSession,
+      reloadProfiles,
+      startRuntimeFromSnapshot,
+      appendLocalMutationRuntimeEventLogEntry,
+    ],
   );
 
   const clearOnboardSession = useCallback(() => {
@@ -5136,6 +5157,49 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           at?: number;
         }>,
       ) => void;
+      // fix-m7-scrutiny-r1-onboard-distinct-share-full-handshake —
+      // seed the currently-active profile's `unadoptedSharesCiphertext`
+      // so the pool-gated `createOnboardSponsorPackage` mutator has
+      // the expected precondition in multi-device e2e specs. Encrypts
+      // the supplied shares under `password` via the same
+      // `encryptUnadoptedSharesPool` helper the Create flow uses and
+      // writes them back via `saveProfile`. DEV-only.
+      __iglooTestSeedUnadoptedSharesPool?: (input: {
+        profileId?: string;
+        password: string;
+        shares: Array<{
+          idx: number;
+          share_secret: string;
+          member_pubkey_x_only: string;
+        }>;
+      }) => Promise<void>;
+      // fix-m7-scrutiny-r1-onboard-distinct-share-full-handshake —
+      // drive the full requester-side adoption pipeline
+      // (decodeOnboardPackage → startOnboardHandshake →
+      // saveOnboardedProfile) for the onboard-sponsorship multi-device
+      // spec. Returns the new profile's id on success. DEV-only; the
+      // production UI uses the `/onboard` route.
+      __iglooTestAdoptOnboardPackage?: (input: {
+        packageText: string;
+        packagePassword: string;
+        profilePassword: string;
+      }) => Promise<string>;
+      // fix-m7-scrutiny-r1-onboard-distinct-share-full-handshake —
+      // expose the WASM `encode_bfonboard_package` bridge call so the
+      // multi-device e2e can construct a bfonboard package that embeds
+      // the real local dev relay (`ws://127.0.0.1:8194`). The
+      // production `createOnboardSponsorPackage` mutator validates
+      // relay URLs as `wss://`-only (matches the Settings-sidebar
+      // contract), so it cannot be used to generate the package that
+      // the requester actually adopts against the local relay. This
+      // hook intentionally bypasses validation; production UI must
+      // never invoke it.
+      __iglooTestEncodeBfonboardPackage?: (input: {
+        shareSecret: string;
+        relays: string[];
+        peerPk: string;
+        password: string;
+      }) => Promise<string>;
     };
     globalWindow.__appState = value;
     // Initialise the dev-only `__debug` surface once per provider mount.
@@ -5298,6 +5362,118 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         {
           share_secret: input.shareSecret,
           relays: input.relays,
+        },
+        input.password,
+      );
+    };
+    // fix-m7-scrutiny-r1-onboard-distinct-share-full-handshake —
+    // seed the active profile's `unadoptedSharesCiphertext` so the
+    // onboard-sponsorship multi-device spec can drive the pool-gated
+    // `createOnboardSponsorPackage` mutator without going through the
+    // full `createProfile` keyset distribution flow. Encrypts the
+    // supplied shares with the same `encryptUnadoptedSharesPool`
+    // helper the Create flow uses and writes them back via
+    // `saveProfile`. The caller is responsible for supplying a
+    // profile password that matches the currently-active profile.
+    globalWindow.__iglooTestSeedUnadoptedSharesPool = async (input) => {
+      const targetId =
+        input.profileId ?? activeProfileRef.current?.id ?? null;
+      if (!targetId) {
+        throw new Error(
+          "__iglooTestSeedUnadoptedSharesPool: no active profile id. " +
+            "Unlock a profile (or pass profileId) first.",
+        );
+      }
+      const record = await getProfile(targetId);
+      if (!record) {
+        throw new Error(
+          `__iglooTestSeedUnadoptedSharesPool: profile ${targetId} not found.`,
+        );
+      }
+      const pool: UnadoptedSharesPool = {
+        version: UNADOPTED_POOL_VERSION,
+        shares: input.shares.map((share) => ({
+          idx: share.idx,
+          share_secret: share.share_secret,
+          member_pubkey_x_only: share.member_pubkey_x_only,
+        })),
+      };
+      const ciphertext = await encryptUnadoptedSharesPool(pool, input.password);
+      await saveProfile({
+        ...record,
+        unadoptedSharesCiphertext: ciphertext,
+        shareAllocations: record.shareAllocations ?? [],
+      });
+    };
+    // fix-m7-scrutiny-r1-onboard-distinct-share-full-handshake —
+    // drive the full requester-side adoption pipeline so the
+    // onboard-sponsorship multi-device spec can drive a full
+    // sponsor→requester handshake to completion programmatically.
+    // This mirrors what the production `/onboard` route does via
+    // `OnboardScreens`: decode → start handshake → save profile.
+    // Returns the new profile's id on success so the caller can
+    // cross-reference it against IndexedDB or activeProfile.
+    globalWindow.__iglooTestAdoptOnboardPackage = async (input) => {
+      // IMPORTANT: each step reads the LATEST `value` via
+      // `globalWindow.__appState`, and we YIELD to React between
+      // mutators so state updates are flushed onto the provider
+      // before the next mutator's closure captures them.
+      //
+      // `startOnboardHandshake` / `saveOnboardedProfile` close over
+      // `onboardSession`. Chaining them back-to-back inside an async
+      // test hook without yielding leaves the second mutator's
+      // closure-captured `onboardSession` at its pre-decode value
+      // (null), throwing "Decode an onboarding package before
+      // starting the handshake." The polling below waits until the
+      // provider re-renders and re-assigns `window.__appState` with
+      // an updated `onboardSession.phase`.
+      const latest = () => {
+        const state = globalWindow.__appState;
+        if (!state) {
+          throw new Error(
+            "__iglooTestAdoptOnboardPackage: AppState bridge unavailable.",
+          );
+        }
+        return state;
+      };
+      const waitForPhase = async (
+        expected: "decoded" | "ready_to_save",
+        timeoutMs = 30_000,
+      ) => {
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+          const session = globalWindow.__appState?.onboardSession ?? null;
+          if (session && session.phase === expected) return;
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        throw new Error(
+          `__iglooTestAdoptOnboardPackage: timed out waiting for ` +
+            `onboardSession.phase === "${expected}".`,
+        );
+      };
+      await latest().decodeOnboardPackage(
+        input.packageText,
+        input.packagePassword,
+      );
+      await waitForPhase("decoded");
+      await latest().startOnboardHandshake();
+      await waitForPhase("ready_to_save");
+      return latest().saveOnboardedProfile({
+        password: input.profilePassword,
+        confirmPassword: input.profilePassword,
+      });
+    };
+    // fix-m7-scrutiny-r1-onboard-distinct-share-full-handshake —
+    // encode a bfonboard package bypassing the production
+    // `createOnboardSponsorPackage` relay-URL validation. See the
+    // `__iglooTestEncodeBfonboardPackage` type declaration above for
+    // the full rationale.
+    globalWindow.__iglooTestEncodeBfonboardPackage = async (input) => {
+      return encodeOnboardPackage(
+        {
+          share_secret: input.shareSecret,
+          relays: input.relays,
+          peer_pk: input.peerPk,
         },
         input.password,
       );
