@@ -14,6 +14,7 @@ import {
   encodeOnboardPackage,
   generateNsec,
   onboardPayloadForRemoteShare,
+  peerPolicyOverridesFromPermissions,
   profilePayloadForShare,
   recoverNsecFromShares,
   resolveShareIndex,
@@ -70,6 +71,24 @@ describe("bifrost wasm package service", () => {
       ecdh: "allow"
     });
     expect(policyOverrides[0].policy.respond).toEqual({
+      echo: "allow",
+      ping: "allow",
+      onboard: "allow",
+      sign: "allow",
+      ecdh: "allow"
+    });
+    const customPolicyOverrides = peerPolicyOverridesFromPermissions(keyset.group, localShare.idx, {
+      [keyset.group.members[1].idx]: { sign: false, onboard: false }
+    });
+    expect(customPolicyOverrides[0].policy.request).toEqual({
+      echo: "allow",
+      ping: "allow",
+      onboard: "deny",
+      sign: "deny",
+      ecdh: "allow"
+    });
+    expect(customPolicyOverrides[0].policy.respond).toEqual(customPolicyOverrides[0].policy.request);
+    expect(customPolicyOverrides[1].policy.request).toEqual({
       echo: "allow",
       ping: "allow",
       onboard: "allow",

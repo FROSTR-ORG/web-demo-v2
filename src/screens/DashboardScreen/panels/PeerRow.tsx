@@ -1,6 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
-import { PermissionBadge } from "../../../components/ui";
+import { PeerPermissionTag } from "../../../components/PeerPermissionTags";
 import { shortHex } from "../../../lib/bifrost/format";
 import { resolveRequestPolicyAllows } from "../../../lib/bifrost/policy";
 import type {
@@ -176,10 +176,10 @@ export function PeerRow({
          */}
         {peer.online || usePolicy ? (
           <span className="inline-actions">
-            {grants.sign ? <PermissionBadge>SIGN</PermissionBadge> : null}
-            {grants.ecdh ? <PermissionBadge tone="info">ECDH</PermissionBadge> : null}
-            {grants.ping ? <PermissionBadge tone="ping">PING</PermissionBadge> : null}
-            {grants.onboard ? <PermissionBadge tone="onboard">ONBOARD</PermissionBadge> : null}
+            {grants.sign ? <PeerPermissionTag method="sign" /> : null}
+            {grants.ecdh ? <PeerPermissionTag method="ecdh" /> : null}
+            {grants.ping ? <PeerPermissionTag method="ping" /> : null}
+            {grants.onboard ? <PeerPermissionTag method="onboard" /> : null}
           </span>
         ) : null}
       </div>

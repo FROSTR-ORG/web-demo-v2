@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useAppState } from "../../../app/AppState";
 import type { PolicyOverrideEntry } from "../../../app/AppStateTypes";
-import { PermissionBadge } from "../../../components/ui";
+import { PeerPermissionTagGroup } from "../../../components/PeerPermissionTags";
 import { shortHex } from "../../../lib/bifrost/format";
 import { resolveRequestPolicyAllows } from "../../../lib/bifrost/policy";
 import type {
@@ -391,30 +391,7 @@ export function PoliciesState({
                       </span>
                     </div>
                     <div className="policies-peer-badges">
-                      <PermissionBadge
-                        tone="success"
-                        muted={!peer.permissions.sign}
-                      >
-                        SIGN
-                      </PermissionBadge>
-                      <PermissionBadge
-                        tone="info"
-                        muted={!peer.permissions.ecdh}
-                      >
-                        ECDH
-                      </PermissionBadge>
-                      <PermissionBadge
-                        tone="ping"
-                        muted={!peer.permissions.ping}
-                      >
-                        PING
-                      </PermissionBadge>
-                      <PermissionBadge
-                        tone="onboard"
-                        muted={!peer.permissions.onboard}
-                      >
-                        ONBOARD
-                      </PermissionBadge>
+                      <PeerPermissionTagGroup values={peer.permissions} />
                     </div>
                   </div>
                 ))

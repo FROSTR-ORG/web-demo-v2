@@ -3,6 +3,10 @@ import { Check, ChevronLeft, Copy, Eye, EyeOff, Minus, Plus, QrCode } from "luci
 import { useEffect, useId, useState } from "react";
 import QRCode from "qrcode";
 import { Modal } from "./Modal";
+import {
+  PeerPermissionTag,
+  type PeerPermissionTone,
+} from "./PeerPermissionTags";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "chip" | "header" | "outline" | "success" | "ghost-blue" | "destructive-outline-compact";
 type ButtonSize = "sm" | "md" | "full" | "icon";
@@ -210,8 +214,12 @@ export function StatusPill({
   );
 }
 
-export function PermissionBadge({ children, tone = "success", muted = false }: { children: ReactNode; tone?: "success" | "info" | "ping" | "onboard"; muted?: boolean }) {
-  return <span className={`permission-badge ${tone} ${muted ? "muted" : ""}`}>{children}</span>;
+export function PermissionBadge({ children, tone = "success", muted = false }: { children: ReactNode; tone?: PeerPermissionTone; muted?: boolean }) {
+  return (
+    <PeerPermissionTag tone={tone} active={!muted}>
+      {children}
+    </PeerPermissionTag>
+  );
 }
 
 export function SecretDisplay({

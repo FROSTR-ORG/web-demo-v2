@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  PeerPermissionTag,
+  type PeerPermissionTone,
+} from "../../../components/PeerPermissionTags";
 import type { BfPolicyOverrideValue } from "../../../lib/bifrost/types";
 
 /**
@@ -35,10 +39,9 @@ export type PeerPolicyChipMethod = "sign" | "ecdh" | "ping" | "onboard";
 
 /**
  * Visual tone used for the chip's "allow" state — mirrors the existing
- * `PermissionBadge` tone palette so the chip drops into the existing
- * layout without visual drift (VAL-POLICIES-001 Paper parity).
+ * Shared peer-permission tag tone used for the chip's "allow" state.
  */
-export type PeerPolicyChipTone = "success" | "info" | "ping" | "onboard";
+export type PeerPolicyChipTone = PeerPermissionTone;
 
 export interface PeerPolicyChipProps {
   /** 64-char hex peer pubkey the chip targets. */
@@ -62,7 +65,7 @@ export interface PeerPolicyChipProps {
   /**
    * Whether the runtime's CURRENT `effective_policy` evaluates to an
    * allow-grant for this (peer, method). Used purely for visual parity
-   * with the existing `PermissionBadge` (`muted` iff !allowed) when the
+   * with the shared peer-permission tag (`muted` iff !allowed) when the
    * chip's cycle state is `unset` — explicit `allow` / `deny` override
    * values drive the visual themselves regardless of this prop.
    */
@@ -229,10 +232,7 @@ export function PeerPolicyChip({
         : !effectiveAllows;
 
   const classes = [
-    "permission-badge",
     "peer-policy-chip",
-    tone,
-    muted ? "muted" : "",
     currentValue === "allow" ? "allow" : "",
     currentValue === "deny" ? "deny" : "",
   ]
@@ -243,11 +243,15 @@ export function PeerPolicyChip({
 
   return (
     <>
-      <button
+      <PeerPermissionTag
         type="button"
         role="button"
         className={classes}
-        aria-pressed={currentValue === "allow"}
+        method={method}
+        tone={tone}
+        active={!muted}
+        interactive
+        pressed={currentValue === "allow"}
         aria-label={ariaLabel}
         data-state={currentValue}
         data-testid={`peer-policy-chip-${peer}-${method}`}
@@ -255,7 +259,7 @@ export function PeerPolicyChip({
         onKeyDown={onKeyDown}
       >
         {children}
-      </button>
+      </PeerPermissionTag>
       {errorMessage ? (
         <span
           role="status"
