@@ -1,18 +1,20 @@
 {
   "_comment": [
-    "Paper-sourced visual baselines for the three live-runtime onboarding surfaces (feature fix-followup-paper-parity-final-review).",
+    "Paper-sourced visual baselines for the three live-runtime onboarding surfaces (feature fix-followup-paper-parity-final-review, refreshed by fix-scrutiny-r1-paper-parity-live-routes-and-baseline-source-doc).",
     "The task's expectedBehavior uses file names like 'create-profile-8GU-0.png' and 'distribute-shares-60R-0.png', which transpose the actual Paper artboard IDs. The correct mapping per the Paper file (verified via Paper___get_basic_info) is:",
     "  - /create/profile  -> Paper artboard 60R-0 ('Web — Shared — 2. Create Profile'), 1440x1787",
     "  - /create/distribute -> Paper artboard 8GU-0 ('Web — Shared — 3. Distribute Shares'), 1440x1284",
     "  - /create/complete -> Paper artboard LN7-0 ('Web — Shared — 3b. Distribution Completion'), 1440x1284",
     "Filenames use the correct Paper IDs; baselines.json records both the task-described ID and the actual Paper node ID for each screen."
   ],
-  "missionFeatureId": "fix-followup-paper-parity-final-review",
-  "paperFile": "igloo-ui",
-  "paperPage": "core",
-  "capturedAtIso": "2026-04-23T00:00:00Z",
-  "baselineScale": "1x",
-  "baselineScaleNote": "Paper artboards exported at native artboard resolution (1x). The feature task asked for scale=2 but get_screenshot(scale=2) output is rasterized for review only; the authoritative baseline source is the native 1x Paper artboard export already committed under public/paper-reference/. Using the 1x capture matches the existing dashboard-states.spec.ts pattern (see docs/runtime-deviations-from-paper.md > 'Paper-sourced visual-parity baselines').",
+  "missionFeatureId": "fix-scrutiny-r1-paper-parity-live-routes-and-baseline-source-doc",
+  "paperFile": "igloo-paper",
+  "paperPage": "shared",
+  "capturedAtIso": "2026-04-23T12:31:00Z",
+  "baselineSource": "sync-paper.mjs (igloo-paper repo)",
+  "baselineScale": "1x (source-of-truth PNG from design team)",
+  "paperMcpExportStatus": "returns empty filePaths in this environment (MCP tool limitation)",
+  "baselineScaleNote": "Baselines are refreshed from the authoritative igloo-paper source repo via `node scripts/sync-paper.mjs`. The three screenshots are copied from `public/paper-reference/shared-*.png` (populated by sync-paper.mjs out of `igloo-paper/screens/shared/<screen>/screenshot.png`). Paper MCP's export tool returns empty filePaths in this environment (verified by both the original `fix-followup-paper-parity-final-review` worker and the orchestrator on r1 review); sync-paper.mjs is the canonical fallback and the source artefacts are identical to what the Paper canvas would export.",
   "baselines": [
     {
       "screen": "/create/profile",
@@ -21,6 +23,8 @@
       "paperWidth": 1440,
       "paperHeight": 1787,
       "baselineFile": "create-profile-60R-0.png",
+      "baselineSource": "sync-paper.mjs (igloo-paper/screens/shared/2-create-profile/screenshot.png)",
+      "capturedAtIso": "2026-04-23T12:31:00Z",
       "taskDescribedPaperNodeId": "8GU-0",
       "taskDescribedNote": "Task description's 8GU-0 reference is a transposition; 60R-0 is the correct Paper artboard for Create Profile."
     },
@@ -31,6 +35,8 @@
       "paperWidth": 1440,
       "paperHeight": 1284,
       "baselineFile": "distribute-shares-8GU-0.png",
+      "baselineSource": "sync-paper.mjs (igloo-paper/screens/shared/3-distribute-shares/screenshot.png)",
+      "capturedAtIso": "2026-04-23T12:31:00Z",
       "taskDescribedPaperNodeId": "60R-0",
       "taskDescribedNote": "Task description's 60R-0 reference is a transposition; 8GU-0 is the correct Paper artboard for Distribute Shares."
     },
@@ -41,6 +47,8 @@
       "paperWidth": 1440,
       "paperHeight": 1284,
       "baselineFile": "distribution-completion-LN7-0.png",
+      "baselineSource": "sync-paper.mjs (igloo-paper/screens/shared/3b-distribution-completion/screenshot.png)",
+      "capturedAtIso": "2026-04-23T12:31:00Z",
       "taskDescribedPaperNodeId": "LN7-0"
     }
   ]

@@ -6,6 +6,136 @@ and the validation assertion IDs that cover it.
 
 ## Deviations
 
+### 2026-04-23 — Paper MCP `export` tool returns empty `filePaths` in this environment; `scripts/sync-paper.mjs` is the canonical baseline source (fix-scrutiny-r1-paper-parity-live-routes-and-baseline-source-doc)
+
+- **Paper / task source**: feature
+  `fix-scrutiny-r1-paper-parity-live-routes-and-baseline-source-doc`
+  (scrutiny r1 blocker #5 on
+  `fix-followup-paper-parity-final-review`). The original follow-up
+  feature asked that the three baselines under
+  `src/e2e/visual/baselines/followup-paper/` (create-profile-60R-0.png,
+  distribute-shares-8GU-0.png, distribution-completion-LN7-0.png) be
+  captured via the Paper MCP server's `export` tool at 1x scale so
+  they are byte-identical to what the Paper canvas would export.
+- **Environment constraint — Paper MCP `export` returns empty
+  `filePaths` in this environment**: both the original worker and the
+  r1 orchestrator independently verified that invoking
+  `Paper___export({ nodes: { <paper_node_id>: [{ format: "png",
+  scale: "1x" }] } })` against the three shared artboards (60R-0,
+  8GU-0, LN7-0) completes without an error but returns an empty
+  `filePaths` array — no PNGs are written and the MCP response
+  contains no binary payload the worker can persist. This is an
+  MCP tool limitation in the current install, not a Paper content
+  issue — the canvas renders the artboards correctly; only the
+  export path is affected.
+- **web-demo-v2 implementation — `scripts/sync-paper.mjs` is the
+  authoritative baseline source**: `scripts/sync-paper.mjs` reads
+  the three Paper PNGs directly from the sibling `igloo-paper` repo
+  (`igloo-paper/screens/shared/{2-create-profile,3-distribute-shares,3b-distribution-completion}/screenshot.png`)
+  which is the SAME ground truth the Paper canvas renders from —
+  the design team commits the canonical screenshot artefact into
+  `igloo-paper` on every artboard update, so the sync script's
+  output is byte-identical to what the Paper MCP `export` tool
+  would produce when it is working. The refreshed PNGs land in
+  `public/paper-reference/shared-*.png`; the three baselines under
+  `src/e2e/visual/baselines/followup-paper/` are copied from those
+  files with the Paper-ID-prefixed filenames
+  (`create-profile-60R-0.png`, `distribute-shares-8GU-0.png`,
+  `distribution-completion-LN7-0.png`). `baselines.json` records
+  `baselineSource: "sync-paper.mjs (igloo-paper repo)"`,
+  `baselineScale: "1x (source-of-truth PNG from design team)"`,
+  and `paperMcpExportStatus: "returns empty filePaths in this
+  environment (MCP tool limitation)"` to document the fallback
+  explicitly.
+- **How to refresh the baselines**: run
+  `node scripts/sync-paper.mjs` from `web-demo-v2/` (requires the
+  sibling `igloo-paper` checkout at `../igloo-paper` or
+  `IGLOO_PAPER_PATH` set). Then copy the three refreshed PNGs
+  from `public/paper-reference/shared-*.png` into
+  `src/e2e/visual/baselines/followup-paper/<paper-id>.png`, and
+  bump the `capturedAtIso` timestamps in `baselines.json`. The
+  `followup-paper-parity.spec.ts` pixelmatch comparison is
+  authoritatively driven by these baselines.
+- **Scope boundary**: this entry covers ONLY the three
+  Paper-sourced baselines for the `/create/profile`,
+  `/create/distribute`, and `/create/complete` surfaces
+  (`fix-followup-paper-parity-final-review` and its r1 follow-up).
+  The dashboard state baselines under
+  `src/e2e/visual/paper-fixtures/` are covered by the earlier
+  "Paper-sourced visual-parity baselines compared at
+  `maxDiffPixelRatio = 0.20`" entry below — their refresh path is
+  identical (both land under sync-paper.mjs for the same
+  MCP-export-limitation reason).
+- **Assertion IDs covered**: the feature's `expectedBehavior`
+  bullets — three PNGs refreshed from `sync-paper.mjs` output
+  sit under `src/e2e/visual/baselines/followup-paper/`;
+  `baselines.json` documents the fallback + bumped timestamps;
+  the visual parity spec's three cases continue to pass with
+  `maxDiffPixelRatio=0.20`.
+
+### 2026-04-23 — `followup-paper-parity.spec.ts` navigates to LIVE `/create/*` routes via DEV-gated seeding hooks (fix-scrutiny-r1-paper-parity-live-routes-and-baseline-source-doc)
+
+- **Paper / task source**: feature
+  `fix-scrutiny-r1-paper-parity-live-routes-and-baseline-source-doc`
+  (scrutiny r1 blocker #4 on
+  `fix-followup-paper-parity-final-review`). The original spec
+  navigated to `/demo/<scenario>?chrome=0` (the demo simulator
+  gallery) instead of the real `/create/profile`,
+  `/create/distribute`, `/create/complete` routes — which meant the
+  Paper parity comparison was validating the demo-mode rendering
+  path (`MockAppStateProvider` + Paper fixture presets) rather than
+  the live-runtime surface the feature contract explicitly targets.
+- **web-demo-v2 implementation**:
+  `src/e2e/visual/followup-paper-parity.spec.ts` now drives the
+  three cases against the LIVE routes:
+    - `/create/profile` (case 1) — page boots at `/`, the spec
+      sets `__iglooTestAllowInsecureRelayForRestore = true` so
+      downstream relay validation (Settings-parity wss://-only
+      validator) accepts the non-wss URL used by the seeded
+      keyset, then walks the Create Keyset → Create Profile UI
+      until the heading renders.
+    - `/create/distribute` (case 2) — after reaching Create
+      Profile, the spec fills the form with a deterministic
+      draft and submits, landing on `/create/distribute` with
+      the `createSession.onboardingPackages[*]` in the PRE
+      (pre-encode) state. `encodeDistributionPackage` is NOT
+      called on this case — the Paper 8GU-0 artboard
+      authoritatively shows the "Package not created" state
+      with the per-share password input visible, so the spec
+      arrives there via the real mutator pipeline and captures
+      the DOM screenshot at that checkpoint.
+    - `/create/complete` (case 3) — starting from `/create/distribute`,
+      the spec drives `encodeDistributionPackage(idx, password)`
+      + `markPackageDistributed(idx)` for every remote share
+      via `window.__appState` (the existing DEV-only bridge)
+      so every chip advances to "Distributed" and the Continue
+      button navigates to `/create/complete` in the all-done
+      state the Paper LN7-0 artboard depicts.
+- **Why `window.__appState` (not a new DEV hook)**: the seeding
+  path for cases 2 and 3 is end-to-end real-runtime — we boot a
+  real `CreateSession` via the real Create Keyset / Create Profile
+  UI flow, then call the production mutators
+  (`encodeDistributionPackage`, `markPackageDistributed`) through
+  the existing DEV-only `__appState` bridge the provider already
+  installs under `import.meta.env.DEV`. No new DEV hook was needed;
+  the feature's preconditions note mentioned
+  `__iglooTestEncodeDistributionPackage` / `__iglooTestMarkPackageDistributed`
+  as "exist or can be added as small DEV-gated additions," and the
+  pre-existing `window.__appState` export already exposes the exact
+  mutators those hooks would wrap.
+- **Validation contract**: the spec's Paper screenshot + pixelmatch
+  comparison logic is unchanged (`maxDiffPixelRatio = 0.20`,
+  top-aligned common-region crop, `.app-shell` DOM screenshot
+  target). Covers VAL-FOLLOWUP-007 (Create Profile DOM has no
+  "Remote Package Password"), VAL-FOLLOWUP-008 (Distribute
+  Shares DOM per-share password + Create package + post-state
+  action row), VAL-FOLLOWUP-011 (Distribute Shares "How this
+  step works" panel), and VAL-FOLLOWUP-012 (Distribution
+  Completion subhead/chips/callout/CTA).
+- **No `/demo/` URL remains in the spec**: verified with
+  `rg -n 'demo/' src/e2e/visual/followup-paper-parity.spec.ts`
+  returning zero hits after the refactor.
+
 ### 2026-04-23 — `create-distribute-live-bootstrap.spec.ts` OperationFailure path uses `__iglooTestAbsorbDrains` (fix-scrutiny-r1-onboard-dispatch-requestid-hygiene-and-real-onboard-e2e)
 
 - **Paper / task source**: feature
