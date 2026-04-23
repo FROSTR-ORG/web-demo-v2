@@ -544,6 +544,8 @@ describe("MockAppStateProvider bridge arming", () => {
     replaceShareSession: null,
     recoverSession: null,
     onboardSponsorSession: null,
+    onboardSponsorSessions: {},
+    activeOnboardSponsorRequestId: null,
     createOnboardSponsorPackage: async () => "bfonboard1mock",
     clearOnboardSponsorSession: () => undefined,
     reloadProfiles: async () => undefined,

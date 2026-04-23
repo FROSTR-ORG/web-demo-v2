@@ -38,6 +38,12 @@ const RUNTIME_BADGES: RuntimeEventLogBadge[] = [
   "INFO",
   "ERROR",
   "BACKUP_PUBLISH",
+  // fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — the
+  // VAL-ONBOARD-011 contract requires onboarding lifecycle entries
+  // (completion + failure) to carry a distinct ONBOARD badge so
+  // Event Log filters can isolate them from the generic INFO /
+  // ERROR buckets.
+  "ONBOARD",
 ];
 
 /**
@@ -70,6 +76,8 @@ function runtimeBadgeClassName(badge: RuntimeEventLogBadge): string {
       return "error";
     case "BACKUP_PUBLISH":
       return "backup-publish";
+    case "ONBOARD":
+      return "onboard";
   }
 }
 
@@ -159,6 +167,29 @@ function summarizeEntry(entry: RuntimeEventLogEntry): string {
         return `Backup publish failed — all ${count} relays offline`;
       }
       return "Backup publish failed";
+    }
+    // fix-m7-scrutiny-r1-sponsor-concurrency-and-badge —
+    // VAL-ONBOARD-011 ONBOARD badge summaries. Truncate
+    // request_id to 10 chars like the completion-channel copy for
+    // consistency.
+    const onboardPayload = entry.payload as {
+      kind?: string;
+      request_id?: string;
+      peer_pubkey32?: string | null;
+      reason?: string;
+    } | null;
+    if (onboardPayload?.kind === "onboard_completed") {
+      const rid = onboardPayload.request_id ?? "";
+      return rid
+        ? `Onboard completed (${rid.slice(0, 10)})`
+        : "Onboard completed";
+    }
+    if (onboardPayload?.kind === "onboard_failed") {
+      const rid = onboardPayload.request_id ?? "";
+      const trail = onboardPayload.reason ? ` — ${onboardPayload.reason}` : "";
+      return rid
+        ? `Onboard failed (${rid.slice(0, 10)})${trail}`
+        : `Onboard failed${trail}`;
     }
     return "Local mutation";
   }

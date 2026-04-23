@@ -548,7 +548,8 @@ export type RuntimeEventLogBadge =
   | "READY"
   | "INFO"
   | "ERROR"
-  | "BACKUP_PUBLISH";
+  | "BACKUP_PUBLISH"
+  | "ONBOARD";
 
 /**
  * Origin of a {@link RuntimeEventLogEntry}: which of the runtime
@@ -679,8 +680,39 @@ export interface AppStateValue {
    * m7-onboard-sponsor — see {@link OnboardSponsorSession}. Non-null
    * only while the sponsor hand-off screen is active. Cleared by
    * {@link clearOnboardSponsorSession}.
+   *
+   * Derived convenience field that surfaces
+   * {@link onboardSponsorSessions}[{@link activeOnboardSponsorRequestId}]
+   * — the session the UI should focus on (last-dispatched wins). Use
+   * {@link onboardSponsorSessions} when iterating all in-flight
+   * sponsorships (fix-m7-scrutiny-r1-sponsor-concurrency-and-badge,
+   * VAL-ONBOARD-013).
    */
   onboardSponsorSession: OnboardSponsorSession | null;
+  /**
+   * fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — all in-flight
+   * onboarding sponsor sessions keyed by the runtime-assigned
+   * `request_id` captured from the outbound `Onboard` command. Two
+   * concurrent {@link createOnboardSponsorPackage} invocations produce
+   * two distinct entries in this map so the second dispatch does NOT
+   * overwrite the first's session state (VAL-ONBOARD-013).
+   *
+   * When the runtime fails to assign a request_id synchronously (e.g.
+   * dispatch rejected because the signer was paused mid-call), the
+   * session is stored under a local-only sentinel key
+   * (`local-failure-<timestamp>`) so the handoff screen can still
+   * render the failure tone to the user.
+   */
+  onboardSponsorSessions: Record<string, OnboardSponsorSession>;
+  /**
+   * fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — key into
+   * {@link onboardSponsorSessions} for the session the UI should
+   * render on the handoff screen. Last-dispatched wins for UI focus.
+   * `null` when no active sponsorship is in flight OR when the only
+   * entries have been cleared via
+   * {@link clearOnboardSponsorSession}.
+   */
+  activeOnboardSponsorRequestId: string | null;
   /**
    * Successful operation completions drained from the runtime, ordered by
    * ascending `request_id`. Populated each refresh tick by AppStateProvider
@@ -1194,10 +1226,20 @@ export interface AppStateValue {
     profilePassword: string;
   }) => Promise<string>;
   /**
-   * m7-onboard-sponsor — clear any active sponsorship session. Called
-   * by Cancel on the hand-off screen and on profile lock / clear.
+   * m7-onboard-sponsor — clear an onboard sponsor session.
+   *
+   * fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — the optional
+   * `requestId` argument targets a specific entry in
+   * {@link onboardSponsorSessions}. When omitted, the currently
+   * active session (the one matching
+   * {@link activeOnboardSponsorRequestId}) is cleared. Either
+   * variant applies a `respond.onboard = deny` policy override for
+   * the cleared session's target peer so any late response from the
+   * requester is rejected by the local runtime (VAL-ONBOARD-014).
+   * Called by Cancel on the hand-off screen and on profile lock /
+   * clear.
    */
-  clearOnboardSponsorSession: () => void;
+  clearOnboardSponsorSession: (requestId?: string) => void;
   /**
    * Dispatches a runtime command to the underlying
    * `RuntimeClient.handleCommand`. The call is synchronous on the bridge but

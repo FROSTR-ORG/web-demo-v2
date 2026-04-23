@@ -61,9 +61,53 @@ export function MockAppStateProvider({
     value.replaceShareSession,
   );
   const [recoverSession, setRecoverSession] = useState(value.recoverSession);
-  const [onboardSponsorSession, setOnboardSponsorSession] = useState<
-    import("./AppStateTypes").OnboardSponsorSession | null
-  >(value.onboardSponsorSession ?? null);
+  // fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — Map-based
+  // sessions state mirroring the real provider. The single-slot
+  // `onboardSponsorSession` remains as a derived convenience view on
+  // the active request_id for backward compat.
+  const [onboardSponsorSessions, setOnboardSponsorSessions] = useState<
+    Record<string, import("./AppStateTypes").OnboardSponsorSession>
+  >(() => {
+    if (
+      value.onboardSponsorSessions &&
+      Object.keys(value.onboardSponsorSessions).length > 0
+    ) {
+      return value.onboardSponsorSessions;
+    }
+    if (!value.onboardSponsorSession) return {};
+    const key =
+      value.activeOnboardSponsorRequestId ??
+      value.onboardSponsorSession.requestId ??
+      "local-mock-active";
+    return { [key]: value.onboardSponsorSession };
+  });
+  const [
+    activeOnboardSponsorRequestId,
+    setActiveOnboardSponsorRequestId,
+  ] = useState<string | null>(() => {
+    // Prefer an explicit activeOnboardSponsorRequestId from the
+    // fixture value; fall back to promoting the single-slot
+    // `onboardSponsorSession` to the active entry so legacy test
+    // fixtures (which only set the single-slot field) keep
+    // surfacing the session through the derived convenience field.
+    if (
+      value.activeOnboardSponsorRequestId !== undefined &&
+      value.activeOnboardSponsorRequestId !== null
+    ) {
+      return value.activeOnboardSponsorRequestId;
+    }
+    if (!value.onboardSponsorSession) return null;
+    return (
+      value.onboardSponsorSession.requestId ?? "local-mock-active"
+    );
+  });
+  const onboardSponsorSession = useMemo(
+    () =>
+      activeOnboardSponsorRequestId !== null
+        ? onboardSponsorSessions[activeOnboardSponsorRequestId] ?? null
+        : null,
+    [activeOnboardSponsorRequestId, onboardSponsorSessions],
+  );
   const [runtimeCompletions, setRuntimeCompletions] = useState(
     value.runtimeCompletions ?? [],
   );
@@ -362,24 +406,51 @@ export function MockAppStateProvider({
   // inject a spy via `value.createOnboardSponsorPackage`) but mirror the
   // generated session locally so UI rendering follows the real
   // AppStateProvider contract.
+  //
+  // fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — store the
+  // session in the Map keyed by a fresh sentinel request_id (the
+  // underlying mock mutator doesn't return a real runtime request_id)
+  // and update activeRequestId so the UI focuses the latest dispatch.
   const createOnboardSponsorPackage = useCallback(
     async (input: Parameters<AppStateValue["createOnboardSponsorPackage"]>[0]) => {
       const packageText = await value.createOnboardSponsorPackage(input);
-      setOnboardSponsorSession({
-        deviceLabel: input.deviceLabel.trim(),
-        packageText,
-        relays: input.relays,
-        createdAt: Date.now(),
-      });
+      const sentinelKey = `local-mock-${Date.now()}-${Math.floor(
+        Math.random() * 1_000_000,
+      )}`;
+      setOnboardSponsorSessions((previous) => ({
+        ...previous,
+        [sentinelKey]: {
+          deviceLabel: input.deviceLabel.trim(),
+          packageText,
+          relays: input.relays,
+          createdAt: Date.now(),
+          requestId: null,
+          status: "awaiting_adoption",
+        },
+      }));
+      setActiveOnboardSponsorRequestId(sentinelKey);
       return packageText;
     },
     [value],
   );
 
-  const clearOnboardSponsorSession = useCallback(() => {
-    value.clearOnboardSponsorSession();
-    setOnboardSponsorSession(null);
-  }, [value]);
+  const clearOnboardSponsorSession = useCallback(
+    (requestId?: string) => {
+      value.clearOnboardSponsorSession(requestId);
+      const targetKey = requestId ?? activeOnboardSponsorRequestId;
+      if (targetKey === null) return;
+      setOnboardSponsorSessions((previous) => {
+        if (!(targetKey in previous)) return previous;
+        const next = { ...previous };
+        delete next[targetKey];
+        return next;
+      });
+      if (targetKey === activeOnboardSponsorRequestId) {
+        setActiveOnboardSponsorRequestId(null);
+      }
+    },
+    [value, activeOnboardSponsorRequestId],
+  );
 
   const validateRotateKeysetSources: AppStateValue["validateRotateKeysetSources"] =
     useCallback(
@@ -762,6 +833,8 @@ export function MockAppStateProvider({
       replaceShareSession,
       recoverSession,
       onboardSponsorSession,
+      onboardSponsorSessions,
+      activeOnboardSponsorRequestId,
       runtimeCompletions,
       runtimeFailures,
       lifecycleEvents,
@@ -832,6 +905,8 @@ export function MockAppStateProvider({
       replaceShareSession,
       recoverSession,
       onboardSponsorSession,
+      onboardSponsorSessions,
+      activeOnboardSponsorRequestId,
       runtimeCompletions,
       runtimeFailures,
       lifecycleEvents,

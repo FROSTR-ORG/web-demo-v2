@@ -285,6 +285,8 @@ export function createDemoAppState(
     replaceShareSession: null,
     recoverSession: null,
     onboardSponsorSession: null,
+    onboardSponsorSessions: {},
+    activeOnboardSponsorRequestId: null,
     reloadProfiles: async () => undefined,
     createKeyset: async () => undefined,
     createProfile: async () => DEMO_PROFILE_ID,

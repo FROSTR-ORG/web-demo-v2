@@ -6329,6 +6329,10 @@ button.peer-policy-chip.deny:focus-visible {
 .event-log-type.info { color: #94a3b8; border-color: rgba(148, 163, 184, 0.3); }
 .event-log-type.error { color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
 .event-log-type.backup-publish { color: #fb923c; border-color: rgba(251, 146, 60, 0.3); }
+/* fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — ONBOARD badge
+   uses the same amber hue as the Pending panel's onboard badge
+   (.pending-kind.onboard) for visual consistency across panels. */
+.event-log-type.onboard { color: #f59e0b; border-color: rgba(245, 158, 11, 0.3); }
 
 .event-log-filter-actions {
   display: flex;

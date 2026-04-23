@@ -165,12 +165,25 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   // m7-onboard-sponsor — transient hand-off state between the Config and
   // Handoff screens. Populated by `createOnboardSponsorPackage`, cleared
   // on Cancel / lock / clearCredentials.
+  //
+  // fix-m7-scrutiny-r1-sponsor-concurrency-and-badge —
+  // `onboardSponsorSessions` is a Map-style record keyed by the
+  // runtime-assigned `request_id`, so two concurrent sponsorships
+  // produce two independently-tracked sessions (VAL-ONBOARD-013).
+  // `activeOnboardSponsorRequestId` tracks the UI focus (last-
+  // dispatched wins); the derived convenience field
+  // `onboardSponsorSession` surfaces that entry for the handoff
+  // screen, which only renders one ceremony at a time.
   const [
-    onboardSponsorSession,
-    setOnboardSponsorSession,
+    onboardSponsorSessions,
+    setOnboardSponsorSessions,
   ] = useState<
-    import("./AppStateTypes").OnboardSponsorSession | null
-  >(null);
+    Record<string, import("./AppStateTypes").OnboardSponsorSession>
+  >({});
+  const [
+    activeOnboardSponsorRequestId,
+    setActiveOnboardSponsorRequestId,
+  ] = useState<string | null>(null);
   const [runtimeCompletions, setRuntimeCompletions] = useState<
     CompletedOperation[]
   >([]);
@@ -374,15 +387,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   } | null>(null);
   const onboardHandshakeSeq = useRef(0);
   /**
-   * m7-onboard-sponsor-flow — mirror of `onboardSponsorSession` as a
+   * m7-onboard-sponsor-flow — mirror of `onboardSponsorSessions` as a
    * ref so `absorbDrains` and `clearOnboardSponsorSession` can inspect
-   * the current session without being re-created on every render
+   * the current sessions map without being re-created on every render
    * (their `useCallback`s must keep a stable identity so the
    * RuntimeRelayPump `onDrains` callback wired at pump-start does not
    * hold a stale closure).
+   *
+   * fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — the ref stores
+   * the FULL sessions map (keyed by request_id) so drain-handlers can
+   * route an incoming Onboard completion or failure to the session
+   * matching the envelope's request_id even when it isn't the UI's
+   * currently-active session.
    */
-  const onboardSponsorSessionRef =
-    useRef<import("./AppStateTypes").OnboardSponsorSession | null>(null);
+  const onboardSponsorSessionsRef = useRef<
+    Record<string, import("./AppStateTypes").OnboardSponsorSession>
+  >({});
+  /**
+   * Mirror of {@link activeOnboardSponsorRequestId} for stable
+   * callbacks (same rationale as {@link onboardSponsorSessionsRef}).
+   */
+  const activeOnboardSponsorRequestIdRef = useRef<string | null>(null);
   /**
    * m7-onboard-sponsor-flow — ref to the live
    * {@link AppStateValue.handleRuntimeCommand} so mutators defined
@@ -495,7 +520,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setRotateKeysetSession(null);
       setReplaceShareSession(null);
       setRecoverSession(null);
-      setOnboardSponsorSession(null);
+      setOnboardSponsorSessions({});
+      setActiveOnboardSponsorRequestId(null);
       setBridgeHydrated(true);
       return true;
     }
@@ -538,32 +564,39 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // handoff screen / event log can render the success badge.
       // Metadata refresh is driven by the next `runtime_status`
       // snapshot (the runtime emits a fresh status post-completion).
-      const sponsorSession = onboardSponsorSessionRef.current;
-      if (sponsorSession?.requestId && sponsorSession.status === "awaiting_adoption") {
-        for (const completion of drains.completions) {
-          const onboardCompletion =
-            (completion as { Onboard?: { request_id: string } }).Onboard;
-          if (
-            onboardCompletion &&
-            onboardCompletion.request_id === sponsorSession.requestId
-          ) {
-            setOnboardSponsorSession((previous) =>
-              previous && previous.requestId === onboardCompletion.request_id
-                ? { ...previous, status: "completed" }
-                : previous,
-            );
-            // fix-m7-onboard-distinct-share-allocation — mark the
-            // allocation ledger entry "completed" so the underlying
-            // share is permanently removed from the available pool
-            // (VAL-ONBOARD-020). Fire-and-forget; persistence failure
-            // does not rollback the session state.
-            void transitionShareAllocationStatusRef.current?.(
-              onboardCompletion.request_id,
-              "completed",
-            );
-            break;
-          }
-        }
+      //
+      // fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — route the
+      // completion to the session whose request_id matches the
+      // drained envelope's request_id, even when it is NOT the UI's
+      // current `activeOnboardSponsorRequestId`. Two concurrent
+      // sponsorships must both complete independently (VAL-ONBOARD-013).
+      const sessionsSnapshot = onboardSponsorSessionsRef.current;
+      for (const completion of drains.completions) {
+        const onboardCompletion =
+          (completion as { Onboard?: { request_id: string } }).Onboard;
+        if (!onboardCompletion) continue;
+        const matching = sessionsSnapshot[onboardCompletion.request_id];
+        if (!matching || matching.status !== "awaiting_adoption") continue;
+        setOnboardSponsorSessions((previous) => {
+          const existing = previous[onboardCompletion.request_id];
+          if (!existing) return previous;
+          return {
+            ...previous,
+            [onboardCompletion.request_id]: {
+              ...existing,
+              status: "completed",
+            },
+          };
+        });
+        // fix-m7-onboard-distinct-share-allocation — mark the
+        // allocation ledger entry "completed" so the underlying
+        // share is permanently removed from the available pool
+        // (VAL-ONBOARD-020). Fire-and-forget; persistence failure
+        // does not rollback the session state.
+        void transitionShareAllocationStatusRef.current?.(
+          onboardCompletion.request_id,
+          "completed",
+        );
       }
       setRuntimeCompletions((previous) => {
         const merged = [...previous, ...drains.completions];
@@ -605,38 +638,40 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (drains.failures.length > 0) {
       // m7-onboard-sponsor-flow — VAL-ONBOARD-012 (wrong/expired
       // password on requester → source event log shows failed
-      // attempt with error tone). Detect an Onboard failure matching
-      // the active sponsor session and transition the session to
-      // `"failed"` with the runtime-emitted reason so the handoff
-      // screen / event log can render the error tone.
-      const sponsorSession = onboardSponsorSessionRef.current;
-      if (
-        sponsorSession?.requestId &&
-        sponsorSession.status === "awaiting_adoption"
-      ) {
-        for (const failure of drains.failures) {
-          if (
-            failure.request_id === sponsorSession.requestId &&
-            failure.op_type === "onboard"
-          ) {
-            const reason = `${failure.code}: ${failure.message}`;
-            setOnboardSponsorSession((previous) =>
-              previous && previous.requestId === failure.request_id
-                ? { ...previous, status: "failed", failureReason: reason }
-                : previous,
-            );
-            // fix-m7-onboard-distinct-share-allocation — mark the
-            // allocation ledger entry "failed" so the underlying
-            // share RETURNS to the pool and can be re-allocated on a
-            // subsequent sponsor attempt. Fire-and-forget.
-            void transitionShareAllocationStatusRef.current?.(
-              failure.request_id,
-              "failed",
-              reason,
-            );
-            break;
-          }
-        }
+      // attempt with error tone). Route each onboard failure to the
+      // session whose request_id matches the envelope's request_id.
+      //
+      // fix-m7-scrutiny-r1-sponsor-concurrency-and-badge —
+      // VAL-ONBOARD-013: concurrent sponsorships are tracked per
+      // request_id; a single failure must not collapse multiple
+      // in-flight sessions.
+      const failureSessionsSnapshot = onboardSponsorSessionsRef.current;
+      for (const failure of drains.failures) {
+        if (failure.op_type !== "onboard") continue;
+        const matching = failureSessionsSnapshot[failure.request_id];
+        if (!matching || matching.status !== "awaiting_adoption") continue;
+        const reason = `${failure.code}: ${failure.message}`;
+        setOnboardSponsorSessions((previous) => {
+          const existing = previous[failure.request_id];
+          if (!existing) return previous;
+          return {
+            ...previous,
+            [failure.request_id]: {
+              ...existing,
+              status: "failed",
+              failureReason: reason,
+            },
+          };
+        });
+        // fix-m7-onboard-distinct-share-allocation — mark the
+        // allocation ledger entry "failed" so the underlying
+        // share RETURNS to the pool and can be re-allocated on a
+        // subsequent sponsor attempt. Fire-and-forget.
+        void transitionShareAllocationStatusRef.current?.(
+          failure.request_id,
+          "failed",
+          reason,
+        );
       }
       // Enrich failures with message_hex_32 / peer_pubkey from the
       // pendingDispatchIndex at drain-time so SigningFailedModal's Retry
@@ -765,6 +800,47 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           badge: "ERROR",
           source: "failure",
           payload: failure,
+        });
+      }
+      // fix-m7-scrutiny-r1-sponsor-concurrency-and-badge —
+      // VAL-ONBOARD-011. Emit an additional `local_mutation`
+      // entry per Onboard completion / failure with badge=ONBOARD
+      // so the EventLogPanel surfaces the ceremony under the
+      // ONBOARD-tagged badge. Keyed fields only (request_id,
+      // peer_pubkey32, reason) — no secret material
+      // (VAL-CROSS-011 / VAL-CROSS-024 security invariants).
+      for (const completion of drains.completions) {
+        const onboardCompletion =
+          (completion as { Onboard?: { request_id: string } }).Onboard;
+        if (!onboardCompletion) continue;
+        const matched =
+          onboardSponsorSessionsRef.current[onboardCompletion.request_id];
+        runtimeEventLogSeqRef.current += 1;
+        newEntries.push({
+          seq: runtimeEventLogSeqRef.current,
+          at: now,
+          badge: "ONBOARD",
+          source: "local_mutation",
+          payload: {
+            kind: "onboard_completed",
+            request_id: onboardCompletion.request_id,
+            peer_pubkey32: matched?.targetPeerPubkey ?? null,
+          },
+        });
+      }
+      for (const failure of drains.failures) {
+        if (failure.op_type !== "onboard") continue;
+        runtimeEventLogSeqRef.current += 1;
+        newEntries.push({
+          seq: runtimeEventLogSeqRef.current,
+          at: now,
+          badge: "ONBOARD",
+          source: "local_mutation",
+          payload: {
+            kind: "onboard_failed",
+            request_id: failure.request_id,
+            reason: `${failure.code}: ${failure.message}`,
+          },
         });
       }
       if (newEntries.length > 0) {
@@ -2328,7 +2404,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
 
       if (dispatchError) {
-        setOnboardSponsorSession({
+        // fix-m7-scrutiny-r1-sponsor-concurrency-and-badge —
+        // record the failed attempt under a local-only sentinel
+        // request_id so the handoff screen can still render the
+        // failure tone. The sentinel is never used to correlate
+        // drained runtime envelopes (no real runtime request_id was
+        // ever registered) so it cannot collide with a live session.
+        const sentinelKey = `local-failure-${Date.now()}-${Math.floor(
+          Math.random() * 1_000_000,
+        )}`;
+        const failedSession: import("./AppStateTypes").OnboardSponsorSession = {
           deviceLabel: label,
           packageText,
           relays: validated,
@@ -2337,34 +2422,25 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           targetPeerPubkey: targetPeerPubkeyXOnly,
           status: "failed",
           failureReason: dispatchError.message,
-        });
+        };
+        setOnboardSponsorSessions((previous) => ({
+          ...previous,
+          [sentinelKey]: failedSession,
+        }));
+        setActiveOnboardSponsorRequestId(sentinelKey);
         return packageText;
       }
 
       // VAL-CROSS-018 — if an in-flight session already tracks the
-      // same target peer with a live request_id, refuse to spawn a
-      // second one so the user cannot accidentally issue parallel
-      // onboards for the same device. The handoff screen receives the
-      // existing session unchanged; validators observe `pendingOnboardOps
-      // === 1`.
-      const existing = onboardSponsorSessionRef.current;
-      if (
-        existing &&
-        existing.status === "awaiting_adoption" &&
-        existing.targetPeerPubkey === targetPeerPubkeyXOnly &&
-        existing.requestId &&
-        onboardRequestId &&
-        existing.requestId !== onboardRequestId
-      ) {
-        // Duplicate dispatch: the second request_id was registered by
-        // the runtime but the UI only surfaces one ceremony at a time.
-        // We swap the session over to the NEW request_id (so completion
-        // tracking lines up with the most recent outbound envelope) but
-        // preserve the deviation message so validators can see this was
-        // a re-onboard.
-      }
-
-      setOnboardSponsorSession({
+      // same target peer with a live request_id, surface a deviation
+      // note so the user understands they have two concurrent
+      // ceremonies addressed at the same peer. We no longer refuse
+      // the second dispatch (VAL-ONBOARD-013 requires concurrent
+      // sponsorships to be isolated, not suppressed) — both entries
+      // live in `onboardSponsorSessions` keyed by their own
+      // request_id.
+      const sessionRequestId = onboardRequestId ?? `local-pending-${Date.now()}`;
+      const newSession: import("./AppStateTypes").OnboardSponsorSession = {
         deviceLabel: label,
         packageText,
         relays: validated,
@@ -2372,7 +2448,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         requestId: onboardRequestId,
         targetPeerPubkey: targetPeerPubkeyXOnly,
         status: "awaiting_adoption",
-      });
+      };
+      setOnboardSponsorSessions((previous) => ({
+        ...previous,
+        [sessionRequestId]: newSession,
+      }));
+      setActiveOnboardSponsorRequestId(sessionRequestId);
       return packageText;
     },
     [],
@@ -2423,42 +2504,75 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const clearOnboardSponsorSession = useCallback(() => {
-    const existing = onboardSponsorSessionRef.current;
-    if (
-      existing &&
-      existing.status === "awaiting_adoption" &&
-      existing.targetPeerPubkey
-    ) {
-      // VAL-ONBOARD-014 — apply a temporary deny override for the
-      // target peer's respond.onboard so any late response from the
-      // requester is rejected by the local runtime. The sponsor UI
-      // does NOT expose an explicit "retract" in the bifrost WASM
-      // surface; a deny override is the closest effect. On the next
-      // `clearPolicyOverrides()` / lock this rolls off.
-      try {
-        runtimeRef.current?.setPolicyOverride({
-          peer: existing.targetPeerPubkey,
-          direction: "respond",
-          method: "onboard",
-          value: "deny",
-        });
-      } catch {
-        // best-effort; if the runtime is torn down the override is
-        // moot.
+  const clearOnboardSponsorSession = useCallback(
+    (requestId?: string) => {
+      // fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — when
+      // `requestId` is provided, target that specific entry in the
+      // sessions map. When omitted, fall back to the currently-active
+      // session (back-compat with pre-refactor call sites in
+      // OnboardSponsorScreens and AppStateProvider tear-down paths).
+      const sessions = onboardSponsorSessionsRef.current;
+      const targetKey =
+        requestId ?? activeOnboardSponsorRequestIdRef.current ?? null;
+      if (targetKey === null || !(targetKey in sessions)) {
+        // Nothing to clear; early-return keeps the no-op contract
+        // from the legacy single-slot implementation.
+        return;
       }
-      // fix-m7-onboard-distinct-share-allocation — mark the
-      // allocation ledger entry "cancelled" so the underlying share
-      // returns to the pool. Fire-and-forget.
-      if (existing.requestId) {
-        void transitionShareAllocationStatus(
-          existing.requestId,
-          "cancelled",
+      const existing = sessions[targetKey];
+      if (
+        existing &&
+        existing.status === "awaiting_adoption" &&
+        existing.targetPeerPubkey
+      ) {
+        // VAL-ONBOARD-014 — apply a temporary deny override for the
+        // target peer's respond.onboard so any late response from the
+        // requester is rejected by the local runtime. The sponsor UI
+        // does NOT expose an explicit "retract" in the bifrost WASM
+        // surface; a deny override is the closest effect. On the next
+        // `clearPolicyOverrides()` / lock this rolls off.
+        try {
+          runtimeRef.current?.setPolicyOverride({
+            peer: existing.targetPeerPubkey,
+            direction: "respond",
+            method: "onboard",
+            value: "deny",
+          });
+        } catch {
+          // best-effort; if the runtime is torn down the override is
+          // moot.
+        }
+        // fix-m7-onboard-distinct-share-allocation — mark the
+        // allocation ledger entry "cancelled" so the underlying share
+        // returns to the pool. Fire-and-forget.
+        if (existing.requestId) {
+          void transitionShareAllocationStatus(
+            existing.requestId,
+            "cancelled",
+          );
+        }
+      }
+      setOnboardSponsorSessions((previous) => {
+        if (!(targetKey in previous)) return previous;
+        const next = { ...previous };
+        delete next[targetKey];
+        return next;
+      });
+      setActiveOnboardSponsorRequestId((previous) => {
+        if (previous !== targetKey) return previous;
+        // Pick the most recently-created remaining session as the
+        // new active one so the UI keeps a valid focus when the user
+        // cancels a single ceremony while another is still in flight.
+        const remaining = Object.entries(sessions).filter(
+          ([key]) => key !== targetKey,
         );
-      }
-    }
-    setOnboardSponsorSession(null);
-  }, [transitionShareAllocationStatus]);
+        if (remaining.length === 0) return null;
+        remaining.sort(([, a], [, b]) => b.createdAt - a.createdAt);
+        return remaining[0][0];
+      });
+    },
+    [transitionShareAllocationStatus],
+  );
 
   // Keep the ref pointed at the latest helper so the `absorbDrains`
   // callback (with `[]` deps) can safely invoke it without
@@ -3386,7 +3500,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setRotateKeysetSession(null);
     setReplaceShareSession(null);
     setRecoverSession(null);
-    setOnboardSponsorSession(null);
+    setOnboardSponsorSessions({});
+    setActiveOnboardSponsorRequestId(null);
     // fix-m7-createsession-redact-secrets-on-finalize — drop the
     // out-of-band package-secrets stash on lock so the secrets never
     // outlive the active unlocked session.
@@ -3471,7 +3586,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setRotateKeysetSession(null);
     setReplaceShareSession(null);
     setRecoverSession(null);
-    setOnboardSponsorSession(null);
+    setOnboardSponsorSessions({});
+    setActiveOnboardSponsorRequestId(null);
     // fix-m7-createsession-redact-secrets-on-finalize — also drop the
     // out-of-band package-secrets stash when the profile is wiped.
     clearCreateSessionPackageSecrets();
@@ -4332,16 +4448,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     signerPausedRef.current = signerPaused;
   }, [signerPaused]);
 
-  // m7-onboard-sponsor-flow — keep `onboardSponsorSessionRef` in
-  // lock-step with React state so `absorbDrains` /
-  // `clearOnboardSponsorSession` can always read the CURRENT session
-  // without triggering a re-subscribe. Without this mirror the
-  // `useCallback(absorbDrains, [])` closure would hold a stale
-  // reference to the session-at-mount-time, missing completion
-  // correlations for sponsorships created mid-session.
+  // m7-onboard-sponsor-flow — keep `onboardSponsorSessionsRef` /
+  // `activeOnboardSponsorRequestIdRef` in lock-step with React state
+  // so `absorbDrains` / `clearOnboardSponsorSession` can always read
+  // the CURRENT sessions without triggering a re-subscribe. Without
+  // these mirrors the `useCallback(absorbDrains, [])` closure would
+  // hold a stale reference to the sessions-at-mount-time, missing
+  // completion correlations for sponsorships created mid-session.
   useEffect(() => {
-    onboardSponsorSessionRef.current = onboardSponsorSession;
-  }, [onboardSponsorSession]);
+    onboardSponsorSessionsRef.current = onboardSponsorSessions;
+  }, [onboardSponsorSessions]);
+  useEffect(() => {
+    activeOnboardSponsorRequestIdRef.current = activeOnboardSponsorRequestId;
+  }, [activeOnboardSponsorRequestId]);
 
   const setSignerPaused = useCallback((paused: boolean) => {
     signerPausedRef.current = paused;
@@ -4721,6 +4840,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, []);
 
+  // fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — derive the
+  // handoff-screen's active session from the Map + activeRequestId.
+  // Handles the empty-map case cleanly so the legacy single-slot
+  // API surface (`onboardSponsorSession: OnboardSponsorSession | null`)
+  // stays identical for screens/components and backward-compat tests.
+  const onboardSponsorSession = useMemo(
+    () =>
+      activeOnboardSponsorRequestId !== null
+        ? onboardSponsorSessions[activeOnboardSponsorRequestId] ?? null
+        : null,
+    [activeOnboardSponsorRequestId, onboardSponsorSessions],
+  );
+
   const value = useMemo<AppStateValue>(
     () => ({
       profiles,
@@ -4735,6 +4867,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       replaceShareSession,
       recoverSession,
       onboardSponsorSession,
+      onboardSponsorSessions,
+      activeOnboardSponsorRequestId,
       runtimeCompletions,
       runtimeFailures,
       lifecycleEvents,
@@ -4808,6 +4942,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       replaceShareSession,
       recoverSession,
       onboardSponsorSession,
+      onboardSponsorSessions,
+      activeOnboardSponsorRequestId,
       runtimeCompletions,
       runtimeFailures,
       lifecycleEvents,
@@ -5446,9 +5582,16 @@ function completionRequestId(completion: CompletedOperation): string {
 
 /**
  * Map a {@link CompletedOperation} discriminant to the typed badge used
- * by the Event Log panel. `Onboard` falls through to `INFO` because
- * onboarding has no dedicated Paper colour and the completion is a
- * lifecycle edge rather than a protocol operation.
+ * by the Event Log panel.
+ *
+ * fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — Onboard
+ * completions now resolve to the dedicated `ONBOARD` badge
+ * (VAL-ONBOARD-011) rather than the generic `INFO` bucket. The
+ * standalone local_mutation entry emitted in `absorbDrains` still
+ * carries the richer `{kind: "onboard_completed", …}` payload that
+ * validators filter on; keeping the completion-channel badge on
+ * `ONBOARD` means users see one coloured chip in the Event Log that
+ * lines up with the peer-permission badge scheme.
  */
 function badgeForCompletion(
   completion: CompletedOperation,
@@ -5456,6 +5599,7 @@ function badgeForCompletion(
   if ("Sign" in completion) return "SIGN";
   if ("Ecdh" in completion) return "ECDH";
   if ("Ping" in completion) return "PING";
+  if ("Onboard" in completion) return "ONBOARD";
   return "INFO";
 }
 
