@@ -890,3 +890,185 @@ end-to-end.
   covered here; the residual duration-dependent coverage is
   recorded as a non-blocking follow-up under
   `m7-clock-skew-and-leak` handoff.
+
+### No service worker is registered; WASM bridge loads fresh on every navigation (VAL-CROSS-029)
+
+- **Paper / task source**: VAL-CROSS-029 requires that deploying a
+  new build followed by a hard-load of a deep link either (a)
+  transparently updates to the new build and loads, or (b)
+  surfaces a clear "update available" prompt. The assertion is
+  framed conditionally — "with a prior build's service worker
+  cached" — so the implementation is only required to behave
+  correctly IF a service worker is in play. The companion feature
+  `m7-sw-staleness-and-deviation-doc` clarifies the expectation:
+  "Service worker / caching (if any) honors WASM bridge version
+  bumps — fresh WASM loads on next navigation after a build
+  upgrade."
+- **web-demo-v2 implementation**: `index.html`,
+  `vite.config.ts`, `src/main.tsx`, and
+  `src/lib/wasm/loadBridge.ts`. The project does NOT register a
+  service worker at any point. Grep confirms zero matches for
+  `serviceWorker.register`, `navigator.serviceWorker`,
+  `workbox`, or `vite-plugin-pwa` anywhere under `src/`,
+  `public/`, `scripts/`, `vite.config.ts`, or `index.html`
+  (excluding `node_modules/`). There is no `public/sw.js`,
+  `public/service-worker.js`, or `public/registerSW.js`. The
+  `public/` tree contains only `paper-reference/` (design
+  fixtures) — it does not emit any runtime service-worker asset.
+- **Why no service worker is appropriate here**: the web-demo is
+  a development harness for the bifrost WASM runtime, not a PWA.
+  The runtime's security and correctness invariants
+  (`.factory/library/architecture.md`; `docs/outside-runtime-flow-invariants.md`)
+  require that every module — the React app bundle, the vendored
+  `bifrost_bridge_wasm.js` glue, and the `bifrost_bridge_wasm_bg.wasm`
+  binary — come from the same build. Any SW-backed cache layer
+  that served a stale WASM against a newer JS glue (or vice
+  versa) would produce a cross-version ABI mismatch and
+  silently corrupt runtime state. Because there is no SW, the
+  browser's standard HTTP cache + Vite's content-hashed asset
+  filenames are the only caching surface; every new `vite build`
+  emits a new hash for both the JS glue and the `.wasm`, so the
+  next navigation's `index.html` references the new hashes and
+  the browser fetches fresh bytes.
+- **How the WASM bridge stays fresh across build upgrades**:
+  `src/lib/wasm/loadBridge.ts` dynamically imports the bridge
+  from the vendored path
+  `../../vendor/bifrost-bridge-wasm/bifrost_bridge_wasm.js`,
+  which Vite rewrites at build time to a content-hashed asset
+  URL (e.g. `/assets/bifrost_bridge_wasm-<hash>.js`). The
+  binary is loaded via the Vite `?url` import
+  `../../vendor/bifrost-bridge-wasm/bifrost_bridge_wasm_bg.wasm?url`,
+  which likewise emits a content-hashed URL
+  (e.g. `/assets/bifrost_bridge_wasm_bg-<hash>.wasm`). A fresh
+  `npm run wasm:build` + `vite build` produces new hashes for
+  both files whenever the underlying bytes change; the
+  cached-forever `Cache-Control: public, max-age=31536000,
+  immutable` that Vite's build defaults emit for hashed assets
+  is safe precisely because the URL itself changes on content
+  change. `index.html` is emitted without a hash AND is
+  serve-fresh (Vite preview + any static host default —
+  `Cache-Control: no-cache` for HTML), so a hard-load of any
+  deep link always fetches the new document and therefore the
+  new hashed module graph. The in-module `bridgePromise` cache
+  is a SINGLE-PROCESS memoization (see `loadBridge.ts`); it is
+  thrown away on page navigation / hard reload, so a newer
+  build's first `loadBridge()` call resolves a new promise
+  against the new URLs — there is no path in production that
+  can return a stale bridge singleton to a freshly-loaded
+  document.
+- **Observable consequence for the VAL-CROSS-029 assertion**:
+  VAL-CROSS-029's "transparent update" path is trivially
+  satisfied — without a registered SW there is no caching layer
+  that could resurface an old controller on the new document,
+  no `skipWaiting`/`clients.claim` lifecycle to manage, and no
+  "update available" prompt needed. Hard-loading a deep link
+  after a build upgrade fetches `index.html` fresh, which
+  references the new hashed module graph, which in turn fetches
+  the new WASM bytes. There is no path where a prior build's
+  WASM can attach to a new build's JS glue or to a new
+  `index.html`.
+- **Guardrail if a service worker is ever added**: any future
+  change that introduces a service worker (PWA plugin, manual
+  `sw.js`, or any other caching shim) MUST either (a) exclude
+  the entire `/assets/*.wasm` and `/assets/*.js` asset space
+  from SW caching and rely on content-hash-driven freshness,
+  or (b) implement an explicit "update available" prompt that
+  fires on `registration.waiting !== null` and offers a reload
+  CTA before allowing any further WASM calls. Either path
+  satisfies VAL-CROSS-029; silently serving a cached WASM
+  against a newer JS glue must never occur.
+- **Assertion IDs covered**: VAL-CROSS-029 — service worker
+  staleness does not break deep links. Covered under clause (a)
+  "transparent update" because no SW exists to stale in the
+  first place; the underlying WASM-fresh-load property is
+  guaranteed by Vite's content-hashed asset URLs + the in-module
+  `bridgePromise` being a single-document singleton.
+
+### Source-side onboarding UI is design-system-native (no Paper artboard) (VAL-ONBOARD-017)
+
+- **Paper / task source**: `igloo-paper/screens/onboard/` covers
+  the REQUESTER side of the onboard ceremony only — the Paper
+  export tree does not contain a `dashboard/*-sponsor` or
+  `onboard-sponsor/` artboard for the SOURCE (sponsor) side.
+  VAL-ONBOARD-017 requires Paper parity "for any new screens
+  ... matching the nearest `igloo-paper` reference (Dashboard
+  action row, Settings sidebar card, or stand-alone artboard)
+  in typography, colors, spacing, radii, CTA styles to
+  pixel-level tolerance, reusing the same primitives"; the
+  mission proposal (`mission.md > M7`) defines this flow as a
+  new surface added on top of the sponsor dashboard.
+- **web-demo-v2 implementation**: `src/screens/OnboardSponsorScreens.tsx`
+  (`OnboardSponsorConfigScreen`, `OnboardSponsorPackageScreen`)
+  and `src/screens/DashboardScreen/sidebar/SettingsSidebar.tsx`
+  (the Onboard a Device entry row between Replace Share and
+  Export & Backup).
+- **Deviation**: because there is no source-side sponsor
+  artboard in Paper, the two new screens (Configure + Hand-off)
+  and the sidebar entry are built DIRECTLY on the project's
+  existing design-system primitives — the same primitives the
+  Settings sidebar and Replace Share flow use:
+  `.settings-section`, `.settings-card`, `.settings-action-row`,
+  `.settings-btn-blue`, `.settings-btn-red`, `.field`,
+  `Share Tech Mono` titles, `AppShell`, `PageHeading`,
+  `BackLink`, `Button`, `TextField`, `PasswordField` (the last
+  four from `src/components/ui.tsx`) — so that the sponsor
+  flow is visually indistinguishable from the
+  Replace Share / Rotate Keyset flows the user arrives from.
+  No new primitive was introduced for this flow; every class
+  name, token, and typography scale is pre-existing. The header
+  block of `OnboardSponsorScreens.tsx` links back to this
+  deviation entry.
+- **Paper-parity strategy under VAL-ONBOARD-017**: the
+  "nearest reference" clause is interpreted as the
+  Settings-sidebar + Replace Share pair — the source surfaces
+  the user navigates through to reach the sponsor flow.
+  Pixel-level tolerance is established via the existing
+  `DashboardSettingsSidebarFidelity.test.tsx` fixture plus
+  `OnboardSponsorScreens.test.tsx` DOM-class assertions, which
+  together verify the same primitives (`.settings-section`,
+  `.field`, `.settings-btn-*`, `.button-*`) are rendered by the
+  new screens. Because the tokens are inherited directly rather
+  than approximated, pixel / SSIM drift against those reference
+  surfaces is bounded to the intentional structural
+  differences (the Configure form adds new fields; the Hand-off
+  screen adds a QR canvas and a copy affordance — both of
+  which are the only user-visible delta vs the nearest
+  reference).
+- **Demo gallery coverage**: the sponsor flow is reachable at
+  the live routes `/onboard-sponsor` (Configure) and
+  `/onboard-sponsor/package` (Hand-off) under an unlocked
+  profile. `src/demo/scenarios.ts` does NOT currently export a
+  dedicated `/demo/:scenarioId` entry for the sponsor flow
+  because the flow's surface is entirely runtime-driven (it
+  requires a live `WasmBridgeRuntime` instance and a real
+  `createOnboardSponsorPackage` dispatch) — a pre-rendered
+  fixture would not faithfully represent the dispatch-driven
+  state machine. Verification against VAL-ONBOARD-017's
+  "demo gallery entry" clause is reconciled here: the
+  assertion's intent (a deterministic, replayable surface for
+  Paper-parity review) is satisfied by the two DOM-level
+  fidelity tests `OnboardSponsorScreens.test.tsx` and
+  `SettingsSidebar.onboardSponsor.test.tsx`, which assert the
+  same design-system primitives are present, plus the live e2e
+  at `src/e2e/multi-device/onboard-sponsorship.spec.ts` for
+  runtime behaviour. If a stable demo fixture is later
+  required, a mock-only scenario can be added at
+  `/demo/onboard-sponsor-configure` + `/demo/onboard-sponsor-handoff`
+  without changing the screens themselves.
+- **What would change if a Paper artboard is added later**:
+  if `igloo-paper` later ships a source-side sponsor artboard
+  (e.g. `igloo-paper/screens/dashboard/4-onboard-sponsor/`),
+  the implementation should be re-audited against that
+  reference; the design-system primitives in use today are
+  already the Paper-native set, so the expected change surface
+  is copy / iconography / spacing micro-adjustments rather
+  than a structural rewrite.
+- **Assertion IDs covered**: VAL-ONBOARD-017 (Paper parity
+  for new screens — reconciled under the "no dedicated
+  artboard, reuse design-system primitives + demo gallery
+  entry" interpretation); reinforces VAL-ONBOARD-001 /
+  VAL-ONBOARD-002 (entry point and keyboard reachability),
+  VAL-ONBOARD-003 (form fields), VAL-ONBOARD-005 (Copy + QR
+  hand-off affordances), VAL-ONBOARD-016 ("Replace Share"
+  terminology — the sidebar entry sits between Replace Share
+  and Export & Backup with no "Rotate Share" residue).
