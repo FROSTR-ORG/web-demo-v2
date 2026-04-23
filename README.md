@@ -15,8 +15,8 @@ multi-device sign / ECDH / ping / onboard round-trips over Nostr relays
 plus an optional local `bifrost-devtools` relay for e2e), real encrypted
 profile backup/restore via NIP-16/33 replaceable events, and persistent
 IndexedDB-backed profile storage. The Dashboard, Policies, Approvals, Event
-Log, and Settings surfaces all read from the live runtime; the only mocked
-rendering path is the read-only `/demo/:scenarioId` gallery. The validation
+Log, and Settings surfaces all read from the live runtime; the deterministic
+`/demo/:scenarioId` gallery is the only mocked rendering path. The validation
 contract enumerates **223 behavioral assertions** covering the full UI +
 runtime surface and is reproduced below by 1059+ Vitest cases plus the
 Playwright demo-gallery + multi-device e2e suites.
@@ -49,10 +49,18 @@ Playwright demo-gallery + multi-device e2e suites.
   `bifrost-devtools` build and individual multi-device specs self-skip with a
   clear reason.
 
+## Docs for Agents
+
+Start with `docs/README.md` for the docs map and `docs/agent-runbook.md` for
+safe agent workflow. The expanded architecture notes live in
+`docs/web-demo-architecture.md`; runtime-vs-Paper exceptions live in
+`docs/runtime-deviations-from-paper.md`.
+
 ## Flows Implemented
 
 All flows follow their Paper design reference exactly (copy, typography,
-layout).
+layout), except for the runtime-constrained deviations documented under
+`docs/runtime-deviations-from-paper.md`.
 
 ### Welcome — `/`
 - First-visit variant ("Split your Nostr key.") and returning-user variant
@@ -77,6 +85,12 @@ package). Wired in `src/app/AppStateProvider.tsx > createOnboardSponsorPackage`.
 3-phase progress (generate keyset, derive shares, publish metadata), shared
 profile screen, distribution, completion.
 
+### Restore From Relay — `/restore-from-relay`
+Query `wss://` Nostr relays for encrypted kind-10000 profile backups, decrypt
+and save the restored profile, then unlock into the live runtime. Local
+`ws://127.0.0.1:8194` restore coverage uses a DEV-only test opt-in documented
+in `docs/runtime-deviations-from-paper.md`.
+
 ### Recover NSEC — `/recover/:profileId` → `/recover/:profileId/success`
 Paste share packages, collect across peers, reveal recovered `nsec` via WASM.
 
@@ -99,15 +113,17 @@ Profile Security sections. Source is organized under
 `src/screens/DashboardScreen/` (index, states/, panels/, modals/, sidebar/,
 mocks.ts, types.ts).
 
-## Demo Gallery
+## Real Routes vs Demo Gallery
 
-The `/demo` route hosts a first-class gallery of every canonical screen +
-variant, keyed by scenario id. Each scenario seeds `MockAppStateProvider` with
-the exact fixtures needed to render that screen, so every assertion in
-`.factory/missions/<id>/validation-contract.md` is reachable via a stable
-`/demo/{scenario-id}` URL. The gallery toolbar exposes
-`All screens / Prev / Next / Raw / Reference`; append `?chrome=0` to any
-scenario URL to strip the chrome for clean capture.
+Product routes are mounted through `src/app/CoreRoutes.tsx` under the real
+`AppStateProvider`. The `/demo` route hosts a first-class gallery of every
+canonical screen + variant, keyed by scenario id and rendered through
+`MockAppStateProvider`. Demo scenarios are deterministic review fixtures; real
+routes are the source of truth for runtime behavior.
+
+Each demo scenario is reachable via a stable `/demo/{scenario-id}` URL. The
+gallery toolbar exposes `All screens / Prev / Next / Raw / Reference`; append
+`?chrome=0` to any scenario URL to strip the chrome for clean capture.
 
 ## Setup & Run
 
@@ -169,19 +185,20 @@ Two providers implement the same `useAppState()` API:
 
 ## Further Reading
 
-- `.factory/library/architecture.md` — layered system overview (UI →
-  AppStateProvider → RuntimeClient → WASM + RuntimeRelayPump → relays).
-- `.factory/library/environment.md` — ports, local relay, test-observability
-  hooks, concurrency budget.
-- `.factory/library/user-testing.md` — validator guidance (agent-browser,
-  shell, Playwright), `backup-publish-restore-live.spec.ts` harness, and the
-  full list of dev-only `window.__debug` / `window.__iglooTest*` hooks.
+- `docs/README.md` — public docs hub and recommended read order for agents.
+- `docs/agent-runbook.md` — first inspection pass, safe edit boundaries, route
+  orientation, local relay caveats, and validation commands.
+- `docs/web-demo-architecture.md` — layered runtime overview, module
+  boundaries, data flows, persistence rules, and testing surfaces.
+- `docs/outside-runtime-flow-invariants.md` — security and phase-gating rules
+  for setup, backup, restore, and recovery flows.
 - `docs/runtime-deviations-from-paper.md` — every intentional deviation from
   `igloo-paper`, each cited back to the Paper source and the covering
   `VAL-*` assertion IDs.
-- `docs/web-demo-architecture.md` — screen/app-state layout conventions.
 - `docs/allowed-console-warnings.md` — zero-warn policy + the (currently
   empty) allowlist.
+- `.factory/library/user-testing.md` — internal validator detail for
+  agent-browser, Playwright, local relay harnesses, and DEV-only hooks.
 
 ## Design Reference
 

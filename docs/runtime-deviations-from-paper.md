@@ -4,6 +4,11 @@ This file enumerates intentional deviations from `igloo-paper` design caused by 
 or architectural constraints. Each entry cites the Paper source, the web-demo-v2 implementation,
 and the validation assertion IDs that cover it.
 
+For agent onboarding, start with `docs/README.md` and
+`docs/agent-runbook.md`. This file is a deviation ledger: use it to explain
+why a live-runtime behavior differs from Paper or a validation-contract phrase,
+not as the main architecture guide.
+
 ## Deviations
 
 ### 2026-04-23 — Paper MCP `export` tool returns empty `filePaths` in this environment; `scripts/sync-paper.mjs` is the canonical baseline source (fix-scrutiny-r1-paper-parity-live-routes-and-baseline-source-doc)
