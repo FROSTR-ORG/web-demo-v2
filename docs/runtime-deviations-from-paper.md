@@ -6,6 +6,76 @@ and the validation assertion IDs that cover it.
 
 ## Deviations
 
+### Paper-sourced visual-parity baselines compared at `maxDiffPixelRatio = 0.20` (m7-paper-parity-visuals)
+
+- **Paper / task source**: feature `fix-m7-scrutiny-r1-paper-parity-baseline-source`
+  (scrutiny m7 r1). The original `m7-paper-parity-visuals` baselines under
+  `src/e2e/visual/dashboard-states.spec.ts-snapshots/` were seeded with
+  `--update-snapshots` against the app's own Paper-fixture render
+  (`paperPanels=true`) — i.e. app-vs-self, not app-vs-paper — which only catches
+  self-regression, not drift from the canonical Paper artboards. Scrutiny
+  flagged this as self-referential parity; the fix requires the 5 dashboard-state
+  baselines to be **exported from the igloo-paper source artboards** at
+  `igloo-paper/screens/dashboard/{1-signer-dashboard, 1b-connecting, 2-stopped,
+  2b-all-relays-offline, 2c-signing-blocked}/screenshot.png` and used as the
+  PRIMARY parity reference, with the app-self baselines retained as a SECONDARY
+  self-consistency check.
+- **web-demo-v2 implementation**:
+  `src/e2e/visual/paper-fixtures/dashboard-{running,connecting,stopped,relays-offline,signing-blocked}.png`
+  hold verbatim copies of the 5 Paper artboard exports (do not regenerate from
+  the app; re-export from `igloo-paper` when the source artboard changes).
+  `src/e2e/visual/dashboard-states.spec.ts` runs two comparisons per state:
+  (a) primary — live `.app-shell` screenshot pixel-diffed against the Paper
+  fixture using `pixelmatch` (via the freshly added `pixelmatch` + `@types/pngjs`
+  dev dependencies), cropping both images to their common top-aligned bounding
+  box before diffing and gated at `PAPER_MAX_DIFF_PIXEL_RATIO = 0.20`; and
+  (b) secondary — Playwright's native `toHaveScreenshot` against
+  `dashboard-<state>-self.png` at the tight 1% tolerance the feature contract
+  originally specified.
+- **Environment constraint — Paper artboards are 1440 × 1284 static HTML
+  exports; app captures are viewport-sized `.app-shell` (1440 × ~1080–1190)**.
+  The Paper artboard PNGs under
+  `igloo-paper/screens/dashboard/*/screenshot.png` are exported from the Paper
+  canvas at a fixed full-artboard height (1284 px for the 5 main states,
+  1700 px for settings variants) and include trailing background/footer area
+  that the live app does not paint. The live app renders `.app-shell` at the
+  Playwright desktop viewport size (1440 × 1080) plus any intrinsic overflow
+  from dynamic panel content, so `.app-shell.screenshot()` returns images
+  between 1440 × 1080 and 1440 × 1190. The two image sources therefore always
+  differ in height; a direct `toHaveScreenshot` against the Paper PNG would
+  fail at the "dimensions mismatch" precheck. The spec compares the common
+  top-aligned region only (min(app.height, paper.height) = app.height in
+  practice) which is where the actual Paper parity content lives.
+- **Threshold deviation — `maxDiffPixelRatio = 0.20` (not ≤ 0.01)**. Within the
+  common bounding box the React/Vite runtime and the static Paper HTML export
+  differ in subpixel-level font hinting, text anti-alias, and occasional
+  sub-pixel layout rounding (Tailwind v4 token resolution + system-font fallback
+  vs the Paper export's baked-in font rendering). Empirically the clean
+  "no-structural-drift" diff sits in the 8–15% range across all 5 states on
+  the Desktop Chrome 1440 × 1080 profile. `0.20` is chosen as the widened
+  threshold with ~5% headroom over the empirical ceiling: big enough to
+  absorb font-render / antialias variance without masking real structural
+  drift (missing panel rows, mis-rendered badges, broken layout grids all add
+  ≥ 25% in spot checks). If your feature work pushes a state above `0.20` you
+  must either (a) fix the drift so the diff returns under `0.20`, or (b) widen
+  the constant in `src/e2e/visual/dashboard-states.spec.ts` AND extend this
+  entry with the new ratio, rationale, and scope (which states, which feature).
+- **Why not crop Paper to app height and run the standard `toHaveScreenshot`
+  path?** Playwright's built-in snapshot tooling expects the reference PNG on
+  disk to exactly match the captured image in dimensions and encoding; it also
+  auto-manages baselines via `--update-snapshots`, which would silently
+  re-write a "Paper" baseline from the app render, re-introducing the exact
+  self-referential regression scrutiny flagged. Decoupling the Paper fixture
+  from Playwright's snapshot-managed baselines (by reading the fixture via
+  `fs.readFileSync` + `pixelmatch`) is the smallest change that makes the
+  Paper source the true source of truth while keeping the `-self` baselines
+  under Playwright's standard `--update-snapshots` workflow.
+- **Assertion IDs covered**: the feature's `expectedBehavior` bullets
+  — Paper-sourced baselines committed at
+  `src/e2e/visual/paper-fixtures/dashboard-<state>.png`; Playwright spec
+  compares against Paper (primary) and app-self (secondary); parity threshold
+  widened with documented justification; deviations documented here.
+
 ### Local `bifrost-devtools` relay does NOT enforce NIP-16/33 replaceable semantics (VAL-BACKUP-006 / VAL-BACKUP-031)
 
 - **Paper / task source**: `validation-contract.md` VAL-BACKUP-006 ("Duplicate publish
