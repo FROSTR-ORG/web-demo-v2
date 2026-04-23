@@ -34,6 +34,7 @@ import { AppStateProvider, useAppState } from "../AppState";
 import type { AppStateValue } from "../AppState";
 import {
   createKeysetBundle,
+  decodeBfonboardPackage,
   defaultManualPeerPolicyOverrides,
   profilePayloadForShare,
 } from "../../lib/bifrost/packageService";
@@ -146,6 +147,7 @@ describe("createOnboardSponsorPackage — VAL-ONBOARD-006 dispatch", () => {
         deviceLabel: "Bob Laptop",
         password: "sponsor-password",
         relays: ["wss://relay.local"],
+        profilePassword: "profile-password",
       });
     });
 
@@ -193,6 +195,7 @@ describe("createOnboardSponsorPackage — VAL-ONBOARD-006 dispatch", () => {
         deviceLabel: "Bob Laptop",
         password: "sponsor-password",
         relays: ["wss://relay.local"],
+        profilePassword: "profile-password",
       });
     });
 
@@ -236,6 +239,7 @@ describe("createOnboardSponsorPackage — VAL-ONBOARD-006 dispatch", () => {
           deviceLabel: "Paused Device",
           password: "sponsor-password",
           relays: ["wss://relay.local"],
+          profilePassword: "profile-password",
         });
       } catch (err) {
         errorMessage = err instanceof Error ? err.message : String(err);
@@ -262,6 +266,7 @@ describe("clearOnboardSponsorSession — VAL-ONBOARD-014", () => {
         deviceLabel: "Bob Laptop",
         password: "sponsor-password",
         relays: ["wss://relay.local"],
+        profilePassword: "profile-password",
       });
     });
     const targetPeer = getState().onboardSponsorSession?.targetPeerPubkey;
@@ -298,6 +303,82 @@ describe("clearOnboardSponsorSession — VAL-ONBOARD-014", () => {
     if (permission?.manual_override?.respond?.onboard !== undefined) {
       expect(permission.manual_override.respond.onboard).toBe("deny");
     }
+  }, 30_000);
+});
+
+describe("fix-m7-onboard-distinct-share-allocation — pool allocation", () => {
+  it("allocates a NON-SELF share from the encrypted pool and encodes its secret (not the sponsor's)", async () => {
+    const { getState } = await bootProvider();
+
+    // Snapshot the local (self) share secret BEFORE dispatching so we
+    // can assert it is NOT what the pool allocated into the
+    // bfonboard package.
+    const createSession = getState().createSession;
+    const localShare = createSession!.localShare!;
+    const selfSecret = localShare.seckey;
+
+    // Decode the package the sponsor created and assert its
+    // `share_secret` does NOT equal the sponsor's own.
+    let packageText = "";
+    await act(async () => {
+      packageText = await getState().createOnboardSponsorPackage({
+        deviceLabel: "Bob Laptop",
+        password: "sponsor-password",
+        relays: ["wss://relay.local"],
+        profilePassword: "profile-password",
+      });
+    });
+    const decoded = await decodeBfonboardPackage(
+      packageText,
+      "sponsor-password",
+    );
+    expect(decoded.share_secret).not.toBe(selfSecret);
+    // The allocated secret must correspond to a remote (non-self)
+    // share from the keyset.
+    const remoteSecrets = createSession!.keyset!.shares
+      .filter((s) => s.idx !== localShare.idx)
+      .map((s) => s.seckey);
+    expect(remoteSecrets).toContain(decoded.share_secret);
+  }, 30_000);
+
+  it("rejects an empty / short profile password", async () => {
+    const { getState } = await bootProvider();
+
+    let errorMessage: string | null = null;
+    await act(async () => {
+      try {
+        await getState().createOnboardSponsorPackage({
+          deviceLabel: "Bob Laptop",
+          password: "sponsor-password",
+          relays: ["wss://relay.local"],
+          profilePassword: "short",
+        });
+      } catch (err) {
+        errorMessage = err instanceof Error ? err.message : String(err);
+      }
+    });
+    expect(errorMessage).toBeTruthy();
+    expect(errorMessage ?? "").toMatch(/profile password/i);
+  }, 30_000);
+
+  it("rejects a wrong profile password with the canonical copy", async () => {
+    const { getState } = await bootProvider();
+
+    let errorMessage: string | null = null;
+    await act(async () => {
+      try {
+        await getState().createOnboardSponsorPackage({
+          deviceLabel: "Bob Laptop",
+          password: "sponsor-password",
+          relays: ["wss://relay.local"],
+          profilePassword: "wrong-password",
+        });
+      } catch (err) {
+        errorMessage = err instanceof Error ? err.message : String(err);
+      }
+    });
+    expect(errorMessage).toBeTruthy();
+    expect(errorMessage ?? "").toMatch(/decrypt|incorrect profile password/i);
   }, 30_000);
 });
 

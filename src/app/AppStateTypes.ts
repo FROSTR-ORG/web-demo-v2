@@ -238,6 +238,14 @@ export const ONBOARD_SPONSOR_THRESHOLD_INVALID_ERROR =
 export const ONBOARD_SPONSOR_DUPLICATE_LABEL_WARNING =
   "A device with this label already exists. Sponsoring will create a second device with the same name.";
 
+/** fix-m7-onboard-distinct-share-allocation — inline copy surfaced
+ *  when the supplied profile password cannot decrypt the unadopted
+ *  share pool (wrong / empty / too short). Mirrors VAL-ONBOARD-020's
+ *  canonical expectation and the change-password / unlock flows'
+ *  "Current password is incorrect" pattern. */
+export const ONBOARD_SPONSOR_PROFILE_PASSWORD_ERROR =
+  "Profile password is required to unlock the share pool.";
+
 /** Minimum password length for onboard-sponsor hand-off (mirrors
  *  VAL-ONBOARD-003 ≥ 8 chars). */
 export const ONBOARD_SPONSOR_PASSWORD_MIN_LENGTH = 8;
@@ -1150,6 +1158,15 @@ export interface AppStateValue {
     deviceLabel: string;
     password: string;
     relays: string[];
+    /**
+     * fix-m7-onboard-distinct-share-allocation — profile password
+     * used to decrypt the encrypted `unadoptedSharesCiphertext` stored
+     * on the profile record. Required to allocate a share from the
+     * pool; the decrypted pool is discarded immediately after one
+     * share is picked (security invariant — see
+     * `src/lib/storage/unadoptedSharesPool.ts`).
+     */
+    profilePassword: string;
   }) => Promise<string>;
   /**
    * m7-onboard-sponsor — clear any active sponsorship session. Called

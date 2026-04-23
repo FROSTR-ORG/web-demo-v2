@@ -41,6 +41,7 @@ import {
   ONBOARD_SPONSOR_PASSWORD_MIN_LENGTH,
   ONBOARD_SPONSOR_PASSWORD_MISMATCH_ERROR,
   ONBOARD_SPONSOR_PASSWORD_TOO_SHORT_ERROR,
+  ONBOARD_SPONSOR_PROFILE_PASSWORD_ERROR,
   ONBOARD_SPONSOR_RELAY_EMPTY_ERROR,
   ONBOARD_SPONSOR_SIGNER_PAUSED_ERROR,
   ONBOARD_SPONSOR_THRESHOLD_INVALID_ERROR,
@@ -98,6 +99,7 @@ export function OnboardSponsorConfigScreen() {
   const [label, setLabel] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [profilePassword, setProfilePassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -156,6 +158,13 @@ export function OnboardSponsorConfigScreen() {
     [password],
   );
 
+  const profilePasswordError =
+    profilePassword.length === 0
+      ? ""
+      : profilePassword.length < ONBOARD_SPONSOR_PASSWORD_MIN_LENGTH
+        ? ONBOARD_SPONSOR_PROFILE_PASSWORD_ERROR
+        : "";
+
   const canSubmit =
     !submitting &&
     !signerPaused &&
@@ -163,6 +172,7 @@ export function OnboardSponsorConfigScreen() {
     trimmedLabel.length > 0 &&
     password.length >= ONBOARD_SPONSOR_PASSWORD_MIN_LENGTH &&
     confirmPassword === password &&
+    profilePassword.length >= ONBOARD_SPONSOR_PASSWORD_MIN_LENGTH &&
     relays.length > 0;
 
   const headerMeta = activeProfile?.groupName ?? "Onboard a Device";
@@ -204,6 +214,7 @@ export function OnboardSponsorConfigScreen() {
         deviceLabel: trimmedLabel,
         password,
         relays,
+        profilePassword,
       });
       navigate("/onboard-sponsor/handoff");
     } catch (err) {
@@ -313,6 +324,23 @@ export function OnboardSponsorConfigScreen() {
           >
             Strength: {strengthLabel}
           </span>
+        </div>
+
+        <div className="settings-section">
+          <div className="settings-section-header">
+            <span className="settings-section-label">Profile Password</span>
+            <span className="settings-section-rule" />
+          </div>
+          <PasswordField
+            label="Profile Password"
+            value={profilePassword}
+            onChange={(event) => setProfilePassword(event.target.value)}
+            placeholder="Profile password (to unlock the share pool)"
+            data-testid="onboard-sponsor-profile-password-input"
+            id="onboard-sponsor-profile-password"
+            error={profilePasswordError || undefined}
+            help="Used once to unlock the encrypted pool of remaining shares."
+          />
         </div>
 
         <div className="settings-section">

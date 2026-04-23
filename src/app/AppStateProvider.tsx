@@ -80,6 +80,17 @@ import {
   createRuntimeFromProfilePayload,
   createRuntimeFromSnapshot,
 } from "./profileRuntime";
+import {
+  UNADOPTED_POOL_EXHAUSTED_ERROR,
+  UNADOPTED_POOL_VERSION,
+  availableUnadoptedShares,
+  decryptUnadoptedSharesPool,
+  encryptUnadoptedSharesPool,
+  updateShareAllocationStatus,
+  upsertShareAllocation,
+  type ShareAllocationEntry,
+  type UnadoptedSharesPool,
+} from "../lib/storage/unadoptedSharesPool";
 import { exportRuntimePackagesFromSnapshot } from "./runtimeExports";
 import {
   decodeExternalBfshareSources,
@@ -354,6 +365,24 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const dispatchRuntimeCommandRef = useRef<
     ((cmd: RuntimeCommand) => Promise<HandleRuntimeCommandResult>) | null
   >(null);
+  /**
+   * fix-m7-onboard-distinct-share-allocation — ref to a helper that
+   * transitions a share-allocation ledger entry on the active
+   * profile's stored record. Callable from `absorbDrains` (drain
+   * handler has `[]` deps) and `clearOnboardSponsorSession` so late
+   * completions / failures / cancellations cleanly reconcile the
+   * ledger without requiring a password re-prompt. Populated by the
+   * `useEffect` below that keeps it pointed at the latest
+   * closure-captured implementation.
+   */
+  const transitionShareAllocationStatusRef = useRef<
+    | ((
+        requestId: string,
+        status: ShareAllocationEntry["status"],
+        failureReason?: string,
+      ) => Promise<void>)
+    | null
+  >(null);
 
   const abortOnboardHandshake = useCallback(() => {
     onboardHandshakeRef.current?.controller.abort();
@@ -452,6 +481,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                 ? { ...previous, status: "completed" }
                 : previous,
             );
+            // fix-m7-onboard-distinct-share-allocation — mark the
+            // allocation ledger entry "completed" so the underlying
+            // share is permanently removed from the available pool
+            // (VAL-ONBOARD-020). Fire-and-forget; persistence failure
+            // does not rollback the session state.
+            void transitionShareAllocationStatusRef.current?.(
+              onboardCompletion.request_id,
+              "completed",
+            );
             break;
           }
         }
@@ -515,6 +553,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               previous && previous.requestId === failure.request_id
                 ? { ...previous, status: "failed", failureReason: reason }
                 : previous,
+            );
+            // fix-m7-onboard-distinct-share-allocation — mark the
+            // allocation ledger entry "failed" so the underlying
+            // share RETURNS to the pool and can be re-allocated on a
+            // subsequent sponsor attempt. Fire-and-forget.
+            void transitionShareAllocationStatusRef.current?.(
+              failure.request_id,
+              "failed",
+              reason,
             );
             break;
           }
@@ -779,6 +826,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         input.method,
         input.value,
       );
+      // fix-m7-onboard-distinct-share-allocation — preserve pool
+      // across policy-override persists so the sponsor flow keeps
+      // working after an "Always allow/deny" decision.
+      const existingRecord = await getProfile(profile.id);
       const { record, normalizedPayload } = await buildStoredProfileRecord(
         nextPayload,
         password,
@@ -786,6 +837,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           createdAt: profile.createdAt,
           lastUsedAt: profile.lastUsedAt,
           label: profile.label,
+          unadoptedSharesCiphertext: existingRecord?.unadoptedSharesCiphertext,
+          shareAllocations: existingRecord?.shareAllocations,
         },
       );
       // Cache the fully normalised payload (post-Zod parse) so subsequent
@@ -1475,12 +1528,39 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         ),
       });
       const createdAt = Date.now();
+      const remoteShares = createSession.keyset.shares.filter(
+        (share) => share.idx !== localShare.idx,
+      );
+      // fix-m7-onboard-distinct-share-allocation — build an encrypted
+      // pool of the NON-SELF share secrets so the Dashboard "Onboard a
+      // Device" flow can allocate a distinct share later on without
+      // re-using the sponsor's own share (which would cause
+      // bifrost-rs's `process_event` to reject the handshake as
+      // `UnknownPeer(self)`). The pool is encrypted under the profile
+      // password; the share secrets are NEVER retained in React state
+      // or any non-envelope store.
+      const initialPool: UnadoptedSharesPool = {
+        version: UNADOPTED_POOL_VERSION,
+        shares: remoteShares.map((share) => ({
+          idx: share.idx,
+          share_secret: share.seckey,
+          member_pubkey_x_only: memberPubkeyXOnly(
+            memberForShare(group, share),
+          ),
+        })),
+      };
+      const unadoptedSharesCiphertext = await encryptUnadoptedSharesPool(
+        initialPool,
+        draft.password,
+      );
       const { record, normalizedPayload: normalizedCreatePayload } =
         await buildStoredProfileRecord(payload, draft.password, {
           createdAt,
           updatedAt: createdAt,
           lastUsedAt: createdAt,
           label: createSession.draft.groupName,
+          unadoptedSharesCiphertext,
+          shareAllocations: [],
         });
       await saveProfile(record);
       // Cache the just-saved payload + password so any subsequent
@@ -1490,10 +1570,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // `fix-m2-persist-always-allow-to-profile` feature.
       unlockedPayloadRef.current = normalizedCreatePayload;
       unlockedPasswordRef.current = draft.password;
-
-      const remoteShares = createSession.keyset.shares.filter(
-        (share) => share.idx !== localShare.idx,
-      );
       const onboardingPackages = await buildRemoteOnboardingPackages({
         remoteShares,
         localShare,
@@ -1857,11 +1933,44 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   // password. Validation mirrors `updateRelays` (wss://-only, no dupes)
   // for consistency with the Settings relay-list editor so users never
   // see divergent error copy.
+  //
+  // fix-m7-onboard-distinct-share-allocation — this mutator is the
+  // ONLY place that decrypts the profile's unadopted-shares pool.
+  // Flow:
+  //   1. Validate inputs (label, onboarding password, relay list,
+  //      threshold, signer paused, profile password length).
+  //   2. Load the stored profile record and decrypt its
+  //      `unadoptedSharesCiphertext` using the supplied profile
+  //      password. On wrong password / malformed envelope, surface
+  //      the canonical copy.
+  //   3. Pick the FIRST available share (one not already claimed by
+  //      an `awaiting_adoption` / `completed` ledger entry). Pool
+  //      exhausted → throw `UNADOPTED_POOL_EXHAUSTED_ERROR`
+  //      (VAL-ONBOARD-020).
+  //   4. Encode the bfonboard package with the allocated share's
+  //      secret + peer_pk = sponsor's self pubkey (so the requester's
+  //      post-adoption handshake targets the sponsor).
+  //   5. Dispatch `handleRuntimeCommand({type: 'onboard',
+  //      peer_pubkey32_hex: <allocated share's member pubkey>})` so
+  //      the runtime registers a pending Onboard op and emits an
+  //      outbound envelope the relay pump publishes.
+  //   6. Append an allocation ledger entry keyed by the runtime
+  //      request_id, re-encrypt the pool (unchanged — allocated
+  //      shares are tracked via the ledger, not the pool contents),
+  //      and re-save the record.
+  //   7. Set the transient `onboardSponsorSession` so the handoff
+  //      screen can render the package + QR + Cancel.
+  //
+  // Security: the decrypted pool is never written to React state or
+  // window.__debug. The allocated share's secret is handed directly
+  // to `encodeOnboardPackage` (which returns the ciphertext form) and
+  // discarded at the end of this function.
   const createOnboardSponsorPackage = useCallback(
     async (input: {
       deviceLabel: string;
       password: string;
       relays: string[];
+      profilePassword: string;
     }): Promise<string> => {
       const label = input.deviceLabel.trim();
       if (label.length === 0) {
@@ -1939,9 +2048,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
 
       // Derive the sponsor's own x-only pubkey from the share's
-      // member entry in the group package. This matches the identity
-      // used by `build_profile_backup_event` so the requester's
-      // handshake targets the correct peer.
+      // member entry in the group package. This is the `peer_pk`
+      // stored in the bfonboard package — the requester's
+      // post-adoption handshake targets this pubkey.
       const memberIdx = await resolveShareIndex(
         payload.group_package,
         shareSecret,
@@ -1956,36 +2065,63 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       const selfPubkeyXOnly = memberPubkeyXOnly(selfMember);
 
-      // fix-m7-onboard-self-peer-rejection — bifrost-rs's
-      // `initiate_onboard` rejects with `SignerError::UnknownPeer` when
-      // `peer_pubkey32_hex` is the sponsor's own pubkey (self is never
-      // present in `member_idx_by_pubkey` on the sponsor's signing
-      // device). The original sponsor UI dispatched against the
-      // sponsor's self pubkey, which caused every sponsorship to
-      // transition immediately to `status='failed'`. The fix: choose a
-      // NON-SELF member from the group package as the runtime's
-      // dispatch target. This satisfies bifrost-rs's membership
-      // requirement so `initiate_onboard` registers a pending Onboard
-      // op and the session transitions to `awaiting_adoption` on the
-      // happy path. See
-      // `docs/runtime-deviations-from-paper.md > M7 sponsor peer_pk`
-      // for the full rationale. Note: the bfonboard payload's
-      // `peer_pk` remains the sponsor's own pubkey — this is the peer
-      // the REQUESTER will target when they dispatch their own
-      // onboarding handshake after adopting the share.
-      const targetMember = payload.group_package.members.find(
-        (member) => member.idx !== memberIdx,
-      );
-      if (!targetMember) {
+      // fix-m7-onboard-distinct-share-allocation — resolve the
+      // profile record + decrypt the unadopted shares pool. The
+      // profile password is required (NOT the onboarding password,
+      // which is the key to the bfonboard package itself). A missing
+      // pool means the profile predates this feature OR every share
+      // has been adopted; both cases surface as "No remaining share
+      // slots." for a uniform user-facing error.
+      const activeSummary = activeProfileRef.current;
+      if (!activeSummary) {
         throw new Error(
-          "Active profile's group has no non-self member to target for onboard.",
+          "Unlock a profile before sponsoring a new device.",
         );
       }
-      const targetPeerPubkeyXOnly = memberPubkeyXOnly(targetMember);
+      const storedRecord = await getProfile(activeSummary.id);
+      if (!storedRecord) {
+        throw new Error(
+          "Active profile record is missing — re-unlock and try again.",
+        );
+      }
+      if (!storedRecord.unadoptedSharesCiphertext) {
+        throw new Error(UNADOPTED_POOL_EXHAUSTED_ERROR);
+      }
+      const profilePassword = input.profilePassword ?? "";
+      if (profilePassword.length < 8) {
+        throw new Error(
+          (await import("./AppStateTypes"))
+            .ONBOARD_SPONSOR_PROFILE_PASSWORD_ERROR,
+        );
+      }
+      const pool = await decryptUnadoptedSharesPool(
+        storedRecord.unadoptedSharesCiphertext,
+        profilePassword,
+      );
+      const ledger = storedRecord.shareAllocations ?? [];
+      const available = availableUnadoptedShares(pool, ledger);
+      if (available.length === 0) {
+        throw new Error(UNADOPTED_POOL_EXHAUSTED_ERROR);
+      }
+      const allocatedShare = available[0]!;
+      const allocatedShareSecret = allocatedShare.share_secret;
+      const targetPeerPubkeyXOnly = allocatedShare.member_pubkey_x_only;
+
+      // Safety: sanity check we are NOT encoding the sponsor's own
+      // share secret. If the pool somehow contains the self entry
+      // (e.g. legacy/forward-compat bug) refuse to proceed.
+      if (
+        targetPeerPubkeyXOnly.toLowerCase() ===
+        selfPubkeyXOnly.toLowerCase()
+      ) {
+        throw new Error(
+          "Unadopted share pool contains the sponsor's own share; refusing to onboard.",
+        );
+      }
 
       const packageText = await encodeOnboardPackage(
         {
-          share_secret: shareSecret,
+          share_secret: allocatedShareSecret,
           relays: validated,
           peer_pk: selfPubkeyXOnly,
         },
@@ -2000,6 +2136,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // (b) `runtime_status.pending_operations` gains a row we can
       // correlate on completion / failure.
       let onboardRequestId: string | null = null;
+      let dispatchError: Error | null = null;
       try {
         const result = await dispatchRuntimeCommandRef.current?.({
           type: "onboard",
@@ -2007,10 +2144,55 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         });
         onboardRequestId = result?.requestId ?? null;
       } catch (error) {
-        // Surface the bifrost error via the session's failure reason so
-        // the handoff screen can render the error tone. We still store
-        // the package text so the user can copy / discard it.
-        const reason = error instanceof Error ? error.message : String(error);
+        dispatchError = error instanceof Error ? error : new Error(String(error));
+      }
+
+      // Persist the allocation ledger update + re-encrypt the pool
+      // under the same password (even on dispatch failure we want to
+      // record the attempt so operators can see it). When the dispatch
+      // failed we record the allocation as "failed" immediately so the
+      // share returns to the pool; on success we write it as
+      // "awaiting_adoption" keyed by the assigned request_id.
+      const allocationRequestId =
+        onboardRequestId ?? `local-failure-${Date.now()}`;
+      const allocationStatus: ShareAllocationEntry["status"] = dispatchError
+        ? "failed"
+        : "awaiting_adoption";
+      const allocationEntry: ShareAllocationEntry = {
+        share_idx: allocatedShare.idx,
+        request_id: allocationRequestId,
+        device_label: label,
+        allocated_at: Date.now(),
+        status: allocationStatus,
+        ...(dispatchError
+          ? {
+              terminal_at: Date.now(),
+              failure_reason: dispatchError.message,
+            }
+          : {}),
+      };
+      const nextLedger = upsertShareAllocation(ledger, allocationEntry);
+      // Re-encrypt with the SAME password so a subsequent sponsor
+      // attempt re-decrypts successfully. (Pool contents are unchanged
+      // — the allocation ledger tracks availability, not the pool
+      // itself.)
+      const reEncryptedPool = await encryptUnadoptedSharesPool(
+        pool,
+        profilePassword,
+      );
+      try {
+        await saveProfile({
+          ...storedRecord,
+          unadoptedSharesCiphertext: reEncryptedPool,
+          shareAllocations: nextLedger,
+        });
+      } catch {
+        // Persistence failures are surfaced via the failure reason
+        // below so the user can retry; we do not rollback the runtime
+        // dispatch because the outbound envelope is already in flight.
+      }
+
+      if (dispatchError) {
         setOnboardSponsorSession({
           deviceLabel: label,
           packageText,
@@ -2019,7 +2201,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           requestId: null,
           targetPeerPubkey: targetPeerPubkeyXOnly,
           status: "failed",
-          failureReason: reason,
+          failureReason: dispatchError.message,
         });
         return packageText;
       }
@@ -2061,6 +2243,51 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  /**
+   * fix-m7-onboard-distinct-share-allocation — transition a single
+   * allocation ledger entry on the active profile's stored record.
+   * Reads the current record via {@link getProfile}, updates the
+   * ledger entry keyed by `requestId`, and writes the record back.
+   * No-op when no active profile is present OR the ledger contains
+   * no entry for `requestId`.
+   *
+   * The pool ciphertext is NOT decrypted here — we only mutate the
+   * unencrypted ledger, which is sufficient to expose/hide a share
+   * via {@link availableUnadoptedShares}.
+   */
+  const transitionShareAllocationStatus = useCallback(
+    async (
+      requestId: string,
+      status: ShareAllocationEntry["status"],
+      failureReason?: string,
+    ): Promise<void> => {
+      const activeSummary = activeProfileRef.current;
+      if (!activeSummary) return;
+      try {
+        const record = await getProfile(activeSummary.id);
+        if (!record) return;
+        const currentLedger = record.shareAllocations ?? [];
+        const nextLedger = updateShareAllocationStatus(
+          currentLedger,
+          requestId,
+          status,
+          { failureReason },
+        );
+        if (nextLedger === currentLedger) return;
+        await saveProfile({
+          ...record,
+          shareAllocations: nextLedger,
+        });
+      } catch {
+        // Best-effort persistence. The user-visible session state has
+        // already been updated via `setOnboardSponsorSession`; a
+        // missing ledger update only affects re-allocation eligibility
+        // which the user can resolve on a subsequent sponsor attempt.
+      }
+    },
+    [],
+  );
+
   const clearOnboardSponsorSession = useCallback(() => {
     const existing = onboardSponsorSessionRef.current;
     if (
@@ -2085,9 +2312,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         // best-effort; if the runtime is torn down the override is
         // moot.
       }
+      // fix-m7-onboard-distinct-share-allocation — mark the
+      // allocation ledger entry "cancelled" so the underlying share
+      // returns to the pool. Fire-and-forget.
+      if (existing.requestId) {
+        void transitionShareAllocationStatus(
+          existing.requestId,
+          "cancelled",
+        );
+      }
     }
     setOnboardSponsorSession(null);
-  }, []);
+  }, [transitionShareAllocationStatus]);
+
+  // Keep the ref pointed at the latest helper so the `absorbDrains`
+  // callback (with `[]` deps) can safely invoke it without
+  // re-subscribing.
+  transitionShareAllocationStatusRef.current = transitionShareAllocationStatus;
 
   const validateRotateKeysetSources = useCallback(
     async (input: {
@@ -2714,11 +2955,31 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         }
         throw error;
       }
+      // fix-m7-onboard-distinct-share-allocation — if the profile
+      // carries an encrypted unadopted-shares pool, rotate its
+      // encryption to the new password so subsequent sponsor attempts
+      // can decrypt it. If the current password cannot decrypt the
+      // pool we treat this as a malformed profile (shouldn't happen —
+      // both envelopes are encrypted under the same password) and
+      // surface a clear error.
+      let rotatedPoolCiphertext = record.unadoptedSharesCiphertext;
+      if (record.unadoptedSharesCiphertext) {
+        const decryptedPool = await decryptUnadoptedSharesPool(
+          record.unadoptedSharesCiphertext,
+          oldPassword,
+        );
+        rotatedPoolCiphertext = await encryptUnadoptedSharesPool(
+          decryptedPool,
+          newPassword,
+        );
+      }
       const { record: updatedRecord, normalizedPayload } =
         await buildStoredProfileRecord(payload, newPassword, {
           createdAt: record.summary.createdAt,
           lastUsedAt: Date.now(),
           label: record.summary.label,
+          unadoptedSharesCiphertext: rotatedPoolCiphertext,
+          shareAllocations: record.shareAllocations,
         });
       await saveProfile(updatedRecord);
       // Refresh the in-memory cache so subsequent always-* decisions
@@ -2815,6 +3076,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           relays: normalized,
         },
       };
+      // fix-m7-onboard-distinct-share-allocation — preserve
+      // pool/ledger fields across unrelated profile mutations so we
+      // don't accidentally drop the encrypted share pool.
+      const existingRecord = await getProfile(activeProfile.id);
       const { record, normalizedPayload } = await buildStoredProfileRecord(
         nextPayload,
         password,
@@ -2822,6 +3087,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           createdAt: activeProfile.createdAt,
           lastUsedAt: Date.now(),
           label: activeProfile.label,
+          unadoptedSharesCiphertext: existingRecord?.unadoptedSharesCiphertext,
+          shareAllocations: existingRecord?.shareAllocations,
         },
       );
       await saveProfile(record);
@@ -2875,6 +3142,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           name: trimmed,
         },
       };
+      // fix-m7-onboard-distinct-share-allocation — preserve the
+      // encrypted unadopted-shares pool + allocation ledger across
+      // profile-name rotations so subsequent sponsor attempts still
+      // find a non-self share to allocate.
+      const existingRecord = await getProfile(activeProfile.id);
       const { record, normalizedPayload } = await buildStoredProfileRecord(
         nextPayload,
         password,
@@ -2882,6 +3154,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           createdAt: activeProfile.createdAt,
           lastUsedAt: Date.now(),
           label: activeProfile.label,
+          unadoptedSharesCiphertext: existingRecord?.unadoptedSharesCiphertext,
+          shareAllocations: existingRecord?.shareAllocations,
         },
       );
       await saveProfile(record);
@@ -3482,6 +3756,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         {
           label: backup.group_package.group_name,
           createdAt: existing?.summary.createdAt,
+          // fix-m7-onboard-distinct-share-allocation — preserve any
+          // pool already associated with the pre-existing record on
+          // re-restore. Fresh restores won't carry one (the backup
+          // envelope doesn't include remote shares).
+          unadoptedSharesCiphertext: existing?.unadoptedSharesCiphertext,
+          shareAllocations: existing?.shareAllocations,
         },
       );
       await saveProfile(record);

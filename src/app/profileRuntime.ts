@@ -10,6 +10,7 @@ import type {
   RuntimeSnapshotInput,
   StoredProfileRecord
 } from "../lib/bifrost/types";
+import type { ShareAllocationEntry } from "../lib/storage/unadoptedSharesPool";
 
 export async function createRuntimeFromProfilePayload(payload: BfProfilePayload, localShareIdx: number): Promise<RuntimeClient> {
   const runtime = new RuntimeClient();
@@ -58,6 +59,16 @@ export async function buildStoredProfileRecord(
     lastUsedAt?: number;
     updatedAt?: number;
     label?: string;
+    /**
+     * fix-m7-onboard-distinct-share-allocation — pass through the
+     * encrypted unadopted shares pool envelope and its allocation
+     * ledger when rebuilding the record. Callers that are only
+     * rotating the profile password / relays / name leave these fields
+     * at their prior values so the pool is not silently wiped on
+     * unrelated mutations.
+     */
+    unadoptedSharesCiphertext?: string;
+    shareAllocations?: ShareAllocationEntry[];
   } = {}
 ): Promise<{ record: StoredProfileRecord; normalizedPayload: BfProfilePayload; localShareIdx: number }> {
   const { profileId, localShareIdx, normalizedPayload } = await normalizeProfilePayload(payload);
@@ -90,7 +101,13 @@ export async function buildStoredProfileRecord(
       updatedAt,
       lastUsedAt
     },
-    encryptedProfilePackage: pair.profile_string
+    encryptedProfilePackage: pair.profile_string,
+    ...(options.unadoptedSharesCiphertext
+      ? { unadoptedSharesCiphertext: options.unadoptedSharesCiphertext }
+      : {}),
+    ...(options.shareAllocations && options.shareAllocations.length > 0
+      ? { shareAllocations: options.shareAllocations }
+      : {})
   };
   return { record, normalizedPayload, localShareIdx };
 }

@@ -181,6 +181,12 @@ describe("OnboardSponsorConfigScreen — VAL-ONBOARD-003 / 019 / 021 / 024", () 
     fireEvent.change(screen.getByTestId("onboard-sponsor-confirm-input"), {
       target: { value: "super-secret-1" },
     });
+    // fix-m7-onboard-distinct-share-allocation — the new profile
+    // password gate also participates in the CTA-enable check.
+    fireEvent.change(
+      screen.getByTestId("onboard-sponsor-profile-password-input"),
+      { target: { value: "profile-password-1" } },
+    );
     expect(cta.disabled).toBe(true);
     // Fill label — CTA enables.
     fireEvent.change(screen.getByTestId("onboard-sponsor-label-input"), {
@@ -257,6 +263,13 @@ describe("OnboardSponsorConfigScreen — VAL-ONBOARD-003 / 019 / 021 / 024", () 
     fireEvent.change(screen.getByTestId("onboard-sponsor-confirm-input"), {
       target: { value: "super-secret-1" },
     });
+    // fix-m7-onboard-distinct-share-allocation — must also fill the
+    // profile password to enable the CTA and pass it through to the
+    // mutator.
+    fireEvent.change(
+      screen.getByTestId("onboard-sponsor-profile-password-input"),
+      { target: { value: "profile-password-1" } },
+    );
     const cta = screen.getByTestId(
       "onboard-sponsor-create-btn",
     ) as HTMLButtonElement;
@@ -267,6 +280,7 @@ describe("OnboardSponsorConfigScreen — VAL-ONBOARD-003 / 019 / 021 / 024", () 
       deviceLabel: "Bob Laptop",
       password: "super-secret-1",
       relays: baseProfile.relays,
+      profilePassword: "profile-password-1",
     });
   });
 

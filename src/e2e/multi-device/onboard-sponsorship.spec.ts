@@ -410,6 +410,7 @@ test.describe("multi-device onboard sponsorship (fix-m7-onboard-self-peer-reject
                   deviceLabel: string;
                   password: string;
                   relays: string[];
+                  profilePassword: string;
                 }) => Promise<string>;
               };
             };
@@ -417,6 +418,12 @@ test.describe("multi-device onboard sponsorship (fix-m7-onboard-self-peer-reject
               deviceLabel: "Bob Laptop",
               password: "onboard-package-pw-1234",
               relays: [relayUrl],
+              // fix-m7-onboard-distinct-share-allocation — the
+              // sponsor flow now requires the profile password to
+              // decrypt the unadopted shares pool. The multi-device
+              // harness provisions profiles with this password in
+              // the fixture bootstrap below.
+              profilePassword: "profile-password",
             });
           },
           { relayUrl: SPONSOR_PKG_RELAY },

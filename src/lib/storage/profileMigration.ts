@@ -1,4 +1,6 @@
 import type { StoredProfileRecord, StoredProfileSummary } from "../bifrost/types";
+import { ShareAllocationEntrySchema } from "./unadoptedSharesPool";
+import type { ShareAllocationEntry } from "./unadoptedSharesPool";
 
 /**
  * m5-idb-migration — forward-only IndexedDB schema migration.
@@ -117,8 +119,34 @@ export function migrateProfileRecord(raw: unknown): StoredProfileRecord | null {
   const summary = migrateSummary(rawSummary, now);
   if (!summary) return null;
 
+  // fix-m7-onboard-distinct-share-allocation — forward-only migration
+  // of the new pool fields. Both are optional on legacy records; we
+  // preserve them byte-for-byte when present and pass them through
+  // unchanged when absent. A future schema bump can re-validate the
+  // ledger shape here; for now we trust the write path to enforce the
+  // schema and only drop obviously-invalid structures.
+  const rawUnadoptedCiphertext = (raw as { unadoptedSharesCiphertext?: unknown })
+    .unadoptedSharesCiphertext;
+  const unadoptedSharesCiphertext =
+    typeof rawUnadoptedCiphertext === "string" && rawUnadoptedCiphertext.length > 0
+      ? rawUnadoptedCiphertext
+      : undefined;
+  const rawShareAllocations = (raw as { shareAllocations?: unknown })
+    .shareAllocations;
+  let shareAllocations: ShareAllocationEntry[] | undefined;
+  if (Array.isArray(rawShareAllocations)) {
+    const validated: ShareAllocationEntry[] = [];
+    for (const entry of rawShareAllocations) {
+      const parsed = ShareAllocationEntrySchema.safeParse(entry);
+      if (parsed.success) validated.push(parsed.data);
+    }
+    shareAllocations = validated.length > 0 ? validated : undefined;
+  }
+
   return {
     summary,
     encryptedProfilePackage,
+    ...(unadoptedSharesCiphertext ? { unadoptedSharesCiphertext } : {}),
+    ...(shareAllocations ? { shareAllocations } : {}),
   };
 }

@@ -454,6 +454,47 @@ export interface StoredProfileSummary {
 export interface StoredProfileRecord {
   summary: StoredProfileSummary;
   encryptedProfilePackage: string;
+  /**
+   * fix-m7-onboard-distinct-share-allocation — canonical JSON envelope
+   * produced by
+   * {@link import("../storage/unadoptedSharesPool").encryptUnadoptedSharesPool}
+   * containing the profile's NON-SELF share secrets encrypted under
+   * the profile password.
+   *
+   * Populated by the Create flow after keyset generation; written
+   * again each time the pool allocation ledger changes (allocation,
+   * completion, cancellation). Absent on legacy records (migration
+   * leaves them un-populated; the sponsor flow will refuse to
+   * onboard when the pool is missing or exhausted).
+   *
+   * SECURITY: decrypted only inside
+   * `AppStateValue.createOnboardSponsorPackage`; the decrypted pool
+   * is never written to React state, `sessionStorage`,
+   * `localStorage`, `window.__debug`, or any non-envelope IndexedDB
+   * store. See `docs/runtime-deviations-from-paper.md > M7 onboard
+   * unadopted share pool` for the full design + security rationale.
+   */
+  unadoptedSharesCiphertext?: string;
+  /**
+   * fix-m7-onboard-distinct-share-allocation — unencrypted ledger of
+   * pool-share allocations issued by the Dashboard "Onboard a Device"
+   * flow. One entry per sponsor-initiated onboard ceremony, keyed by
+   * the runtime-assigned `request_id`.
+   *
+   * Only share indices + allocation metadata (request_id, device
+   * label, timestamps, status, optional failure reason) live here —
+   * NO share secrets, NO passwords, NO ciphertext. The ledger is
+   * therefore safe to store unencrypted alongside the record. Shape
+   * is validated on read via
+   * {@link import("../storage/unadoptedSharesPool").ShareAllocationEntrySchema}.
+   *
+   * On successful onboard completion the entry's `status` transitions
+   * to `"completed"` and the underlying share is permanently removed
+   * from the available pool. On failure or cancel the entry's
+   * `status` transitions to `"failed"` / `"cancelled"` and the share
+   * RETURNS to the available pool for a subsequent sponsor attempt.
+   */
+  shareAllocations?: import("../storage/unadoptedSharesPool").ShareAllocationEntry[];
 }
 
 export interface OnboardingPackageView {
