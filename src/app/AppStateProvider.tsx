@@ -1956,6 +1956,33 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       const selfPubkeyXOnly = memberPubkeyXOnly(selfMember);
 
+      // fix-m7-onboard-self-peer-rejection — bifrost-rs's
+      // `initiate_onboard` rejects with `SignerError::UnknownPeer` when
+      // `peer_pubkey32_hex` is the sponsor's own pubkey (self is never
+      // present in `member_idx_by_pubkey` on the sponsor's signing
+      // device). The original sponsor UI dispatched against the
+      // sponsor's self pubkey, which caused every sponsorship to
+      // transition immediately to `status='failed'`. The fix: choose a
+      // NON-SELF member from the group package as the runtime's
+      // dispatch target. This satisfies bifrost-rs's membership
+      // requirement so `initiate_onboard` registers a pending Onboard
+      // op and the session transitions to `awaiting_adoption` on the
+      // happy path. See
+      // `docs/runtime-deviations-from-paper.md > M7 sponsor peer_pk`
+      // for the full rationale. Note: the bfonboard payload's
+      // `peer_pk` remains the sponsor's own pubkey — this is the peer
+      // the REQUESTER will target when they dispatch their own
+      // onboarding handshake after adopting the share.
+      const targetMember = payload.group_package.members.find(
+        (member) => member.idx !== memberIdx,
+      );
+      if (!targetMember) {
+        throw new Error(
+          "Active profile's group has no non-self member to target for onboard.",
+        );
+      }
+      const targetPeerPubkeyXOnly = memberPubkeyXOnly(targetMember);
+
       const packageText = await encodeOnboardPackage(
         {
           share_secret: shareSecret,
@@ -1971,18 +1998,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // `drain_outbound_events` yields an Onboard-kind envelope that
       // the RuntimeRelayPump publishes to every configured relay, and
       // (b) `runtime_status.pending_operations` gains a row we can
-      // correlate on completion / failure. The target peer is the
-      // sponsor's own member pubkey because the sponsor UI packages
-      // the sponsor's own share (see the deviation entry in
-      // `docs/runtime-deviations-from-paper.md`). On protocol-level
-      // errors (signer paused, unknown peer, policy denied) we still
-      // store the session so the handoff screen can render — the
-      // missing request_id signals the ceremony never started.
+      // correlate on completion / failure.
       let onboardRequestId: string | null = null;
       try {
         const result = await dispatchRuntimeCommandRef.current?.({
           type: "onboard",
-          peer_pubkey32_hex: selfPubkeyXOnly,
+          peer_pubkey32_hex: targetPeerPubkeyXOnly,
         });
         onboardRequestId = result?.requestId ?? null;
       } catch (error) {
@@ -1996,7 +2017,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           relays: validated,
           createdAt: Date.now(),
           requestId: null,
-          targetPeerPubkey: selfPubkeyXOnly,
+          targetPeerPubkey: targetPeerPubkeyXOnly,
           status: "failed",
           failureReason: reason,
         });
@@ -2013,7 +2034,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (
         existing &&
         existing.status === "awaiting_adoption" &&
-        existing.targetPeerPubkey === selfPubkeyXOnly &&
+        existing.targetPeerPubkey === targetPeerPubkeyXOnly &&
         existing.requestId &&
         onboardRequestId &&
         existing.requestId !== onboardRequestId
@@ -2032,7 +2053,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         relays: validated,
         createdAt: Date.now(),
         requestId: onboardRequestId,
-        targetPeerPubkey: selfPubkeyXOnly,
+        targetPeerPubkey: targetPeerPubkeyXOnly,
         status: "awaiting_adoption",
       });
       return packageText;

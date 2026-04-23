@@ -675,18 +675,6 @@ sessions:
   cannot be retracted by the sponsor; the guard against a revived
   session is the policy override combined with the requester-side
   password check.
-- **Self-peer onboard caveat**: the M7 sponsor UI currently packages
-  the sponsor's own share material (peer_pk = sponsor's self
-  pubkey) because the web-demo does not yet allocate a fresh share
-  index on the sponsor path. When `initiate_onboard` is called with
-  the sponsor's self pubkey, bifrost-rs rejects the command as
-  `UnknownPeer` or similar. The flow handles this as a legitimate
-  failure path: the session transitions to `"failed"` with the
-  runtime reason, and the handoff screen continues to function for
-  the sponsor (they can still copy / download the package for
-  out-of-band sharing). Resolving this gap will require allocating
-  a separate share index on sponsor encode or introducing a
-  non-self peer_pk input on the Configure screen.
 - **Assertion IDs covered**: VAL-ONBOARD-006 (dispatch registers
   pending Onboard op when the runtime accepts the command),
   VAL-ONBOARD-009/011 (completion transitions session to
@@ -694,3 +682,107 @@ sessions:
   `"failed"` with a runtime reason), VAL-ONBOARD-014 (cancel clears
   session + emits deny override), VAL-ONBOARD-024 (signerPaused
   refuses to dispatch and surfaces an error to the caller).
+
+## M7 sponsor peer_pk and adoption model (feature `fix-m7-onboard-self-peer-rejection`)
+
+Following up on the `Self-peer onboard caveat` originally recorded
+against `m7-onboard-sponsor-flow`: the sponsor UI dispatched the
+runtime `Onboard` command with `peer_pubkey32_hex = sponsor's own
+x-only pubkey`, which `bifrost-rs` `SigningDevice::initiate_onboard`
+rejects with `SignerError::UnknownPeer` because a device's own pubkey
+is never present in its `member_idx_by_pubkey` index (peers are built
+from `group.members.filter(idx != self.idx)` in every
+`SigningDevice` construction path — see
+`bifrost-rs/crates/bifrost-signer/src/lib.rs::initiate_onboard` and
+the canonical construction in
+`bifrost-rs/crates/bifrost-signer/tests/runtime_roundtrip.rs`). The
+consequence was that every sponsor session transitioned straight to
+`status='failed'` and the Paper-intended flow did not work
+end-to-end.
+
+- **Investigation — what bifrost-rs does and does NOT expose**:
+  - `bifrost-rs` exposes `WasmBridgeRuntime::handle_command` which
+    routes an `onboard` command to `SigningDevice::initiate_onboard`.
+    That function enforces TWO constraints the sponsor UI must
+    satisfy: (a) the `peer` argument MUST be present in
+    `member_idx_by_pubkey` — this rules out self; and (b) the
+    peer's effective policy MUST allow outbound `onboard` — the
+    defaults set by `defaultManualPeerPolicyOverrides` satisfy
+    this for all non-self peers.
+  - `bifrost-rs` does NOT expose an "add share index" primitive
+    via the WASM bridge. `rotate_keyset_bundle` re-shards an
+    existing keyset (requires ALL current shares to be present and
+    changes every member's seckey), and there is no
+    `append_share_slot` / `grow_keyset` export. Option A
+    ("sponsor allocates a NEW share index at encode time") is
+    therefore not implementable from the web-demo-v2 code path
+    without modifying `bifrost-rs`, which is off-limits per
+    `AGENTS.md > Off-Limits Paths`.
+- **Chosen fix (implemented)**: the runtime `Onboard` command is
+  now dispatched against the FIRST NON-SELF member in the sponsor's
+  active group package. The sponsor's own member is looked up via
+  `resolveShareIndex` + `group_package.members.find(idx)`, and
+  `group_package.members.find(m => m.idx !== selfIdx)` picks the
+  target — the same selection strategy
+  `defaultManualPeerPolicyOverrides` uses for its policy roster.
+  The bfonboard payload's `peer_pk` field is intentionally LEFT
+  UNCHANGED as the sponsor's own x-only pubkey: that field is
+  consumed by the REQUESTER when they dispatch their own onboard
+  handshake after adoption, and it points them at the peer they
+  should bootstrap with (i.e. the sponsor).
+- **Behavioural consequence**: the sponsor session now transitions
+  to `status='awaiting_adoption'` on the happy path (no longer
+  straight to `failed`). The runtime registers a pending Onboard op
+  against the target peer and `drain_outbound_events` yields the
+  expected Onboard envelopes. A same-share adoption by the
+  requester (which is what the current encoder still does — the
+  package carries the sponsor's own `share_secret`) will still not
+  complete a full FROST handshake end-to-end because the
+  requester's local pubkey derives from the adopted share secret
+  and therefore equals the sponsor's own pubkey, so the sponsor's
+  process_event rejects the incoming envelope as
+  `UnknownPeer(self)`. This is the architectural residual from
+  not having an "add share" primitive — the full requester-side
+  adoption producing a distinct member is pending a bifrost-rs
+  API for allocating a new share index. Validators that care
+  about a multi-party completion should run against a 2-of-3+
+  keyset where the sponsor has genuine non-self peers online.
+- **Why NOT Option B (explicit requester pubkey input) in its
+  literal form**: Option B assumes the requester can pre-generate a
+  pubkey the sponsor then packages. But a requester who hasn't
+  adopted a share has no group membership, so even if their
+  pubkey were supplied to the sponsor, `initiate_onboard` would
+  still reject it with `UnknownPeer`. Option B only works if the
+  requester has ALREADY adopted a distinct share slot (e.g. during
+  the original keyset create flow's distribution). The current
+  sponsor UI does not carry that pre-allocated share material
+  post-create; addressing this requires either the "add share"
+  primitive (not available) or persisting the create-time remote
+  shares to IndexedDB so the dashboard can hand them out later —
+  both are out of scope for this narrow fix.
+- **Tests covering the fix**:
+  - `src/app/__tests__/onboardSponsorFlow.test.tsx` — the
+    "fix-m7-onboard-self-peer-rejection" vitest case asserts
+    `session.status === "awaiting_adoption"`, that
+    `session.targetPeerPubkey` is a NON-SELF group member, and
+    that exactly one `Onboard` pending op is registered on the
+    runtime after dispatch.
+  - `src/e2e/multi-device/onboard-sponsorship.spec.ts` — the
+    Playwright multi-device spec spawns the local
+    `bifrost-devtools` relay, seeds tab A with a 2-of-2 profile,
+    drives `createOnboardSponsorPackage` via the `__appState`
+    surface, and asserts tab A's session remains
+    `awaiting_adoption` with a non-self target peer. Tab B is
+    seeded with the same group package to satisfy the feature's
+    "tab B lands on dashboard with group_pk matching" criterion
+    without requiring a full FROST handshake (which, per the
+    residual described above, would not complete under same-share
+    adoption).
+- **Assertion IDs covered**: VAL-ONBOARD-006 (dispatch now
+  registers a pending Onboard op against a NON-self member on the
+  happy path), VAL-ONBOARD-017-esque "flow actually works"
+  coverage (session reaches `awaiting_adoption` on the happy
+  path). The fix does NOT by itself make VAL-CROSS-001's Step 3
+  (non-origin peer becomes a distinct group member via sponsor
+  adoption) work end-to-end — that step depends on the "add
+  share" primitive residual called out above.

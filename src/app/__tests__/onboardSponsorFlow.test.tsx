@@ -154,22 +154,69 @@ describe("createOnboardSponsorPackage — VAL-ONBOARD-006 dispatch", () => {
     expect(session?.packageText.startsWith("bfonboard1")).toBe(true);
     expect(session?.deviceLabel).toBe("Bob Laptop");
     expect(session?.relays).toEqual(["wss://relay.local"]);
-    // The session always records a status: either `awaiting_adoption`
-    // when the runtime accepted the Onboard command, or `failed` if
-    // the bifrost runtime rejected it (e.g. self-peer policy). The
-    // VAL-ONBOARD-006 contract at the sponsor-ui-flow level is that
-    // the attempt is observable — not that it always succeeds
-    // (self-targeted onboards and duplicate-peer onboards are
-    // legitimate rejection paths under the current sponsor UI which
-    // packages the sponsor's own share).
-    expect(
-      session?.status === "awaiting_adoption" ||
-        session?.status === "failed" ||
-        session?.status === "completed",
-    ).toBe(true);
+    // fix-m7-onboard-self-peer-rejection — after fixing the dispatch
+    // to target a NON-SELF group member, the happy-path session MUST
+    // transition to `awaiting_adoption` (never immediately `failed`).
+    // The legitimate `failed` transition still occurs on runtime-level
+    // rejections (e.g. signer paused or policy-denied), but those are
+    // covered by dedicated tests below.
+    expect(session?.status).toBe("awaiting_adoption");
     // targetPeerPubkey is set whenever the dispatch attempt ran.
     expect(session?.targetPeerPubkey).toBeTruthy();
     expect(session?.targetPeerPubkey).toMatch(/^[0-9a-f]{64}$/i);
+  }, 30_000);
+
+  it("fix-m7-onboard-self-peer-rejection — dispatches against a NON-SELF group member and registers a pending Onboard op", async () => {
+    // After the self-peer fix, the sponsor's own pubkey must NOT be
+    // the runtime's Onboard dispatch target (bifrost-rs
+    // `initiate_onboard` rejects self with UnknownPeer). The session's
+    // `targetPeerPubkey` must match a non-self group member, the
+    // runtime must have registered exactly one `Onboard` pending op,
+    // and the session status must be `awaiting_adoption`.
+    const { getState } = await bootProvider();
+
+    // Snapshot the sponsor's group members BEFORE dispatch so we can
+    // assert the chosen target peer is a valid non-self member.
+    const createSession = getState().createSession;
+    expect(createSession?.keyset).toBeTruthy();
+    const group = createSession!.keyset!.group;
+    const localShare = createSession!.localShare;
+    expect(localShare).toBeTruthy();
+    const selfMember = group.members.find(
+      (member) => member.idx === localShare!.idx,
+    );
+    expect(selfMember).toBeTruthy();
+    const selfPubkeyXOnly = selfMember!.pubkey.slice(2); // drop 0x02/0x03 prefix byte
+
+    await act(async () => {
+      await getState().createOnboardSponsorPackage({
+        deviceLabel: "Bob Laptop",
+        password: "sponsor-password",
+        relays: ["wss://relay.local"],
+      });
+    });
+
+    const session = getState().onboardSponsorSession;
+    expect(session?.status).toBe("awaiting_adoption");
+    // The dispatch target MUST NOT be the sponsor's own x-only pubkey.
+    // Normalise both to lower-case hex before comparison.
+    const targetHex = session?.targetPeerPubkey?.toLowerCase() ?? "";
+    expect(targetHex).not.toBe(selfPubkeyXOnly.toLowerCase());
+    // The target MUST be a valid group member pubkey (non-self).
+    const targetMember = group.members.find(
+      (member) =>
+        member.pubkey.slice(2).toLowerCase() === targetHex,
+    );
+    expect(targetMember).toBeTruthy();
+    expect(targetMember?.idx).not.toBe(localShare!.idx);
+
+    // A pending Onboard op must be registered on the runtime.
+    const status = getState().runtimeStatus;
+    const onboardOps = status?.pending_operations.filter(
+      (op) => op.op_type === "Onboard",
+    );
+    expect(onboardOps?.length ?? 0).toBeGreaterThanOrEqual(1);
+    expect(session?.requestId).toBeTruthy();
   }, 30_000);
 
   it("VAL-ONBOARD-024 — refuses to dispatch while signerPaused and surfaces a failed session", async () => {
