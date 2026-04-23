@@ -53,7 +53,8 @@ Playwright demo-gallery + multi-device e2e suites.
 
 Start with `docs/README.md` for the docs map and `docs/agent-runbook.md` for
 safe agent workflow. The expanded architecture notes live in
-`docs/web-demo-architecture.md`; runtime-vs-Paper exceptions live in
+`docs/web-demo-architecture.md`; `/demo` scenario workflow lives in
+`docs/demo-scenario-guide.md`; runtime-vs-Paper exceptions live in
 `docs/runtime-deviations-from-paper.md`.
 
 ## Flows Implemented
@@ -124,6 +125,8 @@ routes are the source of truth for runtime behavior.
 Each demo scenario is reachable via a stable `/demo/{scenario-id}` URL. The
 gallery toolbar exposes `All screens / Prev / Next / Raw / Reference`; append
 `?chrome=0` to any scenario URL to strip the chrome for clean capture.
+See `docs/demo-scenario-guide.md` before adding scenario ids, changing
+Paper-reference assets, or relying on the demo bridge.
 
 ## Setup & Run
 
@@ -190,6 +193,8 @@ Two providers implement the same `useAppState()` API:
   orientation, local relay caveats, and validation commands.
 - `docs/web-demo-architecture.md` — layered runtime overview, module
   boundaries, data flows, persistence rules, and testing surfaces.
+- `docs/demo-scenario-guide.md` — `/demo/:scenarioId` registry rules,
+  Paper-reference sync, variant behavior, and demo bridge safety.
 - `docs/outside-runtime-flow-invariants.md` — security and phase-gating rules
   for setup, backup, restore, and recovery flows.
 - `docs/runtime-deviations-from-paper.md` — every intentional deviation from

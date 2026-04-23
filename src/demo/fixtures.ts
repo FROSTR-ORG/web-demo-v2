@@ -308,6 +308,7 @@ export function createDemoAppState(
     // want to observe the dispatch can pass an override in
     // `createDemoAppState({encodeDistributionPackage: spy, ...})`.
     encodeDistributionPackage: async () => undefined,
+    retryDistributionPackageAdoption: async () => undefined,
     markPackageDistributed: () => undefined,
     finishDistribution: async () => DEMO_PROFILE_ID,
     clearCreateSession: () => undefined,

@@ -33,6 +33,21 @@ that private-key material never leaves the WASM bridge or React memory.
   must NOT carry passwords, decoded payloads, raw share secrets, or
   recovered keys.
 
+## Flow-by-flow secret inventory
+
+| Flow | Sensitive material | Allowed browser boundary | Must clear on |
+| --- | --- | --- | --- |
+| Create keyset | Generated `nsec`, local share secret, remote share packages, package passwords | WASM bridge and `createSession` React memory; encrypted `bfprofile` only after save/export | Cancel, direct-navigation guard, profile save finish, credential clear, lock |
+| Create distribution | `bfonboard` payloads and per-share passwords | `createSession.onboardingPackages` and UI input state; display-safe package status may bridge | Package distribution finish, cancel, credential clear, lock |
+| Import profile | Encrypted `bfprofile`, decrypt password, decoded profile payload | Encrypted package may be persisted; decoded payload/password stay in memory | Review save, import error retry/cancel, credential clear, lock |
+| Onboard requester | `bfonboard`, package password, decoded source response, new profile password | `onboardSession` memory and relay transport driven by WASM-verified events | Success save, failure, cancel, timeout, credential clear |
+| Onboard sponsor | Source share selection, minted onboarding package, package password, source ceremony state | `onboardSponsorSessions` memory and runtime relay pump; package text is visible only for user handoff while the session is active | Handoff success/failure, cancel, timeout, credential clear |
+| Restore from relay | `bfshare`, backup password, decrypted restored profile | Relay events contain encrypted backup only; decrypted profile stays in memory until saved | Save, error, cancel, credential clear |
+| Rotate keyset | Source profile password, rotated keyset, new local share, remote packages/passwords | `rotateKeysetSession` memory and WASM helpers | Completion, cancel, wrong-password/group-mismatch/generation failure retry, credential clear |
+| Replace share | Replacement package/password and decoded replacement payload | Replace-share session memory, runtime operation state | Success, failure, cancel, credential clear |
+| Recover NSEC | Collected share packages, recovered `nsec` | Recover session/UI memory only; reveal/copy affordances must not persist it | Leaving success, cancel, credential clear, lock |
+| Backup export/publish | Profile export password and encrypted `bfprofile` | Encrypted package string may be saved/published; password stays in memory | Modal close, publish/export finish, credential clear |
+
 ## Private-key locus — always behind the bridge
 
 Nostr private-key operations for these flows stay in Rust/WASM. Browser code
@@ -61,6 +76,21 @@ or share arithmetic directly.
   profile replacement, and remote package handoff must happen in order.
   Completion requires every remote package to have package handoff plus
   password accounting.
+
+## Review checklist for new setup-flow work
+
+- The intake route validates format before advancing to a route that assumes a
+  decoded package or live session.
+- Every non-intake route redirects to the safe intake route when its expected
+  session phase is missing.
+- Retry and cancel clear in-memory decoded payloads before navigating.
+- Password fields are local component state unless an app-state action needs
+  them synchronously; they are never copied to the demo bridge, IndexedDB, or
+  router state.
+- Event logs, relay-history debug buffers, console output, and screenshots show
+  request ids, peer ids, statuses, and redacted previews only.
+- A component or app-state test covers the direct-navigation guard and at least
+  one cleanup path for any new session phase.
 
 ## Live onboarding — both directions are now live
 

@@ -388,6 +388,28 @@ export function MockAppStateProvider({
     [value],
   );
 
+  const retryDistributionPackageAdoption = useCallback(
+    async (idx: number) => {
+      await value.retryDistributionPackageAdoption(idx);
+      setCreateSession((session) => {
+        if (!session) return session;
+        return {
+          ...session,
+          onboardingPackages: session.onboardingPackages.map((entry) =>
+            entry.idx === idx
+              ? {
+                  ...entry,
+                  pendingDispatchRequestId: `mock-retry-${idx}`,
+                  adoptionError: undefined,
+                }
+              : entry,
+          ),
+        };
+      });
+    },
+    [value],
+  );
+
   // fix-followup-distribute-2a — mirror markPackageDistributed so
   // screens driven by MockAppStateProvider see the chip flip to
   // "Distributed" immediately.
@@ -400,7 +422,12 @@ export function MockAppStateProvider({
           ...session,
           onboardingPackages: session.onboardingPackages.map((entry) =>
             entry.idx === idx
-              ? { ...entry, manuallyMarkedDistributed: true }
+              ? {
+                  ...entry,
+                  manuallyMarkedDistributed: true,
+                  pendingDispatchRequestId: undefined,
+                  adoptionError: undefined,
+                }
               : entry,
           ),
         };
@@ -1016,6 +1043,7 @@ export function MockAppStateProvider({
       updatePackageState,
       setPackageDeviceLabel,
       encodeDistributionPackage,
+      retryDistributionPackageAdoption,
       markPackageDistributed,
       clearCreateSession,
       beginImport,
@@ -1094,6 +1122,7 @@ export function MockAppStateProvider({
       updatePackageState,
       setPackageDeviceLabel,
       encodeDistributionPackage,
+      retryDistributionPackageAdoption,
       markPackageDistributed,
       clearCreateSession,
       beginImport,

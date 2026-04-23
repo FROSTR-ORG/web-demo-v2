@@ -30,6 +30,8 @@ interface TestOnboardingPackage {
   packageText: string;
   password: string;
   packageCreated: boolean;
+  pendingDispatchRequestId?: string;
+  adoptionError?: string;
   peerOnline: boolean;
   manuallyMarkedDistributed: boolean;
   packageCopied: boolean;
@@ -43,6 +45,7 @@ const mocks = vi.hoisted(() => ({
   updatePackageState: vi.fn(),
   setPackageDeviceLabel: vi.fn(),
   encodeDistributionPackage: vi.fn(),
+  retryDistributionPackageAdoption: vi.fn(),
   markPackageDistributed: vi.fn(),
   createSession: null as {
     draft: { groupName: string };
@@ -70,6 +73,7 @@ vi.mock("../../app/AppState", () => ({
     updatePackageState: mocks.updatePackageState,
     setPackageDeviceLabel: mocks.setPackageDeviceLabel,
     encodeDistributionPackage: mocks.encodeDistributionPackage,
+    retryDistributionPackageAdoption: mocks.retryDistributionPackageAdoption,
     markPackageDistributed: mocks.markPackageDistributed,
     getCreateSessionPackageSecret: () => null,
   }),
@@ -124,6 +128,8 @@ beforeEach(() => {
   mocks.setPackageDeviceLabel.mockClear();
   mocks.encodeDistributionPackage.mockReset();
   mocks.encodeDistributionPackage.mockResolvedValue(undefined);
+  mocks.retryDistributionPackageAdoption.mockReset();
+  mocks.retryDistributionPackageAdoption.mockResolvedValue(undefined);
   mocks.markPackageDistributed.mockReset();
   mocks.createSession = makeCreateSession();
   Object.defineProperty(navigator, "clipboard", {
@@ -335,6 +341,67 @@ describe("DistributeSharesScreen — DISTRIBUTED state (VAL-FOLLOWUP-004)", () =
     renderScreen();
     const chip = screen.getByText("Distributed");
     expect(chip.closest(".status-pill")).toHaveClass("success");
+  });
+});
+
+describe("DistributeSharesScreen — adoption failure retry state", () => {
+  beforeEach(() => {
+    mocks.createSession = makeCreateSession([
+      makeRemotePackage(2, {
+        packageCreated: true,
+        packageText: "bfonboard1failedretry0000",
+        password: "[redacted]",
+        pendingDispatchRequestId: "old-onboard-request",
+        adoptionError: "Peer adoption failed — retry or mark distributed manually",
+      }),
+    ]);
+  });
+
+  it("renders Adoption failed with retry and manual fallback actions enabled", () => {
+    renderScreen();
+    const chip = screen.getByText("Adoption failed");
+    expect(chip.closest(".status-pill")).toHaveClass("error");
+    expect(
+      screen.getByText("Peer adoption failed — retry or mark distributed manually"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Retry adoption for share 2" }),
+    ).not.toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /^Mark distributed$/i }),
+    ).not.toBeDisabled();
+  });
+
+  it("invokes retryDistributionPackageAdoption(idx) without re-encoding the package", async () => {
+    renderScreen();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry adoption for share 2" }),
+    );
+    await waitFor(() =>
+      expect(mocks.retryDistributionPackageAdoption).toHaveBeenCalledWith(2),
+    );
+    expect(mocks.encodeDistributionPackage).not.toHaveBeenCalled();
+  });
+
+  it("suppresses stale failure copy once manual distribution is reflected in state", () => {
+    mocks.createSession = makeCreateSession([
+      makeRemotePackage(2, {
+        packageCreated: true,
+        packageText: "bfonboard1manuallydone00",
+        password: "[redacted]",
+        manuallyMarkedDistributed: true,
+        adoptionError: "Peer adoption failed — retry or mark distributed manually",
+      }),
+    ]);
+    renderScreen();
+    expect(screen.getByText("Distributed")).toBeInTheDocument();
+    expect(screen.queryByText("Adoption failed")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Peer adoption failed — retry or mark distributed manually"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Retry adoption for share 2" }),
+    ).not.toBeInTheDocument();
   });
 });
 

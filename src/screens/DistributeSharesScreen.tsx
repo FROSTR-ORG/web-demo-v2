@@ -83,6 +83,7 @@ export function DistributeSharesScreen() {
   const {
     createSession,
     encodeDistributionPackage,
+    retryDistributionPackageAdoption,
     markPackageDistributed,
     setPackageDeviceLabel,
     updatePackageState,
@@ -173,6 +174,7 @@ export function DistributeSharesScreen() {
               pkg={pkg}
               displayNumber={shareDisplayNumber(index + 1)}
               encodeDistributionPackage={encodeDistributionPackage}
+              retryDistributionPackageAdoption={retryDistributionPackageAdoption}
               markPackageDistributed={markPackageDistributed}
               setPackageDeviceLabel={setPackageDeviceLabel}
               updatePackageState={updatePackageState}
@@ -198,6 +200,7 @@ function RemoteShareCard({
   pkg,
   displayNumber,
   encodeDistributionPackage,
+  retryDistributionPackageAdoption,
   markPackageDistributed,
   setPackageDeviceLabel,
   updatePackageState,
@@ -206,6 +209,7 @@ function RemoteShareCard({
   pkg: OnboardingPackageView;
   displayNumber: number;
   encodeDistributionPackage: (idx: number, password: string) => Promise<void>;
+  retryDistributionPackageAdoption: (idx: number) => Promise<void>;
   markPackageDistributed: (idx: number) => void;
   setPackageDeviceLabel: (idx: number, deviceLabel: string) => void;
   updatePackageState: (
@@ -225,12 +229,16 @@ function RemoteShareCard({
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [retryBusy, setRetryBusy] = useState(false);
+  const [retryError, setRetryError] = useState("");
 
   const distributed = packageDistributed(pkg);
   const actionsDisabled = !pkg.packageCreated;
+  const failed = Boolean(pkg.adoptionError && !distributed);
 
   async function onCreatePackage() {
     setError("");
+    setRetryError("");
     if (password.length < 8) {
       setError("Package password must be at least 8 characters.");
       return;
@@ -249,9 +257,27 @@ function RemoteShareCard({
     }
   }
 
-  let chip: { tone: "warning" | "info" | "success"; label: string };
+  async function onRetryAdoption() {
+    setRetryError("");
+    setRetryBusy(true);
+    try {
+      await retryDistributionPackageAdoption(pkg.idx);
+    } catch (err) {
+      setRetryError(
+        err instanceof Error
+          ? err.message
+          : "Retry could not start.",
+      );
+    } finally {
+      setRetryBusy(false);
+    }
+  }
+
+  let chip: { tone: "warning" | "info" | "success" | "error"; label: string };
   if (distributed) {
     chip = { tone: "success", label: "Distributed" };
+  } else if (failed) {
+    chip = { tone: "error", label: "Adoption failed" };
   } else if (pkg.packageCreated) {
     chip = { tone: "info", label: "Ready to distribute" };
   } else {
@@ -328,9 +354,14 @@ function RemoteShareCard({
         )}
       </div>
 
-      {pkg.adoptionError ? (
+      {failed ? (
         <span className="error" role="alert" data-testid={`adoption-error-${pkg.idx}`}>
           {pkg.adoptionError}
+        </span>
+      ) : null}
+      {retryError ? (
+        <span className="error" role="alert">
+          {retryError}
         </span>
       ) : null}
 
@@ -375,6 +406,18 @@ function RemoteShareCard({
           disabled={actionsDisabled}
           onShown={() => updatePackageState(pkg.idx, { qrShown: true })}
         />
+        {failed ? (
+          <Button
+            type="button"
+            variant="chip"
+            size="sm"
+            disabled={retryBusy}
+            aria-label={`Retry adoption for share ${displayNumber}`}
+            onClick={() => void onRetryAdoption()}
+          >
+            {retryBusy ? "Retrying..." : "Retry"}
+          </Button>
+        ) : null}
         <Button
           type="button"
           variant="chip"

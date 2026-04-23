@@ -479,6 +479,154 @@ describe("absorbDrains — onboard echo correlation (fix-followup-distribute-per
   );
 
   it(
+    "retryDistributionPackageAdoption replaces the failed request id without re-encoding package state",
+    async () => {
+      const getState = await renderProvider();
+      const { remoteShares } = await prepareActiveCreateSession(getState);
+      const shareIdx = remoteShares[0].idx;
+      await act(async () => {
+        await getState().encodeDistributionPackage(
+          shareIdx,
+          "per-share-password-1234",
+        );
+      });
+      const beforeFailure = getState().createSession!.onboardingPackages.find(
+        (p) => p.idx === shareIdx,
+      )!;
+      const oldRequestId = beforeFailure.pendingDispatchRequestId!;
+      const packagePreview = beforeFailure.packageText;
+      expect(oldRequestId).toBeTruthy();
+
+      const absorb = useAbsorbDrainsHook();
+      await act(async () => {
+        absorb({
+          completions: [],
+          failures: [
+            {
+              request_id: oldRequestId,
+              op_type: "onboard",
+              code: "timeout",
+              message: "request timed out",
+              failed_peer: null,
+            },
+          ],
+          events: [],
+        });
+      });
+      expect(
+        getState().createSession!.onboardingPackages.find(
+          (p) => p.idx === shareIdx,
+        )!.adoptionError,
+      ).toBe("Peer adoption failed — retry or mark distributed manually");
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      });
+      await act(async () => {
+        await getState().retryDistributionPackageAdoption(shareIdx);
+      });
+
+      const afterRetry = getState().createSession!.onboardingPackages.find(
+        (p) => p.idx === shareIdx,
+      )!;
+      expect(afterRetry.packageText).toBe(packagePreview);
+      expect(afterRetry.password).toBe("[redacted]");
+      expect(afterRetry.pendingDispatchRequestId).toBeTruthy();
+      expect(afterRetry.pendingDispatchRequestId).not.toBe(oldRequestId);
+      expect(afterRetry.adoptionError).toBeUndefined();
+
+      await act(async () => {
+        absorb({
+          completions: [
+            {
+              Onboard: {
+                request_id: oldRequestId,
+                group_member_count: 2,
+                group: getState().createSession!.keyset!.group,
+                nonces: [],
+              },
+            } as CompletedOperation,
+          ],
+          failures: [
+            {
+              request_id: oldRequestId,
+              op_type: "onboard",
+              code: "timeout",
+              message: "old request failed late",
+              failed_peer: null,
+            },
+          ],
+          events: [],
+        });
+      });
+
+      const afterOldDrain = getState().createSession!.onboardingPackages.find(
+        (p) => p.idx === shareIdx,
+      )!;
+      expect(afterOldDrain.peerOnline).toBe(false);
+      expect(afterOldDrain.adoptionError).toBeUndefined();
+      expect(afterOldDrain.pendingDispatchRequestId).toBe(
+        afterRetry.pendingDispatchRequestId,
+      );
+    },
+    30_000,
+  );
+
+  it(
+    "manual mark clears retry state and ignores late onboard failures",
+    async () => {
+      const getState = await renderProvider();
+      const { remoteShares } = await prepareActiveCreateSession(getState);
+      const shareIdx = remoteShares[0].idx;
+      await act(async () => {
+        await getState().encodeDistributionPackage(
+          shareIdx,
+          "per-share-password-1234",
+        );
+      });
+      const requestId = getState().createSession!.onboardingPackages.find(
+        (p) => p.idx === shareIdx,
+      )!.pendingDispatchRequestId!;
+      expect(requestId).toBeTruthy();
+
+      await act(async () => {
+        getState().markPackageDistributed(shareIdx);
+      });
+      const marked = getState().createSession!.onboardingPackages.find(
+        (p) => p.idx === shareIdx,
+      )!;
+      expect(marked.manuallyMarkedDistributed).toBe(true);
+      expect(marked.pendingDispatchRequestId).toBeUndefined();
+      expect(marked.adoptionError).toBeUndefined();
+
+      const absorb = useAbsorbDrainsHook();
+      await act(async () => {
+        absorb({
+          completions: [],
+          failures: [
+            {
+              request_id: requestId,
+              op_type: "onboard",
+              code: "timeout",
+              message: "late timeout",
+              failed_peer: null,
+            },
+          ],
+          events: [],
+        });
+      });
+
+      const afterLateFailure = getState().createSession!.onboardingPackages.find(
+        (p) => p.idx === shareIdx,
+      )!;
+      expect(afterLateFailure.manuallyMarkedDistributed).toBe(true);
+      expect(afterLateFailure.adoptionError).toBeUndefined();
+      expect(afterLateFailure.pendingDispatchRequestId).toBeUndefined();
+    },
+    30_000,
+  );
+
+  it(
     "non-onboard completions / failures leave every share's peerOnline and adoptionError unchanged",
     async () => {
       const getState = await renderProvider();

@@ -554,6 +554,7 @@ describe("MockAppStateProvider bridge arming", () => {
     updatePackageState: () => undefined,
     setPackageDeviceLabel: () => undefined,
     encodeDistributionPackage: async () => undefined,
+    retryDistributionPackageAdoption: async () => undefined,
     markPackageDistributed: () => undefined,
     finishDistribution: async () => "prof_mock",
     clearCreateSession: () => undefined,

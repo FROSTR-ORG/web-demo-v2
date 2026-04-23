@@ -77,6 +77,7 @@ import {
   allPackagesDistributed,
   buildPendingOnboardingPackageView,
   normalizePackageStatePatch,
+  packageDistributed,
 } from "./distributionPackages";
 import {
   buildStoredProfileRecord,
@@ -878,6 +879,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           const nextPackages = session.onboardingPackages.map((entry) => {
             const requestId = entry.pendingDispatchRequestId;
             if (!requestId) return entry;
+            if (packageDistributed(entry)) return entry;
             if (onboardCompletionIds.has(requestId) && !entry.peerOnline) {
               changed = true;
               return {
@@ -2057,6 +2059,61 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const dispatchCreateSessionOnboard = useCallback(
+    async (
+      idx: number,
+      failurePrefix: string,
+    ): Promise<{ requestId?: string; adoptionError?: string }> => {
+      const context = createSessionShareContextRef.current;
+      if (!context) {
+        throw new Error(
+          "No active create session; cannot dispatch adoption.",
+        );
+      }
+      const remoteShare = context.remoteShares.find(
+        (share) => share.idx === idx,
+      );
+      if (!remoteShare) {
+        throw new Error(
+          `No remote share with idx=${idx} in the active create session.`,
+        );
+      }
+      const targetMember = memberForShare(context.group, remoteShare);
+      const onboardCommand = {
+        type: "onboard" as const,
+        peer_pubkey32_hex: memberPubkeyXOnly(targetMember),
+      };
+
+      setCreateSession((session) => {
+        if (!session) return session;
+        return {
+          ...session,
+          onboardingPackages: session.onboardingPackages.map((entry) =>
+            entry.idx === idx
+              ? {
+                  ...entry,
+                  pendingDispatchRequestId: undefined,
+                  adoptionError: undefined,
+                }
+              : entry,
+          ),
+        };
+      });
+
+      try {
+        const result = await dispatchRuntimeCommandRef.current?.(onboardCommand);
+        return { requestId: result?.requestId ?? undefined };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          requestId: undefined,
+          adoptionError: `${failurePrefix} — ${message}`,
+        };
+      }
+    },
+    [],
+  );
+
   // fix-followup-distribute-2a — per-share encoder. Produces a
   // populated bfonboard1… package for remote share `idx` using a
   // user-supplied `password`. See {@link AppStateValue.encodeDistributionPackage}
@@ -2096,81 +2153,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const nextStash = new Map(createSessionPackageSecretsRef.current);
       nextStash.set(idx, { packageText, password });
       createSessionPackageSecretsRef.current = nextStash;
-      // fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire
-      // — mirror the `createOnboardSponsorPackage` pattern at
-      // AppStateProvider.tsx (onboard sponsor flow): after encoding
-      // the bfonboard package, dispatch `handleRuntimeCommand({type:
-      // "onboard", peer_pubkey32_hex})` for the share's target
-      // member. The returned `requestId` is stashed on
-      // `onboardingPackages[idx].pendingDispatchRequestId` so
-      // `absorbDrains` can correlate drained
-      // `CompletedOperation::Onboard` envelopes back to the share
-      // (echo-driven peerOnline flip) and `OperationFailure {
-      // op_type: "onboard" }` envelopes (adoptionError inline
-      // surface).
-      //
-      // Compute the target peer's x-only pubkey from the group
-      // member matching this share. `memberPubkeyXOnly` lowercases
-      // and strips the 02/03 prefix to produce the 64-hex x-only
-      // form the runtime expects as `peer_pubkey32_hex`.
-      const targetMember = memberForShare(context.group, remoteShare);
-      const onboardCommand = {
-        type: "onboard" as const,
-        peer_pubkey32_hex: memberPubkeyXOnly(targetMember),
-      };
-      // fix-scrutiny-r1-onboard-dispatch-requestid-hygiene-and-real-onboard-e2e
-      // — requestId hygiene (scrutiny r1 blocker #2). Before dispatching,
-      // clear any prior `pendingDispatchRequestId` (and stale
-      // `adoptionError`) on this share so a retry click never leaves a
-      // stale id behind — otherwise a subsequent
-      // `CompletedOperation::Onboard` correlated to the OLD id could
-      // falsely flip `peerOnline` on this share.
-      setCreateSession((session) => {
-        if (!session) return session;
-        return {
-          ...session,
-          onboardingPackages: session.onboardingPackages.map((entry) =>
-            entry.idx === idx
-              ? {
-                  ...entry,
-                  pendingDispatchRequestId: undefined,
-                  adoptionError: undefined,
-                }
-              : entry,
-          ),
-        };
-      });
-      // ONLY populate `pendingDispatchRequestId` from a SUCCESSFUL
-      // dispatch result; on throw it stays explicitly undefined (not
-      // a stale fallback) and the error is surfaced inline on the
-      // share's `adoptionError` so the user sees the dispatch failure.
-      let onboardRequestId: string | undefined;
-      let dispatchError: string | undefined;
-      try {
-        const result = await dispatchRuntimeCommandRef.current?.(onboardCommand);
-        onboardRequestId = result?.requestId ?? undefined;
-      } catch (err) {
-        // Runtime dispatch failures are non-fatal — the package text
-        // itself has been encoded and stashed, so the user can still
-        // hand off the package manually and use "Mark distributed".
-        // But leaving `pendingDispatchRequestId` unset AND leaving
-        // `adoptionError` unset would hide the failure from the user.
-        // Surface the dispatch error inline via adoptionError so the
-        // Distribute card shows "Peer adoption failed — …" and the
-        // manual fallback remains reachable.
-        onboardRequestId = undefined;
-        const message = err instanceof Error ? err.message : String(err);
-        dispatchError = `Onboard dispatch failed — ${message}`;
-      }
+      const dispatchResult = await dispatchCreateSessionOnboard(
+        idx,
+        "Onboard dispatch failed",
+      );
       // Populate the redacted preview (first 24 chars of bfonboard1…)
       // and flip packageCreated on the session view. Also stash the
       // onboard command's requestId (only when captured) so
       // absorbDrains can correlate later completions / failures.
-      // `pendingDispatchRequestId` is ALWAYS set from onboardRequestId
-      // (no fallback to `entry.pendingDispatchRequestId`) so a retry
-      // click whose dispatch throws produces `undefined`, not a stale
-      // id. `adoptionError` mirrors the same — cleared on successful
-      // dispatch, populated with the inline copy on throw.
+      // `pendingDispatchRequestId` is ALWAYS set from this dispatch
+      // result (no fallback to `entry.pendingDispatchRequestId`) so
+      // a retry click whose dispatch throws produces `undefined`, not
+      // a stale id. `adoptionError` mirrors the same — cleared on
+      // successful dispatch, populated with inline copy on throw.
       const preview = packageText.slice(0, 24);
       setCreateSession((session) => {
         if (!session) return session;
@@ -2183,15 +2178,66 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                   packageText: preview,
                   password: "[redacted]",
                   packageCreated: true,
-                  pendingDispatchRequestId: onboardRequestId,
-                  adoptionError: dispatchError,
+                  pendingDispatchRequestId: dispatchResult.requestId,
+                  adoptionError: dispatchResult.adoptionError,
                 }
               : entry,
           ),
         };
       });
     },
-    [],
+    [dispatchCreateSessionOnboard],
+  );
+
+  const retryDistributionPackageAdoption = useCallback(
+    async (idx: number) => {
+      if (!createSessionPackageSecretsRef.current.has(idx)) {
+        setCreateSession((session) => {
+          if (!session) return session;
+          return {
+            ...session,
+            onboardingPackages: session.onboardingPackages.map((entry) =>
+              entry.idx === idx
+                ? {
+                    ...entry,
+                    pendingDispatchRequestId: undefined,
+                    adoptionError:
+                      "Retry could not start — mark distributed manually if handoff is done.",
+                  }
+                : entry,
+            ),
+          };
+        });
+        return;
+      }
+
+      const dispatchResult = await dispatchCreateSessionOnboard(
+        idx,
+        "Retry could not start",
+      );
+      const retryError =
+        dispatchResult.adoptionError ??
+        (dispatchResult.requestId
+          ? undefined
+          : "Retry could not start — mark distributed manually if handoff is done.");
+
+      setCreateSession((session) => {
+        if (!session) return session;
+        return {
+          ...session,
+          onboardingPackages: session.onboardingPackages.map((entry) =>
+            entry.idx === idx
+              ? {
+                  ...entry,
+                  pendingDispatchRequestId: dispatchResult.requestId,
+                  adoptionError: retryError,
+                }
+              : entry,
+          ),
+        };
+      });
+    },
+    [dispatchCreateSessionOnboard],
   );
 
   // fix-followup-distribute-2a — offline fallback / manual confirm.
@@ -2206,7 +2252,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         ...session,
         onboardingPackages: session.onboardingPackages.map((entry) =>
           entry.idx === idx
-            ? { ...entry, manuallyMarkedDistributed: true }
+            ? {
+                ...entry,
+                manuallyMarkedDistributed: true,
+                pendingDispatchRequestId: undefined,
+                adoptionError: undefined,
+              }
             : entry,
         ),
       };
@@ -5340,6 +5391,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       updatePackageState,
       setPackageDeviceLabel,
       encodeDistributionPackage,
+      retryDistributionPackageAdoption,
       markPackageDistributed,
       finishDistribution,
       clearCreateSession,
@@ -5421,6 +5473,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       updatePackageState,
       setPackageDeviceLabel,
       encodeDistributionPackage,
+      retryDistributionPackageAdoption,
       markPackageDistributed,
       finishDistribution,
       clearCreateSession,

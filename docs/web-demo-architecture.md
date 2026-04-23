@@ -71,6 +71,24 @@ The `/demo` and `/demo/:scenarioId` routes are mock Paper-review surfaces.
 Scenarios in `src/demo/scenarios.ts` seed `MockAppStateProvider` with the exact
 state needed to render each canonical artboard or variant. Demo click-throughs
 may bridge into product routes, but the bridge carries display-safe state only.
+See `demo-scenario-guide.md` for scenario registry rules, Paper-reference sync,
+variant behavior, and bridge safety.
+
+## Flow Ownership Map
+
+| Surface | Product routes | Primary modules | State/session owner | Demo coverage | High-signal tests |
+| --- | --- | --- | --- | --- | --- |
+| Welcome/unlock | `/` | `src/screens/WelcomeScreen.tsx` | Saved profile summaries, active profile, runtime unlock in `AppStateProvider` | `welcome-*` scenarios | `src/screens/__tests__/WelcomeScreen.test.tsx`, demo gallery |
+| Create keyset | `/create`, `/create/progress` | `CreateKeysetScreen.tsx`, `GenerationProgressScreen.tsx` | `createSession` and WASM package helpers | `create-*` scenarios | `src/screens/__tests__/CreateFlow.test.tsx`, `src/app/__tests__/setupFlows.test.tsx` |
+| Create profile/distribute | `/create/profile`, `/create/distribute`, `/create/complete` | `CreateProfileScreen.tsx`, `DistributeSharesScreen.tsx`, `DistributionCompleteScreen.tsx` | `createSession`, distribution package helpers, optional onboard dispatch state | `shared-*` scenarios | `DistributeSharesScreen.test.tsx`, `DistributionCompleteScreen.test.tsx`, `src/e2e/visual/followup-paper-parity.spec.ts` |
+| Restore from relay | `/restore-from-relay` | `RestoreFromRelayScreen.tsx`, `fetchProfileBackupEvent.ts` | `restoreProfileFromRelay`, IndexedDB profile store | No dedicated Paper scenario | `src/app/__tests__/restoreProfileFromRelay.test.tsx`, `src/e2e/multi-device/backup-publish-restore-live.spec.ts` |
+| Import profile | `/import`, `/import/decrypt`, `/import/review`, `/import/error` | `ImportScreens.tsx` | `importSession`, encrypted `bfprofile` decode/save | `import-*` scenarios | `src/screens/__tests__/ImportScreens.test.tsx`, setup-flow tests |
+| Onboard requester | `/onboard`, `/onboard/handshake`, `/onboard/failed`, `/onboard/complete` | `OnboardScreens.tsx` | `onboardSession`, relay request lifecycle | `onboard-*` scenarios | `src/app/__tests__/onboardFlow.test.tsx`, multi-device onboard specs |
+| Onboard sponsor | `/onboard-sponsor`, `/onboard-sponsor/handoff` | `OnboardSponsorScreens.tsx`, source-share helpers | Sponsor package session and runtime relay pump | No dedicated Paper scenario | `src/app/__tests__/onboardSponsorFlow.test.tsx`, `src/e2e/multi-device/onboard-sponsorship.spec.ts` |
+| Rotate keyset | `/rotate-keyset/*` | `src/screens/RotateKeysetScreen/`, `RotateKeysetScreens.tsx` barrel | `rotateKeysetSession`, WASM rotation helpers, distribution packages | `rotate-keyset-*` scenarios | `src/screens/__tests__/RotateKeysetScreens.test.tsx`, `src/e2e/multi-device/rotate-keyset-live-sign.spec.ts` |
+| Replace share | `/replace-share/*` | `ReplaceShareScreens.tsx` | Decoded package session and runtime replace-share op | `replace-share-*` scenarios | `src/screens/__tests__/ReplaceShareScreens.test.tsx`, setup/runtime specs |
+| Recover NSEC | `/recover/:profileId`, `/recover/:profileId/success` | `RecoverScreens.tsx`, `src/screens/RecoverScreen/` | In-memory share collection and WASM recovery | `recover-*` scenarios | `src/screens/__tests__/RecoverScreens.test.tsx`, `src/e2e/recover-regression.spec.ts` |
+| Dashboard/runtime | `/dashboard/:profileId` | `src/screens/DashboardScreen/` | Runtime status, relay pump, policies, approvals, event log | `dashboard-*` scenarios | dashboard component tests, `src/e2e/visual/dashboard-states.spec.ts`, multi-device specs |
 
 ## Setup Sessions
 

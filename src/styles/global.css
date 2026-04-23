@@ -25,6 +25,7 @@
   --ig-cyan: #22d3ee;
   --ig-purple: #a855f7;
   --ig-yellow: #fbbf24;
+  --ig-button-ease: cubic-bezier(0.2, 0, 0, 1);
   font-family: var(--font-inter, Inter, system-ui, sans-serif);
   background: var(--ig-bg-a);
 }
@@ -327,6 +328,18 @@ a {
   color: #fff;
   font-weight: 600;
   letter-spacing: 0;
+  transform-origin: center;
+  transition:
+    background-color 140ms var(--ig-button-ease),
+    border-color 140ms var(--ig-button-ease),
+    box-shadow 140ms var(--ig-button-ease),
+    color 140ms var(--ig-button-ease),
+    opacity 140ms var(--ig-button-ease),
+    transform 90ms var(--ig-button-ease);
+}
+
+.button:not(:disabled):not([aria-disabled="true"]):active {
+  transform: scale(0.96);
 }
 
 /*
@@ -348,6 +361,328 @@ a {
   outline: 2px solid #60a5fa;
   outline-offset: 2px;
   box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.25);
+}
+
+/*
+ * Light-touch feedback for native buttons that intentionally bypass the
+ * shared Button component. Keep this as a shared grammar so bespoke controls
+ * feel clickable without changing their Paper-derived shapes.
+ */
+.back-link,
+.password-toggle,
+.number-stepper button,
+.profile-row-btn,
+.returning-chip-btn,
+.peers-header-toggle,
+.peer-row-trailing-btn,
+.modal-close,
+.policy-modal-close,
+.policy-btn,
+.signing-failed-dismiss,
+.signing-failed-retry,
+.dash-modal-trigger-btn,
+.settings-close,
+.settings-edit-icon,
+.settings-change-btn,
+.settings-relay-remove,
+.settings-relay-add,
+.settings-btn-blue,
+.settings-btn-muted,
+.settings-btn-red,
+.clear-creds-close,
+.clear-creds-cancel,
+.clear-creds-confirm,
+.export-modal-close,
+.export-btn-cancel,
+.export-btn-submit,
+.export-backup-toggle,
+.export-action-btn,
+.export-done-btn,
+.recover-btn-copy,
+.recover-btn-reveal,
+.recover-btn-clear,
+.event-log-link,
+.event-log-filter,
+.pending-open,
+.event-log-filter-action,
+.policies-dropdown-menu button,
+.event-log-filter-menu button,
+.policies-remove-btn,
+.policies-override-remove,
+.collapsible-header,
+.qr-scanner-close,
+.tab-trigger,
+.demo-scenario-link,
+.test-sign-panel button[type="submit"],
+.test-ecdh-panel button[type="submit"],
+.test-ping-panel button[type="submit"],
+.test-refresh-all-panel button[type="submit"] {
+  transform-origin: center;
+  transition:
+    background-color 140ms var(--ig-button-ease),
+    border-color 140ms var(--ig-button-ease),
+    box-shadow 140ms var(--ig-button-ease),
+    color 140ms var(--ig-button-ease),
+    opacity 140ms var(--ig-button-ease),
+    transform 90ms var(--ig-button-ease);
+}
+
+.back-link:not(:disabled):active,
+.password-toggle:not(:disabled):active,
+.number-stepper button:not(:disabled):active,
+.profile-row-btn:not(:disabled):active,
+.returning-chip-btn:not(:disabled):active,
+.peer-row-trailing-btn:not(:disabled):active,
+.modal-close:not(:disabled):active,
+.policy-modal-close:not(:disabled):active,
+.policy-btn:not(:disabled):active,
+.signing-failed-dismiss:not(:disabled):active,
+.signing-failed-retry:not(:disabled):active,
+.dash-modal-trigger-btn:not(:disabled):active,
+.settings-close:not(:disabled):active,
+.settings-edit-icon:not(:disabled):active,
+.settings-change-btn:not(:disabled):active,
+.settings-relay-remove:not(:disabled):active,
+.settings-relay-add:not(:disabled):active,
+.settings-btn-blue:not(:disabled):active,
+.settings-btn-muted:not(:disabled):active,
+.settings-btn-red:not(:disabled):active,
+.clear-creds-close:not(:disabled):active,
+.clear-creds-cancel:not(:disabled):active,
+.clear-creds-confirm:not(:disabled):active,
+.export-modal-close:not(:disabled):active,
+.export-btn-cancel:not(:disabled):active,
+.export-btn-submit:not(:disabled):active,
+.export-backup-toggle:not(:disabled):active,
+.export-action-btn:not(:disabled):active,
+.export-done-btn:not(:disabled):active,
+.recover-btn-copy:not(:disabled):active,
+.recover-btn-reveal:not(:disabled):active,
+.recover-btn-clear:not(:disabled):active,
+.event-log-link:not(:disabled):active,
+.event-log-filter:not(:disabled):active,
+.pending-open:not(:disabled):active,
+.event-log-filter-action:not(:disabled):active,
+.policies-remove-btn:not(:disabled):active,
+.policies-override-remove:not(:disabled):active,
+.qr-scanner-close:not(:disabled):active,
+.tab-trigger:not(:disabled):active,
+.test-sign-panel button[type="submit"]:not(:disabled):active,
+.test-ecdh-panel button[type="submit"]:not(:disabled):active,
+.test-ping-panel button[type="submit"]:not(:disabled):active,
+.test-refresh-all-panel button[type="submit"]:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+.back-link:focus-visible,
+.password-toggle:focus-visible,
+.number-stepper button:focus-visible,
+.profile-row-btn:focus-visible,
+.returning-chip-btn:focus-visible,
+.peers-header-toggle:focus-visible,
+.peer-row-trailing-btn:focus-visible,
+.modal-close:focus-visible,
+.policy-modal-close:focus-visible,
+.policy-btn:focus-visible,
+.signing-failed-dismiss:focus-visible,
+.signing-failed-retry:focus-visible,
+.dash-modal-trigger-btn:focus-visible,
+.settings-close:focus-visible,
+.settings-edit-icon:focus-visible,
+.settings-change-btn:focus-visible,
+.settings-relay-remove:focus-visible,
+.settings-relay-add:focus-visible,
+.settings-btn-blue:focus-visible,
+.settings-btn-muted:focus-visible,
+.settings-btn-red:focus-visible,
+.clear-creds-close:focus-visible,
+.clear-creds-cancel:focus-visible,
+.clear-creds-confirm:focus-visible,
+.export-modal-close:focus-visible,
+.export-btn-cancel:focus-visible,
+.export-btn-submit:focus-visible,
+.export-backup-toggle:focus-visible,
+.export-action-btn:focus-visible,
+.export-done-btn:focus-visible,
+.recover-btn-copy:focus-visible,
+.recover-btn-reveal:focus-visible,
+.recover-btn-clear:focus-visible,
+.event-log-link:focus-visible,
+.event-log-filter:focus-visible,
+.pending-open:focus-visible,
+.event-log-filter-action:focus-visible,
+.policies-dropdown-menu button:focus-visible,
+.event-log-filter-menu button:focus-visible,
+.policies-remove-btn:focus-visible,
+.policies-override-remove:focus-visible,
+.collapsible-header:focus-visible,
+.qr-scanner-close:focus-visible,
+.tab-trigger:focus-visible,
+.demo-scenario-link:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.2);
+}
+
+.back-link:hover:not(:disabled) {
+  color: #93c5fd;
+}
+
+.password-toggle {
+  border-radius: 6px;
+}
+
+.password-toggle:hover:not(:disabled) {
+  color: var(--ig-text);
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.number-stepper button:hover:not(:disabled) {
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.profile-row-btn.unlock:hover:not(:disabled) {
+  color: #fff;
+  background: #1d4ed8;
+  border-color: rgba(147, 197, 253, 0.24);
+}
+
+.returning-chip-btn:hover:not(:disabled) {
+  color: #93c5fd;
+  background: rgba(30, 58, 138, 0.28);
+  border-color: rgba(96, 165, 250, 0.38);
+}
+
+.profile-row-btn.rotate:hover:not(:disabled) {
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(96, 165, 250, 0.32);
+}
+
+.peers-header-toggle:hover .peers-title,
+.collapsible-header:hover:not(:disabled) {
+  color: #93c5fd;
+}
+
+.collapsible-header:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.event-log-row,
+.pending-row {
+  transition:
+    background-color 140ms var(--ig-button-ease),
+    color 140ms var(--ig-button-ease);
+}
+
+.event-log-row:active {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  .back-link,
+  .password-toggle,
+  .number-stepper button,
+  button.peer-permission-tag,
+  .profile-row-btn,
+  .returning-chip-btn,
+  .peers-header-toggle,
+  .peer-row-trailing-btn,
+  .modal-close,
+  .policy-modal-close,
+  .policy-btn,
+  .signing-failed-dismiss,
+  .signing-failed-retry,
+  .dash-modal-trigger-btn,
+  .settings-close,
+  .settings-edit-icon,
+  .settings-change-btn,
+  .settings-relay-remove,
+  .settings-relay-add,
+  .settings-btn-blue,
+  .settings-btn-muted,
+  .settings-btn-red,
+  .clear-creds-close,
+  .clear-creds-cancel,
+  .clear-creds-confirm,
+  .export-modal-close,
+  .export-btn-cancel,
+  .export-btn-submit,
+  .export-backup-toggle,
+  .export-action-btn,
+  .export-done-btn,
+  .recover-btn-copy,
+  .recover-btn-reveal,
+  .recover-btn-clear,
+  .event-log-link,
+  .event-log-filter,
+  .pending-open,
+  .event-log-filter-action,
+  .policies-dropdown-menu button,
+  .event-log-filter-menu button,
+  .policies-remove-btn,
+  .policies-override-remove,
+  .collapsible-header,
+  .qr-scanner-close,
+  .tab-trigger,
+  .demo-scenario-link,
+  .test-sign-panel button[type="submit"],
+  .test-ecdh-panel button[type="submit"],
+  .test-ping-panel button[type="submit"],
+  .test-refresh-all-panel button[type="submit"] {
+    transition-duration: 0ms !important;
+  }
+
+  .button:not(:disabled):not([aria-disabled="true"]):active,
+  .back-link:not(:disabled):active,
+  .password-toggle:not(:disabled):active,
+  .number-stepper button:not(:disabled):active,
+  .profile-row-btn:not(:disabled):active,
+  .returning-chip-btn:not(:disabled):active,
+  .peer-row-trailing-btn:not(:disabled):active,
+  .modal-close:not(:disabled):active,
+  .policy-modal-close:not(:disabled):active,
+  .policy-btn:not(:disabled):active,
+  .signing-failed-dismiss:not(:disabled):active,
+  .signing-failed-retry:not(:disabled):active,
+  .dash-modal-trigger-btn:not(:disabled):active,
+  .settings-close:not(:disabled):active,
+  .settings-edit-icon:not(:disabled):active,
+  .settings-change-btn:not(:disabled):active,
+  .settings-relay-remove:not(:disabled):active,
+  .settings-relay-add:not(:disabled):active,
+  .settings-btn-blue:not(:disabled):active,
+  .settings-btn-muted:not(:disabled):active,
+  .settings-btn-red:not(:disabled):active,
+  .clear-creds-close:not(:disabled):active,
+  .clear-creds-cancel:not(:disabled):active,
+  .clear-creds-confirm:not(:disabled):active,
+  .export-modal-close:not(:disabled):active,
+  .export-btn-cancel:not(:disabled):active,
+  .export-btn-submit:not(:disabled):active,
+  .export-backup-toggle:not(:disabled):active,
+  .export-action-btn:not(:disabled):active,
+  .export-done-btn:not(:disabled):active,
+  .recover-btn-copy:not(:disabled):active,
+  .recover-btn-reveal:not(:disabled):active,
+  .recover-btn-clear:not(:disabled):active,
+  .event-log-link:not(:disabled):active,
+  .event-log-filter:not(:disabled):active,
+  .pending-open:not(:disabled):active,
+  .event-log-filter-action:not(:disabled):active,
+  .policies-remove-btn:not(:disabled):active,
+  .policies-override-remove:not(:disabled):active,
+  .qr-scanner-close:not(:disabled):active,
+  .tab-trigger:not(:disabled):active,
+  .test-sign-panel button[type="submit"]:not(:disabled):active,
+  .test-ecdh-panel button[type="submit"]:not(:disabled):active,
+  .test-ping-panel button[type="submit"]:not(:disabled):active,
+  .test-refresh-all-panel button[type="submit"]:not(:disabled):active,
+  button.peer-permission-tag:active:not(:disabled) {
+    transform: none !important;
+  }
 }
 
 .button-md {
@@ -380,6 +715,12 @@ a {
 
 .button-primary {
   background: var(--ig-blue-strong);
+  box-shadow: 0 0 0 0 rgba(96, 165, 250, 0);
+}
+
+.button-primary:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: #1d4ed8;
+  box-shadow: 0 0 0 1px rgba(147, 197, 253, 0.16);
 }
 
 .button-primary:disabled,
@@ -387,6 +728,7 @@ a {
   background: #2563EB40;
   color: rgba(255, 255, 255, 0.4);
   opacity: 1;
+  transform: none;
 }
 
 .button-secondary {
@@ -395,10 +737,22 @@ a {
   border-color: var(--ig-border-soft);
 }
 
+.button-secondary:hover:not(:disabled):not([aria-disabled="true"]) {
+  color: #93c5fd;
+  background: rgba(30, 58, 138, 0.28);
+  border-color: rgba(96, 165, 250, 0.38);
+}
+
 .button-ghost {
   color: var(--ig-muted);
   background: transparent;
   border-color: var(--ig-border-soft);
+}
+
+.button-ghost:hover:not(:disabled):not([aria-disabled="true"]) {
+  color: var(--ig-text);
+  background: rgba(148, 163, 184, 0.07);
+  border-color: rgba(148, 163, 184, 0.24);
 }
 
 .button-danger {
@@ -407,11 +761,23 @@ a {
   border-color: rgba(239, 68, 68, 0.3);
 }
 
+.button-danger:hover:not(:disabled):not([aria-disabled="true"]) {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(248, 113, 113, 0.42);
+}
+
 .button-chip {
   color: var(--ig-muted);
   background: transparent;
   border-color: var(--ig-border);
   border-radius: 6px;
+}
+
+.button-chip:hover:not(:disabled):not([aria-disabled="true"]) {
+  color: var(--ig-text);
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(96, 165, 250, 0.32);
 }
 
 .button-header {
@@ -425,6 +791,11 @@ a {
   line-height: 18px;
   font-weight: 500;
 }
+
+.button-header:hover:not(:disabled):not([aria-disabled="true"]) {
+  color: #93c5fd;
+}
+
 .button-header.button-header-active {
   color: #93c5fd;
 }
@@ -1123,6 +1494,11 @@ a {
 
 .relay-add-button {
   background: #16a34a;
+}
+
+.relay-add-button:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: #15803d;
+  box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.16);
 }
 
 .copy-block {
@@ -3641,6 +4017,7 @@ button.peer-policy-chip.deny {
 
 .policy-modal-close:hover {
   background: rgba(148, 163, 184, 0.1);
+  color: #e2e8f0;
 }
 
 .policy-modal-subtitle {
@@ -4299,6 +4676,7 @@ button.peer-policy-chip.deny {
 
 .settings-relay-remove:hover {
   color: #f87171;
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .settings-relay-input {
@@ -4525,6 +4903,7 @@ button.peer-policy-chip.deny {
 
 .clear-creds-close:hover {
   color: var(--ig-muted);
+  background: rgba(148, 163, 184, 0.08);
 }
 
 .clear-creds-body {
@@ -4736,7 +5115,7 @@ button.peer-policy-chip.deny {
   height: 3px;
   border-radius: 2px;
   background: #374151;
-  transition: background 0.2s;
+  transition: background-color 0.2s;
 }
 
 .export-modal-actions {
@@ -5697,6 +6076,11 @@ button.peer-policy-chip.deny {
   font-weight: 500;
 }
 
+.rotate-generate-btn:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: #b91c1c !important;
+  border-color: #b91c1c !important;
+}
+
 /* ========================================
    Rotate Keyset Error Screens
    ======================================== */
@@ -6181,6 +6565,11 @@ button.peer-policy-chip.deny {
   background: rgba(15, 23, 42, 0.45);
 }
 
+.demo-scenario-link:hover {
+  background: rgba(30, 58, 138, 0.18);
+  border-color: rgba(96, 165, 250, 0.28);
+}
+
 .demo-scenario-link span {
   color: var(--ig-text);
   font-size: 13px;
@@ -6561,8 +6950,10 @@ button.peer-policy-chip.deny {
   border: 1px solid var(--ig-blue);
 }
 
-.button-outline:hover:not(:disabled) {
+.button-outline:hover:not(:disabled):not([aria-disabled="true"]) {
   background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(96, 165, 250, 0.52);
+  color: #93c5fd;
 }
 
 .button-success {
@@ -6571,8 +6962,10 @@ button.peer-policy-chip.deny {
   border: 1px solid rgba(34, 197, 94, 0.25);
 }
 
-.button-success:hover:not(:disabled) {
+.button-success:hover:not(:disabled):not([aria-disabled="true"]) {
   background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(74, 222, 128, 0.42);
+  color: #4ade80;
 }
 
 .button-ghost-blue {
@@ -6581,9 +6974,10 @@ button.peer-policy-chip.deny {
   border: 1px solid transparent;
 }
 
-.button-ghost-blue:hover:not(:disabled) {
+.button-ghost-blue:hover:not(:disabled):not([aria-disabled="true"]) {
   background: rgba(37, 99, 235, 0.08);
-  border-color: rgba(37, 99, 235, 0.15);
+  border-color: rgba(96, 165, 250, 0.32);
+  color: #93c5fd;
 }
 
 .button-destructive-outline-compact {
@@ -6595,8 +6989,10 @@ button.peer-policy-chip.deny {
   border-radius: 6px;
 }
 
-.button-destructive-outline-compact:hover:not(:disabled) {
+.button-destructive-outline-compact:hover:not(:disabled):not([aria-disabled="true"]) {
   background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(248, 113, 113, 0.42);
+  color: #f87171;
 }
 
 /* ==========================================================
@@ -6738,7 +7134,7 @@ button.peer-policy-chip.deny {
   flex-shrink: 0;
   background: #334155;
   border-radius: 9999px;
-  transition: background 0.2s ease;
+  transition: background-color 0.2s ease;
 }
 
 .toggle-standard .toggle-track {
@@ -6757,7 +7153,7 @@ button.peer-policy-chip.deny {
   display: block;
   background: #94a3b8;
   border-radius: 50%;
-  transition: transform 0.2s ease, background 0.2s ease;
+  transition: transform 0.2s ease, background-color 0.2s ease;
 }
 
 .toggle-standard .toggle-thumb {
@@ -7055,7 +7451,10 @@ button.peer-policy-chip.deny {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s,
+    transform 90ms var(--ig-button-ease);
 }
 
 .tab-trigger:hover {

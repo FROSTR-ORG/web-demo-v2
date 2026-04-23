@@ -997,6 +997,14 @@ export interface AppStateValue {
    */
   encodeDistributionPackage: (idx: number, password: string) => Promise<void>;
   /**
+   * Retry the runtime Onboard dispatch for an already-created remote
+   * package. Reuses the existing in-memory package stash and preserves
+   * package text, password, and device-label metadata; only the
+   * `pendingDispatchRequestId` / `adoptionError` retry state is
+   * refreshed.
+   */
+  retryDistributionPackageAdoption: (idx: number) => Promise<void>;
+  /**
    * fix-followup-distribute-2a — unconditionally mark the remote
    * share at {@link idx} as "Distributed" by flipping
    * `onboardingPackages[idx].manuallyMarkedDistributed = true` on

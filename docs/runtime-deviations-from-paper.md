@@ -160,8 +160,9 @@ not as the main architecture guide.
   `src/e2e/multi-device/create-distribute-live-bootstrap.spec.ts`
   retains a single carve-out on the OperationFailure (retry) path:
   Device B aborts mid-handshake → Device A must surface the inline
-  copy "Peer adoption failed — retry or mark distributed manually"
-  on the share's card AND keep "Mark distributed" enabled. To
+  copy "Peer adoption failed — retry or mark distributed manually",
+  show a runtime-extension "Retry" chip, and keep "Mark distributed"
+  enabled. To
   simulate that without a flaky live abort, the spec injects a
   synthetic `OperationFailure { op_type: "onboard", request_id }`
   through the DEV-only `__iglooTestAbsorbDrains` hook. The user-
@@ -177,7 +178,10 @@ not as the main architecture guide.
   proves the real UI contract surface end-to-end; the failure path
   is testing `absorbDrains` correlation + the adoptionError surface,
   both of which are exercised identically whether the envelope is
-  injected or arrives via the relay.
+  injected or arrives via the relay. A follow-up retry click is still
+  exercised on Device A: it re-dispatches a fresh sponsor-side Onboard
+  request against the already-created package, then the spec falls back
+  to manual distribution to finish the row.
 - **Validation assertion IDs**: VAL-FOLLOWUP (happy path +
   OperationFailure path). The happy path no longer uses
   `__iglooTestAdoptOnboardPackage`; the failure path retains

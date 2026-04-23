@@ -25,6 +25,51 @@ Then read the smallest set of docs for the task:
 - Paper parity change: sibling `../igloo-paper/screens/...`,
   `src/demo/scenarios.ts`, and the relevant deviation entries.
 
+## Change Recipes
+
+### Docs-only
+
+1. Stay inside `README.md` and `docs/*.md` unless the task explicitly asks for
+   code or generated assets.
+2. Verify every path, command, route, and script name from the repo before
+   documenting it.
+3. Prefer `rg` source checks and `git diff --stat`; do not run `npm test` or
+   `npm run build` just to validate prose.
+
+### UI or Paper parity
+
+1. Read the relevant Paper source under `../igloo-paper/screens/...`.
+2. Find the route in `src/app/CoreRoutes.tsx` and the scenario in
+   `src/demo/scenarios.ts`.
+3. Make the screen change near the owning screen module. Keep shared primitives
+   in `src/components/` only when another flow already needs the same behavior.
+4. Update `docs/runtime-deviations-from-paper.md` only when the live app must
+   intentionally differ from Paper or a validation-contract phrase.
+5. Run focused component tests first, then `src/e2e/demo-gallery.spec.ts` when
+   the visual surface changed.
+
+### Demo scenario or Paper-reference asset
+
+1. Use `docs/demo-scenario-guide.md` as the source of truth.
+2. Update `src/demo/scenarios.ts`; for a new flow also update `demoFlows` and
+   `src/demo/DemoGallery.tsx`.
+3. Run `npm run paper:sync` after the scenario registry points at the right
+   Paper path.
+4. Run `npx vitest run src/demo/__tests__/scenarios.test.tsx src/demo/__tests__/crossAreaFinalGate.test.tsx --config vitest.config.ts`.
+5. Run `npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop`
+   for any gallery-visible change.
+
+### Runtime, storage, or security boundary
+
+1. Read `docs/web-demo-architecture.md` and
+   `docs/outside-runtime-flow-invariants.md`.
+2. Keep protocol-shaped work in `src/app` or `src/lib`; keep screen modules
+   focused on rendering, guards, and user interactions.
+3. Check that setup sessions clear on cancel, finish, lock, credential clear,
+   and invalid direct navigation.
+4. Add or update tests around persistence, demo bridge serialization, and
+   console/event-log redaction when the change touches secrets.
+
 ## Safe Edit Boundaries
 
 - `web-demo-v2/` is its own git repo. Check status from this directory, not the
@@ -95,6 +140,7 @@ For docs-only changes, use source sanity checks instead of app rebuilds:
 ```bash
 rg -n "restore-from-relay|docs/agent-runbook|docs/README" README.md docs/*.md
 rg -n "src/vendor/bifrost-bridge-wasm|bifrost-rs|igloo-paper|8194|5173" README.md docs/*.md
+rg -n "T[O]DO|T[B]D|F[I]XME" README.md docs/*.md
 git diff --stat
 ```
 
