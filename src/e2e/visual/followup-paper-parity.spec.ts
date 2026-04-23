@@ -52,8 +52,8 @@
  *     catches real structural drift without failing on subpixel
  *     antialiasing differences. Known intentional deviations
  *     (Distribution Completion callout body copy, peer permission
- *     ToggleSwitch vs Paper pill badges, missing device label rows
- *     on LN7-0) are documented in
+ *     ToggleSwitch vs Paper pill badges, and the missing
+ *     New/Existing-device secondary sub-label on LN7-0) are documented in
  *     `docs/followup-paper-parity-report.md` and
  *     `docs/runtime-deviations-from-paper.md`.
  *
@@ -286,11 +286,14 @@ async function continueToComplete(page: Page): Promise<void> {
   });
   expect(remoteIndices.length).toBeGreaterThan(0);
 
-  for (const idx of remoteIndices) {
+  const completionLabels = ["Igloo Mobile", "Igloo Desktop"];
+
+  for (const [position, idx] of remoteIndices.entries()) {
     await page.evaluate(
-      async ({ idx, password }) => {
+      async ({ idx, password, deviceLabel }) => {
         const w = window as unknown as {
           __appState: {
+            setPackageDeviceLabel: (idx: number, deviceLabel: string) => void;
             encodeDistributionPackage: (
               idx: number,
               password: string,
@@ -298,10 +301,16 @@ async function continueToComplete(page: Page): Promise<void> {
             markPackageDistributed: (idx: number) => void;
           };
         };
+        w.__appState.setPackageDeviceLabel(idx, deviceLabel);
         await w.__appState.encodeDistributionPackage(idx, password);
         w.__appState.markPackageDistributed(idx);
       },
-      { idx, password: PACKAGE_PASSWORD },
+      {
+        idx,
+        password: PACKAGE_PASSWORD,
+        deviceLabel:
+          completionLabels[position] ?? `Igloo Device ${position + 1}`,
+      },
     );
   }
 

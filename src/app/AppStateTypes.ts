@@ -110,7 +110,6 @@ export interface RotateKeysetSession {
   threshold: number;
   count: number;
   rotated?: RotateKeysetBundleResult;
-  distributionPassword?: string;
   localShare?: SharePackageWire;
   onboardingPackages: OnboardingPackageView[];
   createdProfileId?: string;
@@ -968,6 +967,13 @@ export interface AppStateValue {
   createProfile: (draft: CreateProfileDraft) => Promise<string>;
   updatePackageState: (idx: number, patch: OnboardingPackageStatePatch) => void;
   /**
+   * Update the optional human-readable device label for a single
+   * remote create-session package. Pure UI/session metadata only:
+   * does not participate in package generation, runtime dispatch, or
+   * completion gating.
+   */
+  setPackageDeviceLabel: (idx: number, deviceLabel: string) => void;
+  /**
    * fix-followup-distribute-2a — encode the bfonboard package for a
    * single remote share at {@link idx} using a user-supplied
    * per-share {@link password}.
@@ -986,8 +992,8 @@ export interface AppStateValue {
    *     (first 24 chars of the bfonboard1… string) into
    *     `onboardingPackages[idx].packageText`.
    *
-   * Does NOT dispatch any onboard runtime command — that lives in
-   * feature 3 / 2C.
+   * Also dispatches the matching runtime Onboard command so the
+   * provider can correlate later echo/failure drains back to the row.
    */
   encodeDistributionPackage: (idx: number, password: string) => Promise<void>;
   /**
@@ -1049,14 +1055,22 @@ export interface AppStateValue {
     threshold: number;
     count: number;
   }) => Promise<void>;
-  generateRotatedKeyset: (distributionPassword: string) => Promise<void>;
+  generateRotatedKeyset: () => Promise<void>;
   createRotatedProfile: (draft: ProfileDraft) => Promise<string>;
+  encodeRotateDistributionPackage: (
+    idx: number,
+    password: string,
+  ) => Promise<void>;
+  markRotatePackageDistributed: (idx: number) => void;
   updateRotatePackageState: (
     idx: number,
     patch: OnboardingPackageStatePatch,
   ) => void;
   finishRotateDistribution: () => Promise<string>;
   clearRotateKeysetSession: () => void;
+  getRotateSessionPackageSecret: (
+    idx: number,
+  ) => { packageText: string; password: string } | null;
   decodeReplaceSharePackage: (
     packageString: string,
     password: string,

@@ -74,8 +74,8 @@ import {
 import { BRIDGE_EVENT, consumeBridgeSnapshot } from "./appStateBridge";
 import { AppStateContext } from "./AppStateContext";
 import {
+  allPackagesDistributed,
   buildPendingOnboardingPackageView,
-  buildRemoteOnboardingPackages,
   normalizePackageStatePatch,
 } from "./distributionPackages";
 import {
@@ -507,6 +507,31 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const rotateSessionPackageSecretsRef = useRef<
+    Map<number, { packageText: string; password: string }>
+  >(new Map());
+
+  const rotateSessionShareContextRef = useRef<{
+    remoteShares: SharePackageWire[];
+    localShare: SharePackageWire;
+    group: GroupPackageWire;
+    relays: string[];
+  } | null>(null);
+
+  const clearRotateSessionPackageSecrets = useCallback(() => {
+    rotateSessionPackageSecretsRef.current = new Map();
+    rotateSessionShareContextRef.current = null;
+  }, []);
+
+  const getRotateSessionPackageSecret = useCallback(
+    (idx: number): { packageText: string; password: string } | null => {
+      const entry = rotateSessionPackageSecretsRef.current.get(idx);
+      if (!entry) return null;
+      return { packageText: entry.packageText, password: entry.password };
+    },
+    [],
+  );
+
   // fix-m7-scrutiny-r1-createsession-packagesecrets-ref-reset —
   // Gate the plaintext stash on the session state itself rather than
   // on specific callers. `clearCreateSession` / `lockProfile` /
@@ -523,6 +548,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       createSessionShareContextRef.current = null;
     }
   }, [createSession]);
+
+  useEffect(() => {
+    if (rotateKeysetSession === null) {
+      rotateSessionPackageSecretsRef.current = new Map();
+      rotateSessionShareContextRef.current = null;
+    }
+  }, [rotateKeysetSession]);
 
   const abortOnboardHandshake = useCallback(() => {
     onboardHandshakeRef.current?.controller.abort();
@@ -2008,6 +2040,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const setPackageDeviceLabel = useCallback(
+    (idx: number, deviceLabel: string) => {
+      setCreateSession((session) => {
+        if (!session) {
+          return session;
+        }
+        return {
+          ...session,
+          onboardingPackages: session.onboardingPackages.map((entry) =>
+            entry.idx === idx ? { ...entry, deviceLabel } : entry,
+          ),
+        };
+      });
+    },
+    [],
+  );
+
   // fix-followup-distribute-2a — per-share encoder. Produces a
   // populated bfonboard1… package for remote share `idx` using a
   // user-supplied `password`. See {@link AppStateValue.encodeDistributionPackage}
@@ -2973,12 +3022,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         count: input.count,
         onboardingPackages: [],
       });
+      clearRotateSessionPackageSecrets();
     },
-    [],
+    [clearRotateSessionPackageSecrets],
   );
 
   const generateRotatedKeyset = useCallback(
-    async (distributionPassword: string) => {
+    async () => {
       if (
         !rotateKeysetSession?.sourcePayload ||
         rotateKeysetSession.sourceShares.length === 0
@@ -2987,9 +3037,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           "missing_session",
           "Validate source shares before rotating.",
         );
-      }
-      if (distributionPassword.length < 8) {
-        throw new Error("Distribution password must be at least 8 characters.");
       }
       try {
         const rotated = await rotateKeysetBundle({
@@ -3014,7 +3061,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                 ...session,
                 phase: "rotated",
                 rotated,
-                distributionPassword,
               }
             : session,
         );
@@ -3037,8 +3083,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     async (draft: ProfileDraft) => {
       if (
         !rotateKeysetSession?.rotated ||
-        !rotateKeysetSession.sourcePayload ||
-        !rotateKeysetSession.distributionPassword
+        !rotateKeysetSession.sourcePayload
       ) {
         throw new SetupFlowError(
           "missing_session",
@@ -3092,13 +3137,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const remoteShares = nextBundle.shares.filter(
         (share) => share.idx !== localShare.idx,
       );
-      const onboardingPackages = await buildRemoteOnboardingPackages({
+      const onboardingPackages = remoteShares.map((share) =>
+        buildPendingOnboardingPackageView({
+          remoteShare: share,
+          group: nextBundle.group,
+        }),
+      );
+      rotateSessionPackageSecretsRef.current = new Map();
+      rotateSessionShareContextRef.current = {
         remoteShares,
         localShare,
         group: nextBundle.group,
         relays,
-        password: rotateKeysetSession.distributionPassword,
-      });
+      };
 
       setRotateKeysetSession((session) =>
         session
@@ -3116,6 +3167,54 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [rotateKeysetSession, savePayloadAsProfile],
   );
 
+  const encodeRotateDistributionPackage = useCallback(
+    async (idx: number, password: string) => {
+      if (typeof password !== "string" || password.length < 8) {
+        throw new Error("Package password must be at least 8 characters.");
+      }
+      const context = rotateSessionShareContextRef.current;
+      if (!context) {
+        throw new Error(
+          "No active rotate session; cannot encode distribution package.",
+        );
+      }
+      const remoteShare = context.remoteShares.find((share) => share.idx === idx);
+      if (!remoteShare) {
+        throw new Error(
+          `No remote share with idx=${idx} in the active rotate session.`,
+        );
+      }
+      const payload = onboardPayloadForRemoteShare({
+        remoteShare,
+        localShare: context.localShare,
+        group: context.group,
+        relays: context.relays,
+      });
+      const packageText = await encodeOnboardPackage(payload, password);
+      const nextStash = new Map(rotateSessionPackageSecretsRef.current);
+      nextStash.set(idx, { packageText, password });
+      rotateSessionPackageSecretsRef.current = nextStash;
+      const preview = packageText.slice(0, 24);
+      setRotateKeysetSession((session) => {
+        if (!session) return session;
+        return {
+          ...session,
+          onboardingPackages: session.onboardingPackages.map((entry) =>
+            entry.idx === idx
+              ? {
+                  ...entry,
+                  packageText: preview,
+                  password: "[redacted]",
+                  packageCreated: true,
+                }
+              : entry,
+          ),
+        };
+      });
+    },
+    [],
+  );
+
   const updateRotatePackageState = useCallback(
     (idx: number, patch: OnboardingPackageStatePatch) => {
       setRotateKeysetSession((session) => {
@@ -3126,24 +3225,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         const onboardingPackages = session.onboardingPackages.map((entry) =>
           entry.idx === idx ? { ...entry, ...normalizedPatch } : entry,
         );
-        // fix-followup-distribute-2a — the new `packageDistributed`
-        // predicate (peerOnline || manuallyMarkedDistributed) governs
-        // the Create flow (VAL-FOLLOWUP-006). The rotate-keyset flow
-        // still uses the legacy "package+password copied / QR shown"
-        // heuristic until it is refactored to the per-share flow in
-        // a follow-up. Compute distribution inline here to preserve
-        // rotate semantics without regressing the Create predicate.
-        const distributed =
-          onboardingPackages.length > 0 &&
-          onboardingPackages.every(
-            (pkg) =>
-              (pkg.packageCopied || pkg.copied || pkg.qrShown) &&
-              pkg.passwordCopied,
-          );
         return {
           ...session,
           phase:
-            distributed && session.createdProfileId
+            allPackagesDistributed(onboardingPackages) && session.createdProfileId
               ? "distribution_ready"
               : session.createdProfileId
                 ? "profile_created"
@@ -3154,6 +3239,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  const markRotatePackageDistributed = useCallback((idx: number) => {
+    setRotateKeysetSession((session) => {
+      if (!session) return session;
+      const onboardingPackages = session.onboardingPackages.map((entry) =>
+        entry.idx === idx
+          ? { ...entry, manuallyMarkedDistributed: true }
+          : entry,
+      );
+      return {
+        ...session,
+        phase:
+          allPackagesDistributed(onboardingPackages) && session.createdProfileId
+            ? "distribution_ready"
+            : session.createdProfileId
+              ? "profile_created"
+              : session.phase,
+        onboardingPackages,
+      };
+    });
+  }, []);
 
   const finishRotateDistribution = useCallback(async () => {
     if (
@@ -3171,8 +3277,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [rotateKeysetSession]);
 
   const clearRotateKeysetSession = useCallback(() => {
+    clearRotateSessionPackageSecrets();
     setRotateKeysetSession(null);
-  }, []);
+  }, [clearRotateSessionPackageSecrets]);
 
   const decodeReplaceSharePackage = useCallback(
     async (
@@ -5231,6 +5338,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       createKeyset,
       createProfile,
       updatePackageState,
+      setPackageDeviceLabel,
       encodeDistributionPackage,
       markPackageDistributed,
       finishDistribution,
@@ -5249,8 +5357,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       validateRotateKeysetSources,
       generateRotatedKeyset,
       createRotatedProfile,
+      encodeRotateDistributionPackage,
       updateRotatePackageState,
+      markRotatePackageDistributed,
       finishRotateDistribution,
+      getRotateSessionPackageSecret,
       clearRotateKeysetSession,
       decodeReplaceSharePackage,
       applyReplaceShareUpdate,
@@ -5308,6 +5419,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       createKeyset,
       createProfile,
       updatePackageState,
+      setPackageDeviceLabel,
       encodeDistributionPackage,
       markPackageDistributed,
       finishDistribution,
@@ -5326,8 +5438,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       validateRotateKeysetSources,
       generateRotatedKeyset,
       createRotatedProfile,
+      encodeRotateDistributionPackage,
       updateRotatePackageState,
+      markRotatePackageDistributed,
       finishRotateDistribution,
+      getRotateSessionPackageSecret,
       clearRotateKeysetSession,
       decodeReplaceSharePackage,
       applyReplaceShareUpdate,

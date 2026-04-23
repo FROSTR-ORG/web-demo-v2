@@ -8,7 +8,10 @@ import {
 } from "react";
 import { snapshotFromAppState, writeBridgeSnapshot } from "./appStateBridge";
 import { AppStateContext } from "./AppStateContext";
-import { normalizePackageStatePatch } from "./distributionPackages";
+import {
+  allPackagesDistributed,
+  normalizePackageStatePatch,
+} from "./distributionPackages";
 import type {
   AppStateValue,
   CreateKeysetDraft,
@@ -136,6 +139,15 @@ export function MockAppStateProvider({
     import("./AppStateTypes").PolicyOverrideEntry[]
   >(value.policyOverrides ?? []);
   const resolvedDenialIdsRef = useRef<Set<string>>(new Set());
+  const rotateSessionPackageSecretsRef = useRef<
+    Map<number, { packageText: string; password: string }>
+  >(new Map());
+
+  useEffect(() => {
+    if (rotateKeysetSession === null) {
+      rotateSessionPackageSecretsRef.current = new Map();
+    }
+  }, [rotateKeysetSession]);
 
   const enqueuePeerDenial = useCallback(
     (event: import("./AppStateTypes").PeerDeniedEvent) => {
@@ -314,6 +326,24 @@ export function MockAppStateProvider({
             }
           : session,
       );
+    },
+    [value],
+  );
+
+  const setPackageDeviceLabel = useCallback(
+    (idx: number, deviceLabel: string) => {
+      value.setPackageDeviceLabel(idx, deviceLabel);
+      setCreateSession((session) => {
+        if (!session) {
+          return session;
+        }
+        return {
+          ...session,
+          onboardingPackages: session.onboardingPackages.map((entry) =>
+            entry.idx === idx ? { ...entry, deviceLabel } : entry,
+          ),
+        };
+      });
     },
     [value],
   );
@@ -514,6 +544,7 @@ export function MockAppStateProvider({
     useCallback(
       async (input) => {
         await value.validateRotateKeysetSources(input);
+        rotateSessionPackageSecretsRef.current = new Map();
         if (value.rotateKeysetSession) {
           setRotateKeysetSession(value.rotateKeysetSession);
         }
@@ -522,8 +553,8 @@ export function MockAppStateProvider({
     );
 
   const generateRotatedKeyset = useCallback(
-    async (distributionPassword: string) => {
-      await value.generateRotatedKeyset(distributionPassword);
+    async () => {
+      await value.generateRotatedKeyset();
       if (value.rotateKeysetSession) {
         setRotateKeysetSession(value.rotateKeysetSession);
       }
@@ -535,7 +566,17 @@ export function MockAppStateProvider({
     async (draft: ProfileDraft) => {
       const profileId = await value.createRotatedProfile(draft);
       setRotateKeysetSession((session) =>
-        session ? { ...session, createdProfileId: profileId } : session,
+        value.rotateKeysetSession ??
+        (session
+          ? {
+              ...session,
+              createdProfileId: profileId,
+              phase:
+                session.phase === "distribution_ready"
+                  ? "distribution_ready"
+                  : "profile_created",
+            }
+          : session),
       );
       const nextActive =
         value.profiles.find((profile) => profile.id === profileId) ??
@@ -544,6 +585,42 @@ export function MockAppStateProvider({
         setActiveProfile(nextActive);
       }
       return profileId;
+    },
+    [value],
+  );
+
+  const encodeRotateDistributionPackage = useCallback(
+    async (idx: number, password: string) => {
+      await value.encodeRotateDistributionPackage(idx, password);
+      const seedEntry = value.rotateKeysetSession?.onboardingPackages.find(
+        (candidate) => candidate.idx === idx,
+      );
+      const packageText =
+        seedEntry && seedEntry.packageText.length > 0
+          ? seedEntry.packageText
+          : `bfonboard1mock-rotate-${idx}`;
+      rotateSessionPackageSecretsRef.current = new Map(
+        rotateSessionPackageSecretsRef.current,
+      ).set(idx, { packageText, password });
+      setRotateKeysetSession((session) => {
+        if (!session) return session;
+        return {
+          ...session,
+          onboardingPackages: session.onboardingPackages.map((entry) =>
+            entry.idx === idx
+              ? {
+                  ...entry,
+                  packageText:
+                    seedEntry && seedEntry.packageText.length > 0
+                      ? seedEntry.packageText
+                      : "bfonboard1mock-preview",
+                  password: "[redacted]",
+                  packageCreated: true,
+                }
+              : entry,
+          ),
+        };
+      });
     },
     [value],
   );
@@ -559,23 +636,10 @@ export function MockAppStateProvider({
         const onboardingPackages = session.onboardingPackages.map((entry) =>
           entry.idx === idx ? { ...entry, ...normalizedPatch } : entry,
         );
-        // fix-followup-distribute-2a — legacy rotate-flow heuristic
-        // preserved (see the matching comment in AppStateProvider's
-        // updateRotatePackageState). The new `packageDistributed`
-        // predicate is specific to the Create flow; the rotate flow
-        // still uses packageCopied / passwordCopied / qrShown sub-state
-        // until it is refactored in a follow-up.
-        const distributed =
-          onboardingPackages.length > 0 &&
-          onboardingPackages.every(
-            (pkg) =>
-              (pkg.packageCopied || pkg.copied || pkg.qrShown) &&
-              pkg.passwordCopied,
-          );
         return {
           ...session,
           phase:
-            distributed && session.createdProfileId
+            allPackagesDistributed(onboardingPackages) && session.createdProfileId
               ? "distribution_ready"
               : session.createdProfileId
                 ? "profile_created"
@@ -587,14 +651,50 @@ export function MockAppStateProvider({
     [value],
   );
 
+  const markRotatePackageDistributed = useCallback(
+    (idx: number) => {
+      value.markRotatePackageDistributed(idx);
+      setRotateKeysetSession((session) => {
+        if (!session) return session;
+        const onboardingPackages = session.onboardingPackages.map((entry) =>
+          entry.idx === idx
+            ? { ...entry, manuallyMarkedDistributed: true }
+            : entry,
+        );
+        return {
+          ...session,
+          phase:
+            allPackagesDistributed(onboardingPackages) && session.createdProfileId
+              ? "distribution_ready"
+              : session.createdProfileId
+                ? "profile_created"
+                : session.phase,
+          onboardingPackages,
+        };
+      });
+    },
+    [value],
+  );
+
+  const getRotateSessionPackageSecret = useCallback(
+    (idx: number): { packageText: string; password: string } | null => {
+      const entry = rotateSessionPackageSecretsRef.current.get(idx);
+      if (!entry) return null;
+      return { packageText: entry.packageText, password: entry.password };
+    },
+    [],
+  );
+
   const finishRotateDistribution = useCallback(async () => {
     const profileId = await value.finishRotateDistribution();
+    rotateSessionPackageSecretsRef.current = new Map();
     setRotateKeysetSession(null);
     return profileId;
   }, [value]);
 
   const clearRotateKeysetSession = useCallback(() => {
     value.clearRotateKeysetSession();
+    rotateSessionPackageSecretsRef.current = new Map();
     setRotateKeysetSession(null);
   }, [value]);
 
@@ -914,6 +1014,7 @@ export function MockAppStateProvider({
       createKeyset,
       createProfile,
       updatePackageState,
+      setPackageDeviceLabel,
       encodeDistributionPackage,
       markPackageDistributed,
       clearCreateSession,
@@ -930,8 +1031,11 @@ export function MockAppStateProvider({
       validateRotateKeysetSources,
       generateRotatedKeyset,
       createRotatedProfile,
+      encodeRotateDistributionPackage,
       updateRotatePackageState,
+      markRotatePackageDistributed,
       finishRotateDistribution,
+      getRotateSessionPackageSecret,
       clearRotateKeysetSession,
       decodeReplaceSharePackage,
       applyReplaceShareUpdate,
@@ -988,6 +1092,7 @@ export function MockAppStateProvider({
       createKeyset,
       createProfile,
       updatePackageState,
+      setPackageDeviceLabel,
       encodeDistributionPackage,
       markPackageDistributed,
       clearCreateSession,
@@ -1004,8 +1109,11 @@ export function MockAppStateProvider({
       validateRotateKeysetSources,
       generateRotatedKeyset,
       createRotatedProfile,
+      encodeRotateDistributionPackage,
       updateRotatePackageState,
+      markRotatePackageDistributed,
       finishRotateDistribution,
+      getRotateSessionPackageSecret,
       clearRotateKeysetSession,
       decodeReplaceSharePackage,
       applyReplaceShareUpdate,
@@ -1078,5 +1186,3 @@ function lifecyclePreviewForCmd(cmd: RuntimeCommand): string | null {
       return null;
   }
 }
-
-

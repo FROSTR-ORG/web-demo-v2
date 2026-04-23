@@ -14,6 +14,7 @@ import { DEMO_PROFILE_ID } from "../../demo/fixtures";
 interface TestOnboardingPackage {
   idx: number;
   memberPubkey: string;
+  deviceLabel?: string;
   packageText: string;
   password: string;
   packageCreated: boolean;
@@ -149,6 +150,32 @@ describe("DistributionCompleteScreen — Paper LN7-0 parity (VAL-FOLLOWUP-012)",
     for (const chip of chips) {
       expect(chip.closest(".status-pill")).toHaveClass("success");
     }
+  });
+
+  it("prefers deviceLabel over shortHex(memberPubkey) and falls back when blank", () => {
+    mocks.createSession = {
+      draft: { groupName: "My Signing Key", threshold: 2, count: 3 },
+      createdProfileId: DEMO_PROFILE_ID,
+      onboardingPackages: [
+        makeRemotePackage(1, {
+          deviceLabel: "Igloo Mobile",
+          manuallyMarkedDistributed: true,
+        }),
+        makeRemotePackage(2, {
+          deviceLabel: "   ",
+          manuallyMarkedDistributed: true,
+        }),
+      ],
+    };
+
+    renderScreen();
+
+    expect(
+      screen.getByText("Member #2 — Igloo Mobile"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Member #3 — 022abcde\.\.\.4567/i),
+    ).toBeInTheDocument();
   });
 
   it("renders the success callout EXACT when allPackagesDistributed", () => {

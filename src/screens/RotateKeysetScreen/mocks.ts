@@ -14,8 +14,34 @@ export const MOCK_ROTATE_MEMBERS = [
 ];
 
 export const MOCK_REMOTE_PACKAGES = [
-  { idx: 1, memberPubkey: "03b7d2...a91e", packageText: "bfonboard1qxy7...mock", password: "rotate-pkg-1", packageCopied: false, passwordCopied: false },
-  { idx: 2, memberPubkey: "02c4e8...f3b7", packageText: "bfonboard1qzw9...mock", password: "rotate-pkg-2", packageCopied: false, passwordCopied: false }
+  {
+    idx: 1,
+    memberPubkey:
+      "03b7d2e4f1a8c9054f6a2e83d7b1094c5e8f3a6d2b7e4c19085f6d3a2b8ea91e",
+    packageText: "",
+    password: "",
+    packageCreated: false,
+    peerOnline: false,
+    manuallyMarkedDistributed: false,
+    packageCopied: false,
+    passwordCopied: false,
+    copied: false,
+    qrShown: false
+  },
+  {
+    idx: 2,
+    memberPubkey:
+      "02c4e8f9a1d3b5c7e9f0a2b4c6d8e0f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c3d7",
+    packageText: "",
+    password: "",
+    packageCreated: false,
+    peerOnline: false,
+    manuallyMarkedDistributed: false,
+    packageCopied: false,
+    passwordCopied: false,
+    copied: false,
+    qrShown: false
+  }
 ];
 
 /**
@@ -24,7 +50,7 @@ export const MOCK_REMOTE_PACKAGES = [
  * DistributionCompleteScreen.tsx) so both adaptations ship identical member
  * summary rows with their respective status chips.
  */
-export const ROTATE_COMPLETION_ROWS: { title: string; device: string; statuses: string[] }[] = [
-  { title: "Member #1 — Igloo Mobile", device: "Existing Device", statuses: ["Copied", "QR shown"] },
-  { title: "Member #2 — Igloo Desktop", device: "New Device", statuses: ["QR shown"] }
+export const ROTATE_COMPLETION_ROWS: { title: string; statuses: string[] }[] = [
+  { title: "Member #2 — Igloo Mobile", statuses: ["Marked distributed"] },
+  { title: "Member #3 — Igloo Desktop", statuses: ["Echo received"] }
 ];

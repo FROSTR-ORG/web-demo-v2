@@ -113,18 +113,13 @@ scenario: `/demo/shared-distribution-completion`.
   success/green tone. Existing `DistributionCompleteScreen.test.tsx` fixtures set
   `manuallyMarkedDistributed: true` only, so the test's `getAllByText("Marked distributed")`
   assertion continues to pass.
-- Missing element: **documented deviation.** Paper LN7-0 shows per-member rows with a
-  **device label** ("Igloo Mobile", "Igloo Desktop") and a **"New Device" / "Existing
-  Device"** sub-label underneath. The live render uses the member's short pubkey suffix
-  (`Member #N — <shortHex(pubkey)>`) because the `OnboardingPackageView` type does not
-  track `deviceLabel` or a new-vs-existing flag at create time — the create flow does not
-  prompt the user for per-share device labels (those are Paper fixture values). Adding
-  per-share device labels requires extending the AppState mutator surface and the
-  `OnboardingPackageView` type, which is out of scope for this paper-parity review
-  (`ui-screen-worker` skill explicitly limits this feature to "copy/layout/hierarchy
-  fidelity of these three screens"). See
-  `docs/runtime-deviations-from-paper.md` > "Distribution Completion per-member rows use
-  pubkey suffix in lieu of device labels".
+- Missing element: **documented deviation.** Paper LN7-0 shows a secondary
+  **"New Device" / "Existing Device"** sub-label underneath each member row. The live
+  render now supports the top-line device label (`Member #N — <deviceLabel>`) when the
+  create/distribute flow captures one, but it still omits the second-line new-vs-existing
+  tag. See `docs/runtime-deviations-from-paper.md` >
+  "Distribution Completion omits Paper's secondary `New Device` / `Existing Device`
+  sub-label".
 - Extra element: **no extras.** Pending rows (for members whose handoff is incomplete)
   expose an inline **Mark distributed** button — this is required by VAL-FOLLOWUP-005
   ("a 'Mark distributed' affordance on any remote-share row whose state is still
@@ -147,7 +142,5 @@ scenario: `/demo/shared-distribution-completion`.
   1. Peer permission rows on `/create/profile` use `ToggleSwitch` rather than Paper's
      pill badges — design-system alignment.
   2. `/create/complete` callout body copy pinned by VAL-FOLLOWUP-012 exact-text contract.
-  3. `/create/complete` per-member rows use `shortHex(memberPubkey)` instead of Paper's
-     device label + New/Existing sub-label — deviceLabel is not tracked on
-     `OnboardingPackageView`.
+  3. `/create/complete` still omits Paper's secondary New/Existing device sub-label.
 - **no drift** for every other aspect audited.

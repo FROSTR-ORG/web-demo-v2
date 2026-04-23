@@ -2,9 +2,14 @@ import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Check } from "lucide-react";
 import { useAppState } from "../../app/AppState";
+import {
+  allPackagesDistributed,
+  packageDistributed,
+} from "../../app/distributionPackages";
 import { AppShell, PageHeading } from "../../components/shell";
 import { BackLink, Button, Stepper } from "../../components/ui";
 import { useDemoUi } from "../../demo/demoUi";
+import { shortHex } from "../../lib/bifrost/format";
 import { MOCK_SOURCE_SHARE_1, ROTATE_COMPLETION_ROWS } from "./mocks";
 import { navigateWithRotateState, rotatePhaseAtLeast } from "./utils";
 
@@ -21,27 +26,22 @@ export function RotateDistributionCompleteScreen() {
   const sessionPackages = rotateKeysetSession?.onboardingPackages ?? [];
   const rows = sessionPackages.length
     ? sessionPackages.map((pkg) => ({
-        title: `Member #${pkg.idx} — Igloo Device`,
-        device: "New Device",
+        title: `Member #${pkg.idx + 1} — ${shortHex(pkg.memberPubkey, 8, 4)}`,
         statuses: [
-          pkg.packageCopied || pkg.copied ? "Package copied" : "",
-          pkg.passwordCopied ? "Password copied" : "",
-          pkg.qrShown ? "QR shown" : "",
+          pkg.peerOnline ? "Echo received" : "",
+          !pkg.peerOnline && pkg.manuallyMarkedDistributed
+            ? "Marked distributed"
+            : "",
         ].filter(Boolean),
       }))
     : ROTATE_COMPLETION_ROWS;
   const total = rows.length;
-  /* Paper reference shows all members accounted for (per success callout).
-     We treat every row as distributed so the CTA is enabled and the
-     success banner renders as "All packages distributed". */
   const accounted = sessionPackages.length
-    ? sessionPackages.filter(
-        (pkg) =>
-          (pkg.packageCopied || pkg.copied || pkg.qrShown) &&
-          pkg.passwordCopied,
-      ).length
+    ? sessionPackages.filter(packageDistributed).length
     : total;
-  const complete = accounted === total;
+  const complete = sessionPackages.length
+    ? allPackagesDistributed(sessionPackages)
+    : accounted === total;
   const blocked =
     !rotatePhaseAtLeast(rotateKeysetSession, "distribution_ready") &&
     !demoComplete;
@@ -105,7 +105,6 @@ export function RotateDistributionCompleteScreen() {
                   </span>
                   <span>
                     <span className="value">{row.title}</span>
-                    <span className="help">{row.device}</span>
                   </span>
                 </div>
                 <div className="inline-actions">

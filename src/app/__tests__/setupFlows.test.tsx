@@ -716,7 +716,7 @@ describe("AppState setup flows", () => {
     );
 
     await act(async () => {
-      await getState().generateRotatedKeyset("dist-password");
+      await getState().generateRotatedKeyset();
     });
     await waitFor(() =>
       expect(getState().rotateKeysetSession?.rotated?.next.group.group_pk).toBe(
@@ -751,26 +751,44 @@ describe("AppState setup flows", () => {
     );
     expect(decodedRotated.device.manual_peer_policy_overrides).toHaveLength(4);
 
-    const rotatedPackage =
-      getState().rotateKeysetSession!.onboardingPackages[0];
+    const pendingRotatePackages = getState().rotateKeysetSession!.onboardingPackages;
+    expect(pendingRotatePackages).toHaveLength(4);
+    for (const pkg of pendingRotatePackages) {
+      expect(pkg.packageCreated).toBe(false);
+      expect(pkg.packageText).toBe("");
+      expect(pkg.password).toBe("");
+    }
+
+    await act(async () => {
+      for (const pkg of getState().rotateKeysetSession!.onboardingPackages) {
+        await getState().encodeRotateDistributionPackage(
+          pkg.idx,
+          `dist-password-${pkg.idx}`,
+        );
+      }
+    });
+
+    const rotatedPackage = getState().rotateKeysetSession!.onboardingPackages[0];
+    expect(rotatedPackage.packageCreated).toBe(true);
+    expect(rotatedPackage.password).toBe("[redacted]");
     await expect(
-      decodeBfonboardPackage(rotatedPackage.packageText, "dist-password"),
+      decodeBfonboardPackage(
+        getState().getRotateSessionPackageSecret(rotatedPackage.idx)!.packageText,
+        `dist-password-${rotatedPackage.idx}`,
+      ),
     ).resolves.toMatchObject({
       relays: ["wss://relay.example.test"],
     });
     await expect(
       decodeBfonboardPackage(
-        rotatedPackage.packageText,
+        getState().getRotateSessionPackageSecret(rotatedPackage.idx)!.packageText,
         packagePasswordForShare("Flow Key", rotatedPackage.idx),
       ),
     ).rejects.toThrow();
 
     act(() => {
       for (const pkg of getState().rotateKeysetSession!.onboardingPackages) {
-        getState().updateRotatePackageState(pkg.idx, {
-          packageCopied: true,
-          passwordCopied: true,
-        });
+        getState().markRotatePackageDistributed(pkg.idx);
       }
     });
     await waitFor(() =>

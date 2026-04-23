@@ -21,7 +21,8 @@ import { test, expect, type BrowserContext, type Page } from "@playwright/test";
  *      → Distribute → Completion, backed by
  *      `AppStateValue.validateRotateKeysetSources`,
  *      `generateRotatedKeyset`, `createRotatedProfile`,
- *      `updateRotatePackageState`, and
+ *      `encodeRotateDistributionPackage`,
+ *      `markRotatePackageDistributed`, and
  *      `finishRotateDistribution`) was not exercised end-to-end.
  *      The updated spec now walks tab A through every RotateKeyset
  *      sub-route via real user-visible actions (typing into inputs,
@@ -283,14 +284,9 @@ test.describe("multi-device rotate-keyset-live-sign regression gate", () => {
     "UI-driven rotate flow: group_pk preserved, rotated shares sign successfully, old share sign fails",
     async ({ browser }) => {
       // Grant clipboard permissions to every context up-front so the
-      // RotateKeyset DistributeScreen's Copy Package / Copy Password
-      // buttons flip the package state flags that the "Continue to
-      // Completion" CTA depends on (the UI's Copy handlers call
-      // `navigator.clipboard.writeText` inside `copySecret` and only
-      // record copied=true on success — see
-      // `src/screens/RotateKeysetScreen/utils.ts`). Without explicit
-      // grants, Chromium in ephemeral contexts denies clipboard-write
-      // and the CTA stays disabled, hanging the spec.
+      // rotate distribute screen's Copy Package / Copy Password actions
+      // can still be exercised after package creation without browser
+      // permission flakes.
       const CTX_OPTIONS: { permissions: string[] } = {
         permissions: ["clipboard-read", "clipboard-write"],
       };
@@ -547,21 +543,11 @@ test.describe("multi-device rotate-keyset-live-sign regression gate", () => {
           timeout: ROTATE_UI_STEP_TIMEOUT_MS,
         });
 
-        // (4c) ReviewGenerateScreen — enter matching distribution
-        //      passwords, then click "Rotate & Generate Keyset". The
-        //      generateRotatedKeyset mutator produces the
-        //      `rotateKeysetSession.rotated.next` KeysetBundle
-        //      (group_pk preserved) and navigates to the progress
-        //      screen.
-        const DIST_PASSWORD = "distribution-password-1234";
-        const reviewPasswordLocators = pageA.locator(
-          "input.password-input[placeholder='Enter password']",
-        );
-        const reviewConfirmLocators = pageA.locator(
-          "input.password-input[placeholder='Re-enter password']",
-        );
-        await reviewPasswordLocators.first().fill(DIST_PASSWORD);
-        await reviewConfirmLocators.first().fill(DIST_PASSWORD);
+        // (4c) ReviewGenerateScreen — no distribution password is
+        //      collected here anymore. Clicking "Rotate & Generate
+        //      Keyset" produces the `rotateKeysetSession.rotated.next`
+        //      KeysetBundle (group_pk preserved) and navigates to the
+        //      progress screen.
         await pageA
           .getByRole("button", { name: /rotate & generate keyset/i })
           .click();
@@ -604,13 +590,11 @@ test.describe("multi-device rotate-keyset-live-sign regression gate", () => {
           timeout: ROTATE_UI_STEP_TIMEOUT_MS,
         });
 
-        // (4f) DistributeScreen — click Copy Package and Copy Password
-        //      on EVERY remote package row. Each successful click
-        //      calls `updateRotatePackageState(idx, ...)` on
-        //      AppState, flipping `packageCopied` / `passwordCopied`.
-        //      When every remote package is marked distributed the
-        //      screen's `completionReady` predicate flips and
-        //      "Continue to Completion" becomes clickable.
+        // (4f) DistributeScreen — create each remote package with its
+        //      own password, exercise Copy Package / Copy Password on
+        //      the first created row, then mark every row distributed.
+        //      The screen only allows completion once every remote
+        //      package satisfies `peerOnline || manuallyMarkedDistributed`.
         //
         // Wait for onboardingPackages to actually populate. The
         // screen renders the moment the profile-create navigation
@@ -633,32 +617,67 @@ test.describe("multi-device rotate-keyset-live-sign regression gate", () => {
           undefined,
           { timeout: ROTATE_UI_STEP_TIMEOUT_MS },
         );
+        const distributionPasswords = [
+          "distribution-password-1",
+          "distribution-password-2",
+        ];
+        const packagePasswordInputs = pageA.locator("input.password-input");
+        await expect(packagePasswordInputs).toHaveCount(2, {
+          timeout: ROTATE_UI_STEP_TIMEOUT_MS,
+        });
+        for (let i = 0; i < distributionPasswords.length; i += 1) {
+          await packagePasswordInputs.nth(i).fill(distributionPasswords[i]);
+        }
+        const createPackageButtons = pageA.getByRole("button", {
+          name: /create package/i,
+        });
+        await expect(createPackageButtons).toHaveCount(2, {
+          timeout: ROTATE_UI_STEP_TIMEOUT_MS,
+        });
+        await createPackageButtons.nth(0).click();
+        await createPackageButtons.nth(0).click();
+
         const copyPackageButtons = pageA.getByRole("button", {
           name: /copy package/i,
         });
         const copyPasswordButtons = pageA.getByRole("button", {
           name: /copy password/i,
         });
-        // Wait for the Copy Package rows to render (2 remote packages
-        // in a 2-of-3 with one local share).
         await expect(copyPackageButtons).toHaveCount(2, {
           timeout: ROTATE_UI_STEP_TIMEOUT_MS,
         });
-        const remotePackageCount = await copyPackageButtons.count();
-        expect(remotePackageCount).toBe(2);
-        for (let i = 0; i < remotePackageCount; i += 1) {
-          await copyPackageButtons.nth(i).click();
-          await copyPasswordButtons.nth(i).click();
+        await copyPackageButtons.nth(0).click();
+        await copyPasswordButtons.nth(0).click();
+
+        const markDistributedButtons = pageA.getByRole("button", {
+          name: /mark distributed/i,
+        });
+        await expect(markDistributedButtons).toHaveCount(2, {
+          timeout: ROTATE_UI_STEP_TIMEOUT_MS,
+        });
+        for (let i = 0; i < 2; i += 1) {
+          await markDistributedButtons.nth(i).click();
         }
+        await expect(
+          pageA.getByRole("button", { name: /continue to completion/i }),
+        ).toBeEnabled({
+          timeout: ROTATE_UI_STEP_TIMEOUT_MS,
+        });
 
         // (4g) Capture the rotated material BEFORE clicking "Finish
         //      Distribution" — `finishRotateDistribution` sets
-        //      `rotateKeysetSession = null`, which clears the
-        //      rotated group + onboarding packages from AppState.
-        //      B and C need both to adopt via the bfonboard decoder.
+        //      `rotateKeysetSession = null`, which clears the rotated
+        //      group + onboarding packages from AppState. B and C need
+        //      both to adopt via the bfonboard decoder. The visible
+        //      session rows are redacted previews, so read the real
+        //      package text + password through
+        //      `getRotateSessionPackageSecret(idx)`.
         const rotatedCaptured = await pageA.evaluate(() => {
           const w = window as unknown as {
             __appState?: {
+              getRotateSessionPackageSecret?: (
+                idx: number,
+              ) => { packageText: string; password: string } | null;
               rotateKeysetSession?: {
                 rotated?: {
                   next?: {
@@ -671,11 +690,7 @@ test.describe("multi-device rotate-keyset-live-sign regression gate", () => {
                     shares: Array<{ idx: number; seckey: string }>;
                   };
                 };
-                onboardingPackages?: Array<{
-                  idx: number;
-                  packageText: string;
-                  password: string;
-                }>;
+                onboardingPackages?: Array<{ idx: number }>;
                 localShare?: { idx: number; seckey: string };
               } | null;
             };
@@ -687,11 +702,21 @@ test.describe("multi-device rotate-keyset-live-sign regression gate", () => {
           return {
             group: session.rotated.next.group,
             shares: session.rotated.next.shares,
-            onboardingPackages: session.onboardingPackages.map((p) => ({
-              idx: p.idx,
-              packageText: p.packageText,
-              password: p.password,
-            })),
+            onboardingPackages: session.onboardingPackages.map((p) => {
+              const secret = w.__appState?.getRotateSessionPackageSecret?.(
+                p.idx,
+              );
+              if (!secret) {
+                throw new Error(
+                  `missing rotate package secret for idx=${p.idx}`,
+                );
+              }
+              return {
+                idx: p.idx,
+                packageText: secret.packageText,
+                password: secret.password,
+              };
+            }),
             localShareIdx: session.localShare?.idx ?? 0,
           };
         });

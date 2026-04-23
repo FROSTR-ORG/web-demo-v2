@@ -44,6 +44,13 @@ export function DistributionCompleteScreen() {
   const complete = allPackagesDistributed(packages);
   const distributedCount = packages.filter(packageDistributed).length;
 
+  function completionLabel(pkg: (typeof packages)[number]): string {
+    const deviceLabel = pkg.deviceLabel?.trim();
+    return deviceLabel && deviceLabel.length > 0
+      ? deviceLabel
+      : shortHex(pkg.memberPubkey, 8, 4);
+  }
+
   async function finish() {
     if (handoffStartedRef.current) {
       return;
@@ -98,7 +105,7 @@ export function DistributionCompleteScreen() {
                       <span className="value">
                         Member #{pkg.idx + 1}
                         {" — "}
-                        {shortHex(pkg.memberPubkey, 8, 4)}
+                        {completionLabel(pkg)}
                       </span>
                     </span>
                   </div>

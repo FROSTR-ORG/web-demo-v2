@@ -80,6 +80,7 @@ export function DistributeSharesScreen() {
     createSession,
     encodeDistributionPackage,
     markPackageDistributed,
+    setPackageDeviceLabel,
     updatePackageState,
     getCreateSessionPackageSecret,
   } = useAppState();
@@ -172,6 +173,7 @@ export function DistributeSharesScreen() {
               pkg={pkg}
               encodeDistributionPackage={encodeDistributionPackage}
               markPackageDistributed={markPackageDistributed}
+              setPackageDeviceLabel={setPackageDeviceLabel}
               updatePackageState={updatePackageState}
               resolveSecret={resolveSecret}
             />
@@ -195,12 +197,14 @@ function RemoteShareCard({
   pkg,
   encodeDistributionPackage,
   markPackageDistributed,
+  setPackageDeviceLabel,
   updatePackageState,
   resolveSecret,
 }: {
   pkg: OnboardingPackageView;
   encodeDistributionPackage: (idx: number, password: string) => Promise<void>;
   markPackageDistributed: (idx: number) => void;
+  setPackageDeviceLabel: (idx: number, deviceLabel: string) => void;
   updatePackageState: (
     idx: number,
     patch: {
@@ -271,6 +275,22 @@ function RemoteShareCard({
       ) : (
         <SecretDisplay value="Waiting for package password" dashed />
       )}
+
+      <div className="field">
+        <span className="kicker">Device Label</span>
+        <span className="input-shell">
+          <input
+            className="input"
+            type="text"
+            aria-label={`Device label for share ${pkg.idx + 1}`}
+            placeholder="Optional device label"
+            value={pkg.deviceLabel ?? ""}
+            onChange={(event) =>
+              setPackageDeviceLabel(pkg.idx, event.target.value)
+            }
+          />
+        </span>
+      </div>
 
       <div className="field">
         <span className="kicker">Package Password</span>

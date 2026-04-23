@@ -301,6 +301,7 @@ export function createDemoAppState(
     createKeyset: async () => undefined,
     createProfile: async () => DEMO_PROFILE_ID,
     updatePackageState: () => undefined,
+    setPackageDeviceLabel: () => undefined,
     // fix-followup-distribute-2a — new per-share mutators. The demo
     // fixture is pure metadata, so both are async no-ops that satisfy
     // the AppStateValue interface without side effects. Tests that
@@ -322,8 +323,11 @@ export function createDemoAppState(
     validateRotateKeysetSources: async () => undefined,
     generateRotatedKeyset: async () => undefined,
     createRotatedProfile: async () => DEMO_PROFILE_ID,
+    encodeRotateDistributionPackage: async () => undefined,
     updateRotatePackageState: () => undefined,
+    markRotatePackageDistributed: () => undefined,
     finishRotateDistribution: async () => DEMO_PROFILE_ID,
+    getRotateSessionPackageSecret: () => null,
     clearRotateKeysetSession: () => undefined,
     decodeReplaceSharePackage: async () => undefined,
     applyReplaceShareUpdate: async () => undefined,

@@ -1594,7 +1594,7 @@ end-to-end.
   copy) continues to hold; Paper LN7-0 parity is partially restored
   by the title-line addition.
 
-### 2026-04-23 — Distribution Completion per-member rows use `shortHex(memberPubkey)` instead of Paper device labels (LN7-0)
+### 2026-04-23 — Distribution Completion omits Paper's secondary `New Device` / `Existing Device` sub-label (LN7-0)
 
 - **Paper source**: `igloo-ui` file, page `core`, artboard `LN7-0`.
   Paper renders each member row as
@@ -1603,39 +1603,23 @@ end-to-end.
   with the top line being the human-readable device label and a
   secondary line tagging each member as New vs. Existing.
 - **web-demo-v2 implementation**:
-  `src/screens/DistributionCompleteScreen.tsx` — each row renders
-  > "Member #{idx + 1} — {shortHex(pkg.memberPubkey)}"
-  with no second line. `shortHex` produces the `02abcd...1234`
-  truncation used consistently elsewhere in the app (SettingsSidebar,
-  PeersPanel, PoliciesState).
+  `src/screens/DistributionCompleteScreen.tsx` now renders
+  > "Member #{idx + 1} — {deviceLabel}"
+  when the optional create-flow `OnboardingPackageView.deviceLabel`
+  is present, and falls back to the existing pubkey suffix only when
+  the label is blank. The live render still omits Paper's second-line
+  "New Device" / "Existing Device" status copy.
 - **Rationale for the deviation**: The
-  `OnboardingPackageView` type in `src/lib/bifrost/types.ts` does not
-  track a `deviceLabel` or a new-vs-existing flag. The create flow
-  does not prompt the user for per-share device labels (only profile
-  name + password + relays + peer permissions); Paper's labels
-  ("Igloo Mobile", "Igloo Desktop") are fixture values supplied by
-  the Paper file, not data the create flow collects. Adding per-share
-  device labels requires extending the AppState mutator surface
-  (`encodeDistributionPackage` gains a `deviceLabel` parameter) and
-  the type definition, and wiring a UI to collect them during
-  `/create/distribute` — an architectural change that exceeds the
-  "copy/layout/hierarchy fidelity" scope of
-  `fix-followup-paper-parity-final-review`. The stable pubkey suffix
-  is Paper-faithful in intent (a per-row identifier) and matches the
-  member-identification idiom used elsewhere in the app.
-- **What would change if device labels are later collected**: if a
-  future feature (e.g. `fix-create-profile-device-label-input`) adds
-  a per-share device-label input on `/create/profile` or
-  `/create/distribute` and threads the value through
-  `OnboardingPackageView.deviceLabel`, the LN7-0 row can be updated
-  in place to render `Member #{idx} — {deviceLabel}` with the
-  pubkey-suffix moving to a secondary sub-label. No other LN7-0
-  element is affected.
+  `OnboardingPackageView` now carries `deviceLabel`, but the create
+  flow still does not derive whether a recipient is a "new" or
+  "existing" device. Paper's secondary sub-label is presentation-only
+  metadata that is not available from the runtime/create-session model,
+  and adding it would require a separate data-collection or inference
+  rule beyond the current backlog feature.
 - **Assertion IDs covered**: VAL-FOLLOWUP-012 (one row per remote
   member; success chip; Finish Distribution CTA gating) remains
-  satisfied — the existing test does not assert on deviceLabel /
-  newOrExisting copy. Paper-parity deviation is recorded for future
-  audit cross-reference.
+  satisfied. Paper-parity deviation is now narrowed to the missing
+  secondary sub-label only.
 
 ### 2026-04-23 — Distribute Shares removes redundant BackLink (8GU-0)
 

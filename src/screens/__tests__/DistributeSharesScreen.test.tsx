@@ -26,6 +26,7 @@ import { DistributeSharesScreen } from "../DistributeSharesScreen";
 interface TestOnboardingPackage {
   idx: number;
   memberPubkey: string;
+  deviceLabel?: string;
   packageText: string;
   password: string;
   packageCreated: boolean;
@@ -40,6 +41,7 @@ interface TestOnboardingPackage {
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   updatePackageState: vi.fn(),
+  setPackageDeviceLabel: vi.fn(),
   encodeDistributionPackage: vi.fn(),
   markPackageDistributed: vi.fn(),
   createSession: null as {
@@ -66,6 +68,7 @@ vi.mock("../../app/AppState", () => ({
   useAppState: () => ({
     createSession: mocks.createSession,
     updatePackageState: mocks.updatePackageState,
+    setPackageDeviceLabel: mocks.setPackageDeviceLabel,
     encodeDistributionPackage: mocks.encodeDistributionPackage,
     markPackageDistributed: mocks.markPackageDistributed,
     getCreateSessionPackageSecret: () => null,
@@ -118,6 +121,7 @@ function renderScreen() {
 beforeEach(() => {
   mocks.navigate.mockClear();
   mocks.updatePackageState.mockClear();
+  mocks.setPackageDeviceLabel.mockClear();
   mocks.encodeDistributionPackage.mockReset();
   mocks.encodeDistributionPackage.mockResolvedValue(undefined);
   mocks.markPackageDistributed.mockReset();
@@ -186,6 +190,16 @@ describe("DistributeSharesScreen — LOCAL share badge (VAL-FOLLOWUP-008)", () =
 });
 
 describe("DistributeSharesScreen — PRE-state rendering (VAL-FOLLOWUP-004)", () => {
+  it("renders an optional device-label input for each remote share", () => {
+    renderScreen();
+    expect(
+      screen.getByLabelText("Device label for share 2"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Device label for share 3"),
+    ).toBeInTheDocument();
+  });
+
   it("renders 'Package not created' chip + 'Waiting for package password' for each remote share", () => {
     renderScreen();
     expect(screen.getAllByText("Package not created")).toHaveLength(2);
@@ -317,6 +331,17 @@ describe("DistributeSharesScreen — DISTRIBUTED state (VAL-FOLLOWUP-004)", () =
 });
 
 describe("DistributeSharesScreen — Create package click wiring", () => {
+  it("persists device-label edits independently of package creation", () => {
+    renderScreen();
+    fireEvent.change(screen.getByLabelText("Device label for share 2"), {
+      target: { value: "Igloo Mobile" },
+    });
+    expect(mocks.setPackageDeviceLabel).toHaveBeenCalledWith(
+      1,
+      "Igloo Mobile",
+    );
+  });
+
   it("rejects password.length < 8 with an inline error and does NOT invoke encodeDistributionPackage", async () => {
     renderScreen();
     const input = screen.getByLabelText("Package password for share 2") as HTMLInputElement;

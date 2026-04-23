@@ -501,6 +501,13 @@ export interface OnboardingPackageView {
   idx: number;
   memberPubkey: string;
   /**
+   * Optional human-readable recipient label collected during the
+   * Create/Distribute flow. Used by Distribution Completion to render
+   * "Member #N — {deviceLabel}" when present; blank/whitespace values
+   * fall back to the member pubkey suffix.
+   */
+  deviceLabel?: string;
+  /**
    * fix-followup-distribute-2a — after `createProfile` returns, the
    * remote-share package text is empty for every entry in the create
    * session. The mutator `encodeDistributionPackage(idx, password)`
