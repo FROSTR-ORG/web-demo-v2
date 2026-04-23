@@ -45,6 +45,22 @@ import { test, expect, type Page } from "@playwright/test";
  *        This exercises the same FIFO eviction path used by
  *        VAL-EVENTLOG-014.
  *
+ *   (I5) EVERY iteration's sign AND ECDH complete successfully (no
+ *        partial tolerance). A real long-running session does not
+ *        get to silently skip individual op completions — if one
+ *        cycle's sign or ECDH fails or times out that is a
+ *        regression that must fail the spec. Tightened in
+ *        `fix-m7-scrutiny-r1-long-session-and-clock-skew-criteria`
+ *        after m7 scrutiny R1 flagged the original "≥1 successful
+ *        sign / ≥1 successful ECDH across all iterations" gate as
+ *        too permissive.
+ *
+ *   (I6) Every iteration's ECDH completion carries a well-formed
+ *        `shared_secret_hex32` (64-hex). Verifies the ECDH happy
+ *        path produces real, usable shared-secret material on each
+ *        iteration rather than just arriving as an empty completion
+ *        envelope.
+ *
  *   (I4) Best-effort JS-heap bounds: when
  *        `performance.memory?.usedJSHeapSize` is available (Chrome
  *        only), baseline and post-run heap are sampled; the spec
@@ -648,7 +664,47 @@ test.describe("multi-device long-session (m7-clock-skew-and-leak)", () => {
         const dispatchEcdhOnce = async (): Promise<{
           requestId: string;
           completed: boolean;
+          sharedSecretHex: string | null;
         }> => {
+          // Snapshot the set of ECDH completion request_ids that
+          // already exist on page A BEFORE dispatch. Under loopback
+          // the runtime occasionally processes an ECDH within a
+          // single tick — fast enough that the
+          // `handleRuntimeCommand` synchronous snapshot of
+          // `pending_operations` no longer contains the new op by
+          // the time `runtimeStatus()` is read (the completion has
+          // already drained into `runtimeCompletions`). In that case
+          // `dispatch.requestId` is `null` but the completion DOES
+          // arrive; `correlatePendingOperations` and the unmatched-
+          // dispatch queue surface the Ecdh envelope on the next
+          // tick.
+          //
+          // To keep (I5) tight without false-failing on this
+          // benign race, we correlate by "new ECDH completion that
+          // was NOT present pre-dispatch" rather than by the exact
+          // synchronous request_id. Each completion carries its own
+          // `request_id`, so whichever request_id turns up first
+          // after dispatch is the one we dispatched.
+          const baselineEcdhRequestIds: string[] = await pageA.evaluate(
+            () => {
+              const w = window as unknown as {
+                __appState?: {
+                  runtimeCompletions?: Array<Record<string, unknown>>;
+                };
+              };
+              const completions =
+                w.__appState?.runtimeCompletions ?? [];
+              const ids: string[] = [];
+              for (const entry of completions) {
+                const ecdh = (
+                  entry as { Ecdh?: { request_id?: string } }
+                ).Ecdh;
+                if (ecdh?.request_id) ids.push(ecdh.request_id);
+              }
+              return ids;
+            },
+          );
+
           const dispatch = await pageA.evaluate(
             async (peerHex: string) => {
               const w = window as unknown as {
@@ -669,13 +725,21 @@ test.describe("multi-device long-session (m7-clock-skew-and-leak)", () => {
             },
             peerBPubkey32,
           );
-          const requestId = dispatch.requestId;
-          if (!requestId) {
-            return { requestId: "", completed: false };
-          }
-          const completed = await pageA
+          // If the dispatcher was able to capture a synchronous
+          // request_id, prefer it (exact correlation). Otherwise
+          // fall back to "first new ECDH completion after the
+          // baseline snapshot" correlation.
+          const syncRequestId = dispatch.requestId;
+
+          const newRequestIdRaw = await pageA
             .waitForFunction(
-              (rid: string) => {
+              ({
+                baseline,
+                targetRid,
+              }: {
+                baseline: string[];
+                targetRid: string | null;
+              }) => {
                 const w = window as unknown as {
                   __appState?: {
                     runtimeCompletions?: Array<Record<string, unknown>>;
@@ -683,19 +747,75 @@ test.describe("multi-device long-session (m7-clock-skew-and-leak)", () => {
                 };
                 const completions =
                   w.__appState?.runtimeCompletions ?? [];
-                return completions.some((entry) => {
+                // Exact-match path when the sync capture succeeded.
+                if (targetRid) {
+                  for (const entry of completions) {
+                    const ecdh = (
+                      entry as { Ecdh?: { request_id?: string } }
+                    ).Ecdh;
+                    if (ecdh?.request_id === targetRid) {
+                      return targetRid;
+                    }
+                  }
+                  return null;
+                }
+                // New-completion path when the sync capture missed.
+                const baselineSet = new Set(baseline);
+                for (const entry of completions) {
+                  const ecdh = (
+                    entry as { Ecdh?: { request_id?: string } }
+                  ).Ecdh;
+                  if (ecdh?.request_id && !baselineSet.has(ecdh.request_id)) {
+                    return ecdh.request_id;
+                  }
+                }
+                return null;
+              },
+              {
+                baseline: baselineEcdhRequestIds,
+                targetRid: syncRequestId,
+              },
+              { timeout: OP_COMPLETION_TIMEOUT_MS, polling: 200 },
+            )
+            .then((h) => h.jsonValue() as Promise<string | null>)
+            .catch(() => null);
+
+          const requestId = newRequestIdRaw ?? syncRequestId ?? "";
+          const completed = Boolean(newRequestIdRaw);
+          // Extract `shared_secret_hex32` from the matching
+          // completion so callers can verify (I6) — every ECDH
+          // returns real 64-hex shared-secret material, not an
+          // empty/partial envelope.
+          const sharedSecretHex = completed
+            ? await pageA.evaluate((rid: string) => {
+                const w = window as unknown as {
+                  __appState?: {
+                    runtimeCompletions?: Array<Record<string, unknown>>;
+                  };
+                };
+                const completions =
+                  w.__appState?.runtimeCompletions ?? [];
+                const hit = completions.find((entry) => {
                   const ecdh = (
                     entry as { Ecdh?: { request_id?: string } }
                   ).Ecdh;
                   return !!ecdh && ecdh.request_id === rid;
                 });
-              },
-              requestId,
-              { timeout: OP_COMPLETION_TIMEOUT_MS, polling: 200 },
-            )
-            .then(() => true)
-            .catch(() => false);
-          return { requestId, completed };
+                return (
+                  (
+                    hit as
+                      | {
+                          Ecdh?: {
+                            request_id: string;
+                            shared_secret_hex32: string;
+                          };
+                        }
+                      | undefined
+                  )?.Ecdh?.shared_secret_hex32 ?? null
+                );
+              }, requestId)
+            : null;
+          return { requestId, completed, sharedSecretHex };
         };
 
         const dispatchPingOnce = async (): Promise<void> => {
@@ -721,16 +841,46 @@ test.describe("multi-device long-session (m7-clock-skew-and-leak)", () => {
           });
         };
 
-        // During the loop, each iteration asserts (I1) and (I2) hold
-        // mid-flight so a regression is caught before the final
-        // snapshot.
-        let successfulSigns = 0;
-        let successfulEcdhs = 0;
+        // During the loop, each iteration asserts (I1), (I2), (I5),
+        // and (I6) hold mid-flight so a regression is caught before
+        // the final snapshot. Tightened in
+        // `fix-m7-scrutiny-r1-long-session-and-clock-skew-criteria`:
+        // EVERY iteration's sign AND ECDH must complete successfully,
+        // and every ECDH must carry a 64-hex shared_secret_hex32 —
+        // no partial tolerance. Previously the spec only required
+        // `≥ 1` successful sign and `≥ 1` successful ECDH across the
+        // whole run, which let a regression that broke 5 of 6
+        // iterations pass silently.
         for (let i = 0; i < ITERATIONS; i += 1) {
           const sign = await dispatchSignOnce(nextMessageHex());
-          if (sign.completed) successfulSigns += 1;
+          // (I5) — every iteration's sign must complete. Any
+          // timeout/failure under loopback is a regression.
+          expect(
+            sign.completed,
+            `iteration ${i}: sign must complete successfully ` +
+              `(requestId=${sign.requestId || "<none>"})`,
+          ).toBe(true);
+
           const ecdh = await dispatchEcdhOnce();
-          if (ecdh.completed) successfulEcdhs += 1;
+          // (I5) — every iteration's ECDH must complete.
+          expect(
+            ecdh.completed,
+            `iteration ${i}: ECDH must complete successfully ` +
+              `(requestId=${ecdh.requestId || "<none>"})`,
+          ).toBe(true);
+          // (I6) — every ECDH completion must carry 64-hex shared
+          // secret material.
+          expect(
+            ecdh.sharedSecretHex,
+            `iteration ${i}: ECDH shared_secret_hex32 must be present ` +
+              `on the completion envelope`,
+          ).not.toBeNull();
+          expect(
+            ecdh.sharedSecretHex,
+            `iteration ${i}: ECDH shared_secret_hex32 must be 64 ` +
+              `lowercase-hex chars (got ${JSON.stringify(ecdh.sharedSecretHex)})`,
+          ).toMatch(/^[0-9a-f]{64}$/);
+
           await dispatchPingOnce();
           // Brief pause so the refresh tick can land before the next
           // iteration dispatches — mirrors the 1-minute cadence of
@@ -753,18 +903,6 @@ test.describe("multi-device long-session (m7-clock-skew-and-leak)", () => {
             `iteration ${i}: runtimeEventLog on A must stay ≤ ${EVENT_LOG_CAP}`,
           ).toBeLessThanOrEqual(EVENT_LOG_CAP);
         }
-        // Must have made at least some forward progress — otherwise
-        // the spec is measuring a stuck runtime, not a long session.
-        expect(
-          successfulSigns,
-          `expected ≥ 1 successful sign across ${ITERATIONS} cycles ` +
-            `but saw ${successfulSigns}`,
-        ).toBeGreaterThanOrEqual(1);
-        expect(
-          successfulEcdhs,
-          `expected ≥ 1 successful ECDH across ${ITERATIONS} cycles ` +
-            `but saw ${successfulEcdhs}`,
-        ).toBeGreaterThanOrEqual(1);
 
         // ----------------------------------------------------------
         // (I3) Synthetic injection sweep — inject 600 entries on

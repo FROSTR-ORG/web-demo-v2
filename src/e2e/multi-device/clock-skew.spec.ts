@@ -952,4 +952,122 @@ test.describe("multi-device clock skew ±120s (m7-clock-skew-and-leak)", () => {
       });
     },
   );
+
+  // ---------------------------------------------------------------
+  // Scenario C: asymmetric ±120s — PHYSICALLY IMPOSSIBLE
+  // ---------------------------------------------------------------
+  //
+  // Added in `fix-m7-scrutiny-r1-long-session-and-clock-skew-criteria`
+  // to make the protocol constraint explicit rather than implicit.
+  //
+  // The feature description ("Clock skew: device B ±120s clock vs A
+  // still completes sign+ECDH round-trips") and contract
+  // VAL-CROSS-027's "±5 min from relay wall time" clause nominally
+  // require a test where one device's clock is 120 s / 300 s ahead
+  // of the other. This cannot be validated end-to-end without
+  // violating bifrost-signer's security model:
+  //
+  //   • `bifrost-signer` hard-codes `max_future_skew_secs: 30`
+  //     (`bifrost-rs/crates/bifrost-signer/src/lib.rs:243`) and
+  //     rejects any inbound peer request whose `sent_at` exceeds
+  //     the local wall clock by more than 30 s (`lib.rs:2263`).
+  //   • The cap is NOT patchable via `DeviceConfigPatch`'s
+  //     `update_config` surface (`lib.rs:620`) — it only exposes
+  //     `sign_timeout_secs`, `ping_timeout_secs`,
+  //     `request_ttl_secs`, etc.
+  //   • `bifrost-rs/` is read-only reference material for this
+  //     mission (AGENTS.md > Off-Limits Paths), so widening the
+  //     cap is out of scope.
+  //
+  // Therefore the ±120 s asymmetric scenario is documented as a
+  // DEVIATION from the feature description and VAL-CROSS-027 in
+  // `docs/runtime-deviations-from-paper.md` ("Clock skew magnitude
+  // bounded by bifrost-signer `max_future_skew_secs=30`"). The
+  // validation achieved by the real tests above —
+  //
+  //   • symmetric ±120 s (both devices equally offset; peer-to-peer
+  //     relative skew = 0 s), and
+  //   • asymmetric ±25 s (within the 30 s protocol cap, close to
+  //     the tolerance edge) —
+  //
+  // together covers the real-world failure modes: (1) local wall
+  // clock badly wrong vs reality ("broken NTP / VM suspended /
+  // battery replaced"), and (2) moderate inter-peer clock drift at
+  // the edge of the protocol's documented tolerance.
+  //
+  // We gate the describe with a capability-style `test.skip(...)`
+  // that (a) documents the protocol constraint in the skip reason
+  // (visible in Playwright reporter output), and (b) emits a
+  // console.log in `beforeAll` so the rationale is also visible in
+  // stdout during CI runs. The body of the (skipped) test still
+  // contains the scenario call that WOULD run if the cap were
+  // lifted — kept as executable documentation of what the full
+  // coverage would look like.
+  test.describe("asymmetric ±120s (SKIPPED — physically impossible under bifrost-signer max_future_skew_secs=30)", () => {
+    // `CLOCK_SKEW_MS` is 120_000 and bifrost-signer's
+    // `max_future_skew_secs` is 30; the ratio makes the scenario
+    // protocol-impossible today. Retain as a variable so that if a
+    // future bifrost-rs release lifts the cap and we bump the
+    // constant here, the describe automatically flips live.
+    const ASYMMETRIC_120_SKEW_EXCEEDS_PROTOCOL_CAP =
+      CLOCK_SKEW_MS / 1000 > /* bifrost-signer max_future_skew_secs */ 30;
+
+    test.skip(
+      () => ASYMMETRIC_120_SKEW_EXCEEDS_PROTOCOL_CAP,
+      "Asymmetric peer-to-peer skew of 120s (≫ bifrost-signer's " +
+        "hard-coded max_future_skew_secs=30, bifrost-rs/crates/" +
+        "bifrost-signer/src/lib.rs:243) deterministically fails the " +
+        "signer's `record_request` gate — any inbound request with " +
+        "sent_at > now + 30s is rejected (lib.rs:2263). The cap is " +
+        "not patchable via DeviceConfigPatch and bifrost-rs is " +
+        "read-only reference material for this mission. See " +
+        "docs/runtime-deviations-from-paper.md > 'Clock skew " +
+        "magnitude bounded by bifrost-signer max_future_skew_secs=30'. " +
+        "Real validation is provided by the symmetric ±120s and " +
+        "asymmetric ±25s scenarios above; together they cover the " +
+        "real-world failure modes (broken NTP vs reality, moderate " +
+        "inter-peer clock drift within the protocol tolerance).",
+    );
+
+    test.beforeAll(() => {
+      // eslint-disable-next-line no-console
+      console.log(
+        "[clock-skew] Skipping asymmetric ±120s scenario: peer-to-peer " +
+          "skew exceeds bifrost-signer's hard-coded max_future_skew_secs=30 " +
+          "(bifrost-rs/crates/bifrost-signer/src/lib.rs:243). See " +
+          "docs/runtime-deviations-from-paper.md > 'Clock skew magnitude " +
+          "bounded by bifrost-signer max_future_skew_secs=30' for the " +
+          "full rationale. Validation union: symmetric ±120s + " +
+          "asymmetric ±25s covers the real-world failure modes.",
+      );
+    });
+
+    test(
+      "[would-run-if-cap-lifted] sign + ECDH round-trip with device B +120s ahead of device A",
+      async ({ browser }) => {
+        // Intentional: this body is executable documentation. The
+        // describe-level `test.skip` above prevents it from ever
+        // running against the real runtime — if the protocol cap is
+        // ever raised, the gate flips and this becomes a live test.
+        await runSkewScenario({
+          browser,
+          skewAMs: 0,
+          skewBMs: CLOCK_SKEW_MS,
+          label: "asymmetric B +120s (protocol-impossible)",
+        });
+      },
+    );
+
+    test(
+      "[would-run-if-cap-lifted] sign + ECDH round-trip with device B -120s behind device A",
+      async ({ browser }) => {
+        await runSkewScenario({
+          browser,
+          skewAMs: 0,
+          skewBMs: -CLOCK_SKEW_MS,
+          label: "asymmetric B -120s (protocol-impossible)",
+        });
+      },
+    );
+  });
 });

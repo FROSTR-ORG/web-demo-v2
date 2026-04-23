@@ -833,15 +833,47 @@ end-to-end.
       divergence. Any tighter check (±120 s asymmetric) would be
       a test of the protocol's rejection behaviour, not of the
       runtime's skew tolerance.
+- **Asymmetric ±120 s clause — explicit DEVIATION** (flagged by m7
+  scrutiny R1 in
+  `fix-m7-scrutiny-r1-long-session-and-clock-skew-criteria`): the
+  feature description's literal reading and VAL-CROSS-019's /
+  VAL-CROSS-027's "device B ±120 s clock vs A" / "±5 min from relay
+  wall time" clauses call for a scenario where one device's clock
+  is 120 s ahead of the other. This peer-to-peer delta is four
+  times the bifrost-signer `max_future_skew_secs=30` cap; the
+  receiver's `record_request` gate rejects the request before it
+  ever reaches the FROST round-trip, so no amount of app-layer
+  tolerance can recover the sign. The asymmetric ±120 s scenario
+  is therefore marked SKIPPED in
+  `src/e2e/multi-device/clock-skew.spec.ts`
+  (test.describe "asymmetric ±120s (SKIPPED — physically
+  impossible under bifrost-signer max_future_skew_secs=30)") with
+  the skip reason referencing this deviation entry. If bifrost-rs
+  ever lifts the cap, bumping the constant flips the describe
+  automatically live. Until then the two scenarios we DO run —
+    * **symmetric ±120 s** (both devices shifted equally against
+      the real wall clock; peer-to-peer relative skew = 0 s), AND
+    * **asymmetric ±25 s** (within the protocol cap, at the
+      tolerance edge) —
+  together form the validation union: (1) the host-clock-wrong
+  failure mode is covered at full ±120 s magnitude, and (2) the
+  inter-peer-drift failure mode is covered at the maximum
+  magnitude the protocol tolerates. These two scenarios span the
+  real-world failure modes the feature description was protecting
+  against.
 - **Assertion IDs covered**: feature `m7-clock-skew-and-leak`
   expected behaviour "Clock skew ±120s does not break round-trips"
   is fulfilled in the symmetric-offset interpretation; the
   asymmetric scenario provides the strongest inter-peer skew
-  coverage the protocol allows. VAL-CROSS-027 is partially covered
-  under the same constraint: ±5 min mutually-offset from relay
-  wall time is representable (dev-tools relay does not enforce
-  NIP-22 time tolerance), but ±5 min asymmetric between peers
-  would hit the same bifrost-signer gate.
+  coverage the protocol allows. VAL-CROSS-027's ±5 min clause is
+  partially covered under the same constraint: ±5 min mutually-
+  offset from relay wall time is representable (dev-tools relay
+  does not enforce NIP-22 time tolerance), but ±5 min asymmetric
+  between peers would hit the same bifrost-signer gate.
+  VAL-CROSS-019's ±120 s asymmetric clause is explicitly DEVIATED
+  per the preceding bullet; validation is achieved via the
+  symmetric ±120 s + asymmetric ±25 s union (covers the real-world
+  failure modes).
 
 ### Long-session perf e2e is duration-compressed, not literal 30 minutes (m7-clock-skew-and-leak)
 
