@@ -998,7 +998,7 @@ end-to-end.
   mission proposal (`mission.md > M7`) defines this flow as a
   new surface added on top of the sponsor dashboard.
 - **web-demo-v2 implementation**: `src/screens/OnboardSponsorScreens.tsx`
-  (`OnboardSponsorConfigScreen`, `OnboardSponsorPackageScreen`)
+  (`OnboardSponsorConfigScreen`, `OnboardSponsorHandoffScreen`)
   and `src/screens/DashboardScreen/sidebar/SettingsSidebar.tsx`
   (the Onboard a Device entry row between Replace Share and
   Export & Backup).
@@ -1036,7 +1036,7 @@ end-to-end.
   reference).
 - **Demo gallery coverage**: the sponsor flow is reachable at
   the live routes `/onboard-sponsor` (Configure) and
-  `/onboard-sponsor/package` (Hand-off) under an unlocked
+  `/onboard-sponsor/handoff` (Hand-off) under an unlocked
   profile. `src/demo/scenarios.ts` does NOT currently export a
   dedicated `/demo/:scenarioId` entry for the sponsor flow
   because the flow's surface is entirely runtime-driven (it
