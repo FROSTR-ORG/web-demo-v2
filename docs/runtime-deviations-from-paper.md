@@ -6,6 +6,55 @@ and the validation assertion IDs that cover it.
 
 ## Deviations
 
+### 2026-04-23 — `create-distribute-live-bootstrap.spec.ts` OperationFailure path uses `__iglooTestAbsorbDrains` (fix-scrutiny-r1-onboard-dispatch-requestid-hygiene-and-real-onboard-e2e)
+
+- **Paper / task source**: feature
+  `fix-scrutiny-r1-onboard-dispatch-requestid-hygiene-and-real-onboard-e2e`
+  (scrutiny r1 blocker #3 on
+  `fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire`).
+  The multi-device Playwright spec
+  `src/e2e/multi-device/create-distribute-live-bootstrap.spec.ts`
+  exercises the per-share onboard-dispatch + echo correlation on
+  `/create/distribute`. Its happy-path test drives the REAL /onboard
+  UI on Device B (paste bfonboard1 into the Onboarding Package
+  textarea, type the Package Password, click Begin Onboarding, type
+  the Password + Confirm Password on Onboarding Complete, click
+  Save & Launch Signer, land on /dashboard/:id) — no DEV hooks on
+  the happy path.
+- **web-demo-v2 implementation**:
+  `src/e2e/multi-device/create-distribute-live-bootstrap.spec.ts`
+  retains a single carve-out on the OperationFailure (retry) path:
+  Device B aborts mid-handshake → Device A must surface the inline
+  copy "Peer adoption failed — retry or mark distributed manually"
+  on the share's card AND keep "Mark distributed" enabled. To
+  simulate that without a flaky live abort, the spec injects a
+  synthetic `OperationFailure { op_type: "onboard", request_id }`
+  through the DEV-only `__iglooTestAbsorbDrains` hook. The user-
+  visible outcome is identical to what the runtime would surface if
+  the requester's in-flight OnboardRequest were abandoned and the
+  sponsor-side request timed out / rejected.
+- **Why the DEV hook (not real UI) on the failure path**: the live
+  abort path is driven by a TTL-bound sponsor-side timeout (≥ 60s)
+  and the requester-side OnboardResponse never arrives. Under
+  `--repeat-each=3 --workers=1` this produces test runtimes of
+  ~6–9 minutes and materially increases flake rate (relay
+  reconnect, TTL jitter, page-unload races). The happy path already
+  proves the real UI contract surface end-to-end; the failure path
+  is testing `absorbDrains` correlation + the adoptionError surface,
+  both of which are exercised identically whether the envelope is
+  injected or arrives via the relay.
+- **Validation assertion IDs**: VAL-FOLLOWUP (happy path +
+  OperationFailure path). The happy path no longer uses
+  `__iglooTestAdoptOnboardPackage`; the failure path retains
+  `__iglooTestAbsorbDrains` with the inline rationale comment.
+- **Scope boundary**: this carve-out is strictly scoped to the
+  `OperationFailure` test in
+  `create-distribute-live-bootstrap.spec.ts`. The full real /onboard
+  UI flow is already covered on the happy path of this spec; no
+  other test in `src/e2e/multi-device/` may silently swap
+  `__iglooTestAdoptOnboardPackage` for the real UI without a new
+  dated entry here.
+
 ### Paper-sourced visual-parity baselines compared at `maxDiffPixelRatio = 0.20` (m7-paper-parity-visuals)
 
 - **Paper / task source**: feature `fix-m7-scrutiny-r1-paper-parity-baseline-source`

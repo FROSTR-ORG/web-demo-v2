@@ -2069,25 +2069,59 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         type: "onboard" as const,
         peer_pubkey32_hex: memberPubkeyXOnly(targetMember),
       };
-      let onboardRequestId: string | null = null;
+      // fix-scrutiny-r1-onboard-dispatch-requestid-hygiene-and-real-onboard-e2e
+      // — requestId hygiene (scrutiny r1 blocker #2). Before dispatching,
+      // clear any prior `pendingDispatchRequestId` (and stale
+      // `adoptionError`) on this share so a retry click never leaves a
+      // stale id behind — otherwise a subsequent
+      // `CompletedOperation::Onboard` correlated to the OLD id could
+      // falsely flip `peerOnline` on this share.
+      setCreateSession((session) => {
+        if (!session) return session;
+        return {
+          ...session,
+          onboardingPackages: session.onboardingPackages.map((entry) =>
+            entry.idx === idx
+              ? {
+                  ...entry,
+                  pendingDispatchRequestId: undefined,
+                  adoptionError: undefined,
+                }
+              : entry,
+          ),
+        };
+      });
+      // ONLY populate `pendingDispatchRequestId` from a SUCCESSFUL
+      // dispatch result; on throw it stays explicitly undefined (not
+      // a stale fallback) and the error is surfaced inline on the
+      // share's `adoptionError` so the user sees the dispatch failure.
+      let onboardRequestId: string | undefined;
+      let dispatchError: string | undefined;
       try {
         const result = await dispatchRuntimeCommandRef.current?.(onboardCommand);
-        onboardRequestId = result?.requestId ?? null;
-      } catch {
+        onboardRequestId = result?.requestId ?? undefined;
+      } catch (err) {
         // Runtime dispatch failures are non-fatal — the package text
         // itself has been encoded and stashed, so the user can still
         // hand off the package manually and use "Mark distributed".
-        // The `adoptionError` surface is reserved for drained
-        // OperationFailure envelopes that correlate back to a
-        // specific request_id; we leave pendingDispatchRequestId
-        // unset here so subsequent completions cannot falsely match.
-        onboardRequestId = null;
+        // But leaving `pendingDispatchRequestId` unset AND leaving
+        // `adoptionError` unset would hide the failure from the user.
+        // Surface the dispatch error inline via adoptionError so the
+        // Distribute card shows "Peer adoption failed — …" and the
+        // manual fallback remains reachable.
+        onboardRequestId = undefined;
+        const message = err instanceof Error ? err.message : String(err);
+        dispatchError = `Onboard dispatch failed — ${message}`;
       }
       // Populate the redacted preview (first 24 chars of bfonboard1…)
       // and flip packageCreated on the session view. Also stash the
-      // onboard command's requestId (if captured) so absorbDrains
-      // can correlate later completions / failures. Clear any stale
-      // `adoptionError` left over from a prior attempt.
+      // onboard command's requestId (only when captured) so
+      // absorbDrains can correlate later completions / failures.
+      // `pendingDispatchRequestId` is ALWAYS set from onboardRequestId
+      // (no fallback to `entry.pendingDispatchRequestId`) so a retry
+      // click whose dispatch throws produces `undefined`, not a stale
+      // id. `adoptionError` mirrors the same — cleared on successful
+      // dispatch, populated with the inline copy on throw.
       const preview = packageText.slice(0, 24);
       setCreateSession((session) => {
         if (!session) return session;
@@ -2100,9 +2134,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                   packageText: preview,
                   password: "[redacted]",
                   packageCreated: true,
-                  pendingDispatchRequestId:
-                    onboardRequestId ?? entry.pendingDispatchRequestId,
-                  adoptionError: undefined,
+                  pendingDispatchRequestId: onboardRequestId,
+                  adoptionError: dispatchError,
                 }
               : entry,
           ),

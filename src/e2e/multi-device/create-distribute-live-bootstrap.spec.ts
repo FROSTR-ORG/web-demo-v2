@@ -5,10 +5,12 @@ import { test, expect, type Page } from "@playwright/test";
 
 /**
  * Multi-device Playwright spec for feature
- * `fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire`.
+ * `fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire`
+ * and its scrutiny r1 follow-up
+ * `fix-scrutiny-r1-onboard-dispatch-requestid-hygiene-and-real-onboard-e2e`.
  *
- * Happy path (VAL-FOLLOWUP — Device B adopts, Device A auto-flips
- * chip via echo):
+ * Happy path (VAL-FOLLOWUP — Device B adopts via the REAL /onboard
+ * UI, Device A auto-flips chip via echo):
  *   1. Device A runs through /create → /create/profile on the REAL
  *      AppStateProvider with a 2-of-2 keyset and
  *      ws://127.0.0.1:8194 as its only relay (DEV
@@ -26,11 +28,17 @@ import { test, expect, type Page } from "@playwright/test";
  *          peer_pubkey32_hex})` for the share's target member,
  *        - stashes the returned `requestId` on the share's
  *          `pendingDispatchRequestId` field.
- *   4. Device B, in a SEPARATE BrowserContext, invokes
- *      `window.__iglooTestAdoptOnboardPackage({packageText,
- *      packagePassword, profilePassword})`. This drives the
- *      production adopt pipeline (decode → handshake via relay →
- *      saveOnboardedProfile) and reaches /dashboard.
+ *   4. Device B, in a SEPARATE BrowserContext, drives the REAL
+ *      /onboard UI end-to-end (scrutiny r1 blocker #3). It
+ *      navigates to `/onboard`, pastes the bfonboard1 string into
+ *      the Onboarding Package textarea, types the package password,
+ *      clicks "Begin Onboarding", waits for the handshake screen
+ *      to settle at /onboard/complete, fills in the profile
+ *      Password + Confirm Password fields, clicks
+ *      "Save & Launch Signer" and finally lands on /dashboard/:id.
+ *      This exercises the production decode → handshake →
+ *      saveOnboardedProfile pipeline THROUGH THE UI contract surface,
+ *      not the `__iglooTestAdoptOnboardPackage` DEV hook.
  *   5. Within 10 seconds Device A's share idx=1 status chip
  *      auto-flips from "Ready to distribute" → "Distributed" via
  *      the Onboard completion drained through
@@ -49,7 +57,11 @@ import { test, expect, type Page } from "@playwright/test";
  *   canonical inline copy ("Peer adoption failed — retry or mark
  *   distributed manually") on that share's card, and the
  *   Mark-distributed button remains enabled so the user can still
- *   proceed via the manual fallback.
+ *   proceed via the manual fallback. This deliberate DEV-hook
+ *   carve-out is documented in `docs/runtime-deviations-from-paper.md`
+ *   (see the 2026-04-23 entry
+ *   "create-distribute-live-bootstrap OperationFailure path uses
+ *   __iglooTestAbsorbDrains").
  *
  * Skip gate matches every other multi-device spec in this folder —
  * skip only when `cargo --version` fails; hard-fail on every other
@@ -436,32 +448,75 @@ test.describe(
           expect(typeof requestId).toBe("string");
           expect(requestId!.length).toBeGreaterThan(0);
 
-          // === Device B adopts the bfonboard package ===
-          await pageB.goto("/");
-          await expect(
-            pageB.getByRole("heading", { name: "Igloo Web" }),
-          ).toBeVisible();
+          // === Device B adopts the bfonboard package via the REAL
+          // /onboard UI (scrutiny r1 blocker #3) ===
+          //
+          // Navigate directly to /onboard (no welcome-screen click
+          // needed) and drive the three Paper screens end-to-end:
+          //   (1) /onboard — paste bfonboard1…, type package
+          //       password, click Begin Onboarding
+          //   (2) /onboard/handshake — auto-runs startOnboardHandshake
+          //       which publishes the OnboardRequest on
+          //       ws://127.0.0.1:8194 (same relay the sponsor's pump
+          //       is subscribed to) and on success navigates to
+          //       /onboard/complete
+          //   (3) /onboard/complete — type profile Password +
+          //       Confirm Password, click Save & Launch Signer which
+          //       calls saveOnboardedProfile and navigates to
+          //       /dashboard/:id
+          //
+          // We wait for the appState hooks so test-only console
+          // errors do not trip the spec's error capture; the hooks
+          // are also a cheap readiness signal that the provider
+          // has mounted on Device B.
+          await pageB.goto("/onboard");
           await waitForAppStateHooks(pageB, "B");
-          const adoptedProfileId = await pageB.evaluate(
-            async (input) => {
-              const w = window as unknown as {
-                __iglooTestAdoptOnboardPackage: (input: {
-                  packageText: string;
-                  packagePassword: string;
-                  profilePassword: string;
-                }) => Promise<string>;
-              };
-              return w.__iglooTestAdoptOnboardPackage(input);
-            },
-            {
-              packageText,
-              packagePassword: PACKAGE_PASSWORD,
-              profilePassword: PROFILE_PASSWORD_B,
-            },
-          );
-          expect(adoptedProfileId).toMatch(/^[0-9a-f-]+$/);
+          await expect(
+            pageB.getByRole("heading", { name: "Enter Onboarding Package" }),
+          ).toBeVisible({ timeout: 10_000 });
 
-          // Device B reaches the dashboard (activeProfile populated).
+          // (1) Paste the bfonboard1… package text + package
+          // password, then click Begin Onboarding. We fill the
+          // textarea via `fill()` on the labelled id (the Paper
+          // screen uses <label htmlFor="onboard-package-input">).
+          await pageB.locator("#onboard-package-input").fill(packageText);
+          await pageB
+            .getByLabel("Package Password", { exact: true })
+            .fill(PACKAGE_PASSWORD);
+          await pageB
+            .getByRole("button", { name: "Begin Onboarding" })
+            .click();
+
+          // (2) /onboard/handshake — mount auto-runs
+          // startOnboardHandshake. On success the screen replaces
+          // itself with /onboard/complete (Onboarding Complete).
+          // Wait for the terminal success heading before proceeding
+          // so we do not race the handshake.
+          await expect(
+            pageB.getByRole("heading", { name: "Onboarding Complete" }),
+          ).toBeVisible({ timeout: ADOPTION_TIMEOUT_MS });
+
+          // (3) Set the profile Password + Confirm Password and
+          // click Save & Launch Signer. The Paper /onboard/complete
+          // screen renders two PasswordField components
+          // (label "Password" and "Confirm Password"). Save calls
+          // `saveOnboardedProfile` which persists the profile and
+          // navigates to `/dashboard/:id`.
+          await pageB
+            .getByLabel("Password", { exact: true })
+            .fill(PROFILE_PASSWORD_B);
+          await pageB
+            .getByLabel("Confirm Password", { exact: true })
+            .fill(PROFILE_PASSWORD_B);
+          await pageB
+            .getByRole("button", { name: "Save & Launch Signer" })
+            .click();
+
+          // Device B reaches the dashboard (URL changes AND
+          // activeProfile populated).
+          await pageB.waitForURL(/\/dashboard\//, {
+            timeout: ADOPTION_TIMEOUT_MS,
+          });
           await pageB
             .waitForFunction(
               () => {
