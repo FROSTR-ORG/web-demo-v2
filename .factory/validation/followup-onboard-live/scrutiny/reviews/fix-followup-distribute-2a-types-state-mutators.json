@@ -1,0 +1,33 @@
+{
+  "featureId": "fix-followup-distribute-2a-types-state-mutators",
+  "reviewedAt": "2026-04-23T17:06:04Z",
+  "commitId": "f348b4b",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Reviewed commit f348b4b against the feature description and expected behavior. The core A-phase refactor is correctly implemented in the real provider: CreateProfileDraft no longer carries shared distribution password fields, createProfile now seeds pending remote package placeholders, encodeDistributionPackage performs per-share encoding with secret-stash + redacted preview updates, markPackageDistributed flips manual distribution state, and packageDistributed now uses peerOnline/manual flags. I found one non-blocking parity gap in MockAppStateProvider's mirror mutator behavior.",
+    "issues": [
+      {
+        "file": "src/app/MockAppStateProvider.tsx",
+        "line": 327,
+        "severity": "non_blocking",
+        "description": "Mock `encodeDistributionPackage` diverges from the real-provider contract: it does not enforce `password.length >= 8`, and when a seeded `value.createSession` has full package text it mirrors that raw value instead of always using the redacted 24-char preview behavior. This can let mock-driven screen tests/demos miss validation and redaction regressions that would fail in AppStateProvider."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "The feature contract for this A-phase split is internally ambiguous: it says \"NO screen UI changes and NO e2e/demo fixture changes\" while also requiring removal of CreateProfileDraft fields that are consumed by existing screen/demo codepaths.",
+      "evidence": "Feature description in /Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/features.json (id fix-followup-distribute-2a-types-state-mutators) includes that prohibition. Commit f348b4b necessarily touches src/screens/CreateProfileScreen.tsx, src/screens/OnboardScreens.tsx, and src/demo/fixtures.ts to keep typecheck/tests green after removing distributionPassword fields."
+    },
+    {
+      "area": "conventions",
+      "observation": "The verification expectation that `rg distributionPassword src/` should have zero hits is broader than the scoped change and conflicts with intentional rotate-keyset terminology that remains in code.",
+      "evidence": "Expected behavior for this feature in features.json says `rg distributionPassword src/ returns zero hits except migration-drop comments`; the same commit retains rotate-keyset distributionPassword usage (e.g., src/app/AppStateProvider.tsx rotate flow and src/app/AppStateTypes.ts rotate session fields)."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Pass with one non-blocking issue. The feature's core provider/type/mutator behavior is correctly implemented for the create-flow per-share package model, but MockAppStateProvider's encodeDistributionPackage mirror is not fully behavior-parity with the real provider."
+}
