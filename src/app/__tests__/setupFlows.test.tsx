@@ -19,6 +19,10 @@ import type {
   StoredProfileRecord,
 } from "../../lib/bifrost/types";
 import { SetupFlowError } from "../AppState";
+import {
+  BRIDGE_EVENT,
+  BRIDGE_STORAGE_KEY,
+} from "../appStateBridge";
 
 const storage = new Map<string, unknown>();
 
@@ -263,6 +267,90 @@ describe("AppState setup flows", () => {
     });
     await waitFor(() => expect(getState().createSession).toBeNull());
   }, 45_000);
+
+  it(
+    "clears the package-secrets ref when createSession is reset by the AppState bridge (fix-m7-scrutiny-r1-createsession-packagesecrets-ref-reset)",
+    async () => {
+      const getState = await renderProvider();
+
+      await act(async () => {
+        await getState().createKeyset({
+          groupName: "Bridge Reset Key",
+          threshold: 2,
+          count: 3,
+        });
+      });
+      await waitFor(() =>
+        expect(getState().createSession?.keyset?.group.group_name).toBe(
+          "Bridge Reset Key",
+        ),
+      );
+
+      await act(async () => {
+        await getState().createProfile({
+          deviceName: "Bridge Reset Browser",
+          password: "local-password",
+          confirmPassword: "local-password",
+          distributionPassword: "remote-password",
+          confirmDistributionPassword: "remote-password",
+          relays: ["wss://relay.example.test"],
+        });
+      });
+
+      await waitFor(() =>
+        expect(getState().createSession?.onboardingPackages?.length ?? 0)
+          .toBeGreaterThan(0),
+      );
+      const packages = getState().createSession!.onboardingPackages;
+      // Sanity: the plaintext stash is populated for every remote package.
+      for (const pkg of packages) {
+        const secret = getState().getCreateSessionPackageSecret(pkg.idx);
+        expect(secret).not.toBeNull();
+        expect(secret!.packageText.startsWith("bfonboard1")).toBe(true);
+      }
+
+      // Simulate a bridge-driven reset of createSession. The real
+      // `AppStateProvider.applyBridge` handler sets createSession to null
+      // (along with every other setup session) whenever a BRIDGE_EVENT
+      // delivers a fresh snapshot — most commonly during demo→real app
+      // handoffs and test reset paths. Writing directly to sessionStorage
+      // and dispatching BRIDGE_EVENT mirrors what `writeBridgeSnapshot`
+      // does in production without depending on the MockAppStateProvider
+      // shape.
+      const bridgeSnapshot = {
+        profiles: [],
+        activeProfile: null,
+        runtimeStatus: null,
+        runtimeRelays: [],
+        signerPaused: false,
+        createSession: null,
+        importSession: null,
+        onboardSession: null,
+        rotateKeysetSession: null,
+        replaceShareSession: null,
+        recoverSession: null,
+      };
+      await act(async () => {
+        window.sessionStorage.setItem(
+          BRIDGE_STORAGE_KEY,
+          JSON.stringify(bridgeSnapshot),
+        );
+        window.dispatchEvent(new CustomEvent(BRIDGE_EVENT));
+      });
+
+      await waitFor(() => expect(getState().createSession).toBeNull());
+
+      // The plaintext stash must be cleared for every previously-known
+      // package idx, and also for unknown idxs to prove the ref itself is
+      // reset (not just individual entries).
+      for (const pkg of packages) {
+        expect(getState().getCreateSessionPackageSecret(pkg.idx)).toBeNull();
+      }
+      expect(getState().getCreateSessionPackageSecret(-1)).toBeNull();
+      expect(getState().getCreateSessionPackageSecret(99)).toBeNull();
+    },
+    45_000,
+  );
 
   it("imports a generated bfprofile, stores only encrypted profile material, and unlocks after reload", async () => {
     const generated = await makeProfilePackage();

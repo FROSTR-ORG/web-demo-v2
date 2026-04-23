@@ -480,6 +480,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  // fix-m7-scrutiny-r1-createsession-packagesecrets-ref-reset —
+  // Gate the plaintext stash on the session state itself rather than
+  // on specific callers. `clearCreateSession` / `lockProfile` /
+  // `clearCredentials` all clear the ref explicitly, but `setCreateSession(null)`
+  // is ALSO called from bridge hydration (BRIDGE_EVENT → applyBridge)
+  // and from future test reset paths. Mirroring the ref to the session
+  // state via this effect guarantees that whenever `createSession`
+  // becomes null FOR ANY REASON, the out-of-band ref is dropped too.
+  // No-op when `createSession` is non-null so the ref populated during
+  // `createProfile` survives the subsequent `setCreateSession({...redacted})`.
+  useEffect(() => {
+    if (createSession === null) {
+      createSessionPackageSecretsRef.current = new Map();
+    }
+  }, [createSession]);
+
   const abortOnboardHandshake = useCallback(() => {
     onboardHandshakeRef.current?.controller.abort();
     onboardHandshakeRef.current = null;

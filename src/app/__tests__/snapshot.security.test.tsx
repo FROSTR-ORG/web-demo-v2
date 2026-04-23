@@ -56,6 +56,7 @@ import {
   scanSnapshotSet,
   type SecretSweepFinding,
 } from "../../lib/security/secretSweepScanner";
+import { BRIDGE_EVENT, BRIDGE_STORAGE_KEY } from "../appStateBridge";
 
 /* ---------- idb-keyval storage mock (mirrors operations.test.tsx) --------- */
 const storage = new Map<string, unknown>();
@@ -495,6 +496,104 @@ describe("m7-security-live-sweep — snapshot.security", () => {
           true,
         );
       }
+    },
+    60_000,
+  );
+
+  it(
+    "bridge-driven createSession reset clears the package-secrets ref and leaves no plaintext retrievable (fix-m7-scrutiny-r1-createsession-packagesecrets-ref-reset)",
+    async () => {
+      // Real timers for the same reason as the main sweep.
+      vi.useRealTimers();
+
+      let latest!: AppStateValue;
+      render(
+        <AppStateProvider>
+          <Capture onState={(state) => (latest = state)} />
+        </AppStateProvider>,
+      );
+      await waitFor(() => expect(latest).toBeTruthy());
+
+      // createSession → createProfile.
+      await act(async () => {
+        await latest.createKeyset({
+          groupName: "Bridge Reset Sweep Key",
+          threshold: 2,
+          count: 3,
+        });
+      });
+      await waitFor(() => expect(latest.createSession?.keyset).toBeTruthy());
+      await act(async () => {
+        await latest.createProfile({
+          deviceName: "Igloo Web",
+          password: "profile-password",
+          confirmPassword: "profile-password",
+          relays: ["wss://relay.local"],
+          distributionPassword: "distro-password",
+          confirmDistributionPassword: "distro-password",
+        });
+      });
+      await waitFor(() =>
+        expect(latest.createSession?.onboardingPackages?.length ?? 0)
+          .toBeGreaterThan(0),
+      );
+      const packages = latest.createSession!.onboardingPackages;
+      // Sanity: the out-of-band plaintext stash is populated.
+      for (const pkg of packages) {
+        const secret = latest.getCreateSessionPackageSecret(pkg.idx);
+        expect(secret).not.toBeNull();
+        expect(secret!.packageText.startsWith("bfonboard1")).toBe(true);
+      }
+
+      /* -------- Snapshot A: post-createProfile (pre-bridge-reset) ------ */
+      const snapA = buildSnapshot("post-create-profile-pre-bridge-reset");
+
+      // Simulate an AppStateBridge snapshot delivery. The real
+      // `applyBridge` handler calls `setCreateSession(null)` as part
+      // of consuming the snapshot; the mirrored-to-session useEffect
+      // added by this feature must then clear the package-secrets
+      // ref so plaintext is no longer retrievable.
+      const bridgeSnapshot = {
+        profiles: [],
+        activeProfile: null,
+        runtimeStatus: null,
+        runtimeRelays: [],
+        signerPaused: false,
+        createSession: null,
+        importSession: null,
+        onboardSession: null,
+        rotateKeysetSession: null,
+        replaceShareSession: null,
+        recoverSession: null,
+      };
+      await act(async () => {
+        window.sessionStorage.setItem(
+          BRIDGE_STORAGE_KEY,
+          JSON.stringify(bridgeSnapshot),
+        );
+        window.dispatchEvent(new CustomEvent(BRIDGE_EVENT));
+      });
+      await waitFor(() => expect(latest.createSession).toBeNull());
+
+      // Contract: after a bridge-driven reset, getCreateSessionPackageSecret
+      // returns null for every index — including the previously-known
+      // indices — proving the ref itself is cleared rather than the entries
+      // being individually redacted.
+      for (const pkg of packages) {
+        expect(latest.getCreateSessionPackageSecret(pkg.idx)).toBeNull();
+      }
+      expect(latest.getCreateSessionPackageSecret(-1)).toBeNull();
+      expect(latest.getCreateSessionPackageSecret(99)).toBeNull();
+
+      /* -------- Snapshot B: post-bridge-reset ------------------------- */
+      const snapB = buildSnapshot("post-bridge-reset");
+
+      /* -------- Scan both snapshots; expect zero findings -------------- */
+      const findings = scanSnapshotSet([snapA, snapB]);
+      expect(
+        findings,
+        `secret-leak scan produced ${findings.length} finding(s):\n${summariseFindings(findings)}`,
+      ).toEqual([]);
     },
     60_000,
   );
