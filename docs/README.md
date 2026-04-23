@@ -40,7 +40,7 @@ the runtime, Paper parity, or local relay constraints.
 
 | Change type | Focused validation |
 | --- | --- |
-| Docs-only | `rg -n "T[O]DO|T[B]D|F[I]XME" README.md docs/*.md`; `git diff --stat`; targeted link/source checks from `agent-runbook.md`. |
+| Docs-only | `rg -n 'T[O]DO\|T[B]D\|F[I]XME' README.md docs/*.md`; `git diff --stat`; targeted link/source checks from `agent-runbook.md`. |
 | Demo fixture or Paper-reference change | `npm run paper:sync`; `npx vitest run src/demo/__tests__/scenarios.test.tsx src/demo/__tests__/crossAreaFinalGate.test.tsx --config vitest.config.ts`; `npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop`. |
 | TypeScript UI/refactor change | `npx tsc --noEmit -p tsconfig.json --pretty false`; `npx vitest run --config vitest.config.ts` or narrower related tests. |
 | Multi-device/runtime change | Relevant `src/e2e/multi-device/*.spec.ts` with `--project=desktop --workers 1`, plus the local relay notes in `agent-runbook.md`. |

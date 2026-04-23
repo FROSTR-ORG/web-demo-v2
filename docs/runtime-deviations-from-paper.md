@@ -11,6 +11,27 @@ not as the main architecture guide.
 
 ## Deviations
 
+### 2026-04-23 — Background peer-refresh pings are quiet liveness probes
+
+- **Paper / task source**: the dashboard Paper surface models intentional
+  pending approvals and user-visible operation failures. It does not model
+  the runtime's automatic `refresh_all_peers` polling loop, nor a partial
+  onboarding state where a 2-of-3 key has two active shares and a third
+  share intentionally left offline for later onboarding.
+- **web-demo-v2 implementation**: `RuntimeRelayPump.refreshAll()` still
+  dispatches `refresh_all_peers` so known peers update `last_seen`,
+  readiness, and nonce availability. The dashboard now treats uncorrelated
+  fan-out Ping operations from that loop as background liveness probes:
+  they are filtered out of Pending Approvals, `runtimeFailures`, and
+  Event Log completion/failure rows unless the Ping has a
+  `pendingDispatchIndex` entry from an explicit user/dev `ping` dispatch.
+- **Protocol / UX constraint**: a not-yet-onboarded or intentionally
+  offline optional share can still be present in the group package. Probing
+  it is useful for runtime freshness, but surfacing those timeouts as
+  approvals/errors makes a healthy 2-of-3-with-two-online dashboard look
+  broken. Explicit sign/ECDH/onboard failures and explicit Test Ping
+  failures remain visible.
+
 ### 2026-04-23 — Paper MCP `export` tool returns empty `filePaths` in this environment; `scripts/sync-paper.mjs` is the canonical baseline source (fix-scrutiny-r1-paper-parity-live-routes-and-baseline-source-doc)
 
 - **Paper / task source**: feature

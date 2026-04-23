@@ -3,6 +3,9 @@ import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "r
 import { StatusPill } from "../../../components/ui";
 import { shortHex } from "../../../lib/bifrost/format";
 import type {
+  PendingDispatchEntry,
+} from "../../../app/AppStateTypes";
+import type {
   PendingOperation,
   PeerStatus,
 } from "../../../lib/bifrost/types";
@@ -185,7 +188,8 @@ function extractMessagePreview(ctx: unknown): string | null {
 
 /**
  * Derive the panel's display rows from the live
- * `runtime_status.pending_operations` snapshot. Each row is populated
+ * `runtime_status.pending_operations` snapshot after filtering
+ * background refresh Ping probes. Each row is populated
  * with:
  *   - `kind`: SIGN / ECDH / PING / ONBOARD pill
  *   - `peer`: "Peer #<idx>" if the target peer is in the current peers
@@ -201,13 +205,19 @@ export function deriveApprovalRowsFromRuntime(
   pendingOps: PendingOperation[],
   peers: PeerStatus[],
   nowMs: number,
+  options: {
+    pendingDispatchIndex?: Record<string, PendingDispatchEntry>;
+  } = {},
 ): DashboardApprovalRow[] {
   const peerByPubkey = new Map<string, PeerStatus>();
   for (const peer of peers) {
     peerByPubkey.set(peer.pubkey.toLowerCase(), peer);
   }
 
-  return pendingOps.map((op) => {
+  return filterPendingApprovalOperations(
+    pendingOps,
+    options.pendingDispatchIndex,
+  ).map((op) => {
     const kind = opTypeToKind(op.op_type);
     const targetPubkey = op.target_peers[0] ?? "";
     const normalizedTarget = targetPubkey.toLowerCase();
@@ -233,11 +243,28 @@ export function deriveApprovalRowsFromRuntime(
 }
 
 /**
+ * Background `refresh_all_peers` probes fan out into per-peer Ping ops,
+ * but those are liveness checks, not approval requests. Keep explicit
+ * user/dev pings (they carry pendingDispatchIndex metadata) visible.
+ */
+export function filterPendingApprovalOperations(
+  pendingOps: PendingOperation[],
+  pendingDispatchIndex?: Record<string, PendingDispatchEntry>,
+): PendingOperation[] {
+  if (!pendingDispatchIndex) return pendingOps;
+  return pendingOps.filter((op) => {
+    if (op.op_type !== "Ping") return true;
+    return pendingDispatchIndex[op.request_id]?.type === "ping";
+  });
+}
+
+/**
  * `PendingApprovalsPanel`: runtime-driven panel rendering one row per
  * entry in `runtime_status.pending_operations`. In demo/Paper mode the
  * caller passes the Paper-fixture rows directly via `rows`; in
- * production runtime mode the caller derives rows from pending_operations
- * via {@link deriveApprovalRowsFromRuntime} and passes them in.
+ * production runtime mode the caller derives user-facing rows from
+ * pending_operations via {@link deriveApprovalRowsFromRuntime} and passes
+ * them in. Background refresh Ping probes are intentionally absent.
  *
  * Collapse state is held in a module-level memo so it survives
  * re-mounts within the same page load (tab switches) but resets to the

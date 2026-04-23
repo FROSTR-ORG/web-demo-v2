@@ -391,6 +391,7 @@ export function MockAppStateProvider({
   const retryDistributionPackageAdoption = useCallback(
     async (idx: number) => {
       await value.retryDistributionPackageAdoption(idx);
+      const retryRequestId = `mock-retry-${idx}-${Date.now()}-${Math.random()}`;
       setCreateSession((session) => {
         if (!session) return session;
         return {
@@ -399,7 +400,7 @@ export function MockAppStateProvider({
             entry.idx === idx
               ? {
                   ...entry,
-                  pendingDispatchRequestId: `mock-retry-${idx}`,
+                  pendingDispatchRequestId: retryRequestId,
                   adoptionError: undefined,
                 }
               : entry,

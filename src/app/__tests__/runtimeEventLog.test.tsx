@@ -32,6 +32,7 @@ import type {
 } from "../AppStateTypes";
 import { RUNTIME_EVENT_LOG_MAX } from "../AppStateTypes";
 import { RuntimeRelayPump } from "../../lib/relay/runtimeRelayPump";
+import type { RuntimeDrainBatch } from "../../lib/relay/runtimeRelayPump";
 import type {
   CompletedOperation,
   OperationFailure,
@@ -175,6 +176,7 @@ interface TestWindow extends Window {
       at?: number;
     }>,
   ) => void;
+  __iglooTestAbsorbDrains?: (drains: RuntimeDrainBatch) => void;
 }
 
 function Capture({ onState }: { onState: (state: AppStateValue) => void }) {
@@ -318,6 +320,46 @@ describe("AppStateProvider — runtimeEventLog", () => {
     for (let i = 1; i < seqs.length; i += 1) {
       expect(seqs[i]).toBeGreaterThan(seqs[i - 1]);
     }
+  });
+
+  it("does not surface uncorrelated background Ping drains in user-facing failure or event-log buffers", async () => {
+    let latest!: AppStateValue;
+    render(
+      <AppStateProvider>
+        <Capture onState={(state) => (latest = state)} />
+      </AppStateProvider>,
+    );
+    await waitFor(() => expect(latest).toBeTruthy());
+
+    const testWindow = window as TestWindow;
+    expect(typeof testWindow.__iglooTestAbsorbDrains).toBe("function");
+
+    await act(async () => {
+      testWindow.__iglooTestAbsorbDrains?.({
+        completions: [
+          { Ping: { request_id: "req-background-ping-ok", peer: "peer-a" } },
+        ],
+        failures: [
+          {
+            request_id: "req-background-ping-fail",
+            op_type: "ping",
+            code: "timeout",
+            message: "locked peer response timeout",
+            failed_peer: "peer-offline",
+          },
+        ],
+        events: [],
+      });
+    });
+
+    await waitFor(() =>
+      expect(latest.runtimeCompletions).toHaveLength(1),
+    );
+    expect(latest.runtimeFailures).toEqual([]);
+    expect(latest.runtimeEventLog).toEqual([]);
+    expect(latest.runtimeCompletions[0]).toEqual({
+      Ping: { request_id: "req-background-ping-ok", peer: "peer-a" },
+    });
   });
 
   it("ring buffer is bounded to 500 entries; oldest are evicted FIFO (VAL-EVENTLOG-014 / VAL-EVENTLOG-024)", async () => {

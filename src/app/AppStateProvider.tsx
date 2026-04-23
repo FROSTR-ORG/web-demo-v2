@@ -45,6 +45,7 @@ import type {
   DerivedPublicNonceWire,
   GroupPackageWire,
   KeysetBundle,
+  OperationFailure,
   OnboardingPackageView,
   RuntimeBootstrapInput,
   RuntimeEvent,
@@ -634,6 +635,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
    * union; we extract it defensively.
    */
   const absorbDrains = useCallback((drains: RuntimeDrainBatch) => {
+    const indexSnapshot = pendingDispatchIndexRef.current;
+    const userFacingFailures = drains.failures.filter(
+      (failure) => !isUncorrelatedPingFailure(failure, indexSnapshot),
+    );
+    const eventLogCompletions = drains.completions.filter(
+      (completion) => !isUncorrelatedPingCompletion(completion, indexSnapshot),
+    );
     if (drains.completions.length > 0) {
       // m7-onboard-sponsor-flow — VAL-ONBOARD-009 / VAL-ONBOARD-011.
       // Detect an Onboard completion matching the active sponsor
@@ -756,8 +764,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // correlation exists (VAL-OPS-007). Falls back to the raw payload
       // when no correlation is available; the UI renders a clear
       // "message not resolvable" reason in that case.
-      const indexSnapshot = pendingDispatchIndexRef.current;
-      const enriched: EnrichedOperationFailure[] = drains.failures.map(
+      const enriched: EnrichedOperationFailure[] = userFacingFailures.map(
         (failure) => {
           const entry = indexSnapshot[failure.request_id];
           if (!entry) return { ...failure };
@@ -771,11 +778,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           return result;
         },
       );
-      setRuntimeFailures((previous) => {
-        const merged = [...previous, ...enriched];
-        merged.sort((a, b) => a.request_id.localeCompare(b.request_id));
-        return merged;
-      });
+      if (enriched.length > 0) {
+        setRuntimeFailures((previous) => {
+          const merged = [...previous, ...enriched];
+          merged.sort((a, b) => a.request_id.localeCompare(b.request_id));
+          return merged;
+        });
+      }
       const failures = new Map<string, { at: number; reason: string }>();
       const now = Date.now();
       for (const failure of drains.failures) {
@@ -929,7 +938,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           payload: event,
         });
       }
-      for (const completion of drains.completions) {
+      for (const completion of eventLogCompletions) {
         runtimeEventLogSeqRef.current += 1;
         newEntries.push({
           seq: runtimeEventLogSeqRef.current,
@@ -939,7 +948,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           payload: completion,
         });
       }
-      for (const failure of drains.failures) {
+      for (const failure of userFacingFailures) {
         runtimeEventLogSeqRef.current += 1;
         newEntries.push({
           seq: runtimeEventLogSeqRef.current,
@@ -1573,6 +1582,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       if (Object.keys(additions).length === 0) return;
       pendingUnmatchedDispatchesRef.current = stillUnmatched;
+      pendingDispatchIndexRef.current = {
+        ...pendingDispatchIndexRef.current,
+        ...additions,
+      };
       setPendingDispatchIndex((previous) => ({ ...previous, ...additions }));
     },
     [],
@@ -2159,14 +2172,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       );
       // Populate the redacted preview (first 24 chars of bfonboard1…)
       // and flip packageCreated on the session view. Also stash the
-      // onboard command's requestId (only when captured) so
-      // absorbDrains can correlate later completions / failures.
+      // onboard command's requestId so absorbDrains can correlate later
+      // completions / failures. A missing requestId means the dispatch never
+      // produced a trackable start, so surface that inline instead of leaving
+      // the row looking pending forever.
       // `pendingDispatchRequestId` is ALWAYS set from this dispatch
       // result (no fallback to `entry.pendingDispatchRequestId`) so
       // a retry click whose dispatch throws produces `undefined`, not
-      // a stale id. `adoptionError` mirrors the same — cleared on
-      // successful dispatch, populated with inline copy on throw.
+      // a stale id. `adoptionError` mirrors the same: cleared on
+      // successful dispatch, populated with inline copy on throw or
+      // missing requestId.
       const preview = packageText.slice(0, 24);
+      const dispatchStartError =
+        dispatchResult.adoptionError ??
+        "onboard failed to start: missing requestId";
       setCreateSession((session) => {
         if (!session) return session;
         return {
@@ -2178,8 +2197,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                   packageText: preview,
                   password: "[redacted]",
                   packageCreated: true,
-                  pendingDispatchRequestId: dispatchResult.requestId,
-                  adoptionError: dispatchResult.adoptionError,
+                  pendingDispatchRequestId: dispatchResult.requestId
+                    ? dispatchResult.requestId
+                    : undefined,
+                  adoptionError: dispatchResult.requestId
+                    ? undefined
+                    : dispatchStartError,
                 }
               : entry,
           ),
@@ -5150,8 +5173,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           indexEntry.peer_pubkey = dispatchMetadata.peer_pubkey;
         }
         const capturedRequestId = requestId;
+        pendingDispatchIndexRef.current = {
+          ...pendingDispatchIndexRef.current,
+          [capturedRequestId]:
+            pendingDispatchIndexRef.current[capturedRequestId] ?? indexEntry,
+        };
         setPendingDispatchIndex((prev) =>
-          prev[capturedRequestId] ? prev : { ...prev, [capturedRequestId]: indexEntry },
+          prev[capturedRequestId]
+            ? prev
+            : { ...prev, [capturedRequestId]: indexEntry },
         );
       }
       // After capturing our own dispatch, run the async correlation pass
@@ -6343,6 +6373,23 @@ function completionRequestId(completion: CompletedOperation): string {
     (completion as { Ping?: { request_id: string } }).Ping ??
     (completion as { Onboard?: { request_id: string } }).Onboard;
   return payload?.request_id ?? "";
+}
+
+function isUncorrelatedPingCompletion(
+  completion: CompletedOperation,
+  index: Record<string, PendingDispatchEntry>,
+): boolean {
+  const ping = (completion as { Ping?: { request_id: string } }).Ping;
+  if (!ping?.request_id) return false;
+  return index[ping.request_id]?.type !== "ping";
+}
+
+function isUncorrelatedPingFailure(
+  failure: OperationFailure,
+  index: Record<string, PendingDispatchEntry>,
+): boolean {
+  if (failure.op_type !== "ping") return false;
+  return index[failure.request_id]?.type !== "ping";
 }
 
 /**

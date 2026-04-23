@@ -164,6 +164,7 @@ export function DashboardScreen() {
     },
     restartRuntimeConnections = async () => undefined,
     runtimeFailures = [],
+    pendingDispatchIndex = {},
     signDispatchLog = {},
     handleRuntimeCommand,
     lifecycleEvents = [],
@@ -196,9 +197,11 @@ export function DashboardScreen() {
   const [activeSignFailure, setActiveSignFailure] = useState<EnrichedOperationFailure | null>(null);
   const consumedFailureIdsRef = useRef<Set<string>>(new Set());
   // --- Non-sign failure surface (VAL-OPS-011 / VAL-OPS-015) ------------
-  // Per `fix-m1-non-sign-failure-surface`: every non-sign OperationFailure
-  // (op_type in {ecdh, ping, onboard}) must surface somewhere non-modal so
-  // VAL-OPS-015's "non-modal feedback appears" is observable.
+  // Per `fix-m1-non-sign-failure-surface`: every user-facing non-sign
+  // OperationFailure (op_type in {ecdh, ping, onboard}) must surface
+  // somewhere non-modal so VAL-OPS-015's "non-modal feedback appears" is
+  // observable. AppStateProvider filters background refresh-all Ping probe
+  // failures before they reach this slice.
   //
   //   - If the failure has a `failed_peer` that resolves to a visible
   //     PeerRow, we mirror it into `peerRefreshErrors` and the row renders
@@ -320,12 +323,13 @@ export function DashboardScreen() {
     }
   }, [activeSignFailure, handleRuntimeCommand, signDispatchLog]);
 
-  // VAL-OPS-011 / VAL-OPS-015: Route every non-sign OperationFailure into a
-  // non-modal surface. Peer-resolvable failures attach to the corresponding
-  // PeerRow via `peerRefreshErrors`; all other non-sign failures raise a
-  // banner in the aria-live Activity-surface stack. Sign failures remain
-  // routed to SigningFailedModal via the separate effect above — this
-  // effect deliberately ignores `op_type === "sign"`.
+  // VAL-OPS-011 / VAL-OPS-015: Route every user-facing non-sign
+  // OperationFailure into a non-modal surface. Peer-resolvable failures
+  // attach to the corresponding PeerRow via `peerRefreshErrors`; all other
+  // non-sign failures raise a banner in the aria-live Activity-surface
+  // stack. Sign failures remain routed to SigningFailedModal via the
+  // separate effect above — this effect deliberately ignores
+  // `op_type === "sign"`.
   useEffect(() => {
     if (!runtimeFailures || runtimeFailures.length === 0) return;
     const now = Date.now();
@@ -866,6 +870,9 @@ export function DashboardScreen() {
                     : runtimeStatus.peer_permission_states ?? undefined
                 }
                 pendingOperations={runtimeStatus.pending_operations}
+                pendingDispatchIndex={
+                  paperPanels ? undefined : pendingDispatchIndex
+                }
                 paperPanels={paperPanels}
                 sidebarOpen={settingsOpen}
                 runtimeRelays={paperPanels ? undefined : runtimeRelays}

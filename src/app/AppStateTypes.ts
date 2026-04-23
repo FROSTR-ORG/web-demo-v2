@@ -552,7 +552,8 @@ export interface NoncePoolSnapshot {
  *   - `INFO`         — any other lifecycle edge that doesn't merit a
  *                       dedicated colour (command_queued, config_updated,
  *                       state_wiped, Onboard completion)
- *   - `ERROR`        — any drained `OperationFailure`
+ *   - `ERROR`        — drained user-facing `OperationFailure`s
+ *                       (background refresh Ping probes are quiet)
  *   - `BACKUP_PUBLISH` — local-mutation marker emitted by
  *                       {@link AppStateValue.publishProfileBackup} when a
  *                       publish attempt fails pre-flight (no relays
@@ -743,9 +744,12 @@ export interface AppStateValue {
    */
   runtimeCompletions: CompletedOperation[];
   /**
-   * Operation failures drained from the runtime, ordered by ascending
-   * `request_id`. Populated each refresh tick by AppStateProvider reading
-   * `RuntimeClient.drainFailures()`.
+   * User-facing operation failures drained from the runtime, ordered by
+   * ascending `request_id`. Populated each refresh tick by
+   * AppStateProvider reading `RuntimeClient.drainFailures()`. Background
+   * refresh-all Ping probe failures are intentionally filtered before they
+   * reach this slice so an optional offline future share does not look like
+   * an actionable dashboard error.
    *
    * Each entry is enriched via {@link AppStateValue.pendingDispatchIndex}
    * before landing here — sign-type failures carry their originating
@@ -757,7 +761,9 @@ export interface AppStateValue {
   /**
    * Bounded ring buffer of dashboard-oriented event log entries derived from
    * all three runtime drain channels (`drainRuntimeEvents`,
-   * `drainCompletions`, `drainFailures`). Each entry is tagged with a
+   * `drainCompletions`, `drainFailures`). Background refresh-all Ping
+   * probe completions/failures are treated as quiet liveness telemetry and
+   * filtered out before display. Each retained entry is tagged with a
    * {@link RuntimeEventLogBadge} and retained in insertion order up to
    * {@link RUNTIME_EVENT_LOG_MAX} (500) entries — once exceeded, the
    * oldest is FIFO-evicted. Survives tick cycles and relay reconnects;
