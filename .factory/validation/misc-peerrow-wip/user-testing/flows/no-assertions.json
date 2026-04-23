@@ -1,0 +1,32 @@
+{
+  "groupId": "no-assertions",
+  "testedAt": "2026-04-23T15:17:01Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173/",
+    "guidanceSection": "Flow Validator Guidance: shell-cli",
+    "assignedAssertions": []
+  },
+  "toolsUsed": [
+    "shell-cli",
+    "jq",
+    "curl"
+  ],
+  "commandsRun": [
+    {
+      "command": "jq -n --arg m \"misc-peerrow-wip\" --slurpfile f \"/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/features.json\" --slurpfile s \"/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/validation-state.json\" '($f[0].features | map(select(.milestone == $m and .status == \"completed\")) | map(select((.skillName // \"\") | test(\"^scrutiny-|^user-testing-\") | not)) | map(.fulfills // []) | flatten | unique) as $allFromFulfills | {allFromFulfills: $allFromFulfills, pendingToTest: ($allFromFulfills | map(select(($s[0].assertions[.]?.status // \"pending\") == \"pending\")))}'",
+      "exitCode": 0,
+      "observed": "Derived fulfills assertion sets were empty: allFromFulfills=[] and pendingToTest=[]."
+    },
+    {
+      "command": "curl -sS -o /tmp/misc-peerrow-wip-health-body.txt -w \"HTTP_STATUS=%{http_code}\\n\" \"http://127.0.0.1:5173/\"",
+      "exitCode": 0,
+      "observed": "HTTP_STATUS=200. Vite HTML shell returned, confirming testing surface availability."
+    }
+  ],
+  "assertions": [],
+  "frictions": [],
+  "blockers": [],
+  "reasoning": "This flow had no fulfills-derived assertions assigned. After confirming the derived set is empty and app health is available, no assertion execution was required.",
+  "summary": "No assertions were assigned/tested for misc-peerrow-wip in this flow (0 pass, 0 fail, 0 blocked, 0 skipped)."
+}
