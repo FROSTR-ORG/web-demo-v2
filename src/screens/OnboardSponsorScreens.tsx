@@ -494,16 +494,16 @@ export function OnboardSponsorHandoffScreen() {
     };
   }, [location.state]);
 
-  // Guard: if there's no session we got here by deep-link or a stale
-  // back-navigation. Redirect to the config screen so the user can
-  // restart cleanly.
-  if (!onboardSponsorSession) {
-    return <Navigate to="/onboard-sponsor" replace />;
-  }
-
-  const packageText = onboardSponsorSession.packageText;
+  // Package text is sourced lazily so hooks that depend on it can be
+  // declared unconditionally BEFORE the session-null guard below —
+  // satisfying React's Rules of Hooks when `clearOnboardSponsorSession`
+  // transitions the session from present → absent mid-lifecycle
+  // (confirmCancel path, VAL-ONBOARD-022). We fall back to an empty
+  // string so QRCode.toCanvas is a no-op in the redirected render.
+  const packageText = onboardSponsorSession?.packageText ?? "";
 
   useEffect(() => {
+    if (!packageText) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     // VAL-ONBOARD-005 — QR canvas ≥ 256×256 CSS px and matches the
@@ -578,7 +578,9 @@ export function OnboardSponsorHandoffScreen() {
   }
 
   // VAL-ONBOARD-022 — Escape on any handoff-screen focus target opens
-  // the cancel confirm dialog.
+  // the cancel confirm dialog. Registered unconditionally (above the
+  // session-null guard below) so the listener count is stable across
+  // a session-clear transition — satisfying React's Rules of Hooks.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -589,6 +591,15 @@ export function OnboardSponsorHandoffScreen() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  // Guard: if there's no session we got here by deep-link or a stale
+  // back-navigation. Redirect to the config screen so the user can
+  // restart cleanly. Placed AFTER all hooks to keep hook counts
+  // stable when the session transitions null mid-lifecycle
+  // (confirmCancel path, VAL-ONBOARD-022).
+  if (!onboardSponsorSession) {
+    return <Navigate to="/onboard-sponsor" replace />;
+  }
 
   const headerMeta = activeProfile?.groupName ?? "Onboard a Device";
 

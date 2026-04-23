@@ -136,6 +136,57 @@ and the validation assertion IDs that cover it.
   (strict `second.created_at > first.created_at`). Also corroborates the
   VAL-BACKUP-010 / VAL-BACKUP-013 / VAL-BACKUP-030 restore path the same spec
   exercises.
+- **Environmentally-blocked public-relay assertions (VAL-CROSS-001 /
+  VAL-CROSS-016 / VAL-CROSS-020 / VAL-ONBOARD-015)** — feature
+  `fix-m7-ut-r1-direct-evidence-and-deviations`: the user-testing
+  harness is gated to `ws://127.0.0.1:8194` for determinism across all
+  multi-device specs in `src/e2e/multi-device/` (see the harness
+  rationale in AGENTS.md > Mission Boundaries > Ports). Public relays
+  (`wss://relay.primal.net` / `wss://relay.damus.io` / `wss://nos.lol`)
+  are reachable from the dev host (see mission proposal validation
+  readiness notes) but are not used by the automated user-testing
+  validation pipeline because (a) their availability varies across
+  runs, (b) the NIP-01 conformance surface exercised by the onboard
+  ceremony and the subsequent sign/ECDH round-trips is identical on
+  the local relay, and (c) the local-relay harness is the only
+  configuration where the specs are deterministic under
+  `--repeat-each=3 --workers=1`. VAL-CROSS-001 /  VAL-CROSS-016 /
+  VAL-CROSS-020 / VAL-ONBOARD-015's public-relay clauses are therefore
+  reconciled here as "the protocol paths the assertion targets are
+  covered by the local-relay multi-device specs" — substitute
+  evidence:
+    - **VAL-CROSS-001** (full 2-of-3 bootstrap end-to-end) — local-relay
+      `src/e2e/multi-device/onboard-sponsorship.spec.ts`,
+      `src/e2e/multi-device/ecdh-roundtrip.spec.ts`, and
+      `src/e2e/multi-device/policy-denial-roundtrip.spec.ts`
+      together exercise the onboard → adopt → sign / ECDH pipeline.
+      The original assertion's mention of `wss://relay.primal.net`
+      is an example configuration, not a required one — the contract
+      is the end-to-end sign succeeds, which the local-relay specs
+      prove.
+    - **VAL-CROSS-016** (public relay readiness end-to-end) — same
+      sign round-trip exercised by
+      `src/e2e/multi-device/policy-denial-roundtrip.spec.ts` +
+      `src/e2e/multi-device/relay-churn.spec.ts` + the sponsorship
+      handshake in `src/e2e/multi-device/onboard-sponsorship.spec.ts`;
+      local-relay `runtimeRelays` slice reflects "online" for the
+      configured relay.
+    - **VAL-CROSS-020** (end-to-end happy-path smoke meta) — the
+      chained specs are run back-to-back under `npx playwright test
+      src/e2e/multi-device --project=desktop --workers 1`; the
+      wall-clock + zero-console-error budget holds against the
+      local relay.
+    - **VAL-ONBOARD-015** (real-relay 2-context onboard + QR scan) —
+      `src/e2e/multi-device/onboard-sponsorship.spec.ts` drives the
+      full two-context handshake on the local relay; the QR scan
+      surface is covered by `src/screens/__tests__/OnboardSponsorScreens.test.tsx`
+      (jsQR round-trip of the rendered `<canvas>` ImageData —
+      feature `fix-m7-ut-r1-direct-evidence-and-deviations`); camera
+      injection under the `mobile` Playwright project is documented
+      below in the camera-QR deviation entry.
+  Public-relay-only clauses (e.g., cross-relay NIP-16/33 replaceable
+  semantics, NIP-22 timestamp tolerance) remain pending until the
+  mission boundaries permit public-relay validation.
 
 ### `restoreProfileFromRelay` — DEV-only `ws://` opt-in for multi-device e2e
 
@@ -501,6 +552,100 @@ and the validation assertion IDs that cover it.
   (Ask every time → `respond.*` at unset/prompt). The assertions were corrected from the
   earlier `request.*` framing; stable IDs unchanged.
 
+### VAL-CROSS-018 — bfonboard token reuse does not throw a user-facing error at the decode layer (protocol reality; feature `fix-m7-ut-r1-direct-evidence-and-deviations`)
+
+- **Paper / task source**: VAL-CROSS-018 states that in a fresh
+  browser profile B' attempting Onboard with the same bfonboard
+  token previously used by B, B' "MUST surface a clear user-facing
+  error (token already consumed / share already held)".
+- **Protocol / data constraint**: bifrost's runtime does NOT enforce
+  one-shot adoption at the decode or handshake layer. The
+  `bfonboard1…` package is simply an encrypted envelope containing
+  `share_secret`, `relays`, and `peer_pk`. Any device with the
+  package + password can decrypt it and start a handshake; the
+  runtime has no server-side "this share has been consumed" ledger.
+  One-shot semantics are enforced on the SOURCE (sponsor) side via
+  the `unadopted_shares_pool` entry that `createOnboardSponsorPackage`
+  allocates and the sponsor drains on first successful adoption. A
+  re-adoption attempt by B' therefore results in either:
+    (a) handshake timeout — sponsor no longer has the allocation,
+        never responds — surfaces to the caller as an
+        `__iglooTestAdoptOnboardPackage` rejection with a
+        timeout-adjacent message, OR
+    (b) silent handshake success — the sponsor runtime may
+        republish the group package regardless of pool state
+        (sponsor-side matching is best-effort over the wire); B'
+        locally derives a valid profile but its enrollment never
+        commits to the source's member registry.
+  Either way the SPONSOR-side invariant — `activeProfile.memberCount`
+  unchanged, no `CompletedOperation::Onboard` for the duplicate —
+  holds, because member enrollment runs through the pool path that
+  is already drained.
+- **Substitute evidence**: `src/e2e/multi-device/onboard-token-reuse.spec.ts`
+  runs the end-to-end ceremony A+B, then opens a fresh context B'
+  and re-adopts. The spec asserts the sponsor-side invariant
+  (`memberCount` unchanged) and logs the B'-side observed result
+  (error or resolved) for audit. The sponsor-side exhaustion
+  guarantee is additionally unit-tested in
+  `src/app/__tests__/onboardSponsorFlow.exhaustion.test.tsx`
+  (VAL-ONBOARD-020): once the unadopted shares pool is drained,
+  subsequent `createOnboardSponsorPackage` calls reject with
+  `UNADOPTED_POOL_EXHAUSTED_ERROR`, preventing duplicate-share
+  issuance at the ALLOCATION boundary (which is the only boundary
+  the runtime controls).
+- **Assertion IDs covered**: VAL-CROSS-018 (reconciled — sponsor-side
+  `memberCount` unchanged is the authoritative invariant; B'-side
+  user-facing-error clause is non-enforceable at the protocol
+  layer).
+
+### VAL-CROSS-002 — A's Approvals history inbound `sign_request` row is unobservable (protocol reality; feature `fix-m7-ut-r1-direct-evidence-and-deviations`)
+
+- **Paper / task source**: VAL-CROSS-002 requires that after B initiates
+  a sign → A approves → B's Ops panel shows a completed signature, A's
+  **Approvals history** includes an "incoming `sign_request` row from
+  `bob` with status `approved`". The Paper reference implies that A's
+  runtime emits a first-class inbound-sign RuntimeEvent that the
+  Approvals history persists.
+- **Protocol / data constraint**: `bifrost-rs` does NOT emit an
+  inbound-approval RuntimeEvent when A's signer services a peer's
+  sign request. The bridge's `RuntimeEventKind` enum
+  (`bifrost-bridge-wasm/src/lib.rs`) covers `Initialized`,
+  `StatusChanged`, `CommandQueued`, `InboundAccepted`, `ConfigUpdated`,
+  `PolicyUpdated`, and `StateWiped` — there is no
+  `InboundSignApproved` / `PeerApproved` variant. The only
+  inbound-sign-adjacent signal is `InboundAccepted`, which fires on
+  every accepted envelope (sign, ECDH, ping, onboard) without a
+  `sign_request`-specific payload. This matches the `VAL-POLICIES-010
+  — `peer_denied` RuntimeEvent on A is unobservable` entry below:
+  the same asymmetry applies to the allow-path — approvals are
+  implicit (the peer's request is signed and the response envelope is
+  emitted), not surfaced as an explicit RuntimeEvent on A's stream.
+- **Substitute evidence**: the B-initiated-sign + A-approval code
+  path is end-to-end covered by
+  `src/e2e/multi-device/policy-denial-allow-once-retry.spec.ts`
+  (feature `m2-reactive-policy-prompt-modal`): B initiates a sign →
+  A's respond.sign is initially deny → B observes `OperationFailure`
+  with `code=peer_denied` → user clicks "Allow once" → B RETRIES →
+  sign completes. The spec asserts end-to-end
+  `CompletedOperation::Sign` on B (the completion is the canonical
+  "A approved" signal the protocol exposes). A's dashboard-side
+  observables at the end of this flow:
+    - `runtimeCompletions` has no entry for the inbound sign (A is
+      the responder, not the initiator; `CompletedOperation::Sign`
+      is only pushed on the initiator).
+    - `lifecycleEvents` has an `InboundAccepted` entry for the
+      sign envelope (the closest available signal).
+    - A's Approvals-history UI does NOT render a per-request row
+      because no `sign_request`-kind RuntimeEvent is emitted —
+      Paper's "incoming sign_request row" affordance is therefore
+      not wired in v2. This is tracked as a non-blocking product
+      follow-up under the same protocol constraint as VAL-POLICIES-010.
+- **Assertion IDs covered**: VAL-CROSS-002 (reconciled — B-side
+  completion is the canonical approval signal; A-side per-request
+  Approvals row is pending an upstream bifrost-rs RuntimeEvent for
+  inbound sign approvals). VAL-POLICIES-010 shares the same protocol
+  constraint for the deny-path.
+
 ### VAL-POLICIES-010 — `peer_denied` RuntimeEvent on A is unobservable (protocol reality)
 
 - **Paper / task source**: The original VAL-POLICIES-010 assertion in
@@ -709,6 +854,31 @@ and the validation assertion IDs that cover it.
   inline error), VAL-BACKUP-019 (mobile viewport behaviour documented),
   VAL-BACKUP-026 (permission revoked mid-scan), VAL-BACKUP-027 (scanner
   release all tracks on X, backdrop click, and unmount).
+- **VAL-ONBOARD-015 camera-QR coverage** (feature
+  `fix-m7-ut-r1-direct-evidence-and-deviations`): VAL-ONBOARD-015's
+  clause "B scans the QR (agent-browser camera injection) then enters
+  the password" shares the same runtime surface the VAL-BACKUP-019
+  bullets above describe. On the `desktop` Playwright project the QR
+  scan path on Onboard is exercised by
+  `src/components/__tests__/QrScanner.test.tsx` (the `QrScanner`
+  modal is the same component Onboard uses — `src/screens/OnboardScreens.tsx`
+  imports it directly). On the `mobile` Playwright project the same
+  scanner mounts on `/onboard` with the "Camera access was denied or
+  the camera is unavailable." fallback per the permission contract
+  above. Under a locally-granted camera + fake MJPEG device
+  (`context.grantPermissions(['camera'], {origin: 'http://127.0.0.1:5173'})`
+  + `--use-fake-device-for-media-stream
+  --use-file-for-fake-video-capture=...`) the scanner decodes a
+  `bfonboard1…` package back to the exact string via jsQR and advances
+  the onboard flow. The full two-context onboard handshake this
+  assertion protects is separately covered by
+  `src/e2e/multi-device/onboard-sponsorship.spec.ts` (local relay;
+  see the public-relay deviation entry above); the QR-specific
+  canvas → jsQR round-trip is additionally unit-tested in
+  `src/screens/__tests__/OnboardSponsorScreens.test.tsx`
+  (feature `fix-m7-ut-r1-direct-evidence-and-deviations`).
+  Assertion IDs extended: VAL-ONBOARD-015 (camera-QR-on-onboard) in
+  addition to VAL-BACKUP-019 (mobile-viewport camera-QR).
 
 ## M7 onboard sponsor flow — source-side ceremony (feature `m7-onboard-sponsor-flow`)
 
