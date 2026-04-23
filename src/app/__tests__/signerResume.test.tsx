@@ -285,7 +285,7 @@ describe("AppStateProvider — signer resume restores readiness (VAL-OPS-017)", 
         password: "profile-password",
         confirmPassword: "profile-password",
         // Zero-length relay list here would be rejected by createProfile
-        // ("At least one relay is required."); we supply a throwaway
+        // (canonical RELAY_EMPTY_ERROR copy); we supply a throwaway
         // entry and rely on lockProfile+unlockProfile to reset into the
         // no-simulator path below.
         relays: ["wss://relay.local"],

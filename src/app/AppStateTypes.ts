@@ -229,8 +229,26 @@ export const ONBOARD_SPONSOR_PASSWORD_TOO_SHORT_ERROR =
   "Password must be at least 8 characters.";
 export const ONBOARD_SPONSOR_PASSWORD_MISMATCH_ERROR =
   "Passwords do not match.";
-export const ONBOARD_SPONSOR_RELAY_EMPTY_ERROR =
-  "At least one relay is required.";
+/**
+ * Canonical inline-validation copy surfaced whenever a user-supplied
+ * relay list is empty after trim. Shared across: Settings sidebar
+ * relay-list editor, AppStateProvider.updateRelays, createProfile,
+ * createOnboardSponsorPackage, createRotatedProfile,
+ * restoreProfileFromRelay, fetchProfileBackupEvent, profileRuntime,
+ * RestoreFromRelayScreen, and MockAppStateProvider.
+ *
+ * Any UI surface that renders this copy should import this constant
+ * rather than re-hardcoding the string literal so copy changes remain
+ * a single-touch edit.
+ */
+export const RELAY_EMPTY_ERROR = "At least one relay is required.";
+
+/**
+ * Back-compat alias retained so existing OnboardSponsor surfaces that
+ * imported the sponsor-flow-specific name continue to compile. New
+ * call sites should import {@link RELAY_EMPTY_ERROR} directly.
+ */
+export const ONBOARD_SPONSOR_RELAY_EMPTY_ERROR = RELAY_EMPTY_ERROR;
 export const ONBOARD_SPONSOR_SIGNER_PAUSED_ERROR =
   "Signer is paused. Resume the signer to sponsor a new device.";
 export const ONBOARD_SPONSOR_THRESHOLD_INVALID_ERROR =

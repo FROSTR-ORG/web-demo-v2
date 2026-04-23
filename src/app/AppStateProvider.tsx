@@ -105,6 +105,7 @@ import {
 } from "./setupFlowErrors";
 import {
   PROFILE_NAME_MAX_LENGTH,
+  RELAY_EMPTY_ERROR,
   RUNTIME_EVENT_LOG_MAX,
   SetupFlowError,
 } from "./AppStateTypes";
@@ -1672,7 +1673,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         throw new Error("Remote package passwords do not match.");
       }
       if (relays.length === 0) {
-        throw new Error("At least one relay is required.");
+        throw new Error(RELAY_EMPTY_ERROR);
       }
 
       const { group } = createSession.keyset;
@@ -2243,20 +2244,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         );
       }
 
-      const { validateRelayUrl, normalizeRelayKey } = await import(
+      const { normalizeRelayList } = await import(
         "../lib/relay/relayUrl"
       );
-      const validated: string[] = [];
-      const seenKeys = new Set<string>();
-      for (const raw of input.relays ?? []) {
-        const trimmed = (raw ?? "").trim();
-        if (trimmed.length === 0) continue;
-        const ok = validateRelayUrl(trimmed);
-        const key = normalizeRelayKey(ok);
-        if (seenKeys.has(key)) continue;
-        seenKeys.add(key);
-        validated.push(ok);
-      }
+      const validated = normalizeRelayList(input.relays ?? []);
       if (validated.length === 0) {
         throw new Error(
           (await import("./AppStateTypes"))
@@ -2746,7 +2737,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         throw new Error("Profile passwords do not match.");
       }
       if (relays.length === 0) {
-        throw new Error("At least one relay is required.");
+        throw new Error(RELAY_EMPTY_ERROR);
       }
 
       const previousLocalIdx = rotateKeysetSession.sourceShares[0]?.idx;
@@ -3326,23 +3317,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
    */
   const updateRelays = useCallback(
     async (nextRelays: string[]) => {
-      const { validateRelayUrl, normalizeRelayKey, RELAY_DUPLICATE_ERROR } =
-        await import("../lib/relay/relayUrl");
-      const normalized: string[] = [];
-      const seenKeys = new Set<string>();
-      for (const raw of nextRelays) {
-        const trimmed = typeof raw === "string" ? raw.trim() : "";
-        if (trimmed.length === 0) continue;
-        const validated = validateRelayUrl(trimmed);
-        const key = normalizeRelayKey(validated);
-        if (seenKeys.has(key)) {
-          throw new Error(RELAY_DUPLICATE_ERROR);
-        }
-        seenKeys.add(key);
-        normalized.push(validated);
-      }
+      const { normalizeRelayList } = await import("../lib/relay/relayUrl");
+      const { RELAY_EMPTY_ERROR } = await import("./AppStateTypes");
+      const normalized = normalizeRelayList(nextRelays, {
+        onDuplicate: "throw",
+      });
       if (normalized.length === 0) {
-        throw new Error("At least one relay is required.");
+        throw new Error(RELAY_EMPTY_ERROR);
       }
       if (!activeProfile) {
         throw new Error("No active profile.");
@@ -3904,9 +3885,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           "Invalid password — could not decrypt this backup.",
         );
       }
-      const { validateRelayUrl, normalizeRelayKey } = await import(
+      const { validateRelayUrl, normalizeRelayList } = await import(
         "../lib/relay/relayUrl"
       );
+      const { RELAY_EMPTY_ERROR } = await import("./AppStateTypes");
       // DEV-only escape hatch: the multi-device Playwright spec for
       // restore-from-relay talks to a local `bifrost-devtools` relay
       // exposed over plain `ws://127.0.0.1:8194` (no TLS terminator).
@@ -3937,23 +3919,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         }
         return validateRelayUrl(raw);
       };
-      const normalizedRelays: string[] = [];
-      const seenKeys = new Set<string>();
-      for (const raw of input.relays ?? []) {
-        const trimmed = typeof raw === "string" ? raw.trim() : "";
-        if (trimmed.length === 0) continue;
-        // validateRestoreRelayUrl throws RelayValidationError with the
-        // canonical "Relay URL must start with wss://" copy on failure
-        // (same as validateRelayUrl), unless the DEV-only test toggle
-        // whitelists ws:// for this mutator.
-        const validated = validateRestoreRelayUrl(trimmed);
-        const key = normalizeRelayKey(validated);
-        if (seenKeys.has(key)) continue;
-        seenKeys.add(key);
-        normalizedRelays.push(validated);
-      }
+      // validateRestoreRelayUrl throws RelayValidationError with the
+      // canonical "Relay URL must start with wss://" copy on failure
+      // (same as validateRelayUrl), unless the DEV-only test toggle
+      // whitelists ws:// for this mutator.
+      const normalizedRelays = normalizeRelayList(input.relays ?? [], {
+        validator: validateRestoreRelayUrl,
+      });
       if (normalizedRelays.length === 0) {
-        throw new Error("At least one relay is required.");
+        throw new Error(RELAY_EMPTY_ERROR);
       }
 
       // Decrypt the bfshare package. A wrong password surfaces as a
@@ -4055,19 +4029,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // Without this, the multi-device restore e2e would silently drop
       // its only relay during the merge step and hit
       // "At least one relay is required" from buildStoredProfileRecord.
-      const mergedRelays: string[] = [];
-      const mergedKeys = new Set<string>();
-      for (const relay of [...normalizedRelays, ...backup.device.relays]) {
-        try {
-          const validated = validateRestoreRelayUrl(relay);
-          const key = normalizeRelayKey(validated);
-          if (mergedKeys.has(key)) continue;
-          mergedKeys.add(key);
-          mergedRelays.push(validated);
-        } catch {
-          // skip invalid relays from the backup silently
-        }
-      }
+      //
+      // Invalid legacy backup relays are skipped silently so the
+      // restore does not fail when only the backup list is malformed —
+      // the user's freshly-validated list is already in the merge set.
+      const mergedRelays = normalizeRelayList(
+        [...normalizedRelays, ...backup.device.relays],
+        {
+          validator: validateRestoreRelayUrl,
+          onValidatorError: "skip",
+        },
+      );
       const payload: BfProfilePayload = {
         profile_id: profileId,
         version: backup.version,
@@ -4554,7 +4526,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
    * from the next `pending_operations` snapshot.
    *
    * Debounce contract: identical commands (by serialised payload) dispatched
-   * within {@link HANDLE_COMMAND_DEBOUNCE_WINDOW_MS} of the previous
+   * within {@link HANDLE_COMMAND_DEBOUNCE_MS} of the previous
    * dispatch are coalesced. The returned `debounced` flag tells the caller
    * whether the underlying runtime received the command this call — this is
    * deterministic and safe to assert in tests (VAL-OPS-019).
@@ -4590,7 +4562,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       lastDispatchRef.current = { key, at: now };
 
       const before = new Set<string>();
-      const expectedType = pendingOpTypeFor(cmd);
+      const descriptor = runtimeCommandDescriptor(cmd);
+      const expectedType = descriptor.pendingOpType;
       try {
         const statusBefore = runtime.runtimeStatus();
         for (const op of statusBefore.pending_operations) {
@@ -4609,12 +4582,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // index (VAL-OPS-007). For commands that do not register a pending
       // op (`refresh_all_peers`), no queue entry is pushed.
       const dispatchedAt = now;
-      const dispatchMetadata = dispatchMetadataForCommand(cmd);
+      const dispatchMetadata = descriptor.dispatchMetadata;
       if (dispatchMetadata && expectedType !== null) {
         pendingUnmatchedDispatchesRef.current.push({
           ...dispatchMetadata,
           dispatchedAt,
-          pendingOpType: expectedType as "Sign" | "Ecdh" | "Ping" | "Onboard",
+          pendingOpType: expectedType,
         });
       }
 
@@ -4717,9 +4690,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // `pending_at = dispatched_at` so the transition is always present
       // regardless of how fast the runtime completes.
       if (requestId) {
-        const lifecycleOpType = lifecycleOpTypeFor(cmd);
+        const lifecycleOpType = descriptor.lifecycleOpType;
         if (lifecycleOpType) {
-          const preview = lifecycleMessagePreview(cmd);
+          const preview = descriptor.lifecyclePreview;
           const entry: SignLifecycleEntry = {
             request_id: requestId,
             op_type: lifecycleOpType,
@@ -5100,16 +5073,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         group: GroupPackageWire,
         shareIdx: number,
       ) => string;
-      // m7-rotate-keyset-live-sign — expose the WASM
-      // `rotate_keyset_bundle` primitive so the multi-device
-      // regression spec can drive an in-browser keyset rotation
-      // without routing through the `RotateKeysetScreens` setup
-      // flow (which requires IndexedDB-persisted profiles,
-      // password prompts, and route navigation that the test hook
-      // surface deliberately avoids). Pure client-side WASM call
-      // matching the shape of `createKeysetBundle`; no AppState
-      // side-effects.
-      __iglooTestRotateKeysetBundle?: typeof rotateKeysetBundle;
       // fix-m7-scrutiny-r1-rotate-regression-full-flow — expose the
       // bfonboard decoder so the UI-driven multi-device rotate spec
       // can let peer tabs B / C adopt the rotated onboarding packages
@@ -5332,13 +5295,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       await startRuntimeFromPayload(payload, input.share.idx);
     };
     globalWindow.__iglooTestCreateKeysetBundle = createKeysetBundle;
-    // m7-rotate-keyset-live-sign — dev-only bridge hook so the
-    // multi-device regression spec can invoke the WASM
-    // `rotate_keyset_bundle` primitive directly. Production UI drives
-    // rotation through `AppStateValue.generateRotatedKeyset`, which
-    // combines this bridge call with setup-session bookkeeping; the
-    // regression gate only needs the keyset material itself.
-    globalWindow.__iglooTestRotateKeysetBundle = rotateKeysetBundle;
     // fix-m7-scrutiny-r1-rotate-regression-full-flow — DEV-only hook
     // letting the UI-driven rotate-keyset spec decode the sponsor's
     // bfonboard adoption packages from inside a peer tab. Round-trips
@@ -5885,29 +5841,99 @@ function commandKey(cmd: RuntimeCommand): string {
 }
 
 /**
- * Map a RuntimeCommand verb to the PendingOperation `op_type` string used by
- * the WASM runtime_status snapshot. Returns `null` for commands that do not
- * register a pending entry (e.g. `refresh_all_peers` fans out to pings
- * already).
+ * Combined descriptor for a {@link RuntimeCommand}, keyed by `cmd.type`.
+ * Collapses the four previously-parallel switches
+ * (pendingOpTypeFor / dispatchMetadataForCommand / lifecycleOpTypeFor /
+ * lifecycleMessagePreview) into a single lookup so adding a new runtime
+ * verb is a single-touch change and cannot fall out of sync across the
+ * four concerns.
+ *
+ *  - `pendingOpType`: PendingOperation `op_type` string used by the WASM
+ *    runtime_status snapshot. `null` for commands that do not register a
+ *    single pending entry (e.g. `refresh_all_peers` fans out to pings).
+ *  - `dispatchMetadata`: fields stored in the pendingDispatchIndex so
+ *    Retry handlers can correlate a later failure back to the original
+ *    request. `null` mirrors the `pendingOpType` absence above.
+ *  - `lifecycleOpType`: op_type recorded in {@link SignLifecycleEntry};
+ *    `refresh_peer` is folded into `ping`, `onboard` and
+ *    `refresh_all_peers` do not appear in Sign Activity.
+ *  - `lifecyclePreview`: first 10 hex characters of the command's
+ *    non-secret payload field (message / peer pubkey) for UI surfaces
+ *    that need a stable, non-sensitive identifier.
  */
-function pendingOpTypeFor(cmd: RuntimeCommand): string | null {
+interface RuntimeCommandDescriptor {
+  pendingOpType: "Sign" | "Ecdh" | "Ping" | "Onboard" | null;
+  dispatchMetadata: Pick<
+    PendingDispatchEntry,
+    "type" | "message_hex_32" | "peer_pubkey"
+  > | null;
+  lifecycleOpType: "sign" | "ecdh" | "ping" | null;
+  lifecyclePreview: string | null;
+}
+
+/**
+ * Build a {@link RuntimeCommandDescriptor} for the given RuntimeCommand.
+ *
+ * Behaviour preserved verbatim from the prior quartet of switch helpers
+ * — this is a pure refactor; any future deviation from the original
+ * semantics must be explicit and covered by tests.
+ */
+function runtimeCommandDescriptor(
+  cmd: RuntimeCommand,
+): RuntimeCommandDescriptor {
   switch (cmd.type) {
     case "sign":
-      return "Sign";
+      return {
+        pendingOpType: "Sign",
+        dispatchMetadata: {
+          type: "sign",
+          message_hex_32: cmd.message_hex_32,
+        },
+        lifecycleOpType: "sign",
+        lifecyclePreview: cmd.message_hex_32.slice(0, 10).toLowerCase(),
+      };
     case "ecdh":
-      return "Ecdh";
+      return {
+        pendingOpType: "Ecdh",
+        dispatchMetadata: {
+          type: "ecdh",
+          peer_pubkey: cmd.pubkey32_hex,
+        },
+        lifecycleOpType: "ecdh",
+        lifecyclePreview: cmd.pubkey32_hex.slice(0, 10).toLowerCase(),
+      };
     case "ping":
     case "refresh_peer":
-      return "Ping";
+      return {
+        pendingOpType: "Ping",
+        dispatchMetadata: {
+          type: "ping",
+          peer_pubkey: cmd.peer_pubkey32_hex,
+        },
+        lifecycleOpType: "ping",
+        lifecyclePreview: cmd.peer_pubkey32_hex.slice(0, 10).toLowerCase(),
+      };
     case "onboard":
-      return "Onboard";
+      return {
+        pendingOpType: "Onboard",
+        dispatchMetadata: {
+          type: "onboard",
+          peer_pubkey: cmd.peer_pubkey32_hex,
+        },
+        lifecycleOpType: null,
+        lifecyclePreview: null,
+      };
     case "refresh_all_peers":
-      return null;
+      return {
+        pendingOpType: null,
+        dispatchMetadata: null,
+        lifecycleOpType: null,
+        lifecyclePreview: null,
+      };
   }
 }
 
 const HANDLE_COMMAND_DEBOUNCE_MS = 300;
-export const HANDLE_COMMAND_DEBOUNCE_WINDOW_MS = HANDLE_COMMAND_DEBOUNCE_MS;
 
 /**
  * Retention window for {@link PendingDispatchEntry} after settlement
@@ -5919,76 +5945,6 @@ export const HANDLE_COMMAND_DEBOUNCE_WINDOW_MS = HANDLE_COMMAND_DEBOUNCE_MS;
  */
 const PENDING_DISPATCH_RETENTION_MS = 60_000;
 
-/**
- * Extract the dispatch metadata stored in the pendingDispatchIndex from
- * a RuntimeCommand. Returns `null` for commands that do not register a
- * single pending op (e.g. `refresh_all_peers`).
- */
-function dispatchMetadataForCommand(
-  cmd: RuntimeCommand,
-):
-  | (Pick<PendingDispatchEntry, "type" | "message_hex_32" | "peer_pubkey">)
-  | null {
-  switch (cmd.type) {
-    case "sign":
-      return { type: "sign", message_hex_32: cmd.message_hex_32 };
-    case "ecdh":
-      return { type: "ecdh", peer_pubkey: cmd.pubkey32_hex };
-    case "ping":
-    case "refresh_peer":
-      return { type: "ping", peer_pubkey: cmd.peer_pubkey32_hex };
-    case "onboard":
-      return { type: "onboard", peer_pubkey: cmd.peer_pubkey32_hex };
-    case "refresh_all_peers":
-      return null;
-  }
-}
-
-/**
- * Map a RuntimeCommand to the lifecycle op_type recorded in
- * {@link SignLifecycleEntry}. `refresh_peer` is folded into `ping` because
- * it dispatches a ping under the hood. Returns `null` for commands that
- * don't produce a single correlatable request_id (e.g. `refresh_all_peers`
- * fans out to many).
- */
-function lifecycleOpTypeFor(
-  cmd: RuntimeCommand,
-): "sign" | "ecdh" | "ping" | null {
-  switch (cmd.type) {
-    case "sign":
-      return "sign";
-    case "ecdh":
-      return "ecdh";
-    case "ping":
-    case "refresh_peer":
-      return "ping";
-    case "refresh_all_peers":
-    case "onboard":
-      return null;
-  }
-}
-
-/**
- * Extract the first 10 hex characters of a sign command's message or a
- * peer pubkey (ecdh / ping) so the Sign Activity row has a stable,
- * non-secret preview for users. Returns `null` when no source payload is
- * available (e.g. commands the lifecycle log does not track).
- */
-function lifecycleMessagePreview(cmd: RuntimeCommand): string | null {
-  switch (cmd.type) {
-    case "sign":
-      return cmd.message_hex_32.slice(0, 10).toLowerCase();
-    case "ecdh":
-      return cmd.pubkey32_hex.slice(0, 10).toLowerCase();
-    case "ping":
-    case "refresh_peer":
-      return cmd.peer_pubkey32_hex.slice(0, 10).toLowerCase();
-    case "refresh_all_peers":
-    case "onboard":
-      return null;
-  }
-}
-
 /* -------------------------------------------------------------------------- */
 /* Dev-only test-observability helpers                                        */
 /* -------------------------------------------------------------------------- */
@@ -5998,7 +5954,7 @@ function lifecycleMessagePreview(cmd: RuntimeCommand): string | null {
  * lifecycle event (open/close/error). Intentionally flat/serialisable so
  * agent-browser can `JSON.stringify` it from a `page.evaluate`.
  */
-export interface RelayHistoryEntry {
+interface RelayHistoryEntry {
   type: "open" | "close" | "error";
   url: string;
   at: string;
@@ -6012,7 +5968,7 @@ export interface RelayHistoryEntry {
  * `visibilitychange` transition. Seeded on mount with the initial state so
  * validators always see at least one entry.
  */
-export interface VisibilityHistoryEntry {
+interface VisibilityHistoryEntry {
   state: "visible" | "hidden";
   at: string;
 }
@@ -6029,7 +5985,7 @@ export interface VisibilityHistoryEntry {
  * `wipe_state.error` instead of `wipe_state.resolved`; dispose still
  * runs so the app can recover from a broken runtime.
  */
-export interface ClearCredentialsLogEntry {
+interface ClearCredentialsLogEntry {
   phase:
     | "wipe_state.invoked"
     | "wipe_state.resolved"
@@ -6044,7 +6000,7 @@ export interface ClearCredentialsLogEntry {
  * Shape of the dev-only `window.__debug` surface. Not shipped to
  * production (the installer effect is gated on `import.meta.env.DEV`).
  */
-export interface TestObservabilityDebugSurface {
+interface TestObservabilityDebugSurface {
   relayHistory: RelayHistoryEntry[];
   visibilityHistory: VisibilityHistoryEntry[];
   readonly noncePoolSnapshot: NoncePoolSnapshot | null;

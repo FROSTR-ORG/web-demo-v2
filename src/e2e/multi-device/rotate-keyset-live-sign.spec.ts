@@ -10,9 +10,11 @@ import { test, expect, type BrowserContext, type Page } from "@playwright/test";
  * by `fix-m7-scrutiny-r1-rotate-regression-full-flow` to close two scrutiny
  * gaps called out in the m7 r1 review:
  *
- *   1. The previous version bypassed the UI entirely by calling
- *      `__iglooTestRotateKeysetBundle` and seeding tabs A / B / C
- *      directly with rotated share bundles. That regressed nothing
+ *   1. The previous version bypassed the UI entirely by calling a
+ *      DEV-only `rotateKeysetBundle` test hook and seeding tabs
+ *      A / B / C directly with rotated share bundles (that hook has
+ *      since been removed — see `polish-2nd-pass-code-tests`). That
+ *      regressed nothing
  *      in the rotate pipeline itself — only the pure-WASM
  *      `rotate_keyset_bundle` primitive. The pipeline tab A users
  *      actually drive (Form → Review/Generate → Progress → Profile

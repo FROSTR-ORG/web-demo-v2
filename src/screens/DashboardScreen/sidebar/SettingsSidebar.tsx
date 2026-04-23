@@ -2,7 +2,10 @@ import { X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppState } from "../../../app/AppState";
-import { PROFILE_NAME_MAX_LENGTH } from "../../../app/AppStateTypes";
+import {
+  PROFILE_NAME_MAX_LENGTH,
+  RELAY_EMPTY_ERROR,
+} from "../../../app/AppStateTypes";
 import {
   RELAY_DUPLICATE_ERROR,
   RELAY_INVALID_URL_ERROR,
@@ -497,7 +500,7 @@ export function SettingsSidebar({
   async function handleRemoveRelay(index: number) {
     if (index < 0 || index >= relays.length) return;
     if (relays.length <= 1) {
-      setAddError("At least one relay is required.");
+      setAddError(RELAY_EMPTY_ERROR);
       return;
     }
     const next = relays.filter((_, i) => i !== index);

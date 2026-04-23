@@ -6,6 +6,7 @@ import {
   RelayValidationError,
   isValidRelayUrl,
   normalizeRelayKey,
+  normalizeRelayList,
   validateRelayUrl,
 } from "./relayUrl";
 
@@ -96,6 +97,67 @@ describe("normalizeRelayKey (VAL-SETTINGS-023)", () => {
     expect(normalizeRelayKey("  WSS://Foo  ")).toBe(
       normalizeRelayKey("wss://foo"),
     );
+  });
+});
+
+describe("normalizeRelayList", () => {
+  it("returns an empty array for an empty input (callers enforce the relay-required gate)", () => {
+    expect(normalizeRelayList([])).toEqual([]);
+  });
+
+  it("drops non-string / empty / whitespace-only entries without throwing", () => {
+    expect(
+      normalizeRelayList([
+        "wss://relay.example.com",
+        "",
+        "   ",
+        null,
+        undefined,
+        42,
+      ]),
+    ).toEqual(["wss://relay.example.com"]);
+  });
+
+  it("deduplicates case- and trailing-slash-normalised variants in default (skip) mode", () => {
+    expect(
+      normalizeRelayList([
+        "wss://relay.example.com",
+        "WSS://Relay.Example.com/",
+        "  wss://relay.example.com/  ",
+      ]),
+    ).toEqual(["wss://relay.example.com"]);
+  });
+
+  it("rejects duplicates with RELAY_DUPLICATE_ERROR when onDuplicate === 'throw'", () => {
+    expect(() =>
+      normalizeRelayList(
+        ["wss://relay.example.com", "wss://Relay.Example.com/"],
+        { onDuplicate: "throw" },
+      ),
+    ).toThrow(RELAY_DUPLICATE_ERROR);
+  });
+
+  it("preserves validator-driven throws verbatim on invalid input", () => {
+    expect(() =>
+      normalizeRelayList(["wss://ok.example.com", "http://bad.example.com"]),
+    ).toThrow(RelayValidationError);
+    // The canonical copy is the one users see inline.
+    expect(() =>
+      normalizeRelayList(["http://bad.example.com"]),
+    ).toThrow(RELAY_INVALID_URL_ERROR);
+  });
+
+  it("honours a custom validator that widens the scheme allow-list (e.g. DEV ws:// opt-in)", () => {
+    const allowWsValidator = (url: string) => {
+      if (/^ws:\/\//i.test(url)) return url;
+      return validateRelayUrl(url);
+    };
+    expect(
+      normalizeRelayList(
+        ["ws://127.0.0.1:8194", "wss://relay.example.com"],
+        { validator: allowWsValidator },
+      ),
+    ).toEqual(["ws://127.0.0.1:8194", "wss://relay.example.com"]);
   });
 });
 

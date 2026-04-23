@@ -233,8 +233,8 @@ test.describe("VAL-CROSS-021 — multi-tab profile lifecycle propagation", () =>
               await w.__iglooTestSeedRuntime({
                 group,
                 // `persistProfile` requires at least one relay entry
-                // (see `buildStoredProfileRecord`'s
-                // `At least one relay is required.` invariant). The
+                // (see `buildStoredProfileRecord`'s RELAY_EMPTY_ERROR
+                // invariant, exported from `AppStateTypes`). The
                 // lifecycle contract being asserted here is
                 // independent of relay connectivity, so a
                 // non-routable loopback port is sufficient — the

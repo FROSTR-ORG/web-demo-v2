@@ -93,6 +93,94 @@ export function isValidRelayUrl(value: string): boolean {
 }
 
 /**
+ * Options accepted by {@link normalizeRelayList}.
+ */
+export interface NormalizeRelayListOptions {
+  /**
+   * How to treat a duplicate (case-insensitive, trailing-slash-normalised)
+   * relay URL after the first occurrence.
+   *
+   *  - `"skip"` (default): silently drop the duplicate.
+   *  - `"throw"`: throw `new Error(RELAY_DUPLICATE_ERROR)` so the caller
+   *    can surface the canonical inline-validation copy verbatim.
+   */
+  onDuplicate?: "skip" | "throw";
+
+  /**
+   * Custom validator. Takes the trimmed input string and returns the value
+   * to persist (or throws a {@link RelayValidationError} / any other Error
+   * on failure). Defaults to {@link validateRelayUrl} which enforces the
+   * strict `wss://` contract.
+   *
+   * The DEV-only `restoreProfileFromRelay` mutator supplies a custom
+   * validator that opts into `ws://` for the local bifrost-devtools relay
+   * — see `AGENTS.md > Local-Relay Caveats` for rationale.
+   */
+  validator?: (url: string) => string;
+
+  /**
+   * How to treat validator errors.
+   *
+   *  - `"throw"` (default): propagate the validator's Error to the caller
+   *    so the canonical inline-validation copy renders verbatim.
+   *  - `"skip"`: silently drop the offending entry. Used by the
+   *    `restoreProfileFromRelay` merge step where the backup envelope
+   *    may carry legacy or malformed relay URLs that must not fail the
+   *    restore as long as the user-supplied list is valid.
+   */
+  onValidatorError?: "throw" | "skip";
+}
+
+/**
+ * Trim, validate, and deduplicate a list of user-supplied relay URLs
+ * into the canonical shape that `AppStateProvider` / `MockAppStateProvider`
+ * persist and hand to the relay pump.
+ *
+ * Rules:
+ *   - Non-string or empty-after-trim entries are dropped silently.
+ *   - Each remaining entry is validated through `options.validator`
+ *     (defaults to {@link validateRelayUrl}). A validator throw
+ *     propagates unchanged so callers render the canonical error copy.
+ *   - Duplicates (by {@link normalizeRelayKey}) are either skipped
+ *     (default) or rejected via `throw new Error(RELAY_DUPLICATE_ERROR)`
+ *     when `options.onDuplicate === "throw"`.
+ *   - Returns the validated-in-order list. Empty input yields an empty
+ *     array — callers that require at least one relay must enforce that
+ *     separately using {@link RELAY_EMPTY_ERROR} from `AppStateTypes`.
+ */
+export function normalizeRelayList(
+  raws: readonly unknown[],
+  options?: NormalizeRelayListOptions,
+): string[] {
+  const onDuplicate = options?.onDuplicate ?? "skip";
+  const onValidatorError = options?.onValidatorError ?? "throw";
+  const validator = options?.validator ?? validateRelayUrl;
+  const result: string[] = [];
+  const seenKeys = new Set<string>();
+  for (const raw of raws) {
+    const trimmed = typeof raw === "string" ? raw.trim() : "";
+    if (trimmed.length === 0) continue;
+    let validated: string;
+    try {
+      validated = validator(trimmed);
+    } catch (err) {
+      if (onValidatorError === "throw") throw err;
+      continue;
+    }
+    const key = normalizeRelayKey(validated);
+    if (seenKeys.has(key)) {
+      if (onDuplicate === "throw") {
+        throw new Error(RELAY_DUPLICATE_ERROR);
+      }
+      continue;
+    }
+    seenKeys.add(key);
+    result.push(validated);
+  }
+  return result;
+}
+
+/**
  * Produce a canonical duplicate-detection key for a relay URL. Callers
  * should pass the raw user-supplied string; the key is lowercased and
  * any single trailing slash on the pathname is stripped, matching

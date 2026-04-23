@@ -16,7 +16,7 @@ import type { RecoverSourceSummary } from "./AppStateTypes";
 import { SetupFlowError } from "./AppStateTypes";
 import { setupErrorFromPackage } from "./setupFlowErrors";
 
-export interface SourcePackageInput {
+interface SourcePackageInput {
   packageText: string;
   password: string;
 }

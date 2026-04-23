@@ -26,8 +26,9 @@
  */
 
 import type { RelayClient, RelayConnection } from "../lib/relay/browserRelayClient";
+import { RELAY_EMPTY_ERROR } from "./AppStateTypes";
 
-export interface FetchProfileBackupEventInput {
+interface FetchProfileBackupEventInput {
   /** Validated wss:// (or test-opted-in ws://) relay URLs, deduped. */
   relays: string[];
   /** 32-byte x-only hex pubkey the backup event was signed with. */
@@ -67,7 +68,7 @@ export async function fetchProfileBackupEvent(
   } = input;
 
   if (relays.length === 0) {
-    throw new Error("At least one relay is required.");
+    throw new Error(RELAY_EMPTY_ERROR);
   }
 
   const connections: RelayConnection[] = relays.map((url) => client.connect(url));

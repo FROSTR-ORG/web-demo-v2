@@ -30,6 +30,7 @@ import {
   RELAY_INVALID_URL_ERROR,
   isValidRelayUrl,
 } from "../lib/relay/relayUrl";
+import { RELAY_EMPTY_ERROR } from "../app/AppStateTypes";
 
 const DEFAULT_RESTORE_RELAYS = [
   "wss://relay.primal.net",
@@ -64,7 +65,7 @@ export function RestoreFromRelayScreen() {
       return {
         relayList: entries,
         relayListValid: false,
-        relayListError: "At least one relay is required.",
+        relayListError: RELAY_EMPTY_ERROR,
       };
     }
     for (const entry of entries) {

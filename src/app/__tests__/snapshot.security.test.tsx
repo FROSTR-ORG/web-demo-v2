@@ -476,28 +476,32 @@ describe("m7-security-live-sweep — snapshot.security", () => {
       // `handleRuntimeCommand({type: "onboard", ...})` path AND
       // encrypts the bfonboard package with a user-supplied password.
       // Neither the password nor the sponsor's share secret may leak.
+      //
+      // polish-2nd-pass-code-tests — the previous version wrapped this
+      // call in a try/catch that swallowed failures silently so the
+      // security sweep still passed even if the unadopted shares pool
+      // was empty. That hid real dispatch regressions. The 2-of-2
+      // keyset seeded by the `createProfile` block above deterministically
+      // populates the pool with one remote share (see the `initialPool`
+      // construction in `AppStateProvider.createProfile`), so the
+      // happy path MUST succeed. Let any real failure propagate.
       let sponsorPackage: string | null = null;
       await act(async () => {
-        try {
-          sponsorPackage = await latest.createOnboardSponsorPackage({
-            deviceLabel: "Security Sweep Device",
-            password: "onboard-package-pw-1234",
-            relays: ["wss://relay.local"],
-            profilePassword: "profile-password",
-          });
-        } catch (error) {
-          // The unadopted shares pool may be empty in this fixture if
-          // the create flow did not persist pool entries. In that
-          // case the mutator throws; that's fine for the sweep — the
-          // dispatch path still ran and no secrets should have
-          // leaked. Surface the error as a console line so it is
-          // captured by the transcript scan too.
-          console.warn(
-            "createOnboardSponsorPackage rejected during security sweep:",
-            error instanceof Error ? error.message : String(error),
-          );
-        }
+        sponsorPackage = await latest.createOnboardSponsorPackage({
+          deviceLabel: "Security Sweep Device",
+          password: "onboard-package-pw-1234",
+          relays: ["wss://relay.local"],
+          profilePassword: "profile-password",
+        });
       });
+
+      // polish-2nd-pass-code-tests — assert the post-dispatch session
+      // status reached `awaiting_adoption` so the dispatch is not
+      // silently a no-op. The sensitive-surface scanner still runs
+      // on every snapshot below (snap5 = post-dispatch).
+      expect(latest.onboardSponsorSession?.status).toBe(
+        "awaiting_adoption",
+      );
 
       // Force another refresh tick so any in-flight onboard dispatch
       // completes or fails through the drain path (populating the
@@ -521,22 +525,18 @@ describe("m7-security-live-sweep — snapshot.security", () => {
       // during the run — otherwise a silent no-op would trivially
       // pass the scan. The outbound envelope stream MUST be non-
       // empty (handle_command always produces at least one outbound
-      // envelope) and the console transcript MUST have been wired
-      // (the harness itself logs via the onboard catch branch in the
-      // pool-empty case).
+      // envelope for the sign / ECDH / onboard dispatches above).
       expect(recordedOutbound.length).toBeGreaterThan(0);
 
-      // Sponsor package, when produced, MUST begin with the bfonboard1
-      // bech32 preamble. This is the only place in the flow that a
-      // bfonboard-prefixed string is allowed — and it is NEVER
-      // persisted anywhere by the mutator; it is returned to the
-      // caller for rendering into a handoff screen. The snapshot
-      // surfaces did not include it, which is exactly the contract.
-      if (sponsorPackage !== null) {
-        expect((sponsorPackage as string).startsWith("bfonboard1")).toBe(
-          true,
-        );
-      }
+      // Sponsor package MUST begin with the bfonboard1 bech32 preamble.
+      // This is the only place in the flow that a bfonboard-prefixed
+      // string is allowed — and it is NEVER persisted anywhere by the
+      // mutator; it is returned to the caller for rendering into a
+      // handoff screen. The snapshot surfaces did not include it, which
+      // is exactly the contract.
+      expect(sponsorPackage).not.toBeNull();
+      expect((sponsorPackage as unknown as string).startsWith("bfonboard1"))
+        .toBe(true);
     },
     60_000,
   );

@@ -647,23 +647,13 @@ export function MockAppStateProvider({
    */
   const updateRelays = useCallback(
     async (relays: string[]) => {
-      const { validateRelayUrl, normalizeRelayKey, RELAY_DUPLICATE_ERROR } =
-        await import("../lib/relay/relayUrl");
-      const normalized: string[] = [];
-      const seenKeys = new Set<string>();
-      for (const raw of relays) {
-        const trimmed = typeof raw === "string" ? raw.trim() : "";
-        if (trimmed.length === 0) continue;
-        const validated = validateRelayUrl(trimmed);
-        const key = normalizeRelayKey(validated);
-        if (seenKeys.has(key)) {
-          throw new Error(RELAY_DUPLICATE_ERROR);
-        }
-        seenKeys.add(key);
-        normalized.push(validated);
-      }
+      const { normalizeRelayList } = await import("../lib/relay/relayUrl");
+      const { RELAY_EMPTY_ERROR } = await import("./AppStateTypes");
+      const normalized = normalizeRelayList(relays, {
+        onDuplicate: "throw",
+      });
       if (normalized.length === 0) {
-        throw new Error("At least one relay is required.");
+        throw new Error(RELAY_EMPTY_ERROR);
       }
       await value.updateRelays(normalized);
       setActiveProfile((previous) =>

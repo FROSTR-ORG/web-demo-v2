@@ -37,6 +37,8 @@ import {
   defaultManualPeerPolicyOverrides,
   profilePayloadForShare,
 } from "../../lib/bifrost/packageService";
+import { RuntimeClient } from "../../lib/bifrost/runtimeClient";
+import type { CompletedOperation } from "../../lib/bifrost/types";
 
 const storage = new Map<string, unknown>();
 
@@ -482,56 +484,109 @@ describe("fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — VAL-ONBOARD-013",
 });
 
 describe("fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — VAL-ONBOARD-011 badge", () => {
-  it("emits ONBOARD local_mutation entries for onboard completions/failures and tags the completion-channel entry with ONBOARD", async () => {
-    // We assert the ONBOARD taxonomy plumbing in isolation by
-    // injecting a synthetic runtime drain through the WASM bridge
-    // layer — but without running the full onboard ceremony. Since
-    // that's not directly possible from a unit test (drain_outbound
-    // is internal to the WASM worker), we instead verify the
-    // RuntimeEventLogBadge type + badgeForCompletion semantics via
-    // the publicly-exposed types. The E2E test extends coverage.
-    const badge: import("../AppStateTypes").RuntimeEventLogBadge = "ONBOARD";
-    expect(badge).toBe("ONBOARD");
-    // Assert the union accepts ONBOARD by constructing a narrow
-    // runtime event log entry with that badge.
-    const entry: import("../AppStateTypes").RuntimeEventLogEntry = {
-      seq: 1,
-      at: 0,
-      badge: "ONBOARD",
-      source: "local_mutation",
-      payload: {
-        kind: "onboard_completed",
-        request_id: "req-onboard-42",
-        peer_pubkey32: null,
-      },
+  // polish-2nd-pass-code-tests — replaced the original tautology
+  // (constructed a TS literal and asserted `entry.badge === 'ONBOARD'`)
+  // with a real test that drives a synthetic `CompletedOperation::Onboard`
+  // through the provider's `absorbDrains` pipeline by monkey-patching
+  // `RuntimeClient.prototype.drainCompletions`. Mirrors the pattern used
+  // by `snapshot.security.test.tsx` which patches `drainOutboundEvents`
+  // on the prototype and restores it in an `afterEach`. Asserts that a
+  // new `runtimeEventLog` entry lands with the canonical shape
+  // `{badge:'ONBOARD', source:'local_mutation', payload:{kind:'onboard_completed', request_id, peer_pubkey32}}`.
+  it("drain-path injects an ONBOARD local_mutation entry with kind='onboard_completed' and the originating request_id", async () => {
+    // Boot the provider FIRST so that the simulator-level drain calls
+    // performed during runtime setup (createProfile → startRuntime →
+    // initial pumps) run against the REAL drainCompletions. Only after
+    // setup is fully complete do we install the prototype patch, so
+    // the injection lands cleanly on the next refresh-triggered pump.
+    const { getState } = await bootProvider();
+    const preLogLength = getState().runtimeEventLog.length;
+
+    const originalDrainCompletions =
+      RuntimeClient.prototype.drainCompletions;
+    // Inject exactly ONE synthetic Onboard completion on the NEXT
+    // drain call, then revert to the real implementation so subsequent
+    // drains don't keep re-issuing the same synthetic entry.
+    const injectedRequestId = "req-onboard-inject-42";
+    let injected = false;
+    const injectedCompletion = {
+      Onboard: { request_id: injectedRequestId },
+    } as unknown as CompletedOperation;
+    RuntimeClient.prototype.drainCompletions = function patched(
+      this: RuntimeClient,
+    ) {
+      const real = originalDrainCompletions.call(this);
+      if (!injected) {
+        injected = true;
+        return [...real, injectedCompletion];
+      }
+      return real;
     };
-    expect(entry.badge).toBe("ONBOARD");
-  });
+    try {
+      // Drive a refresh tick so the simulator's pump() drains completions
+      // into absorbDrains → runtimeEventLog. The patched drainCompletions
+      // is consumed exactly once during this pump cycle.
+      await act(async () => {
+        getState().refreshRuntime();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      // Poll until the patched drain is observed — up to ~2s on busy
+      // CI hosts. The first refresh tick is usually enough, but the
+      // LocalRuntimeSimulator's internal pump cadence can vary.
+      await waitFor(
+        () => {
+          const entries = getState().runtimeEventLog.slice(preLogLength);
+          const found = entries.find((entry) =>
+            entry.badge === "ONBOARD" &&
+            entry.source === "local_mutation" &&
+            typeof entry.payload === "object" &&
+            entry.payload !== null &&
+            (entry.payload as { kind?: string }).kind ===
+              "onboard_completed",
+          );
+          expect(found).toBeTruthy();
+        },
+        { timeout: 2_000 },
+      );
+
+      const entries = getState()
+        .runtimeEventLog.slice(preLogLength)
+        .filter(
+          (entry) =>
+            entry.badge === "ONBOARD" &&
+            entry.source === "local_mutation" &&
+            (entry.payload as { kind?: string } | null)?.kind ===
+              "onboard_completed",
+        );
+      // Exactly one onboard_completed entry for the injected request_id.
+      const matching = entries.filter(
+        (entry) =>
+          (entry.payload as { request_id?: string }).request_id ===
+          injectedRequestId,
+      );
+      expect(matching.length).toBe(1);
+      // The shape contract surfaced by absorbDrains: peer_pubkey32 is
+      // `null` when no sponsor session was pre-registered for the
+      // injected request_id (the injection path bypasses the sponsor
+      // flow entirely). That null is intentional and documented in the
+      // absorbDrains onboard_completed emission block.
+      const payload = matching[0].payload as {
+        kind: string;
+        request_id: string;
+        peer_pubkey32: string | null;
+      };
+      expect(payload.kind).toBe("onboard_completed");
+      expect(payload.request_id).toBe(injectedRequestId);
+      expect(payload.peer_pubkey32).toBeNull();
+    } finally {
+      RuntimeClient.prototype.drainCompletions = originalDrainCompletions;
+    }
+  }, 45_000);
 });
 
-describe("OnboardSponsorSession type shape", () => {
-  it("carries the status lifecycle field so UI surfaces can render completed / failed / cancelled states", () => {
-    const value: import("../AppStateTypes").OnboardSponsorSession = {
-      deviceLabel: "Bob Laptop",
-      packageText: "bfonboard1…",
-      relays: ["wss://relay.local"],
-      createdAt: 1_000,
-      requestId: "req-onboard-1",
-      targetPeerPubkey: "a".repeat(64),
-      status: "awaiting_adoption",
-    };
-    expect(value.status).toBe("awaiting_adoption");
-    // Exhaustively cover the other status values so a widened enum
-    // breaks this test loudly.
-    const others: Array<typeof value.status> = [
-      "completed",
-      "failed",
-      "cancelled",
-      "awaiting_adoption",
-    ];
-    for (const v of others) {
-      const copy = { ...value, status: v };
-      expect(copy.status).toBe(v);
-    }
-  });
-});
+// polish-2nd-pass-code-tests — the previous "OnboardSponsorSession
+// type shape" test constructed a TS literal and asserted its field
+// values against itself (pure tautology). The shape is enforced by
+// `tsc --noEmit`; the test is deleted here rather than replaced with
+// a no-op. See the feature description for rationale.

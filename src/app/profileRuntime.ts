@@ -11,6 +11,7 @@ import type {
   StoredProfileRecord
 } from "../lib/bifrost/types";
 import type { ShareAllocationEntry } from "../lib/storage/unadoptedSharesPool";
+import { RELAY_EMPTY_ERROR } from "./AppStateTypes";
 
 export async function createRuntimeFromProfilePayload(payload: BfProfilePayload, localShareIdx: number): Promise<RuntimeClient> {
   const runtime = new RuntimeClient();
@@ -73,7 +74,7 @@ export async function buildStoredProfileRecord(
 ): Promise<{ record: StoredProfileRecord; normalizedPayload: BfProfilePayload; localShareIdx: number }> {
   const { profileId, localShareIdx, normalizedPayload } = await normalizeProfilePayload(payload);
   if (normalizedPayload.device.relays.length === 0) {
-    throw new Error("At least one relay is required.");
+    throw new Error(RELAY_EMPTY_ERROR);
   }
   const pair = await createProfilePackagePair(normalizedPayload, password);
   const now = Date.now();

@@ -211,16 +211,20 @@ describe("Dashboard nonce-pool overlay — __iglooTestSimulateNonceDepletion end
       // directly, bypassing the nonce-depletion augmentation — any user
       // action between simulate() and restore() would silently clear the
       // overlay.
+      //
+      // polish-2nd-pass-code-tests — the prior try/catch swallowed every
+      // throw indiscriminately. `refresh_all_peers` is documented to
+      // return `{requestId: null, debounced: false}` without throwing
+      // (see `handleRuntimeCommand` in `AppStateProvider.tsx`; the
+      // only throw paths are "no runtime active" and the signer-paused
+      // gate, neither of which apply in this fixture since bootProvider
+      // has set up the runtime and signerPaused=false). Assert the call
+      // resolves cleanly — a regression that starts throwing here is a
+      // real bug we want surfaced, not silently accepted.
       await act(async () => {
-        try {
-          await latest.handleRuntimeCommand({
-            type: "refresh_all_peers",
-          });
-        } catch {
-          // Runtime may throw in jsdom depending on simulator state; the
-          // point of this call is to exercise the status-commit path, not
-          // to succeed at the runtime level.
-        }
+        await expect(
+          latest.handleRuntimeCommand({ type: "refresh_all_peers" }),
+        ).resolves.toEqual({ requestId: null, debounced: false });
       });
       expect(screen.getByTestId("nonce-pool-overlay")).toBeInTheDocument();
 
