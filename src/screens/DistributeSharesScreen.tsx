@@ -4,7 +4,6 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
 import {
-  BackLink,
   Button,
   QrButton,
   SecretDisplay,
@@ -117,7 +116,11 @@ export function DistributeSharesScreen() {
     <AppShell headerMeta={createSession.draft.groupName} mainVariant="flow">
       <section className="distribute-column">
         <Stepper current={3} variant="shared" />
-        <BackLink onClick={() => navigate("/create/profile")} />
+        {/* fix-followup-paper-parity-final-review — Paper 8GU-0 renders
+            no BackLink on the Distribute Shares screen. Once a profile
+            has been created and per-share onboard dispatches are in
+            flight the flow is one-way; the Stepper remains as the
+            navigation affordance. */}
         <PageHeading
           title="Distribute Shares"
           copy="Create each remote bfonboard package by setting its password, then hand off the package and password by copy or QR."

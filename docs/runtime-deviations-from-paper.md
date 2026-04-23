@@ -1344,3 +1344,170 @@ end-to-end.
   hand-off affordances), VAL-ONBOARD-016 ("Replace Share"
   terminology — the sidebar entry sits between Replace Share
   and Export & Backup with no "Rotate Share" residue).
+
+### 2026-04-23 — Peer Permissions row uses `ToggleSwitch` instead of Paper pill badges (60R-0 / VAL-FOLLOWUP-007)
+
+- **Paper source**: `igloo-ui` file, page `core`, artboard `60R-0` —
+  "Web — Shared — 2. Create Profile". The Peer Permissions rows render
+  four color-coded pill badges per peer (SIGN green, ECDH cyan, PING
+  purple, ONBOARD amber); saturated fill indicates the method is
+  allowed, muted fill indicates it is denied. Clicking a pill toggles
+  the value.
+- **web-demo-v2 implementation**:
+  `src/screens/CreateProfileScreen.tsx` — each peer row renders four
+  `ToggleSwitch` components (slider-style on/off switches from
+  `src/components/ToggleSwitch.tsx`) with the method name (`SIGN` /
+  `ECDH` / `PING` / `ONBOARD`) as the switch label.
+- **Rationale for the deviation**: `ToggleSwitch` is the established
+  design-system primitive for boolean user-controlled toggles used
+  elsewhere (`PoliciesState`, `SettingsSidebar` rows). The live
+  render must support interactive toggling of these four permissions
+  per peer during Create Profile; Paper's pill-badge visual is a
+  static "final state" snapshot that does not spec the toggle
+  interaction model. Introducing a separate "chip-toggle" primitive
+  (clickable pill that toggles saturated/muted) purely for parity
+  would fragment the design system and duplicate toggle affordance
+  logic without improving user clarity — the two controls are
+  semantically equivalent. The `fix-followup-paper-parity-final-review`
+  audit explicitly flagged this and resolved it as a documented
+  intentional deviation rather than fix-in-code (which would
+  exceed the "copy/layout/hierarchy fidelity" scope the audit
+  procedure limits itself to).
+- **Assertion IDs covered**: VAL-FOLLOWUP-007 continues to hold —
+  the `CreateProfileDraft` type has no `distributionPassword` /
+  `confirmDistributionPassword` keys and the rendered DOM has zero
+  matches for "Remote Package Password" / "Confirm Remote Package
+  Password". The pill-vs-switch deviation is orthogonal to
+  VAL-FOLLOWUP-007 and does not affect any existing assertion.
+
+### 2026-04-23 — Distribution Completion callout body copy pinned by VAL-FOLLOWUP-012 (LN7-0)
+
+- **Paper source**: `igloo-ui` file, page `core`, artboard `LN7-0` —
+  "Web — Shared — 3b. Distribution Completion". Paper's success
+  callout body copy reads:
+  > "2 of 2 remote bfonboard packages completed by echo or manual mark."
+- **web-demo-v2 implementation**:
+  `src/screens/DistributionCompleteScreen.tsx` — the success callout
+  renders the VAL-FOLLOWUP-012-pinned copy:
+  > "All packages distributed — N of N remote bfonboard packages have
+  > been marked distributed. Continue when device adoption handoff can
+  > proceed."
+- **Rationale for the deviation**: VAL-FOLLOWUP-012 (see
+  `.factory/missions/b48100dd-.../validation-contract.md > Area:
+  Follow-up`) pins the callout body via an exact-text assertion in
+  `src/screens/__tests__/DistributionCompleteScreen.test.tsx` — the
+  test uses `expect(callout?.textContent).toContain("All packages
+  distributed — 2 of 2 remote bfonboard packages have been marked
+  distributed. Continue when device adoption handoff can proceed.")`.
+  Changing the live copy to match Paper LN7-0 verbatim would break
+  that assertion and violate the validation contract. The
+  paper-parity audit therefore preserves the validation-contract
+  text and documents the deviation.
+- **Partial mitigation applied in the same audit**:
+  `fix-followup-paper-parity-final-review` added a `<strong>` title
+  line "All remote packages complete" above the callout body so that
+  Paper LN7-0's "All remote packages complete" heading is represented
+  on the live screen alongside the pinned body. The combined visual is
+  (title) "All remote packages complete" → (body) "All packages
+  distributed — N of N ...", which is closer to Paper's layout than
+  the pre-audit "(body only)".
+- **Assertion IDs covered**: VAL-FOLLOWUP-012 (exact callout body
+  copy) continues to hold; Paper LN7-0 parity is partially restored
+  by the title-line addition.
+
+### 2026-04-23 — Distribution Completion per-member rows use `shortHex(memberPubkey)` instead of Paper device labels (LN7-0)
+
+- **Paper source**: `igloo-ui` file, page `core`, artboard `LN7-0`.
+  Paper renders each member row as
+  > "Member #1 — Igloo Mobile" / "Existing Device"
+  > "Member #2 — Igloo Desktop" / "New Device"
+  with the top line being the human-readable device label and a
+  secondary line tagging each member as New vs. Existing.
+- **web-demo-v2 implementation**:
+  `src/screens/DistributionCompleteScreen.tsx` — each row renders
+  > "Member #{idx + 1} — {shortHex(pkg.memberPubkey)}"
+  with no second line. `shortHex` produces the `02abcd...1234`
+  truncation used consistently elsewhere in the app (SettingsSidebar,
+  PeersPanel, PoliciesState).
+- **Rationale for the deviation**: The
+  `OnboardingPackageView` type in `src/lib/bifrost/types.ts` does not
+  track a `deviceLabel` or a new-vs-existing flag. The create flow
+  does not prompt the user for per-share device labels (only profile
+  name + password + relays + peer permissions); Paper's labels
+  ("Igloo Mobile", "Igloo Desktop") are fixture values supplied by
+  the Paper file, not data the create flow collects. Adding per-share
+  device labels requires extending the AppState mutator surface
+  (`encodeDistributionPackage` gains a `deviceLabel` parameter) and
+  the type definition, and wiring a UI to collect them during
+  `/create/distribute` — an architectural change that exceeds the
+  "copy/layout/hierarchy fidelity" scope of
+  `fix-followup-paper-parity-final-review`. The stable pubkey suffix
+  is Paper-faithful in intent (a per-row identifier) and matches the
+  member-identification idiom used elsewhere in the app.
+- **What would change if device labels are later collected**: if a
+  future feature (e.g. `fix-create-profile-device-label-input`) adds
+  a per-share device-label input on `/create/profile` or
+  `/create/distribute` and threads the value through
+  `OnboardingPackageView.deviceLabel`, the LN7-0 row can be updated
+  in place to render `Member #{idx} — {deviceLabel}` with the
+  pubkey-suffix moving to a secondary sub-label. No other LN7-0
+  element is affected.
+- **Assertion IDs covered**: VAL-FOLLOWUP-012 (one row per remote
+  member; success chip; Finish Distribution CTA gating) remains
+  satisfied — the existing test does not assert on deviceLabel /
+  newOrExisting copy. Paper-parity deviation is recorded for future
+  audit cross-reference.
+
+### 2026-04-23 — Distribute Shares removes redundant BackLink (8GU-0)
+
+- **Paper source**: `igloo-ui` file, page `core`, artboard `8GU-0` —
+  "Web — Shared — 3. Distribute Shares". Paper renders only the
+  Stepper (step 3 active) as the navigation affordance on the
+  Distribute Shares screen — there is no BackLink between the
+  Stepper and the Page Intro.
+- **web-demo-v2 implementation (pre-fix)**:
+  `src/screens/DistributeSharesScreen.tsx` rendered a `<BackLink>`
+  between the Stepper and the PageHeading, wired to
+  `navigate("/create/profile")`.
+- **Fix applied under `fix-followup-paper-parity-final-review`**:
+  the BackLink was removed from `DistributeSharesScreen` (import
+  dropped, element removed with an inline comment citing this
+  feature). The Stepper remains as the navigation affordance;
+  browser-back continues to function. The distribute flow is
+  effectively one-way once `createProfile` has resolved (the
+  per-share onboard commands have been dispatched and re-running
+  `createProfile` is not a supported in-session transition), so the
+  BackLink's removal does not block any legitimate user path.
+- **Assertion IDs covered**: no VAL assertion specifically required
+  the BackLink; no regression test is altered by its removal.
+
+### 2026-04-23 — Paper baseline filename ID transposition (fix-followup-paper-parity-final-review)
+
+- **Source of the transposition**: the feature task description for
+  `fix-followup-paper-parity-final-review` stated the Paper artboard
+  IDs as
+  > "(1) /create/profile (Paper artboard **8GU-0** — 'Create New
+  > Profile'), (2) /create/distribute (Paper artboard **60R-0** —
+  > 'Distribute Shares'), ..."
+  and listed the expected baseline filenames as
+  `create-profile-8GU-0.png` / `distribute-shares-60R-0.png`.
+- **Actual Paper reality**: per `Paper___get_basic_info` against the
+  `igloo-ui` file (`core` page), the canonical mapping is
+  > `60R-0` = "Web — Shared — 2. Create Profile" (1440 × 1787)
+  > `8GU-0` = "Web — Shared — 3. Distribute Shares" (1440 × 1284)
+  The task transposed the two IDs (while LN7-0 =
+  "Distribution Completion" was described correctly).
+- **Reconciliation**: `src/e2e/visual/baselines/followup-paper/`
+  uses the CORRECT Paper node IDs in filenames
+  (`create-profile-60R-0.png`, `distribute-shares-8GU-0.png`,
+  `distribution-completion-LN7-0.png`) and `baselines.json` records
+  both the actual Paper node ID (`paperNodeId`) and the
+  task-described ID (`taskDescribedPaperNodeId`) per entry. The
+  Playwright spec (`src/e2e/visual/followup-paper-parity.spec.ts`)
+  references the corrected filenames.
+- **Assertion IDs covered**: this deviation is purely a bookkeeping
+  note; it does not change any assertion. The task's
+  `verificationSteps` clause "baselines.json shows Paper nodeIds
+  8GU-0, 60R-0, LN7-0 with timestamps" is satisfied (all three IDs
+  appear in `baselines.json`, correctly mapped to their real Paper
+  artboards).

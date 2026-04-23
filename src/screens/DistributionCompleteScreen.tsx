@@ -104,8 +104,16 @@ export function DistributionCompleteScreen() {
                   </div>
                   <div className="inline-actions">
                     {distributed ? (
+                      // fix-followup-paper-parity-final-review — Paper LN7-0
+                      // distinguishes the two distributed sub-states: an
+                      // echoed package (peerOnline === true) renders
+                      // "Echo received" while a manual handoff renders
+                      // "Marked distributed". Both tones are success/green.
+                      // If BOTH flags are set (echo arrived AND user hit
+                      // Mark distributed), prefer "Echo received" since
+                      // the peer genuinely came online.
                       <StatusPill tone="success" marker="check">
-                        Marked distributed
+                        {pkg.peerOnline ? "Echo received" : "Marked distributed"}
                       </StatusPill>
                     ) : (
                       <Button
@@ -125,6 +133,15 @@ export function DistributionCompleteScreen() {
         </div>
         {complete ? (
           <div className="success-callout">
+            {/* fix-followup-paper-parity-final-review — Paper LN7-0
+                renders a "All remote packages complete" title above
+                the callout body. The body copy below is pinned by
+                VAL-FOLLOWUP-012's exact-text assertion (see
+                docs/runtime-deviations-from-paper.md > "Distribution
+                Completion callout body"). */}
+            <strong className="success-callout-title">
+              All remote packages complete
+            </strong>
             <span>
               All packages distributed — {distributedCount} of {total} remote
               bfonboard packages have been marked distributed. Continue when
