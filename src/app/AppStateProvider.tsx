@@ -5090,6 +5090,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // matching the shape of `createKeysetBundle`; no AppState
       // side-effects.
       __iglooTestRotateKeysetBundle?: typeof rotateKeysetBundle;
+      // fix-m7-scrutiny-r1-rotate-regression-full-flow — expose the
+      // bfonboard decoder so the UI-driven multi-device rotate spec
+      // can let peer tabs B / C adopt the rotated onboarding packages
+      // produced by the sponsor without routing through the full
+      // requester-side `/onboard` flow. Pure WASM bridge call with
+      // no AppState side-effects; DEV-only like every other
+      // `__iglooTest*` hook.
+      __iglooTestDecodeBfonboardPackage?: typeof decodeBfonboardPackage;
       // m6-backup-restore — expose the WASM bfshare encoder so the
       // restore-from-relay multi-device e2e can convert a share secret
       // + relays + password into the `bfshare1…` package string that
@@ -5268,6 +5276,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     // combines this bridge call with setup-session bookkeeping; the
     // regression gate only needs the keyset material itself.
     globalWindow.__iglooTestRotateKeysetBundle = rotateKeysetBundle;
+    // fix-m7-scrutiny-r1-rotate-regression-full-flow — DEV-only hook
+    // letting the UI-driven rotate-keyset spec decode the sponsor's
+    // bfonboard adoption packages from inside a peer tab. Round-trips
+    // through `decode_bfonboard_package_result` on the WASM bridge.
+    globalWindow.__iglooTestDecodeBfonboardPackage = decodeBfonboardPackage;
     globalWindow.__iglooTestMemberPubkey32 = (group, shareIdx) => {
       const member = group.members.find((entry) => entry.idx === shareIdx);
       if (!member) {
