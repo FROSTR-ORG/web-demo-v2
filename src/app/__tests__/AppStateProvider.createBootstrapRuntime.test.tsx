@@ -176,6 +176,58 @@ describe("AppStateProvider.createProfile — bootstrap runtime source (VAL-FOLLO
   );
 
   it(
+    "rejects ws://localhost:8194 even when __iglooTestAllowInsecureRelayForRestore is set",
+    async () => {
+      // fix-scrutiny-r1-bootstrap-narrow-dev-allowlist —
+      // VAL-FOLLOWUP-010 requires the DEV insecure-relay allowlist to
+      // be restricted to the literal IPv4 `127.0.0.1`. `localhost`
+      // (even though it DNS-resolves to 127.0.0.1 on most hosts) must
+      // fall through to the strict validator and surface the canonical
+      // "Relay URL must start with wss://" copy. Scrutiny r1 blocker
+      // #1 flagged that the previous allowlist also accepted
+      // `ws://localhost:*`; this test pins the narrower behaviour.
+      const getState = await renderProvider();
+
+      await act(async () => {
+        await getState().createKeyset({
+          groupName: "Relay Validation Localhost Reject Key",
+          threshold: 2,
+          count: 2,
+        });
+      });
+      await waitFor(() =>
+        expect(getState().createSession?.keyset?.group.group_name).toBe(
+          "Relay Validation Localhost Reject Key",
+        ),
+      );
+
+      // Set the DEV opt-in to prove the narrowing is independent of
+      // the flag — `localhost` must still be rejected.
+      (
+        window as typeof window & {
+          __iglooTestAllowInsecureRelayForRestore?: boolean;
+        }
+      ).__iglooTestAllowInsecureRelayForRestore = true;
+
+      await expect(
+        getState().createProfile({
+          deviceName: "Bootstrap Browser",
+          password: "profile-password",
+          confirmPassword: "profile-password",
+          relays: ["ws://localhost:8194"],
+        }),
+      ).rejects.toThrow("Relay URL must start with wss://");
+
+      // No simulator fallback, no runtime bootstrap.
+      expect(readRuntimeSource()).toBeNull();
+      const session = getState().createSession;
+      expect(session?.createdProfileId).toBeUndefined();
+      expect(session?.onboardingPackages ?? []).toEqual([]);
+    },
+    45_000,
+  );
+
+  it(
     "rejects ws://127.0.0.1 unless the DEV-only __iglooTestAllowInsecureRelayForRestore hook is set; accepts it with the hook",
     async () => {
       const getState = await renderProvider();

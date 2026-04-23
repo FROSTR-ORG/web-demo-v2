@@ -1779,6 +1779,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // `import.meta.env.DEV`) whitelists `ws://127.0.0.1:*` for the
       // multi-device e2e that targets the local `bifrost-devtools`
       // relay (plain ws://). See VAL-FOLLOWUP-001 / VAL-FOLLOWUP-010.
+      //
+      // fix-scrutiny-r1-bootstrap-narrow-dev-allowlist — the allowlist
+      // is narrowed to the literal IPv4 `127.0.0.1` ONLY. `localhost`
+      // (and every other host) falls through to the strict validator
+      // and is rejected with the canonical "Relay URL must start with
+      // wss://" copy even when the DEV opt-in is active. Contract
+      // VAL-FOLLOWUP-010 requires 127.0.0.1 — no DNS-resolved aliases.
       const { validateRelayUrl, normalizeRelayList } = await import(
         "../lib/relay/relayUrl"
       );
@@ -1793,8 +1800,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             const parsed = new URL(raw);
             if (
               parsed.protocol.toLowerCase() === "ws:" &&
-              (parsed.hostname === "127.0.0.1" ||
-                parsed.hostname === "localhost")
+              parsed.hostname === "127.0.0.1"
             ) {
               return raw;
             }
