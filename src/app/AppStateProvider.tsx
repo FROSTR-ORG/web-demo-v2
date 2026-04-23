@@ -4656,6 +4656,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         group: GroupPackageWire,
         shareIdx: number,
       ) => string;
+      // m7-rotate-keyset-live-sign — expose the WASM
+      // `rotate_keyset_bundle` primitive so the multi-device
+      // regression spec can drive an in-browser keyset rotation
+      // without routing through the `RotateKeysetScreens` setup
+      // flow (which requires IndexedDB-persisted profiles,
+      // password prompts, and route navigation that the test hook
+      // surface deliberately avoids). Pure client-side WASM call
+      // matching the shape of `createKeysetBundle`; no AppState
+      // side-effects.
+      __iglooTestRotateKeysetBundle?: typeof rotateKeysetBundle;
       // m6-backup-restore — expose the WASM bfshare encoder so the
       // restore-from-relay multi-device e2e can convert a share secret
       // + relays + password into the `bfshare1…` package string that
@@ -4827,6 +4837,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       await startRuntimeFromPayload(payload, input.share.idx);
     };
     globalWindow.__iglooTestCreateKeysetBundle = createKeysetBundle;
+    // m7-rotate-keyset-live-sign — dev-only bridge hook so the
+    // multi-device regression spec can invoke the WASM
+    // `rotate_keyset_bundle` primitive directly. Production UI drives
+    // rotation through `AppStateValue.generateRotatedKeyset`, which
+    // combines this bridge call with setup-session bookkeeping; the
+    // regression gate only needs the keyset material itself.
+    globalWindow.__iglooTestRotateKeysetBundle = rotateKeysetBundle;
     globalWindow.__iglooTestMemberPubkey32 = (group, shareIdx) => {
       const member = group.members.find((entry) => entry.idx === shareIdx);
       if (!member) {
