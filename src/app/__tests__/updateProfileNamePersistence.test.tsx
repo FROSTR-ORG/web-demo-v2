@@ -15,7 +15,6 @@ import {
   type AppStateValue,
 } from "../AppState";
 import {
-  createKeysetBundle,
   decodeProfilePackage,
 } from "../../lib/bifrost/packageService";
 import type { StoredProfileRecord } from "../../lib/bifrost/types";

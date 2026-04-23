@@ -15,10 +15,8 @@ import {
 } from "../../lib/bifrost/packageService";
 import { packagePasswordForShare } from "../../lib/bifrost/format";
 import type {
-  BfProfilePayload,
   StoredProfileRecord,
 } from "../../lib/bifrost/types";
-import { SetupFlowError } from "../AppState";
 import {
   BRIDGE_EVENT,
   BRIDGE_STORAGE_KEY,

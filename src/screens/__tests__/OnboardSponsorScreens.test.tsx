@@ -22,7 +22,6 @@ import { MockAppStateProvider } from "../../app/MockAppStateProvider";
 import { createDemoAppState } from "../../demo/fixtures";
 import type { StoredProfileSummary } from "../../lib/bifrost/types";
 import {
-  ONBOARD_SPONSOR_LABEL_EMPTY_ERROR,
   ONBOARD_SPONSOR_PASSWORD_MISMATCH_ERROR,
   ONBOARD_SPONSOR_PASSWORD_TOO_SHORT_ERROR,
   ONBOARD_SPONSOR_RELAY_EMPTY_ERROR,

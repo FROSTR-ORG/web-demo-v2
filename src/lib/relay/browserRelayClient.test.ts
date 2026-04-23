@@ -117,7 +117,7 @@ class FakeRelayClient implements RelayClient {
 
   constructor(
     urls: string[],
-    private readonly failAll = false,
+    failAll = false,
     optionsByUrl: Record<
       string,
       ConstructorParameters<typeof FakeRelayConnection>[1]

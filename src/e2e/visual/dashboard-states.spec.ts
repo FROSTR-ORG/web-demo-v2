@@ -134,7 +134,6 @@ const PAPER_MAX_DIFF_PIXEL_RATIO = 0.20;
  */
 function cropTopAligned(src: PNG, width: number, height: number): PNG {
   const out = new PNG({ width, height });
-  const rowBytes = width * 4;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       if (x >= src.width || y >= src.height) continue;

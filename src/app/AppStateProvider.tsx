@@ -44,7 +44,6 @@ import type {
   GroupPackageWire,
   KeysetBundle,
   OnboardingPackageView,
-  OperationFailure,
   RuntimeBootstrapInput,
   RuntimeEvent,
   RuntimeSnapshotInput,

@@ -2,9 +2,15 @@
 
 This document enumerates the set of `console.warn` messages that are expected to
 appear at runtime in `web-demo-v2` and are therefore allowlisted by the
-demo-gallery and multi-device e2e specs (see
-`src/e2e/demo-gallery.spec.ts` — `collectConsoleNoise` /
-`allowedConsoleWarnPatterns`).
+demo-gallery and multi-device e2e specs. The demo-gallery gate lives in
+`src/e2e/demo-gallery.spec.ts` and collects messages via a direct
+`page.on("console", …)` handler that pushes every `type === "error"` entry
+into an `errors: string[]` array (then asserted empty per-scenario). There is
+currently no separate "allowed warn patterns" regex list — the policy below
+is enforced by the combination of that handler, `vitest.setup.ts`'s
+`console.warn`/`console.error` interceptors, and the per-spec handlers used
+by the multi-device e2e suites (each spec declares its own `page.on("console",
+…)` allowlist inline where needed).
 
 ## Policy
 
@@ -18,13 +24,13 @@ demo-gallery and multi-device e2e specs (see
 
 Any new `console.warn` introduced by the app layer must either be (a) removed
 before committing, or (b) added to this file with a rationale AND (if
-necessary) to the regex list in the e2e specs.
+necessary) to the relevant `page.on("console", …)` allowlist in the e2e specs.
 
 ## Current allowlist
 
 _None._ The demo-gallery + multi-device e2e gate currently runs with a strict
 zero-warning policy (the pre-existing `PeersPanel` nested-button React DOM
-warning was fixed in commit `b478499` under `misc-peers-panel-nested-button`).
+warning was fixed under feature `misc-peers-panel-nested-button`).
 
 If a future warning is added here, its pattern (anchored regex) must also be
 added to the e2e spec's allowlist and this file must explain:

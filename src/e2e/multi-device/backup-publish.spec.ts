@@ -60,7 +60,6 @@ const RELAY_URL = `ws://${RELAY_HOST}:${RELAY_PORT}`;
 
 const RELAY_READY_TIMEOUT_MS = 20_000;
 const BACKUP_EVENT_TIMEOUT_MS = 30_000;
-const PUBLISH_TIMEOUT_MS = 30_000;
 
 function cargoAvailable(): boolean {
   try {

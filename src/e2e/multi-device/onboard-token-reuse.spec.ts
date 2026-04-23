@@ -38,7 +38,6 @@ const RELAY_URL = `ws://${RELAY_HOST}:${RELAY_PORT}`;
 const RELAY_READY_TIMEOUT_MS = 20_000;
 const HOOKS_READY_TIMEOUT_MS = 15_000;
 const RUNTIME_READY_TIMEOUT_MS = 20_000;
-const ONBOARD_HANDSHAKE_TIMEOUT_MS = 90_000;
 
 const SPONSOR_PROFILE_PASSWORD = "token-reuse-sponsor-pw";
 const ONBOARD_PACKAGE_PASSWORD = "token-reuse-package-pw";

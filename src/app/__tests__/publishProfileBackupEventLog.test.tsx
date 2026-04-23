@@ -111,7 +111,6 @@ vi.mock("idb-keyval", () => ({
 
 vi.mock("../../lib/bifrost/runtimeClient", () => ({
   RuntimeClient: class {
-    private alive = true;
     runtimeStatus() {
       return relayPumpMock.status;
     }
@@ -156,7 +155,7 @@ vi.mock("../../lib/bifrost/runtimeClient", () => ({
       /* no-op */
     }
     wipeState() {
-      this.alive = false;
+      /* no-op */
     }
   },
 }));

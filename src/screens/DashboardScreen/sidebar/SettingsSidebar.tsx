@@ -8,7 +8,6 @@ import {
   RELAY_INVALID_URL_ERROR,
   isValidRelayUrl,
   normalizeRelayKey,
-  validateRelayUrl,
 } from "../../../lib/relay/relayUrl";
 import { paperGroupKey } from "../mocks";
 
@@ -343,7 +342,7 @@ export function SettingsSidebar({
   // user understands why the action is blocked. The "wrong current"
   // message is set only after a dispatched change fails with a
   // `wrong_password` error so it never appears before any submit.
-  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [, setSubmitAttempted] = useState(false);
   const newPasswordTooShort =
     newPassword.length > 0 && newPassword.length < CHANGE_PASSWORD_MIN_LENGTH;
   const confirmMismatch =

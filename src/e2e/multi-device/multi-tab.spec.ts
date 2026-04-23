@@ -111,7 +111,7 @@ async function readActiveProfileId(page: Page): Promise<string | null> {
 
 async function waitForActiveProfile(
   page: Page,
-  label: string,
+  _label: string,
   expected: string | null,
   timeoutMs: number,
 ): Promise<number | null> {

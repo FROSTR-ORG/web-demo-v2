@@ -515,8 +515,6 @@ function LocalShareUpdatedContent({
     }
   };
 
-  const oldProfileId = replaceShareSession?.oldProfileId ?? "—";
-  const newProfileId = replaceShareSession?.newProfileId ?? activeProfile?.id ?? "—";
   const groupPublicKey = activeProfile?.groupPublicKey ?? "—";
   const headerMeta = activeProfile?.groupName ?? "Replace Share";
 

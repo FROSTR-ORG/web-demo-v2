@@ -74,8 +74,6 @@ function GenerationProgressContent({
     }
   }, [phases, allDone, navigate, advancePhase, demoUi.progress?.frozen]);
 
-  const progressPercent = (doneCount / phases.length) * 100;
-
   return (
     <AppShell headerMeta={groupName} mainVariant="flow">
       <div className="screen-column">

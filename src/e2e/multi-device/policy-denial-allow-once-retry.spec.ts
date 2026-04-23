@@ -1076,7 +1076,6 @@ test.describe("multi-device denial → allow-once → retry-success (VAL-CROSS-0
               )}).\nB state:\n${JSON.stringify(diag, null, 2)}`,
           );
         }
-        const retryRequestIdStr: string = successfulRetryRequestId;
         const retrySignatures: string[] | null = successfulSignatures;
         expect(retrySignatures).not.toBeNull();
         expect(Array.isArray(retrySignatures)).toBe(true);

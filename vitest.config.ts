@@ -5,6 +5,7 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
     css: true,
+    maxConcurrency: 2,
     exclude: ["node_modules/**", "dist/**", "src/e2e/**"]
   }
 });

@@ -33,7 +33,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppStateProvider, useAppState } from "../AppState";
 import type { AppStateValue } from "../AppState";
 import {
-  createKeysetBundle,
   decodeBfonboardPackage,
   defaultManualPeerPolicyOverrides,
   profilePayloadForShare,

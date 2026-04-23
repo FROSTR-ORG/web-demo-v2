@@ -1,7 +1,7 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import net from "node:net";
 import { existsSync } from "node:fs";
-import { test, expect, type Page, type WebSocket } from "@playwright/test";
+import { test, expect, type WebSocket } from "@playwright/test";
 
 /**
  * Multi-device onboard per-relay fan-out e2e for feature

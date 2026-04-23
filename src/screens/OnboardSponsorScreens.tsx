@@ -32,7 +32,7 @@
 
 import { Copy, QrCode, X } from "lucide-react";
 import QRCode from "qrcode";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAppState } from "../app/AppState";
 import {
