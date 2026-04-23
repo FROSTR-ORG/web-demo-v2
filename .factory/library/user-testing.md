@@ -210,3 +210,14 @@ The spec self-hosts an isolated `bifrost-devtools` relay on `ws://127.0.0.1:8194
 **Related deviation**: `docs/runtime-deviations-from-paper.md > Local bifrost-devtools relay does NOT enforce NIP-16/33 replaceable semantics (VAL-BACKUP-006 / VAL-BACKUP-031)` covers the NIP-16/33 gap and the rationale for treating the spec as the canonical evidence.
 
 - For `VAL-BACKUP-028` targeted reruns, use `-t "VAL-BACKUP-028"` (not the full literal test title with parentheses). Vitest `-t` is a regex; unescaped parentheses in the full literal title can produce a no-match all-skipped run.
+
+## Flow Validator Guidance: shell-cli
+
+- Use this surface for contract gates that explicitly require shell commands (`tsc`, `vitest`, `lint`, `format:check`, `rg` doc/source checks).
+- Always run commands from repo root: `/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2`.
+- Record exact command, exit code, and a short output snippet in the flow report.
+- Do not run multi-device Playwright specs from this surface; keep port-8194 specs under `playwright-cli` to avoid relay-port contention.
+- For `VAL-CROSS-029`, validate the documented no-service-worker path by combining:
+  - source grep evidence (`rg -n "serviceWorker|service-worker|navigator\\.serviceWorker" src public`)
+  - deviation doc presence in `docs/runtime-deviations-from-paper.md`.
+- For `VAL-CROSS-030`, require `rg -n "VAL-" docs/runtime-deviations-from-paper.md` evidence and include matching assertion IDs in the flow report reasoning.

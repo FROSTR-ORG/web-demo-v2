@@ -1,0 +1,362 @@
+{
+  "groupId": "g1-onboard-runtime",
+  "testedAt": "2026-04-23T05:17:55Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "flowValidatorGuidance": "playwright-cli",
+    "relayPort": 8194,
+    "serialExecutionRequired": true,
+    "assignedAssertions": [
+      "VAL-ONBOARD-006",
+      "VAL-ONBOARD-007",
+      "VAL-ONBOARD-008",
+      "VAL-ONBOARD-009",
+      "VAL-ONBOARD-010",
+      "VAL-ONBOARD-011",
+      "VAL-ONBOARD-012",
+      "VAL-ONBOARD-013",
+      "VAL-ONBOARD-014",
+      "VAL-ONBOARD-015",
+      "VAL-ONBOARD-018",
+      "VAL-ONBOARD-020",
+      "VAL-CROSS-001",
+      "VAL-CROSS-002",
+      "VAL-CROSS-016",
+      "VAL-CROSS-018",
+      "VAL-CROSS-020",
+      "VAL-CROSS-008"
+    ]
+  },
+  "toolsUsed": [
+    "playwright-cli"
+  ],
+  "commandsRun": [
+    {
+      "command": "npx playwright test src/e2e/multi-device/onboard-sponsorship.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "status": "pass",
+      "evidence": {
+        "transcript": "m7-onboard/g1-onboard-runtime/01-onboard-sponsorship.txt",
+        "exitCodeFile": "m7-onboard/g1-onboard-runtime/01-onboard-sponsorship.exit",
+        "snippet": "1 passed (2.8s)"
+      }
+    },
+    {
+      "command": "npx playwright test src/e2e/multi-device/rotate-keyset-live-sign.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "status": "pass",
+      "evidence": {
+        "transcript": "m7-onboard/g1-onboard-runtime/02-rotate-keyset-live-sign.txt",
+        "exitCodeFile": "m7-onboard/g1-onboard-runtime/02-rotate-keyset-live-sign.exit",
+        "snippet": "1 passed (46.5s)"
+      }
+    },
+    {
+      "command": "npx playwright test src/e2e/multi-device/policy-denial-allow-once-retry.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "status": "pass",
+      "evidence": {
+        "transcript": "m7-onboard/g1-onboard-runtime/03-policy-denial-allow-once-retry.txt",
+        "exitCodeFile": "m7-onboard/g1-onboard-runtime/03-policy-denial-allow-once-retry.exit",
+        "snippet": "1 passed (13.8s)"
+      }
+    }
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-ONBOARD-006",
+      "title": "Source runtime enqueues outbound Onboard envelope",
+      "status": "blocked",
+      "reason": "The executed specs did not directly assert drain_outbound_events payload contents for an outbound Onboard envelope.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/onboard-sponsorship.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-ONBOARD-007",
+      "title": "Relay publish actually reaches configured relays",
+      "status": "blocked",
+      "reason": "The executed specs did not directly capture per-relay publish/OK frame evidence for configured relay fan-out.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/onboard-sponsorship.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-ONBOARD-008",
+      "title": "Requester device completes handshake end-to-end",
+      "status": "pass",
+      "reason": "onboard-sponsorship.spec.ts passed and explicitly asserts sponsor\u2192requester handshake completion with adopted profile bound to the source group public key.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/onboard-sponsorship.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-ONBOARD-009",
+      "title": "Source dashboard peer list updates with the new member",
+      "status": "blocked",
+      "reason": "The executed specs did not directly assert source dashboard peer-list row rendering/persistence for the newly onboarded member.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/onboard-sponsorship.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-ONBOARD-010",
+      "title": "Group threshold/member count reflects the update accurately",
+      "status": "blocked",
+      "reason": "The executed specs did not directly assert Settings > Group Profile threshold text/date UI behavior required by this assertion.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/onboard-sponsorship.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-ONBOARD-011",
+      "title": "ONBOARD event-log entry on both sides",
+      "status": "pass",
+      "reason": "onboard-sponsorship.spec.ts passed and explicitly verifies ONBOARD-tagged runtime event-log entries on both sponsor and requester contexts.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/onboard-sponsorship.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-ONBOARD-012",
+      "title": "Wrong or expired password fails cleanly",
+      "status": "blocked",
+      "reason": "None of the executed specs exercised wrong-password or expired-package failure paths for onboarding.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-ONBOARD-013",
+      "title": "Two simultaneous onboards remain isolated",
+      "status": "blocked",
+      "reason": "None of the executed specs drove two concurrent onboarding ceremonies across three contexts.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-ONBOARD-014",
+      "title": "Sponsor can cancel an in-flight onboard",
+      "status": "blocked",
+      "reason": "None of the executed specs exercised sponsor-side cancel flow and post-cancel drain verification.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-ONBOARD-015",
+      "title": "Real-relay e2e across two agent-browser contexts",
+      "status": "blocked",
+      "reason": "The executed harnesses used local ws://127.0.0.1:8194 relay and did not run the public-relay + camera-injection flow required by this assertion.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/onboard-sponsorship.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-ONBOARD-018",
+      "title": "Duplicate device label handling",
+      "status": "blocked",
+      "reason": "None of the executed specs tested duplicate-label validation/disambiguation behavior in sponsor flow.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-ONBOARD-020",
+      "title": "Threshold/roster limits enforced on sponsor flow",
+      "status": "blocked",
+      "reason": "None of the executed specs attempted over-capacity onboarding (exhausted share slots) and resulting error handling.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-CROSS-001",
+      "title": "Full 2-of-3 bootstrap end-to-end (M7 + M1 + M2)",
+      "status": "blocked",
+      "reason": "The executed specs did not run the full A/B/C public-relay bootstrap workflow from create/distribute/onboard through approvals required by this assertion.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-CROSS-002",
+      "title": "Sign fan-out initiated from non-origin peer (M1 + M2)",
+      "status": "blocked",
+      "reason": "The executed specs did not directly assert B-initiated sign with A approval-history/UI correlation semantics required by this assertion.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-CROSS-016",
+      "title": "Public relay readiness end-to-end",
+      "status": "blocked",
+      "reason": "All executed specs targeted local relay ws://127.0.0.1:8194 and did not validate primal-only public relay readiness/sign completion path.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-CROSS-018",
+      "title": "Idempotent re-onboard safety (M7 + Welcome/Unlock)",
+      "status": "blocked",
+      "reason": "None of the executed specs attempted reusing an already-consumed onboarding token in a fresh browser profile.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-CROSS-020",
+      "title": "End-to-end happy path smoke (meta)",
+      "status": "blocked",
+      "reason": "The required chained meta flow (001\u2192002\u2192003\u2192015\u2192016) was not executed as one continuous scripted session by the assigned command set.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-CROSS-008",
+      "title": "Rotate Keyset with live sign (Rotate Keyset + M1 + M2 + M7)",
+      "status": "blocked",
+      "reason": "rotate-keyset-live-sign.spec.ts validated key rotate + sign-success/old-share-failure, but did not directly assert the full cross-contract flow details (B-initiated sign with approval UI/event-log/indexeddb checks) required by VAL-CROSS-008.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/rotate-keyset-live-sign.spec.ts --project=desktop --workers 1"
+    }
+  ],
+  "frictions": [
+    {
+      "description": "One required command (`policy-denial-allow-once-retry.spec.ts`) validates VAL-CROSS-003 semantics, which are outside this assignment's assertion list, so it did not contribute direct evidence for assigned assertions.",
+      "resolved": true,
+      "resolution": "Recorded as executed evidence with exit code 0 and left non-overlapping assigned assertions as blocked per instruction.",
+      "affectedAssertions": [
+        "VAL-CROSS-001",
+        "VAL-CROSS-002",
+        "VAL-CROSS-008",
+        "VAL-CROSS-016",
+        "VAL-CROSS-018",
+        "VAL-CROSS-020"
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "description": "Most assigned assertions require behaviors not directly asserted by the three mandated spec runs (e.g., public relay/camera paths, concurrent onboard isolation, cancel flow, duplicate-label and roster-limit checks, cross-flow meta chaining).",
+      "affectedAssertions": [
+        "VAL-ONBOARD-006",
+        "VAL-ONBOARD-007",
+        "VAL-ONBOARD-009",
+        "VAL-ONBOARD-010",
+        "VAL-ONBOARD-012",
+        "VAL-ONBOARD-013",
+        "VAL-ONBOARD-014",
+        "VAL-ONBOARD-015",
+        "VAL-ONBOARD-018",
+        "VAL-ONBOARD-020",
+        "VAL-CROSS-001",
+        "VAL-CROSS-002",
+        "VAL-CROSS-008",
+        "VAL-CROSS-016",
+        "VAL-CROSS-018",
+        "VAL-CROSS-020"
+      ],
+      "quickFixAttempted": "Executed all three mandated specs serially exactly as assigned and mapped coverage strictly to directly asserted behaviors."
+    }
+  ],
+  "overallSummary": "18 assertions targeted: 2 pass, 0 fail, 16 blocked.",
+  "assertions": [
+    {
+      "id": "VAL-ONBOARD-006",
+      "title": "Source runtime enqueues outbound Onboard envelope",
+      "status": "blocked",
+      "reason": "The executed specs did not directly assert drain_outbound_events payload contents for an outbound Onboard envelope.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/onboard-sponsorship.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-ONBOARD-007",
+      "title": "Relay publish actually reaches configured relays",
+      "status": "blocked",
+      "reason": "The executed specs did not directly capture per-relay publish/OK frame evidence for configured relay fan-out.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/onboard-sponsorship.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-ONBOARD-008",
+      "title": "Requester device completes handshake end-to-end",
+      "status": "pass",
+      "reason": "onboard-sponsorship.spec.ts passed and explicitly asserts sponsor\u2192requester handshake completion with adopted profile bound to the source group public key.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/onboard-sponsorship.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-ONBOARD-009",
+      "title": "Source dashboard peer list updates with the new member",
+      "status": "blocked",
+      "reason": "The executed specs did not directly assert source dashboard peer-list row rendering/persistence for the newly onboarded member.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/onboard-sponsorship.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-ONBOARD-010",
+      "title": "Group threshold/member count reflects the update accurately",
+      "status": "blocked",
+      "reason": "The executed specs did not directly assert Settings > Group Profile threshold text/date UI behavior required by this assertion.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/onboard-sponsorship.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-ONBOARD-011",
+      "title": "ONBOARD event-log entry on both sides",
+      "status": "pass",
+      "reason": "onboard-sponsorship.spec.ts passed and explicitly verifies ONBOARD-tagged runtime event-log entries on both sponsor and requester contexts.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/onboard-sponsorship.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-ONBOARD-012",
+      "title": "Wrong or expired password fails cleanly",
+      "status": "blocked",
+      "reason": "None of the executed specs exercised wrong-password or expired-package failure paths for onboarding.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-ONBOARD-013",
+      "title": "Two simultaneous onboards remain isolated",
+      "status": "blocked",
+      "reason": "None of the executed specs drove two concurrent onboarding ceremonies across three contexts.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-ONBOARD-014",
+      "title": "Sponsor can cancel an in-flight onboard",
+      "status": "blocked",
+      "reason": "None of the executed specs exercised sponsor-side cancel flow and post-cancel drain verification.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-ONBOARD-015",
+      "title": "Real-relay e2e across two agent-browser contexts",
+      "status": "blocked",
+      "reason": "The executed harnesses used local ws://127.0.0.1:8194 relay and did not run the public-relay + camera-injection flow required by this assertion.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/onboard-sponsorship.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-ONBOARD-018",
+      "title": "Duplicate device label handling",
+      "status": "blocked",
+      "reason": "None of the executed specs tested duplicate-label validation/disambiguation behavior in sponsor flow.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-ONBOARD-020",
+      "title": "Threshold/roster limits enforced on sponsor flow",
+      "status": "blocked",
+      "reason": "None of the executed specs attempted over-capacity onboarding (exhausted share slots) and resulting error handling.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-CROSS-001",
+      "title": "Full 2-of-3 bootstrap end-to-end (M7 + M1 + M2)",
+      "status": "blocked",
+      "reason": "The executed specs did not run the full A/B/C public-relay bootstrap workflow from create/distribute/onboard through approvals required by this assertion.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-CROSS-002",
+      "title": "Sign fan-out initiated from non-origin peer (M1 + M2)",
+      "status": "blocked",
+      "reason": "The executed specs did not directly assert B-initiated sign with A approval-history/UI correlation semantics required by this assertion.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-CROSS-016",
+      "title": "Public relay readiness end-to-end",
+      "status": "blocked",
+      "reason": "All executed specs targeted local relay ws://127.0.0.1:8194 and did not validate primal-only public relay readiness/sign completion path.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-CROSS-018",
+      "title": "Idempotent re-onboard safety (M7 + Welcome/Unlock)",
+      "status": "blocked",
+      "reason": "None of the executed specs attempted reusing an already-consumed onboarding token in a fresh browser profile.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-CROSS-020",
+      "title": "End-to-end happy path smoke (meta)",
+      "status": "blocked",
+      "reason": "The required chained meta flow (001\u2192002\u2192003\u2192015\u2192016) was not executed as one continuous scripted session by the assigned command set.",
+      "commandEvidence": "Ran only onboard-sponsorship.spec.ts, rotate-keyset-live-sign.spec.ts, and policy-denial-allow-once-retry.spec.ts"
+    },
+    {
+      "id": "VAL-CROSS-008",
+      "title": "Rotate Keyset with live sign (Rotate Keyset + M1 + M2 + M7)",
+      "status": "blocked",
+      "reason": "rotate-keyset-live-sign.spec.ts validated key rotate + sign-success/old-share-failure, but did not directly assert the full cross-contract flow details (B-initiated sign with approval UI/event-log/indexeddb checks) required by VAL-CROSS-008.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/rotate-keyset-live-sign.spec.ts --project=desktop --workers 1"
+    }
+  ]
+}

@@ -1,0 +1,239 @@
+{
+  "groupId": "g3-cross-system-gates",
+  "testedAt": "2026-04-23T05:27:23Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "flowGuidance": "Flow Validator Guidance: shell-cli",
+    "assignedAssertions": [
+      "VAL-CROSS-011",
+      "VAL-CROSS-012",
+      "VAL-CROSS-013",
+      "VAL-CROSS-024",
+      "VAL-CROSS-029",
+      "VAL-CROSS-030",
+      "VAL-CROSS-032"
+    ]
+  },
+  "toolsUsed": [
+    "shell-cli",
+    "npx",
+    "npm",
+    "rg"
+  ],
+  "commandRuns": [
+    {
+      "command": "npx tsc --noEmit -p tsconfig.json --pretty false",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g3-cross-system-gates/01-tsc-noemit.txt",
+      "outputSnippet": "TypeScript noEmit gate completed with exit code 0 and no TS error lines."
+    },
+    {
+      "command": "npx vitest run --config vitest.config.ts",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g3-cross-system-gates/02-vitest-all.txt",
+      "outputSnippet": "Test Files 119 passed (119); Tests 1054 passed (1054)."
+    },
+    {
+      "command": "npx vitest run src/app/__tests__/snapshot.security.test.tsx --config vitest.config.ts",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g3-cross-system-gates/03-vitest-snapshot-security.txt",
+      "outputSnippet": "Test Files 1 passed (1); Tests 2 passed (2)."
+    },
+    {
+      "command": "npm run lint",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g3-cross-system-gates/04-npm-lint.txt",
+      "outputSnippet": "lint via tsc+vitest (see docs/allowed-console-warnings.md)."
+    },
+    {
+      "command": "npm run format:check",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g3-cross-system-gates/05-npm-format-check.txt",
+      "outputSnippet": "format:check via tsc+vitest (see docs/allowed-console-warnings.md)."
+    },
+    {
+      "command": "rg -n \"serviceWorker|service-worker|navigator\\.serviceWorker\" src public",
+      "exitCode": 1,
+      "transcript": "m7-onboard/g3-cross-system-gates/06-rg-service-worker.txt",
+      "outputSnippet": "No matches in src/public (rg exit code 1)."
+    },
+    {
+      "command": "rg -n \"VAL-\" docs/runtime-deviations-from-paper.md",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g3-cross-system-gates/07-rg-val-docs.txt",
+      "outputSnippet": "Deviation doc contains many VAL-linked entries including VAL-CROSS-029 coverage and APPROVALS/POLICIES references."
+    }
+  ],
+  "assertions": [
+    {
+      "id": "VAL-CROSS-011",
+      "title": "Security invariant sweep on a live runtime",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Run assigned shell commands including targeted snapshot security test",
+          "expected": "Direct live-runtime storage sweep evidence (sessionStorage/localStorage/IndexedDB + bridge snapshot) from an active browser runtime",
+          "observed": "Only shell/Vitest evidence was collected; no live browser storage dump artifacts were produced in this run set."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g3-cross-system-gates/02-vitest-all.txt",
+          "m7-onboard/g3-cross-system-gates/03-vitest-snapshot-security.txt"
+        ],
+        "exitCodes": [0, 0]
+      },
+      "issues": "Command evidence does not directly satisfy the live-runtime DevTools storage-sweep requirement."
+    },
+    {
+      "id": "VAL-CROSS-012",
+      "title": "TypeScript gate",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run npx tsc --noEmit -p tsconfig.json --pretty false",
+          "expected": "Exit code 0 and zero error TS#### lines",
+          "observed": "Command exited 0; transcript contains no TypeScript error lines."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g3-cross-system-gates/01-tsc-noemit.txt"
+        ],
+        "exitCodes": [0]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-013",
+      "title": "Unit/integration test gate",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Run npx vitest run --config vitest.config.ts",
+          "expected": "All suites pass plus contract clauses about no .skip additions vs baseline and test-import coverage for all modified src files",
+          "observed": "Full Vitest run passed (119 files / 1054 tests), but this command set did not directly provide baseline .skip-diff evidence or per-modified-file import mapping evidence."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g3-cross-system-gates/02-vitest-all.txt"
+        ],
+        "exitCodes": [0]
+      },
+      "issues": "Partial gate evidence only; additional diff/import-audit proof was not part of the assigned shell run set."
+    },
+    {
+      "id": "VAL-CROSS-024",
+      "title": "Live secret sweep across all steady-state surfaces",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Run assigned shell commands including targeted security snapshot test",
+          "expected": "Live DOM/attribute + IDB/localStorage/sessionStorage + bridge sweep during runtime Running state with zero secret matches",
+          "observed": "Vitest security snapshot test passed, but no live browser steady-state sweep transcript/artifact was produced in this shell-only assignment."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g3-cross-system-gates/03-vitest-snapshot-security.txt"
+        ],
+        "exitCodes": [0]
+      },
+      "issues": "No direct live-surface sweep artifact in the assigned command evidence."
+    },
+    {
+      "id": "VAL-CROSS-029",
+      "title": "Service worker staleness does not break deep links",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run rg service worker sweep on src/public",
+          "expected": "No service-worker registration references when validating documented no-SW path",
+          "observed": "rg returned no matches (exit 1)."
+        },
+        {
+          "action": "Run rg VAL- sweep on runtime deviations document",
+          "expected": "Documented deviation entry for no-service-worker path",
+          "observed": "Transcript includes the VAL-CROSS-029 deviation section and assertion-coverage lines."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g3-cross-system-gates/06-rg-service-worker.txt",
+          "m7-onboard/g3-cross-system-gates/07-rg-val-docs.txt"
+        ],
+        "exitCodes": [1, 0]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-030",
+      "title": "Deviation documentation exists for every documented gap",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run rg -n \"VAL-\" docs/runtime-deviations-from-paper.md",
+          "expected": "Deviation doc emits VAL-linked entries with assertion coverage references",
+          "observed": "Command returned extensive VAL-linked entries, including APPROVALS, POLICIES, OPS, BACKUP, ONBOARD, SETTINGS, and CROSS sections with assertion coverage lines."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g3-cross-system-gates/07-rg-val-docs.txt"
+        ],
+        "exitCodes": [0]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-032",
+      "title": "Lint and format gates pass",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run npm run lint and npm run format:check",
+          "expected": "Both commands exit 0",
+          "observed": "Both commands exited 0 in this run."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g3-cross-system-gates/04-npm-lint.txt",
+          "m7-onboard/g3-cross-system-gates/05-npm-format-check.txt"
+        ],
+        "exitCodes": [0, 0]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Vitest full-suite transcript contains jsdom environment warnings/noise (e.g., unimplemented canvas/scroll APIs) while still exiting successfully.",
+      "resolved": true,
+      "resolution": "Recorded as non-blocking transcript context; assertion outcomes were based on exit codes and direct contract evidence.",
+      "affectedAssertions": [
+        "VAL-CROSS-013"
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "description": "Live-runtime security sweeps required by VAL-CROSS-011 and VAL-CROSS-024 are not directly evidenced by the assigned shell command set.",
+      "affectedAssertions": [
+        "VAL-CROSS-011",
+        "VAL-CROSS-024"
+      ],
+      "quickFixAttempted": "Executed the assigned snapshot security Vitest command, but it is non-live and does not produce browser storage dump artifacts."
+    },
+    {
+      "description": "VAL-CROSS-013 includes baseline/diff coverage clauses (no new .skip, modified-file import coverage) not directly proven by the assigned command list.",
+      "affectedAssertions": [
+        "VAL-CROSS-013"
+      ],
+      "quickFixAttempted": "Executed the full Vitest suite to satisfy the pass/fail run gate and captured full transcript + exit code."
+    }
+  ],
+  "summary": "Tested 7 assigned assertions from shell-cli evidence: 4 passed, 0 failed, 3 blocked."
+}

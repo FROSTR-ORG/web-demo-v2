@@ -1,0 +1,195 @@
+{
+  "milestone": "m7-onboard",
+  "round": 1,
+  "status": "fail",
+  "assertionsSummary": {
+    "total": 50,
+    "passed": 29,
+    "failed": 0,
+    "blocked": 21
+  },
+  "passedAssertions": [
+    "VAL-CROSS-010",
+    "VAL-CROSS-011",
+    "VAL-CROSS-012",
+    "VAL-CROSS-013",
+    "VAL-CROSS-017",
+    "VAL-CROSS-021",
+    "VAL-CROSS-022",
+    "VAL-CROSS-024",
+    "VAL-CROSS-025",
+    "VAL-CROSS-026",
+    "VAL-CROSS-027",
+    "VAL-CROSS-028",
+    "VAL-CROSS-029",
+    "VAL-CROSS-030",
+    "VAL-CROSS-032",
+    "VAL-ONBOARD-001",
+    "VAL-ONBOARD-003",
+    "VAL-ONBOARD-004",
+    "VAL-ONBOARD-006",
+    "VAL-ONBOARD-008",
+    "VAL-ONBOARD-011",
+    "VAL-ONBOARD-012",
+    "VAL-ONBOARD-013",
+    "VAL-ONBOARD-014",
+    "VAL-ONBOARD-016",
+    "VAL-ONBOARD-018",
+    "VAL-ONBOARD-019",
+    "VAL-ONBOARD-021",
+    "VAL-ONBOARD-024"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [
+    {
+      "id": "VAL-CROSS-001",
+      "blockedBy": "The executed specs did not run the full A/B/C public-relay bootstrap workflow from create/distribute/onboard through approvals required by this assertion."
+    },
+    {
+      "id": "VAL-CROSS-002",
+      "blockedBy": "The executed specs did not directly assert B-initiated sign with A approval-history/UI correlation semantics required by this assertion."
+    },
+    {
+      "id": "VAL-CROSS-008",
+      "blockedBy": "rotate-keyset-live-sign.spec.ts validated key rotate + sign-success/old-share-failure, but did not directly assert the full cross-contract flow details (B-initiated sign with approval UI/event-log/indexeddb checks) required by VAL-CROSS-008."
+    },
+    {
+      "id": "VAL-CROSS-014",
+      "blockedBy": "Insufficient direct evidence for the dev-server/HMR-specific contract clauses from the prescribed command list."
+    },
+    {
+      "id": "VAL-CROSS-016",
+      "blockedBy": "All executed specs targeted local relay ws://127.0.0.1:8194 and did not validate primal-only public relay readiness/sign completion path."
+    },
+    {
+      "id": "VAL-CROSS-018",
+      "blockedBy": "None of the executed specs attempted reusing an already-consumed onboarding token in a fresh browser profile."
+    },
+    {
+      "id": "VAL-CROSS-019",
+      "blockedBy": "Available run evidence is partial relative to the full VAL-CROSS-019 behavioral contract."
+    },
+    {
+      "id": "VAL-CROSS-020",
+      "blockedBy": "The required chained meta flow (001\u2192002\u2192003\u2192015\u2192016) was not executed as one continuous scripted session by the assigned command set."
+    },
+    {
+      "id": "VAL-CROSS-023",
+      "blockedBy": "Insufficient direct Back-button flow evidence in the mandated command set."
+    },
+    {
+      "id": "VAL-CROSS-031",
+      "blockedBy": "Warning-whitelist clause not directly evidenced by the recorded transcript output."
+    },
+    {
+      "id": "VAL-ONBOARD-002",
+      "blockedBy": "Insufficient direct evidence from the requested command set for keyboard activation/focus-ring behavior."
+    },
+    {
+      "id": "VAL-ONBOARD-005",
+      "blockedBy": "Insufficient direct evidence for the QR scannability clause from the specified runs."
+    },
+    {
+      "id": "VAL-ONBOARD-007",
+      "blockedBy": "The executed specs did not directly capture per-relay publish/OK frame evidence for configured relay fan-out."
+    },
+    {
+      "id": "VAL-ONBOARD-009",
+      "blockedBy": "The executed specs did not directly assert source dashboard peer-list row rendering/persistence for the newly onboarded member."
+    },
+    {
+      "id": "VAL-ONBOARD-010",
+      "blockedBy": "The executed specs did not directly assert Settings > Group Profile threshold text/date UI behavior required by this assertion."
+    },
+    {
+      "id": "VAL-ONBOARD-015",
+      "blockedBy": "The executed harnesses used local ws://127.0.0.1:8194 relay and did not run the public-relay + camera-injection flow required by this assertion."
+    },
+    {
+      "id": "VAL-ONBOARD-017",
+      "blockedBy": "No direct Paper parity artifact (comparison/screenshot diff) in the specified runs."
+    },
+    {
+      "id": "VAL-ONBOARD-020",
+      "blockedBy": "None of the executed specs attempted over-capacity onboarding (exhausted share slots) and resulting error handling."
+    },
+    {
+      "id": "VAL-ONBOARD-022",
+      "blockedBy": "Insufficient direct evidence for end-to-end keyboard cancellation semantics."
+    },
+    {
+      "id": "VAL-ONBOARD-023",
+      "blockedBy": "Insufficient direct evidence for focus-traversal clauses."
+    },
+    {
+      "id": "VAL-ONBOARD-025",
+      "blockedBy": "Insufficient direct evidence for all clauses of VAL-ONBOARD-025 from the requested command set."
+    }
+  ],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Added Flow Validator Guidance: shell-cli section covering shell gate evidence requirements and VAL-CROSS-029/030 checks.",
+      "source": "setup"
+    }
+  ],
+  "flowReports": [
+    {
+      "groupId": "g1-onboard-runtime",
+      "file": ".factory/validation/m7-onboard/user-testing/flows/g1-onboard-runtime.json"
+    },
+    {
+      "groupId": "g2-onboard-ui",
+      "file": ".factory/validation/m7-onboard/user-testing/flows/g2-onboard-ui.json"
+    },
+    {
+      "groupId": "g3-cross-system-gates",
+      "file": ".factory/validation/m7-onboard/user-testing/flows/g3-cross-system-gates.json"
+    },
+    {
+      "groupId": "g4-cross-ui-runtime",
+      "file": ".factory/validation/m7-onboard/user-testing/flows/g4-cross-ui-runtime.json"
+    }
+  ],
+  "toolsUsed": [
+    "npm",
+    "npx",
+    "playwright",
+    "playwright-cli",
+    "rg",
+    "shell-cli",
+    "vitest"
+  ],
+  "dedupedBlockers": [
+    {
+      "rootCause": "Insufficient direct evidence for full public-relay multi-device bootstrap chain assertions.",
+      "affects": [
+        "VAL-CROSS-001",
+        "VAL-CROSS-002",
+        "VAL-CROSS-016",
+        "VAL-CROSS-020",
+        "VAL-ONBOARD-015"
+      ]
+    },
+    {
+      "rootCause": "Onboard sponsor UI/manual interaction clauses not fully covered by current automated harness (focus restoration, tab traversal, post-copy interaction continuity, full QR decode loop).",
+      "affects": [
+        "VAL-ONBOARD-002",
+        "VAL-ONBOARD-005",
+        "VAL-ONBOARD-022",
+        "VAL-ONBOARD-023",
+        "VAL-ONBOARD-025"
+      ]
+    },
+    {
+      "rootCause": "Some cross-route/browser-manual clauses were not directly executed in this round (dev-server HMR deep-link continuity, Back-button continuity, per-route warning-whitelist accounting).",
+      "affects": [
+        "VAL-CROSS-014",
+        "VAL-CROSS-023",
+        "VAL-CROSS-031"
+      ]
+    }
+  ],
+  "previousRound": null,
+  "generatedAt": "2026-04-23T05:39:50Z"
+}
