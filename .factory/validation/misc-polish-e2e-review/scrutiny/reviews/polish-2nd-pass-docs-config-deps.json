@@ -1,0 +1,31 @@
+{
+  "featureId": "polish-2nd-pass-docs-config-deps",
+  "reviewedAt": "2026-04-23T07:31:27Z",
+  "commitId": "790e5ac1f0d493f809ad45b888247313016a8bb4",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "issues": [],
+  "codeReview": {
+    "summary": "Reviewed handoff, transcript skeleton, skill guidance, and commit 790e5ac1f0d493f809ad45b888247313016a8bb4. Changes align with the feature scope (docs/config/dependency polish plus noUnused cleanup), and no high-confidence functional defects were found in the attributable diff.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "target": "AGENTS.md",
+      "observation": "Task wording referenced 'AGENTS.md (repo root)' while the active operational AGENTS file is mission-scoped. The worker transcript shows attempts against both paths, which indicates ambiguity.",
+      "suggestedChange": "In mission AGENTS guidance, explicitly state whether AGENTS updates for polish tasks should be made in mission AGENTS only, and note if no repo-root AGENTS.md exists.",
+      "rationale": "Reduces path confusion and prevents future workers from probing/editing the wrong AGENTS location.",
+      "evidence": "Transcript skeleton for workerSessionId a37e95a9-d579-4eff-9fe6-eecae3fa58fc includes reads of both /web-demo-v2/AGENTS.md and /Users/plebdev/.factory/missions/.../AGENTS.md; repo root listing currently has no AGENTS.md."
+    },
+    {
+      "target": "skill",
+      "observation": "Feature was assigned runtime-worker even though the work was primarily docs/config/dependency polish. Handoff recorded followedProcedure=false solely due skipping agent-browser.",
+      "suggestedChange": "Add planner/skill guidance that docs/config-only polish features should use a non-runtime skill (or explicitly waive agent-browser when runtime-worker is used for non-UI docs/config tasks).",
+      "rationale": "Avoids avoidable procedure-deviation noise and keeps skill compliance signals meaningful.",
+      "evidence": "features.json sets skillName=runtime-worker for polish-2nd-pass-docs-config-deps; handoff.skillFeedback marks followedProcedure=false with the only deviation being agent-browser omission."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Pass. The feature’s commit-level implementation is consistent with the requested docs/config/dependency polish and includes the expected cleanup/config updates without introducing high-confidence actionable defects."
+}
