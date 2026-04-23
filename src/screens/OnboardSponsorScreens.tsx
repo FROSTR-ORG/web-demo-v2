@@ -418,7 +418,15 @@ export function OnboardSponsorConfigScreen() {
               Add Relay
             </Button>
           </div>
-          {submitAttempted && relayListError && (
+          {relayListError && (
+            // fix-m7-scrutiny-r1-sponsor-ui-relay-validation — surface
+            // the empty-relay error eagerly. The CTA is already disabled
+            // while `relays.length === 0`, so the submit-gated branch
+            // that previously guarded this error was dead code: the
+            // user could never trigger submit to flip `submitAttempted`.
+            // Removing all relays (or loading a profile with none)
+            // should immediately flag the inline error below the relay
+            // section so the user knows why the CTA is disabled.
             <span
               className="field-error-text"
               data-testid="onboard-sponsor-relay-empty-error"

@@ -24,6 +24,7 @@ import {
   ONBOARD_SPONSOR_LABEL_EMPTY_ERROR,
   ONBOARD_SPONSOR_PASSWORD_MISMATCH_ERROR,
   ONBOARD_SPONSOR_PASSWORD_TOO_SHORT_ERROR,
+  ONBOARD_SPONSOR_RELAY_EMPTY_ERROR,
   ONBOARD_SPONSOR_SIGNER_PAUSED_ERROR,
   ONBOARD_SPONSOR_THRESHOLD_INVALID_ERROR,
   type AppStateValue,
@@ -214,6 +215,50 @@ describe("OnboardSponsorConfigScreen — VAL-ONBOARD-003 / 019 / 021 / 024", () 
       screen.getByText(ONBOARD_SPONSOR_PASSWORD_MISMATCH_ERROR),
     ).toBeInTheDocument();
   });
+
+  it(
+    "surfaces the empty-relay error immediately when all relays are removed, not after a submit click (fix-m7-scrutiny-r1-sponsor-ui-relay-validation)",
+    () => {
+      renderConfig();
+      // No error yet — profile has relays configured.
+      expect(
+        screen.queryByTestId("onboard-sponsor-relay-empty-error"),
+      ).not.toBeInTheDocument();
+
+      // Remove every relay row via its per-row remove button.
+      const rows = screen.getAllByTestId("onboard-sponsor-relay-row");
+      expect(rows.length).toBeGreaterThan(0);
+      const removeButtons = screen.getAllByRole("button", {
+        name: /^Remove wss:\/\//,
+      });
+      // Click from the end to avoid index shifting invalidating earlier
+      // buttons (React re-renders after each click).
+      for (let i = removeButtons.length - 1; i >= 0; i--) {
+        fireEvent.click(removeButtons[i]);
+      }
+
+      // Inline error appears immediately, before any submit attempt.
+      const emptyError = screen.getByTestId(
+        "onboard-sponsor-relay-empty-error",
+      );
+      expect(emptyError).toHaveTextContent(ONBOARD_SPONSOR_RELAY_EMPTY_ERROR);
+      // CTA stays disabled because no relay is configured.
+      const cta = screen.getByTestId(
+        "onboard-sponsor-create-btn",
+      ) as HTMLButtonElement;
+      expect(cta.disabled).toBe(true);
+
+      // Re-adding a valid relay clears the inline error.
+      fireEvent.change(
+        screen.getByTestId("onboard-sponsor-add-relay-input"),
+        { target: { value: "wss://relay.example.net" } },
+      );
+      fireEvent.click(screen.getByTestId("onboard-sponsor-add-relay-btn"));
+      expect(
+        screen.queryByTestId("onboard-sponsor-relay-empty-error"),
+      ).not.toBeInTheDocument();
+    },
+  );
 
   it("rejects invalid relay overrides with canonical wss:// copy", () => {
     renderConfig();
