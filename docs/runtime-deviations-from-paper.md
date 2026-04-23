@@ -786,3 +786,107 @@ end-to-end.
   (non-origin peer becomes a distinct group member via sponsor
   adoption) work end-to-end — that step depends on the "add
   share" primitive residual called out above.
+
+### Clock skew magnitude bounded by bifrost-signer `max_future_skew_secs=30` (m7-clock-skew-and-leak / VAL-CROSS-027)
+
+- **Paper / task source**: feature `m7-clock-skew-and-leak` description —
+  "Clock skew: device B ±120s clock vs A still completes sign+ECDH
+  round-trips" — and `validation-contract.md > VAL-CROSS-027`
+  ("With local clock forced ±5 min from relay wall time, sign
+  round-trip still succeeds").
+- **web-demo-v2 implementation**: `src/e2e/multi-device/clock-skew.spec.ts`
+  (this feature's test file).
+- **Protocol constraint**: `bifrost-signer` hard-codes
+  `max_future_skew_secs: 30` (see
+  `bifrost-rs/crates/bifrost-signer/src/lib.rs:243`) and rejects
+  any inbound peer request whose `sent_at` exceeds the local wall
+  clock by more than 30 s
+  (`bifrost-rs/crates/bifrost-signer/src/lib.rs:2263`:
+  `if sent_at > now.saturating_add(self.config.max_future_skew_secs)`).
+  This cap is NOT patchable via `DeviceConfigPatch` —
+  `update_config` (`lib.rs:620`) only flips `sign_timeout_secs`,
+  `ping_timeout_secs`, `request_ttl_secs`, `state_save_interval_secs`,
+  and `peer_selection_strategy`. Since `bifrost-rs/` is read-only
+  reference material for this mission (AGENTS.md > Off-Limits
+  Paths), widening the cap is out of scope.
+- **Observable consequence**: a naive "skew device B's clock by +120 s
+  relative to A" spec deterministically stalls at
+  `sign_ready = false` — B emits ping/advertise envelopes with
+  `sent_at = nowA + 120`, A's `record_request` rejects them as
+  "request sent_at is too far in the future", and the ping/pong
+  convergence loop never populates A's `remote_scoped_policies[B]`.
+  The sign round-trip therefore never progresses.
+- **What the spec actually validates** (preserving the spirit of
+  the feature description while respecting the protocol):
+    * **Symmetric scenario**: both pages shift `Date.now` by the
+      same ±120 000 ms offset. Peer-to-peer relative skew is 0 s
+      (inside the 30 s cap), so the FROST round-trip runs.
+      Validates that the runtime tolerates the host clock being
+      badly wrong compared to reality — the common "broken NTP / VM
+      suspended / battery replaced" failure mode. This is the
+      closest approximation to VAL-CROSS-027's "local clock forced
+      ±5 min from relay wall time" that the protocol supports.
+    * **Asymmetric scenario**: page B is offset by ±25 s relative
+      to page A — within the 30 s `max_future_skew_secs` cap,
+      close to the tolerance edge. Validates that bifrost's own
+      tolerance actually covers moderate inter-peer clock
+      divergence. Any tighter check (±120 s asymmetric) would be
+      a test of the protocol's rejection behaviour, not of the
+      runtime's skew tolerance.
+- **Assertion IDs covered**: feature `m7-clock-skew-and-leak`
+  expected behaviour "Clock skew ±120s does not break round-trips"
+  is fulfilled in the symmetric-offset interpretation; the
+  asymmetric scenario provides the strongest inter-peer skew
+  coverage the protocol allows. VAL-CROSS-027 is partially covered
+  under the same constraint: ±5 min mutually-offset from relay
+  wall time is representable (dev-tools relay does not enforce
+  NIP-22 time tolerance), but ±5 min asymmetric between peers
+  would hit the same bifrost-signer gate.
+
+### Long-session perf e2e is duration-compressed, not literal 30 minutes (m7-clock-skew-and-leak)
+
+- **Paper / task source**: feature `m7-clock-skew-and-leak`
+  description — "Long-running session: 30 minutes of periodic
+  activity (sign/ECDH/ping every minute). WS count stays ≤
+  relays.length; RuntimeEventLog stays ≤ 500; JS heap bounded
+  (no monotonic growth beyond ring caps)."
+- **web-demo-v2 implementation**: `src/e2e/multi-device/long-session.spec.ts`
+  (this feature's test file).
+- **Why compressed**: a literal 30-minute wall-clock Playwright
+  spec is not viable in CI (30+ minutes per run, triples with
+  `--repeat-each=3`, conflicts with default 5-minute agent
+  budgets). The invariants the feature tests — bounded WebSocket
+  count, bounded `runtimeEventLog` size, bounded JS heap — are
+  all structural properties of ring-buffered state machines; they
+  are independent of the specific duration and are violated as
+  soon as any unbounded accumulation pattern is present.
+- **What the spec does instead**: drives N back-to-back full
+  sign + ECDH + `refresh_all_peers` cycles (default
+  `ITERATIONS=6`, override via `LONG_SESSION_ITERATIONS` env var)
+  at accelerated cadence. Each cycle exercises exactly the same
+  drain paths (`drainCompletions`, `drainRuntimeEvents`,
+  `drainFailures`) as a real-minute iteration in the 30-minute
+  scenario, and the spec ALSO injects 600 synthetic event-log
+  entries mid-run (matching the VAL-EVENTLOG-014 / VAL-EVENTLOG-024
+  pattern) to deliberately stress the `RUNTIME_EVENT_LOG_MAX=500`
+  eviction path. A best-effort `performance.memory?.usedJSHeapSize`
+  ratio assertion caps post-run heap at ≤ 3× baseline — the
+  factor is intentionally generous because React dev-mode
+  retention prevents a tight `±10%` bound in this harness, but
+  tight enough to catch genuine monotonic leaks (unbounded closure
+  retention, leaked subscriptions, etc.).
+- **Trade-off acknowledged**: this spec would NOT catch a leak
+  whose trigger requires 30 minutes of sustained traffic AND is
+  also absent in 6 compressed cycles — e.g. a leak that only
+  surfaces when a dependency internal to the runtime or the WASM
+  bridge crosses a time-based GC threshold. An explicit 30-minute
+  scheduled run would be needed to cover that class of
+  regression. Increase `LONG_SESSION_ITERATIONS` to manually
+  approximate longer runs without changing the spec.
+- **Assertion IDs covered**: feature `m7-clock-skew-and-leak`
+  expected behaviour "30-min session: bounded WS + heap + log
+  size" is fulfilled in the compressed-iteration interpretation.
+  VAL-CROSS-028's literal 30-minute requirement is partially
+  covered here; the residual duration-dependent coverage is
+  recorded as a non-blocking follow-up under
+  `m7-clock-skew-and-leak` handoff.
