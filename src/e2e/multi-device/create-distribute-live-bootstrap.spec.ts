@@ -398,9 +398,9 @@ test.describe(
           await waitForAppStateHooks(pageA, "A");
 
           // === Type the per-share password + click Create package ===
-          const passwordInput = pageA.getByLabel(
-            `Package password for share ${remoteIdx + 1}`,
-          );
+          const passwordInput = pageA
+            .getByLabel(/^Package password for share \d+$/)
+            .first();
           await passwordInput.fill(PACKAGE_PASSWORD);
           await pageA
             .getByRole("button", { name: /Create package/i })
@@ -602,7 +602,8 @@ test.describe(
           await waitForAppStateHooks(pageA, "A");
 
           await pageA
-            .getByLabel(`Package password for share ${remoteIdx + 1}`)
+            .getByLabel(/^Package password for share \d+$/)
+            .first()
             .fill(PACKAGE_PASSWORD);
           await pageA
             .getByRole("button", { name: /Create package/i })

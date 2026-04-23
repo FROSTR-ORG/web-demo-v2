@@ -74,6 +74,10 @@ function previewPackageText(packageText: string): string {
   return `${base}…`;
 }
 
+function shareDisplayNumber(position: number): number {
+  return position + 1;
+}
+
 export function DistributeSharesScreen() {
   const navigate = useNavigate();
   const {
@@ -108,7 +112,6 @@ export function DistributeSharesScreen() {
     return { packageText: pkg.packageText, password: pkg.password };
   }
 
-  const localShare = createSession.localShare;
   const remoteCreatedAll = createSession.onboardingPackages.every(
     (pkg) => pkg.packageCreated,
   );
@@ -133,7 +136,7 @@ export function DistributeSharesScreen() {
             {HOW_THIS_STEP_WORKS_STEPS.map((step, idx) => (
               <li key={step.title} className="how-this-step-works-item">
                 <span className="how-this-step-works-number" aria-hidden="true">
-                  {idx + 1}
+                  {idx + 1}.
                 </span>
                 <span className="how-this-step-works-body">
                   <strong className="how-this-step-works-title">
@@ -153,10 +156,7 @@ export function DistributeSharesScreen() {
           <div className="package-head">
             <div className="package-title-row">
               <div className="package-title">
-                Share {localShare.idx + 1}
-              </div>
-              <div className="package-index">
-                Index {localShare.idx}
+                Share {shareDisplayNumber(0)}
               </div>
             </div>
             <StatusPill tone="success" marker="check">
@@ -167,10 +167,11 @@ export function DistributeSharesScreen() {
         </div>
 
         <div className="package-stack">
-          {createSession.onboardingPackages.map((pkg) => (
+          {createSession.onboardingPackages.map((pkg, index) => (
             <RemoteShareCard
               key={pkg.idx}
               pkg={pkg}
+              displayNumber={shareDisplayNumber(index + 1)}
               encodeDistributionPackage={encodeDistributionPackage}
               markPackageDistributed={markPackageDistributed}
               setPackageDeviceLabel={setPackageDeviceLabel}
@@ -195,6 +196,7 @@ export function DistributeSharesScreen() {
 
 function RemoteShareCard({
   pkg,
+  displayNumber,
   encodeDistributionPackage,
   markPackageDistributed,
   setPackageDeviceLabel,
@@ -202,6 +204,7 @@ function RemoteShareCard({
   resolveSecret,
 }: {
   pkg: OnboardingPackageView;
+  displayNumber: number;
   encodeDistributionPackage: (idx: number, password: string) => Promise<void>;
   markPackageDistributed: (idx: number) => void;
   setPackageDeviceLabel: (idx: number, deviceLabel: string) => void;
@@ -259,8 +262,7 @@ function RemoteShareCard({
     <div className={`package-card${pkg.packageCreated ? "" : " pending"}`}>
       <div className="package-head">
         <div className="package-title-row">
-          <div className="package-title">Share {pkg.idx + 1}</div>
-          <div className="package-index">Index {pkg.idx}</div>
+          <div className="package-title">Share {displayNumber}</div>
         </div>
         <StatusPill
           tone={chip.tone}
@@ -282,7 +284,7 @@ function RemoteShareCard({
           <input
             className="input"
             type="text"
-            aria-label={`Device label for share ${pkg.idx + 1}`}
+            aria-label={`Device label for share ${displayNumber}`}
             placeholder="Optional device label"
             value={pkg.deviceLabel ?? ""}
             onChange={(event) =>
@@ -304,7 +306,7 @@ function RemoteShareCard({
               <input
                 className="input password-input"
                 type="password"
-                aria-label={`Package password for share ${pkg.idx + 1}`}
+                aria-label={`Package password for share ${displayNumber}`}
                 required
                 value={password}
                 onChange={(event) => {

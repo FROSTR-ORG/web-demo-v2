@@ -99,12 +99,12 @@ function makeRemotePackage(
 }
 
 function makeCreateSession(
-  packages: TestOnboardingPackage[] = [makeRemotePackage(1), makeRemotePackage(2)],
+  packages: TestOnboardingPackage[] = [makeRemotePackage(2), makeRemotePackage(3)],
 ) {
   return {
     draft: { groupName: "My Signing Key" },
     keyset: { group: { group_name: "My Signing Key" } },
-    localShare: { idx: 0 },
+    localShare: { idx: 1 },
     createdProfileId: "profile-created",
     onboardingPackages: packages,
   };
@@ -177,15 +177,23 @@ describe("DistributeSharesScreen — LOCAL share badge (VAL-FOLLOWUP-008)", () =
     expect(
       screen.getAllByLabelText(/Package password for share/i),
     ).toHaveLength(2);
-    // None of the password inputs belongs to the local share (idx 0 -> "share 1"
-    // would collide with "Share 1" label for the local share, so we assert the
-    // remote shares 2/3 are present).
     expect(
       screen.getByLabelText("Package password for share 2"),
     ).toBeInTheDocument();
     expect(
       screen.getByLabelText("Package password for share 3"),
     ).toBeInTheDocument();
+  });
+
+  it("renders Paper-facing share titles by row order without internal index metadata", () => {
+    const { container } = renderScreen();
+    expect(
+      Array.from(container.querySelectorAll(".package-title")).map((node) =>
+        node.textContent?.trim(),
+      ),
+    ).toEqual(["Share 1", "Share 2", "Share 3"]);
+    expect(container.querySelector(".package-index")).toBeNull();
+    expect(screen.queryByText(/^Index \d+$/)).not.toBeInTheDocument();
   });
 });
 
@@ -246,12 +254,12 @@ describe("DistributeSharesScreen — PRE-state rendering (VAL-FOLLOWUP-004)", ()
 describe("DistributeSharesScreen — POST-state rendering (VAL-FOLLOWUP-008)", () => {
   beforeEach(() => {
     mocks.createSession = makeCreateSession([
-      makeRemotePackage(1, {
+      makeRemotePackage(2, {
         packageCreated: true,
         packageText: "bfonboard1abcdef01234567",
         password: "[redacted]",
       }),
-      makeRemotePackage(2, {
+      makeRemotePackage(3, {
         packageCreated: true,
         packageText: "bfonboard1xyzpdq7777",
         password: "[redacted]",
@@ -303,7 +311,7 @@ describe("DistributeSharesScreen — POST-state rendering (VAL-FOLLOWUP-008)", (
 describe("DistributeSharesScreen — DISTRIBUTED state (VAL-FOLLOWUP-004)", () => {
   it("renders the 'Distributed' success-tone chip when peerOnline is true", () => {
     mocks.createSession = makeCreateSession([
-      makeRemotePackage(1, {
+      makeRemotePackage(2, {
         packageCreated: true,
         packageText: "bfonboard1onlineonline00",
         password: "[redacted]",
@@ -317,7 +325,7 @@ describe("DistributeSharesScreen — DISTRIBUTED state (VAL-FOLLOWUP-004)", () =
 
   it("renders the 'Distributed' success-tone chip when manuallyMarkedDistributed is true", () => {
     mocks.createSession = makeCreateSession([
-      makeRemotePackage(1, {
+      makeRemotePackage(2, {
         packageCreated: true,
         packageText: "bfonboard1manual000000000",
         password: "[redacted]",
@@ -337,7 +345,7 @@ describe("DistributeSharesScreen — Create package click wiring", () => {
       target: { value: "Igloo Mobile" },
     });
     expect(mocks.setPackageDeviceLabel).toHaveBeenCalledWith(
-      1,
+      2,
       "Igloo Mobile",
     );
   });
@@ -366,7 +374,7 @@ describe("DistributeSharesScreen — Create package click wiring", () => {
     fireEvent.click(createButton);
     await waitFor(() => {
       expect(mocks.encodeDistributionPackage).toHaveBeenCalledWith(
-        1,
+        2,
         "verysecretpw",
       );
     });
@@ -376,7 +384,7 @@ describe("DistributeSharesScreen — Create package click wiring", () => {
 describe("DistributeSharesScreen — Mark distributed click wiring (VAL-FOLLOWUP-005)", () => {
   it("calls markPackageDistributed(idx) with the correct share index", () => {
     mocks.createSession = makeCreateSession([
-      makeRemotePackage(1, {
+      makeRemotePackage(2, {
         packageCreated: true,
         packageText: "bfonboard1readytodistribute00",
         password: "[redacted]",
@@ -384,14 +392,14 @@ describe("DistributeSharesScreen — Mark distributed click wiring (VAL-FOLLOWUP
     ]);
     renderScreen();
     fireEvent.click(screen.getByRole("button", { name: /^Mark distributed$/i }));
-    expect(mocks.markPackageDistributed).toHaveBeenCalledWith(1);
+    expect(mocks.markPackageDistributed).toHaveBeenCalledWith(2);
   });
 });
 
 describe("DistributeSharesScreen — Copy package / Copy password wiring (existing contract)", () => {
   beforeEach(() => {
     mocks.createSession = makeCreateSession([
-      makeRemotePackage(1, {
+      makeRemotePackage(2, {
         packageCreated: true,
         packageText: "bfonboard1abcd",
         password: "[redacted]",
@@ -403,7 +411,7 @@ describe("DistributeSharesScreen — Copy package / Copy password wiring (existi
     renderScreen();
     fireEvent.click(screen.getByRole("button", { name: /^Copy package$/i }));
     await waitFor(() =>
-      expect(mocks.updatePackageState).toHaveBeenCalledWith(1, {
+      expect(mocks.updatePackageState).toHaveBeenCalledWith(2, {
         packageCopied: true,
         copied: true,
       }),
@@ -414,7 +422,7 @@ describe("DistributeSharesScreen — Copy package / Copy password wiring (existi
     renderScreen();
     fireEvent.click(screen.getByRole("button", { name: /^Copy password$/i }));
     await waitFor(() =>
-      expect(mocks.updatePackageState).toHaveBeenCalledWith(1, {
+      expect(mocks.updatePackageState).toHaveBeenCalledWith(2, {
         passwordCopied: true,
       }),
     );

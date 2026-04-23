@@ -2664,6 +2664,34 @@ button.peer-policy-chip.deny {
   text-transform: uppercase;
 }
 
+.how-this-step-works-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.how-this-step-works-item {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: start;
+  color: var(--ig-text);
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.how-this-step-works-number {
+  color: var(--ig-text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.how-this-step-works-body {
+  min-width: 0;
+}
+
 .dash-info-line {
   color: var(--ig-text);
   font-size: 15px;
