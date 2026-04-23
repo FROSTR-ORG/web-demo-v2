@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m7-scrutiny-r1-paper-parity-baseline-source",
+  "reviewedAt": "2026-04-23T05:02:22Z",
+  "commitId": "2b7c5dd",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly addresses the prior failure: the 5 primary baselines are now sourced from igloo-paper dashboard artboard exports, the Playwright suite performs an explicit app-vs-paper comparison per state, the former app-generated baselines were retained and renamed to *-self.png as secondary checks, and the widened 0.20 parity threshold is documented with rationale in runtime-deviations.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "ui-screen-worker procedure is UI-change centric; for this test-infrastructure-only remediation the worker had to deviate on both agent-browser and strict RED-first requirements. The deviation appears justified, but the skill could explicitly document a parity-baseline-remediation carve-out to reduce recurring false non-compliance signals.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md:23,33,49,51,53; /Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/handoffs/2026-04-23T04-57-45-521Z__fix-m7-scrutiny-r1-paper-parity-baseline-source__789a923d-e8f5-40c1-ba25-8aceb52546aa.json:88-97"
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m7-onboard/scrutiny/reviews/m7-paper-parity-visuals.json",
+  "summary": "Pass: the original self-referential baseline flaw in m7-paper-parity-visuals is fixed by committing real Paper-source fixtures and making them the primary parity comparator, while preserving renamed self baselines as secondary regression guards."
+}

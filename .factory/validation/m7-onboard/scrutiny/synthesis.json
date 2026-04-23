@@ -1,7 +1,7 @@
 {
   "milestone": "m7-onboard",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "validatorsRun": {
     "typecheck": {
       "passed": true,
@@ -20,144 +20,48 @@
     }
   },
   "reviewsSummary": {
-    "total": 14,
-    "passed": 5,
-    "failed": 9,
-    "failedFeatures": [
-      "fix-m7-createsession-redact-secrets-on-finalize",
-      "fix-m7-onboard-distinct-share-allocation",
-      "m7-clock-skew-and-leak",
-      "m7-onboard-sponsor-flow",
-      "m7-onboard-sponsor-ui",
-      "m7-paper-parity-visuals",
-      "m7-rotate-keyset-live-sign",
-      "m7-security-live-sweep",
-      "m7-sw-staleness-and-deviation-doc"
-    ]
+    "total": 9,
+    "passed": 9,
+    "failed": 0,
+    "failedFeatures": []
   },
-  "blockingIssues": [
-    {
-      "featureId": "m7-onboard-sponsor-ui",
-      "severity": "blocking",
-      "description": "Empty-relay inline validation is unreachable because submitAttempted only flips in submit handler while Create CTA is disabled when relay list is empty."
-    },
-    {
-      "featureId": "m7-onboard-sponsor-flow",
-      "severity": "blocking",
-      "description": "Sponsor onboard dispatch targets sponsor self pubkey/share, preventing successful new-device sponsorship outcomes."
-    },
-    {
-      "featureId": "m7-onboard-sponsor-flow",
-      "severity": "blocking",
-      "description": "Concurrent onboarding ceremonies are not isolated per request_id; single onboardSponsorSession state is overwritten."
-    },
-    {
-      "featureId": "m7-onboard-sponsor-flow",
-      "severity": "blocking",
-      "description": "Onboard completions map to INFO in event log; required ONBOARD-tagged representation is missing."
-    },
-    {
-      "featureId": "fix-m7-onboard-distinct-share-allocation",
-      "severity": "blocking",
-      "description": "Multi-device spec still simulates adoption via seeding and only asserts awaiting_adoption, not full sponsor->requester handshake completion."
-    },
-    {
-      "featureId": "fix-m7-onboard-distinct-share-allocation",
-      "severity": "blocking",
-      "description": "Updated e2e path is inconsistent with pool-gated mutator preconditions (missing unadoptedSharesCiphertext seed and password mismatch)."
-    },
-    {
-      "featureId": "m7-rotate-keyset-live-sign",
-      "severity": "blocking",
-      "description": "Rotate regression test bypasses rotate->distribute->adopt integration by direct runtime seeding."
-    },
-    {
-      "featureId": "m7-rotate-keyset-live-sign",
-      "severity": "blocking",
-      "description": "Old-share invalidation is inferred from material differences instead of direct failed old-share protocol assertion."
-    },
-    {
-      "featureId": "m7-paper-parity-visuals",
-      "severity": "blocking",
-      "description": "Visual parity compares against app-generated baselines instead of igloo-paper source screenshots."
-    },
-    {
-      "featureId": "m7-clock-skew-and-leak",
-      "severity": "blocking",
-      "description": "Asymmetric B ±120s vs A clock-skew scenario is not tested (only ±25s asymmetric; ±120s symmetric)."
-    },
-    {
-      "featureId": "m7-clock-skew-and-leak",
-      "severity": "blocking",
-      "description": "Long-session criteria allow pass with only one successful sign and one successful ECDH across all iterations."
-    },
-    {
-      "featureId": "m7-security-live-sweep",
-      "severity": "blocking",
-      "description": "Security snapshot helper stores live references, so all checkpoints can collapse to final state and miss transient leaks."
-    },
-    {
-      "featureId": "m7-security-live-sweep",
-      "severity": "blocking",
-      "description": "Secret scanner allow-list over-masks wrapper keys and suppresses scanning for non-bfprofile strings under those keys."
-    },
-    {
-      "featureId": "fix-m7-createsession-redact-secrets-on-finalize",
-      "severity": "blocking",
-      "description": "Bridge-driven createSession reset does not clear createSessionPackageSecretsRef, leaving plaintext package secrets retrievable."
-    },
-    {
-      "featureId": "m7-sw-staleness-and-deviation-doc",
-      "severity": "blocking",
-      "description": "Deviation doc route is incorrect (`/onboard-sponsor/package` vs actual `/onboard-sponsor/handoff`)."
-    }
-  ],
+  "blockingIssues": [],
   "appliedUpdates": [
     {
-      "target": "services.yaml",
-      "description": "Added canonical `lint` and `format_check` commands to `.factory/services.yaml` to align shared command catalog with m7-final-gates scripts in package.json.",
-      "sourceFeature": "m7-final-gates"
+      "target": "library",
+      "description": "Added .factory/library/clock-skew-constraints.md documenting bifrost-signer max_future_skew_secs=30 and why asymmetric ±120s validation is treated as deviation coverage.",
+      "sourceFeature": "fix-m7-scrutiny-r1-long-session-and-clock-skew-criteria"
     }
   ],
   "suggestedGuidanceUpdates": [
     {
-      "target": "AGENTS.md",
-      "suggestion": "Clarify whether project-scoped Playwright guards (`test.skip(testInfo.project.name !== \"desktop\")`) are allowed under the current \"No `.skip` additions\" rule.",
-      "evidence": "Multiple milestone specs use project-scoped skip guards while AGENTS has a blanket prohibition, causing repeated scrutiny observations.",
+      "target": "AGENTS.md + worker skills",
+      "suggestion": "Resolve agent-browser requirement conflicts and followedProcedure semantics across ui-screen-worker/runtime-worker/protocol-flow-worker so workers can report deviations consistently.",
+      "evidence": "Multiple m7 round-2 reviews observed contradictory rules between AGENTS.md and skill files, plus handoffs marked followedProcedure=true despite skipping required agent-browser/Playwright steps.",
       "isSystemic": true
     },
     {
       "target": ".factory/skills/ui-screen-worker, .factory/skills/runtime-worker, .factory/skills/protocol-flow-worker",
-      "suggestion": "Tighten followedProcedure guidance and agent-browser requirements: when omitted, require explicit deviation reporting and consistent pass/fail semantics.",
-      "evidence": "Repeated scrutiny observations across m7 reviews report agent-browser omission or RED-first gaps while handoffs still mark followedProcedure=true.",
+      "suggestion": "Add explicit procedure carve-outs for docs-only and test-infrastructure micro-fixes, and require explicit deviation logging when RED-first, demo-gallery Playwright, or agent-browser steps are skipped.",
+      "evidence": "Recurring observations across fix-m7-scrutiny-r1-sponsor-ui-relay-validation, fix-m7-scrutiny-r1-sw-staleness-doc-route, fix-m7-scrutiny-r1-paper-parity-baseline-source, fix-m7-scrutiny-r1-rotate-regression-full-flow, and fix-m7-scrutiny-r1-security-sweep-snapshot-cloning.",
       "isSystemic": true
     },
     {
-      "target": "validation-contract.md",
-      "suggestion": "Reconcile contract assertions that conflict with runtime/docs reality (e.g., ONBOARD event badge taxonomy, VAL-ONBOARD-017 paper-artboard/demo-scenario requirement, offline-trigger wording drift).",
-      "evidence": "Review reports repeatedly flagged contract-vs-implementation mismatches that are currently undocumented in mission-level guidance.",
-      "isSystemic": true
-    },
-    {
-      "target": "Feature-skill assignment policy",
-      "suggestion": "Route docs-only and verification-only features to a matching validator/docs skill instead of UI/protocol implementation skills.",
-      "evidence": "m7-sw-staleness-and-deviation-doc and m7-final-gates produced repeated process deviations due to skill mismatch rather than code defects.",
-      "isSystemic": true
+      "target": "docs/runtime-deviations-from-paper.md",
+      "suggestion": "Reconcile stale onboarding residual text that still describes awaiting_adoption-only behavior now superseded by full sponsor-requester handshake validation.",
+      "evidence": "Review for fix-m7-scrutiny-r1-onboard-distinct-share-full-handshake found lines describing pre-fix residual behavior inconsistent with current multi-device spec assertions.",
+      "isSystemic": false
     }
   ],
   "rejectedObservations": [
     {
-      "observation": "Add a new `.factory/library` entry for self-peer UnknownPeer sponsorship caveat immediately.",
-      "reason": "already-documented"
-    },
-    {
-      "observation": "Add `.factory/library` note for clock-skew/max_future_skew constraints from m7-clock-skew-and-leak.",
+      "observation": "Treat missing tsconfig.node/demo-gallery runs in runtime-worker handoffs as immediate blocking failures for this round.",
       "reason": "ambiguous"
     },
     {
-      "observation": "Promote single-feature handoff anomalies (e.g., known pre-existing issue re-reported once) into immediate shared-state file edits.",
+      "observation": "Record each repeated skill-procedure mismatch as separate guidance updates.",
       "reason": "duplicate"
     }
   ],
-  "previousRound": null
+  "previousRound": ".factory/validation/m7-onboard/scrutiny/synthesis.round1.json"
 }

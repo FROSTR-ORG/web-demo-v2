@@ -1,0 +1,26 @@
+{
+  "featureId": "fix-m7-scrutiny-r1-onboard-distinct-share-full-handshake",
+  "reviewedAt": "2026-04-23T05:04:28Z",
+  "commitId": "ad8b1ff",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix commit directly addresses the prior blocking failures: the spec now seeds an encrypted unadopted-shares pool with a matching profile password, drives requester adoption via decode->handshake->save, waits for sponsor session completion correlated by request_id, and asserts ONBOARD-tagged runtime-event-log entries on both tabs.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The protocol-flow-worker skill still says agent-browser is mandatory for multi-device protocol validation, but this feature's transcript/handoff shows Playwright-only validation while still marking followedProcedure=true.",
+      "evidence": ".factory/skills/protocol-flow-worker/SKILL.md:19-21 requires agent-browser; handoff verification for session 942df564-86b6-4cdd-8a8d-6f1c044cf1be lists only tsc/vitest/playwright commands and skillFeedback.followedProcedure=true."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Shared deviation docs still describe the pre-fix residual (same-share adoption cannot complete and spec only asserts awaiting_adoption), which is now stale relative to the full-handshake fix.",
+      "evidence": "docs/runtime-deviations-from-paper.md:807-810 and 843-850 still describe no full handshake / awaiting_adoption-only assertions, while src/e2e/multi-device/onboard-sponsorship.spec.ts:675, 736, 758, 788 now asserts completed handshake and ONBOARD entries on both tabs."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m7-onboard/scrutiny/reviews/fix-m7-onboard-distinct-share-allocation.json",
+  "summary": "PASS: Compared the original failed feature diff (1349a2e0aef150f61ac2cc3ed02e7b5a293953bf) and the fix diff (ad8b1ff), reviewed the fix transcript skeleton, and confirmed the two prior blocking issues are addressed by the rewritten multi-device onboarding handshake coverage."
+}

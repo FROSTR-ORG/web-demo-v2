@@ -1,0 +1,28 @@
+{
+  "featureId": "fix-m7-scrutiny-r1-sponsor-concurrency-and-badge",
+  "reviewedAt": "2026-04-23T05:04:02Z",
+  "commitId": "2a2bfaf8216c186c79f0a3a3dce884d224f30bc0",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Compared with the original failed feature commit (7b8283190ec252d02f62d6870452992b55c301b1), this fix resolves both prior blockers: sponsor sessions are now tracked in a request_id-keyed map (no single-slot overwrite under concurrent sponsorships), and onboard lifecycle entries now support/emit an ONBOARD badge in runtime event-log plumbing and UI rendering.",
+    "issues": [
+      {
+        "file": "src/app/__tests__/onboardSponsorFlow.test.tsx",
+        "line": 486,
+        "severity": "non_blocking",
+        "description": "The VAL-ONBOARD-011 test name claims emission-path coverage ('emits ONBOARD local_mutation entries...') but only type-checks the badge union and a synthetic entry shape; it does not assert absorbDrains completion/failure emission behavior."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "runtime-worker procedure reporting is inconsistent here: UI-visible EventLogPanel/CSS changes were made, but no agent-browser step was run and no deviation was recorded.",
+      "evidence": ".factory/skills/runtime-worker/SKILL.md requires agent-browser for user-interactive changes unless the fix is pure non-UI and says omissions must set followedProcedure=false with deviations; fix handoff (3e4d4f13-ba42-49c7-bca2-b2658d018363) records followedProcedure=true with no deviations and verification commands list only tsc/vitest/lint/format. Transcript skeleton query for this worker session contains no agent-browser invocation."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m7-onboard/scrutiny/reviews/m7-onboard-sponsor-flow.json",
+  "summary": "Pass: this fix adequately addresses the original m7-onboard-sponsor-flow failures by isolating concurrent sponsor sessions per request_id and introducing ONBOARD badge support through AppState types, drain ingestion, and EventLogPanel styling/summaries."
+}

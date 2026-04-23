@@ -1,0 +1,26 @@
+{
+  "featureId": "fix-m7-scrutiny-r1-sponsor-ui-relay-validation",
+  "reviewedAt": "2026-04-23T05:02:21Z",
+  "commitId": "69474f05954d2f610cf9ddbdfbc1e377d8fef74e",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly resolves the prior blocking issue: the relay-empty inline error is now rendered whenever the relay list is empty, instead of being gated behind submitAttempted. The CTA remains disabled when relays are empty, and new test coverage verifies remove-all-relays -> immediate inline error (without submit click) plus clear-on-valid-readd. Compared against the original m7-onboard-sponsor-ui diff, this closes the exact dead-code path identified in the prior failure review.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Mission-level guidance and skill-level guidance conflict on whether agent-browser is mandatory for UI changes. This fix followed the skill carve-out and skipped agent-browser, but AGENTS states agent-browser is mandatory for UI validation.",
+      "evidence": "Mission AGENTS.md:89 says 'The agent-browser skill is mandatory for UI validation'; .factory/skills/ui-screen-worker/SKILL.md:23 allows skipping agent-browser for certain low-risk fixes if covered by Vitest; fix handoff (...a5f17912-77f9-406d-b74c-0792af944671.json) records followedProcedure=false with that exact skip."
+    },
+    {
+      "area": "skills",
+      "observation": "The ui-screen-worker procedure still requires RED proof and Playwright in verification, but the fix transcript/handoff shows only green-path Vitest + typecheck/full Vitest and no pre-implementation failing run. Either the procedure is too rigid for micro-fixes or deviation reporting guidance should explicitly require logging these omissions.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md:33 and :49-50 require RED evidence + demo-gallery Playwright; fix handoff verification.commandsRun lists only: file-scoped Vitest, tsc, full Vitest; transcript skeleton for workerSessionId a5f17912-77f9-406d-b74c-0792af944671 contains no pre-implementation failing test invocation and no Playwright command."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m7-onboard/scrutiny/reviews/m7-onboard-sponsor-ui.json",
+  "summary": "Pass: fix-m7-scrutiny-r1-sponsor-ui-relay-validation adequately addresses the original m7-onboard-sponsor-ui failure by making empty-relay validation immediately visible while preserving CTA disablement, and adds focused regression coverage for the exact scenario."
+}
