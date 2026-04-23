@@ -45,6 +45,13 @@ vi.mock("../../app/AppState", () => ({
   useAppState: () => ({
     createSession: mocks.createSession,
     updatePackageState: mocks.updatePackageState,
+    // fix-m7-createsession-redact-secrets-on-finalize — the real
+    // provider serves the plaintext package text / password via an
+    // out-of-band accessor. The test's createSession mock fixtures
+    // still include plaintext `packageText` / `password` strings so
+    // `DistributeSharesScreen` falls back to them when the accessor
+    // returns null (mimicking demo mode).
+    getCreateSessionPackageSecret: () => null,
   }),
 }));
 

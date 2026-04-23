@@ -291,6 +291,7 @@ export function createDemoAppState(
     updatePackageState: () => undefined,
     finishDistribution: async () => DEMO_PROFILE_ID,
     clearCreateSession: () => undefined,
+    getCreateSessionPackageSecret: () => null,
     beginImport: () => undefined,
     decryptImportBackup: async () => undefined,
     saveImportedProfile: async () => DEMO_PROFILE_ID,

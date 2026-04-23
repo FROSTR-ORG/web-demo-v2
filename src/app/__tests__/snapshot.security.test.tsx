@@ -335,21 +335,33 @@ describe("m7-security-live-sweep — snapshot.security", () => {
       });
       await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());
 
-      // The create flow's final UI step (`DistributionCompleteScreen`)
-      // clears the setup session state before landing the user on the
-      // dashboard — per AGENTS.md Security Invariants ("Setup session
-      // state cleared on cancel/finish/lock/..."). The programmatic
-      // `createProfile` mutator used above does not itself invoke the
-      // final-screen cleanup (it sets up the runtime and persists the
-      // record but does not mutate createSession), so we emulate the
-      // UI's finish-transition here to match the observable surfaces
-      // the dashboard runtime actually sees. Without this, the sweep
-      // would double-count SETUP-flow state (covered by a separate
-      // feature) as runtime leaks.
-      act(() => {
-        latest.clearCreateSession();
-      });
-      await waitFor(() => expect(latest.createSession).toBeNull());
+      // fix-m7-createsession-redact-secrets-on-finalize —
+      // `createProfile` now REDACTS every sensitive field in
+      // `createSession` in place before returning: share seckeys and
+      // distribution passwords resolve to the `[redacted]` sentinel,
+      // and every bfonboard package text resolves to the
+      // `[redacted-bfprofile]` sentinel. Non-sensitive display
+      // metadata (group pubkey, threshold, member list, device labels,
+      // profile id, per-package booleans) survives intact so
+      // `DistributionCompleteScreen` still renders correctly.
+      //
+      // The sweep therefore no longer needs to emulate the
+      // `DistributionCompleteScreen` finish-transition with a manual
+      // `clearCreateSession` — the redaction already makes every
+      // observable surface (window.__appState, IndexedDB, console,
+      // outbound envelopes) scan-clean immediately after
+      // `createProfile` resolves. The real UI-mediated
+      // `clearCreateSession` is still invoked from the finish-
+      // transition, and its unit coverage lives in
+      // `DistributionCompleteScreen.test.tsx`.
+      expect(latest.createSession).toBeTruthy();
+      expect(
+        latest.createSession?.onboardingPackages[0]?.packageText,
+      ).toBe("[redacted-bfprofile]");
+      expect(latest.createSession?.onboardingPackages[0]?.password).toBe(
+        "[redacted]",
+      );
+      expect(latest.createSession?.localShare?.seckey).toBe("[redacted]");
 
       /* ------------------- Snapshot 1: post-unlock ------------------- */
       const snap1 = buildSnapshot("post-unlock");

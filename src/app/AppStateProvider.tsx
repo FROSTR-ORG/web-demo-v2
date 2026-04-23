@@ -42,6 +42,8 @@ import type {
   CompletedOperation,
   DerivedPublicNonceWire,
   GroupPackageWire,
+  KeysetBundle,
+  OnboardingPackageView,
   OperationFailure,
   RuntimeBootstrapInput,
   RuntimeEvent,
@@ -411,6 +413,47 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       ) => Promise<void>)
     | null
   >(null);
+
+  /**
+   * fix-m7-createsession-redact-secrets-on-finalize — out-of-band
+   * stash of the plaintext bfonboard package text + distribution
+   * password for each remote share of the active create session,
+   * keyed by the share's `idx`.
+   *
+   * After {@link createProfile} finishes, the on-React-state
+   * `createSession.onboardingPackages` surfaces only redaction
+   * sentinels for `packageText` / `password`, so `window.__appState`,
+   * IndexedDB, and console transcripts never leak the plaintext
+   * secrets past the mutator boundary (m7 security-live-sweep
+   * contract). The distribution screens still need the plaintext to
+   * drive Copy-to-Clipboard and the QR renderer; they pull it out
+   * through this ref via the `getCreateSessionPackageSecret`
+   * accessor. The ref is intentionally NOT exposed on the context
+   * value object — functions on the value object serialise as
+   * `[fn …]` under `JSON.stringify`, so the scanner cannot reach the
+   * plaintext through `window.__appState`.
+   *
+   * Reset to an empty Map on {@link clearCreateSession},
+   * {@link lockProfile}, and {@link clearCredentials} so no secrets
+   * bleed across profile boundaries.
+   */
+  const createSessionPackageSecretsRef = useRef<
+    Map<number, { packageText: string; password: string }>
+  >(new Map());
+
+  const clearCreateSessionPackageSecrets = useCallback(() => {
+    createSessionPackageSecretsRef.current = new Map();
+  }, []);
+
+  const getCreateSessionPackageSecret = useCallback(
+    (idx: number): { packageText: string; password: string } | null => {
+      const entry = createSessionPackageSecretsRef.current.get(idx);
+      if (!entry) return null;
+      // Return a defensive copy so callers can't mutate the stash.
+      return { packageText: entry.packageText, password: entry.password };
+    },
+    [],
+  );
 
   const abortOnboardHandshake = useCallback(() => {
     onboardHandshakeRef.current?.controller.abort();
@@ -1619,10 +1662,70 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setRuntimeStatus(augmentStatus(simulator.pump(4)));
       setActiveProfile(record.summary);
       setSignerPausedState(false);
+
+      // fix-m7-createsession-redact-secrets-on-finalize — stash the
+      // plaintext package text / distribution password for each
+      // sponsored remote share in an out-of-band ref so the
+      // DistributeSharesScreen UI can still drive Copy / QR via
+      // {@link getCreateSessionPackageSecret}, then REDACT the
+      // sensitive fields in the React `createSession` object so
+      // `window.__appState` (and every other serialised surface the
+      // m7 security-live-sweep scans) only ever sees the redaction
+      // sentinels recognised by
+      // `src/lib/security/secretSweepScanner.ts`.
+      //
+      // Redacted in place:
+      //   - every `keyset.shares[*].seckey`  → "[redacted]"
+      //   - `localShare.seckey`              → "[redacted]"
+      //   - every onboarding package's `packageText`
+      //                                       → "[redacted-bfprofile]"
+      //   - every onboarding package's `password`
+      //                                       → "[redacted]"
+      // Preserved intact (non-sensitive display metadata):
+      //   - draft / groupName / threshold / count
+      //   - group_name / group_pk / members / member pubkeys
+      //   - share indices, member pubkey per package, status flags,
+      //     createdProfileId
+      //
+      // Share seckeys are only consumed above this point (the
+      // unadoptedSharesPool + runtime bootstrap complete before we
+      // get here), so zero behaviour downstream of `createProfile`
+      // depends on the real seckey / password / packageText values
+      // surviving on the React state.
+      const packageSecretsStash = new Map<
+        number,
+        { packageText: string; password: string }
+      >();
+      for (const pkg of onboardingPackages) {
+        packageSecretsStash.set(pkg.idx, {
+          packageText: pkg.packageText,
+          password: pkg.password,
+        });
+      }
+      createSessionPackageSecretsRef.current = packageSecretsStash;
+      const redactedOnboardingPackages: OnboardingPackageView[] =
+        onboardingPackages.map((pkg) => ({
+          ...pkg,
+          packageText: "[redacted-bfprofile]",
+          password: "[redacted]",
+        }));
+      const redactedLocalShare: SharePackageWire = {
+        ...localShare,
+        seckey: "[redacted]",
+      };
+      const redactedKeyset: KeysetBundle = {
+        group: createSession.keyset.group,
+        shares: createSession.keyset.shares.map((share) => ({
+          ...share,
+          seckey: "[redacted]",
+        })),
+      };
       setCreateSession({
         ...createSession,
+        keyset: redactedKeyset,
+        localShare: redactedLocalShare,
         createdProfileId: profileId,
-        onboardingPackages,
+        onboardingPackages: redactedOnboardingPackages,
       });
       await reloadProfiles();
 
@@ -1658,7 +1761,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const clearCreateSession = useCallback(() => {
     setCreateSession(null);
-  }, []);
+    // fix-m7-createsession-redact-secrets-on-finalize — also drop the
+    // out-of-band stash of plaintext package secrets so the next create
+    // flow starts with an empty stash.
+    clearCreateSessionPackageSecrets();
+  }, [clearCreateSessionPackageSecrets]);
 
   const beginImport = useCallback((backupString: string) => {
     setImportSession({ backupString: backupString.trim() });
@@ -3280,8 +3387,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setReplaceShareSession(null);
     setRecoverSession(null);
     setOnboardSponsorSession(null);
+    // fix-m7-createsession-redact-secrets-on-finalize — drop the
+    // out-of-band package-secrets stash on lock so the secrets never
+    // outlive the active unlocked session.
+    clearCreateSessionPackageSecrets();
     resetDrainSlices();
-  }, [abortOnboardHandshake, resetDrainSlices, stopRelayPump]);
+  }, [
+    abortOnboardHandshake,
+    clearCreateSessionPackageSecrets,
+    resetDrainSlices,
+    stopRelayPump,
+  ]);
 
   const clearCredentials = useCallback(async () => {
     abortOnboardHandshake();
@@ -3356,6 +3472,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setReplaceShareSession(null);
     setRecoverSession(null);
     setOnboardSponsorSession(null);
+    // fix-m7-createsession-redact-secrets-on-finalize — also drop the
+    // out-of-band package-secrets stash when the profile is wiped.
+    clearCreateSessionPackageSecrets();
     resetDrainSlices();
     if (id) {
       await removeProfile(id);
@@ -3364,6 +3483,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [
     abortOnboardHandshake,
     activeProfile,
+    clearCreateSessionPackageSecrets,
     reloadProfiles,
     resetDrainSlices,
     stopRelayPump,
@@ -4637,6 +4757,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       updatePackageState,
       finishDistribution,
       clearCreateSession,
+      getCreateSessionPackageSecret,
       beginImport,
       decryptImportBackup,
       saveImportedProfile,
@@ -4709,6 +4830,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       updatePackageState,
       finishDistribution,
       clearCreateSession,
+      getCreateSessionPackageSecret,
       beginImport,
       decryptImportBackup,
       saveImportedProfile,

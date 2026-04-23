@@ -913,6 +913,31 @@ export interface AppStateValue {
   updatePackageState: (idx: number, patch: OnboardingPackageStatePatch) => void;
   finishDistribution: () => Promise<string>;
   clearCreateSession: () => void;
+  /**
+   * fix-m7-createsession-redact-secrets-on-finalize — read the
+   * plaintext `bfonboard1…` package text and the distribution
+   * password for the remote share at {@link idx} from the unlocked
+   * provider's in-memory stash.
+   *
+   * After {@link createProfile} completes, `createSession.onboardingPackages`
+   * surfaces only redacted sentinels for `packageText` / `password`
+   * (so `window.__appState`, IndexedDB, and console transcripts never
+   * carry the plaintext secrets past the mutator boundary — see the
+   * m7 security-live-sweep contract). The UI distribution screen must
+   * still be able to copy the real package text to the clipboard or
+   * render it in a QR code; it does so exclusively through this
+   * accessor, which reads from a ref that is NOT exposed on the
+   * serialised AppState value.
+   *
+   * Returns `null` when the stash is empty (no active create session
+   * / already cleared) or when `idx` does not match a sponsored
+   * remote share. The caller is responsible for not logging or
+   * persisting the returned values — they are the same raw secrets
+   * the mutator intentionally moved off the React state.
+   */
+  getCreateSessionPackageSecret: (
+    idx: number,
+  ) => { packageText: string; password: string } | null;
   beginImport: (backupString: string) => void;
   decryptImportBackup: (
     backupString: string,

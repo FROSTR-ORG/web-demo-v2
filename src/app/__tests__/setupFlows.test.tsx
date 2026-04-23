@@ -202,14 +202,32 @@ describe("AppState setup flows", () => {
     );
     const session = getState().createSession!;
     const remotePackage = session.onboardingPackages[0];
+    // fix-m7-createsession-redact-secrets-on-finalize — after
+    // createProfile resolves, the on-session `packageText` / `password`
+    // fields are redaction sentinels, not the plaintext. The plaintext
+    // continues to be addressable through the provider's out-of-band
+    // accessor so the DistributeSharesScreen Copy / QR affordances and
+    // tests asserting decoder round-trips can still verify that a real
+    // bfonboard package was produced.
+    expect(remotePackage.packageText).toBe("[redacted-bfprofile]");
+    expect(remotePackage.password).toBe("[redacted]");
+    const plaintextRemotePackage =
+      getState().getCreateSessionPackageSecret(remotePackage.idx);
+    expect(plaintextRemotePackage).not.toBeNull();
+    expect(plaintextRemotePackage!.packageText.startsWith("bfonboard1")).toBe(
+      true,
+    );
     await expect(
-      decodeBfonboardPackage(remotePackage.packageText, "remote-password"),
+      decodeBfonboardPackage(
+        plaintextRemotePackage!.packageText,
+        "remote-password",
+      ),
     ).resolves.toMatchObject({
       relays: ["wss://relay.example.test"],
     });
     await expect(
       decodeBfonboardPackage(
-        remotePackage.packageText,
+        plaintextRemotePackage!.packageText,
         packagePasswordForShare("Create Flow Key", remotePackage.idx),
       ),
     ).rejects.toThrow();

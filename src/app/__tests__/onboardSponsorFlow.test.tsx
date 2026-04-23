@@ -78,7 +78,21 @@ afterEach(() => {
 async function bootProvider(options: {
   groupName?: string;
   deviceName?: string;
-} = {}): Promise<{ getState: () => AppStateValue }> {
+} = {}): Promise<{
+  getState: () => AppStateValue;
+  // fix-m7-createsession-redact-secrets-on-finalize — the real
+  // provider redacts share seckeys in the createSession AFTER
+  // createProfile resolves, so downstream assertions that need the
+  // plaintext pre-redaction values (to cross-check against the
+  // sponsor's allocated pool secret) must capture them here while
+  // the keyset is still fully materialised on React state.
+  originalKeyset: NonNullable<
+    NonNullable<AppStateValue["createSession"]>["keyset"]
+  >;
+  originalLocalShare: NonNullable<
+    NonNullable<AppStateValue["createSession"]>["localShare"]
+  >;
+}> {
   vi.useRealTimers();
   let latest!: AppStateValue;
   render(
@@ -100,6 +114,19 @@ async function bootProvider(options: {
   });
   await waitFor(() => expect(latest.createSession?.keyset).toBeTruthy());
 
+  // fix-m7-createsession-redact-secrets-on-finalize — snapshot the
+  // plaintext keyset + local share now (pre-createProfile). After
+  // createProfile resolves, the createSession's seckey fields
+  // (keyset.shares[*].seckey, localShare.seckey) resolve to the
+  // `[redacted]` sentinel so the m7 security-live-sweep finds zero
+  // non-redacted secrets on the window.__appState surface.
+  const preCreateKeyset = latest.createSession!.keyset!;
+  const originalKeyset = {
+    group: preCreateKeyset.group,
+    shares: preCreateKeyset.shares.map((share) => ({ ...share })),
+  };
+  const originalLocalShare = { ...latest.createSession!.localShare! };
+
   await act(async () => {
     await latest.createProfile({
       deviceName,
@@ -119,23 +146,17 @@ async function bootProvider(options: {
     profilePayloadForShare({
       profileId: "ignored",
       deviceName,
-      share:
-        latest.activeProfile && latest.createSession?.keyset
-          ? latest.createSession.keyset.shares[0]
-          : (await createKeysetBundle({ groupName, threshold: 2, count: 2 })).shares[0],
-      group:
-        latest.activeProfile && latest.createSession?.keyset
-          ? latest.createSession.keyset.group
-          : (await createKeysetBundle({ groupName, threshold: 2, count: 2 })).group,
+      share: originalKeyset.shares[0],
+      group: originalKeyset.group,
       relays: [],
       manualPeerPolicyOverrides: defaultManualPeerPolicyOverrides(
-        (await createKeysetBundle({ groupName, threshold: 2, count: 2 })).group,
+        originalKeyset.group,
         0,
       ),
     }),
   ).toBeTruthy();
 
-  return { getState: () => latest };
+  return { getState: () => latest, originalKeyset, originalLocalShare };
 }
 
 describe("createOnboardSponsorPackage — VAL-ONBOARD-006 dispatch", () => {
@@ -308,14 +329,18 @@ describe("clearOnboardSponsorSession — VAL-ONBOARD-014", () => {
 
 describe("fix-m7-onboard-distinct-share-allocation — pool allocation", () => {
   it("allocates a NON-SELF share from the encrypted pool and encodes its secret (not the sponsor's)", async () => {
-    const { getState } = await bootProvider();
+    // fix-m7-createsession-redact-secrets-on-finalize — the real
+    // createSession's localShare.seckey / keyset.shares[*].seckey
+    // resolve to `[redacted]` after createProfile so secrets never
+    // leak via window.__appState. We cross-check the sponsor-
+    // allocated pool secret against the plaintext keyset captured
+    // BEFORE createProfile redacted it.
+    const { getState, originalKeyset, originalLocalShare } =
+      await bootProvider();
 
-    // Snapshot the local (self) share secret BEFORE dispatching so we
-    // can assert it is NOT what the pool allocated into the
-    // bfonboard package.
-    const createSession = getState().createSession;
-    const localShare = createSession!.localShare!;
-    const selfSecret = localShare.seckey;
+    // Snapshot the local (self) share secret so we can assert it is
+    // NOT what the pool allocated into the bfonboard package.
+    const selfSecret = originalLocalShare.seckey;
 
     // Decode the package the sponsor created and assert its
     // `share_secret` does NOT equal the sponsor's own.
@@ -335,8 +360,8 @@ describe("fix-m7-onboard-distinct-share-allocation — pool allocation", () => {
     expect(decoded.share_secret).not.toBe(selfSecret);
     // The allocated secret must correspond to a remote (non-self)
     // share from the keyset.
-    const remoteSecrets = createSession!.keyset!.shares
-      .filter((s) => s.idx !== localShare.idx)
+    const remoteSecrets = originalKeyset.shares
+      .filter((s) => s.idx !== originalLocalShare.idx)
       .map((s) => s.seckey);
     expect(remoteSecrets).toContain(decoded.share_secret);
   }, 30_000);

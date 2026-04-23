@@ -28,8 +28,30 @@ async function copySecret(value: string): Promise<boolean> {
 
 export function DistributeSharesScreen() {
   const navigate = useNavigate();
-  const { createSession, updatePackageState } = useAppState();
+  const { createSession, updatePackageState, getCreateSessionPackageSecret } =
+    useAppState();
   const demoUi = useDemoUi();
+
+  /**
+   * fix-m7-createsession-redact-secrets-on-finalize — after
+   * `createProfile` returns, `createSession.onboardingPackages[*].
+   * packageText` / `.password` are redaction sentinels so the
+   * serialised AppState (window.__appState, IndexedDB, console
+   * transcripts) never carries the plaintext. The Copy / QR
+   * affordances resolve the real plaintext through the provider's
+   * out-of-band accessor instead. Demo mode (no provider-side stash)
+   * falls back to `pkg.packageText` / `pkg.password` which are just
+   * placeholder strings for the deterministic gallery.
+   */
+  function resolveSecret(pkg: {
+    idx: number;
+    packageText: string;
+    password: string;
+  }): { packageText: string; password: string } {
+    const stash = getCreateSessionPackageSecret?.(pkg.idx);
+    if (stash) return stash;
+    return { packageText: pkg.packageText, password: pkg.password };
+  }
 
   if (
     !createSession?.keyset ||
@@ -117,7 +139,8 @@ export function DistributeSharesScreen() {
                     size="sm"
                     disabled={locked}
                     onClick={async () => {
-                      if (await copySecret(pkg.packageText)) {
+                      const { packageText } = resolveSecret(pkg);
+                      if (await copySecret(packageText)) {
                         updatePackageState(pkg.idx, {
                           packageCopied: true,
                           copied: true,
@@ -134,7 +157,8 @@ export function DistributeSharesScreen() {
                     size="sm"
                     disabled={locked}
                     onClick={async () => {
-                      if (await copySecret(pkg.password)) {
+                      const { password } = resolveSecret(pkg);
+                      if (await copySecret(password)) {
                         updatePackageState(pkg.idx, { passwordCopied: true });
                       }
                     }}
@@ -143,7 +167,7 @@ export function DistributeSharesScreen() {
                     Copy Password
                   </Button>
                   <QrButton
-                    value={pkg.packageText}
+                    value={resolveSecret(pkg).packageText}
                     disabled={locked}
                     onShown={() =>
                       updatePackageState(pkg.idx, { qrShown: true })

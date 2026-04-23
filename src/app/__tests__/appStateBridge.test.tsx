@@ -552,6 +552,7 @@ describe("MockAppStateProvider bridge arming", () => {
     updatePackageState: () => undefined,
     finishDistribution: async () => "prof_mock",
     clearCreateSession: () => undefined,
+    getCreateSessionPackageSecret: () => null,
     beginImport: () => undefined,
     decryptImportBackup: async () => undefined,
     saveImportedProfile: async () => "prof_mock",
