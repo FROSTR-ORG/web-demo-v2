@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { AlertTriangle, HelpCircle } from "lucide-react";
+import { AlertTriangle, HelpCircle, QrCode } from "lucide-react";
 import { useAppState } from "../app/AppState";
 import { AppShell } from "../components/shell";
 import { PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField } from "../components/ui";
+import { QrScanner } from "../components/QrScanner";
 import { DEMO_BFPROFILE } from "../demo/fixtures";
 import { useDemoUi } from "../demo/demoUi";
 import type { BfProfilePayload } from "../lib/bifrost/types";
@@ -80,6 +81,7 @@ export function LoadBackupScreen() {
   const [backupString, setBackupString] = useState(
     demoUi.import?.backupPreset ?? "",
   );
+  const [showQrScanner, setShowQrScanner] = useState(false);
   const validation = validateBackupString(backupString);
 
   function handleContinue() {
@@ -137,6 +139,14 @@ export function LoadBackupScreen() {
           >
             Upload Backup File
           </button>
+          <button
+            type="button"
+            className="button button-chip button-sm onboard-scan-btn"
+            onClick={() => setShowQrScanner(true)}
+          >
+            <QrCode size={14} />
+            Scan QR
+          </button>
           {validation.message && (
             <span
               className={
@@ -160,6 +170,16 @@ export function LoadBackupScreen() {
           Continue
         </Button>
       </div>
+      {showQrScanner && (
+        <QrScanner
+          onScan={(data) => {
+            setBackupString(data);
+            setShowQrScanner(false);
+          }}
+          onClose={() => setShowQrScanner(false)}
+          expectedPrefixes={["bfprofile1"]}
+        />
+      )}
     </AppShell>
   );
 }

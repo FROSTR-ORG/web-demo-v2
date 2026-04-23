@@ -1,0 +1,28 @@
+{
+  "featureId": "m4-event-log-buffer",
+  "reviewedAt": "2026-04-22T15:39:50Z",
+  "commitId": "649ad12a7d1083b1ce51f7e423d9c7991ff33829",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The real AppStateProvider implementation correctly introduces a 500-entry runtime event-log ring buffer, typed badge mapping, drain ingestion, and dev-only debug exposure. However, the companion MockAppStateProvider wiring is incomplete: lock/clear flows do not clear the new runtimeEventLog slice, allowing stale event-log entries to persist across profile/session resets in demo/mock mode.",
+    "issues": [
+      {
+        "file": "src/app/MockAppStateProvider.tsx",
+        "line": 513,
+        "severity": "blocking",
+        "description": "runtimeEventLog is added as provider state (lines 72-77), but neither lockProfile (lines 513-533) nor clearCredentials (lines 534-553) clears it. This breaks parity with AppStateProvider reset semantics and can leak stale event-log rows between lock/clear transitions, violating the feature's 'no stale bleed' reset contract."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Shared guidance does not give an explicit checklist that every new AppStateValue state slice must be reset in MockAppStateProvider lock/clear mutators, which likely contributed to this omission.",
+      "evidence": "AGENTS.md discusses MockAppStateProvider lock/clear behavior in general terms, while this feature added `runtimeEventLog` state in src/app/MockAppStateProvider.tsx:72-77 but did not include it in lock/clear reset blocks at lines 513-553."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed transcript skeleton and commit 649ad12 in full. Core ring-buffer implementation is sound in AppStateProvider, but the feature fails due to missing runtimeEventLog reset on MockAppStateProvider lock/clear paths."
+}

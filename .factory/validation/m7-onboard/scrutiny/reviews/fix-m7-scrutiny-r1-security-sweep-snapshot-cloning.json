@@ -1,0 +1,28 @@
+{
+  "featureId": "fix-m7-scrutiny-r1-security-sweep-snapshot-cloning",
+  "reviewedAt": "2026-04-23T05:02:41Z",
+  "commitId": "dbd643b",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix commit directly resolves both prior blocking false-negative paths: snapshots are now frozen via deep clone at capture time, and wrapper-key allow-listing now redacts only bfprofile matches so other secret patterns remain detectable. Added scanner tests cover the required nested-partial_signature regression and related wrapper-key leak cases. A previously noted non-blocking harness gap around onboard-dispatch assertion remains.",
+    "issues": [
+      {
+        "file": "src/app/__tests__/snapshot.security.test.tsx",
+        "line": 488,
+        "severity": "non_blocking",
+        "description": "The onboard leg still uses a broad try/catch without asserting successful dispatch. If createOnboardSponsorPackage throws early, the sweep can still pass without fully exercising the onboard path."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Transcript evidence shows the worker skipped runtime-worker Step 5 checks (tsconfig.node typecheck and demo-gallery Playwright) but handoff still marked followedProcedure=true, suggesting either the skill procedure is too strict for pure scanner/test-only fixes or compliance expectations are unclear.",
+      "evidence": "runtime-worker SKILL.md Step 5 requires `npx tsc --noEmit -p tsconfig.node.json --pretty false` and `npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop --workers 1`; transcript skeleton for session fabca9e0-3dca-47e5-beb4-c4ca67ee412f shows vitest + tsconfig typecheck + full vitest only."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m7-onboard/scrutiny/reviews/m7-security-live-sweep.json",
+  "summary": "Reviewed fix feature against prior failed review and both commits (ee74c2e, dbd643b). The fix adequately addresses the original blocking failures (snapshot live-reference collapse and scanner over-masking) and adds targeted regression coverage; overall review passes with one non-blocking pre-existing harness assertion gap noted."
+}

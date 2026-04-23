@@ -103,19 +103,22 @@ describe("DashboardScreen — Signer Policy Prompt Modal", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("renders all key elements: title, request badge, peer info, details table, expiration, 6 action buttons", () => {
+  it("renders title, request badge, peer info, details table, expiration, and 4 peer-level decision buttons (scoped variants hidden per VAL-APPROVALS-013 deviation)", () => {
     renderDashboard();
     fireEvent.click(screen.getByLabelText("Open Policy Prompt"));
     const dialog = screen.getByRole("dialog");
     // Title
     expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
-    // Subtitle
-    expect(screen.getByText("A peer is requesting permission to sign on your behalf")).toBeInTheDocument();
+    // Subtitle references the verb ("sign") as part of the new reactive
+    // denial surface copy.
+    expect(
+      screen.getByText(/requesting permission to sign on your behalf/),
+    ).toBeInTheDocument();
     // Request badge - use getAllByText since SIGN also appears in peer badges
     const signElements = screen.getAllByText("SIGN");
     expect(signElements.length).toBeGreaterThanOrEqual(1);
-    // Peer info
-    expect(screen.getByText("from Peer #2")).toBeInTheDocument();
+    // Peer info — Paper demo path carries the display label
+    expect(screen.getAllByText(/Peer #2/).length).toBeGreaterThanOrEqual(1);
     // Details table
     expect(screen.getByText("EVENT KIND")).toBeInTheDocument();
     expect(screen.getByText("CONTENT")).toBeInTheDocument();
@@ -123,15 +126,25 @@ describe("DashboardScreen — Signer Policy Prompt Modal", () => {
     expect(screen.getByText("DOMAIN")).toBeInTheDocument();
     // Detail values
     expect(screen.getByText("kind:1 (Short Text Note)")).toBeInTheDocument();
-    // Expiration timer
-    expect(screen.getByText("Expires in 42s")).toBeInTheDocument();
-    // 6 action buttons
+    // Expiration timer — the reactive modal applies a session TTL when the
+    // Paper fixture provides a display string rather than a numeric ms.
+    expect(screen.getByText(/Expires in/)).toBeInTheDocument();
+    // 4 peer-level action buttons. Scoped variants (Always for kind:1,
+    // Always deny for kind:1, Always deny for <domain>) are NOT rendered
+    // because `RuntimeClient.setPolicyOverride` only exposes peer-level
+    // granularity — documented deviation in
+    // docs/runtime-deviations-from-paper.md (VAL-APPROVALS-013).
     expect(screen.getByText("Deny")).toBeInTheDocument();
     expect(screen.getByText("Allow once")).toBeInTheDocument();
     expect(screen.getByText("Always allow")).toBeInTheDocument();
-    expect(screen.getByText("Always for kind:1")).toBeInTheDocument();
-    expect(screen.getByText("Always deny for kind:1")).toBeInTheDocument();
-    expect(screen.getByText("Always deny for primal.net")).toBeInTheDocument();
+    expect(screen.getByText("Always deny")).toBeInTheDocument();
+    expect(screen.queryByText("Always for kind:1")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Always deny for kind:1"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Always deny for primal.net"),
+    ).not.toBeInTheDocument();
     // Confirm dialog is present
     expect(dialog).toBeInTheDocument();
   });
@@ -166,10 +179,10 @@ describe("DashboardScreen — Signer Policy Prompt Modal", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("dismisses modal when Always deny for kind:1 is clicked", () => {
+  it("dismisses modal when Always deny (peer-level) is clicked — scoped kind-level variant is hidden per VAL-APPROVALS-013 deviation", () => {
     renderDashboard();
     fireEvent.click(screen.getByLabelText("Open Policy Prompt"));
-    fireEvent.click(screen.getByText("Always deny for kind:1"));
+    fireEvent.click(screen.getByText("Always deny"));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
@@ -199,10 +212,18 @@ describe("DashboardScreen — Signing Failed Modal", () => {
     // Title — modal title h2 should exist
     const titleEl = screen.getByRole("heading", { name: "Signing Failed" });
     expect(titleEl).toBeInTheDocument();
-    // Description
-    expect(screen.getByText("Unable to complete signature for event kind:1. All 3 retry attempts exhausted.")).toBeInTheDocument();
-    // Code box
-    expect(screen.getByText("Round: r-0x4f2a · Peers responded: 1/2 · Error: insufficient partial signatures")).toBeInTheDocument();
+    // Description — neutral fallback when no real runtime failure payload
+    // is supplied (see `fix-m1-signing-failed-modal-real-peer-response`).
+    expect(
+      screen.getByText(/failure details are unavailable/i),
+    ).toBeInTheDocument();
+    // Code box — neutral fallback, no synthesized peer-response ratio.
+    const codeBox = screen.getByTestId("signing-failed-code-text");
+    expect(codeBox.textContent).toMatch(/failure details unavailable/i);
+    expect(codeBox.textContent).not.toContain("no peers responded");
+    expect(codeBox.textContent).not.toContain("Peers responded");
+    expect(codeBox.textContent).not.toContain("1/2");
+    expect(codeBox.textContent).not.toContain("r-0x4f2a");
     // Buttons
     expect(screen.getByText("Dismiss")).toBeInTheDocument();
     expect(screen.getByText("Retry")).toBeInTheDocument();

@@ -1,11 +1,52 @@
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { PolicyOverrideEntry } from "../../app/AppStateTypes";
 
 // Mock AppState so we can provide a controlled activeProfile and runtimeStatus.
 const mockLockProfile = vi.fn();
 const mockSetSignerPaused = vi.fn();
 const mockRefreshRuntime = vi.fn();
+const mockRemovePolicyOverride = vi.fn(async () => undefined);
+const mockSetPeerPolicyOverride = vi.fn(async () => undefined);
+
+// Seeded active peer-policy overrides that drive the Signer Policies
+// rule list under the new m3-signer-policies-crud wiring — rows are
+// derived from `policyOverrides` (direction=respond for the reactive
+// prompt flow), not from the legacy MOCK_SIGNER_RULES fixture.
+const peerZeroPubkey =
+  "a3f8c2d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f78f2c";
+const peerOnePubkey =
+  "d7e1b9f3a4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c93b9e";
+const peerTwoPubkey =
+  "9c4a8e2f3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c1f5e";
+
+const seededPolicyOverrides: PolicyOverrideEntry[] = [
+  {
+    peer: peerZeroPubkey,
+    direction: "respond",
+    method: "sign",
+    value: "allow",
+    source: "persistent",
+    createdAt: 3000,
+  },
+  {
+    peer: peerOnePubkey,
+    direction: "respond",
+    method: "ecdh",
+    value: "allow",
+    source: "session",
+    createdAt: 2000,
+  },
+  {
+    peer: peerTwoPubkey,
+    direction: "respond",
+    method: "sign",
+    value: "deny",
+    source: "persistent",
+    createdAt: 1000,
+  },
+];
 
 const fakeProfile = {
   id: "test-profile-id",
@@ -22,7 +63,12 @@ const fakeProfile = {
 };
 
 const fakeRuntimeStatus = {
-  metadata: { member_idx: 0, share_public_key: "02a3f8c2d1e2f3a4b5c6d7e8f9a0b1c28f2c4a" },
+  // Distinct from every peer pubkey below — the self-peer exclusion
+  // (VAL-POLICIES-025) filters any peers[] entry whose pubkey equals
+  // `metadata.share_public_key`, so pretending share_public_key ===
+  // peers[0] (the pre-m3-policy-denial fixture) would silently drop
+  // one row from the rendered Peer Policies list.
+  metadata: { member_idx: 0, share_public_key: "01f0000000000000000000000000000000000000000000000000000000000000" },
   readiness: {
     runtime_ready: true,
     degraded_reasons: [],
@@ -69,6 +115,9 @@ vi.mock("../../app/AppState", () => ({
     lockProfile: mockLockProfile,
     setSignerPaused: mockSetSignerPaused,
     refreshRuntime: mockRefreshRuntime,
+    policyOverrides: seededPolicyOverrides,
+    removePolicyOverride: mockRemovePolicyOverride,
+    setPeerPolicyOverride: mockSetPeerPolicyOverride,
   }),
 }));
 
@@ -96,55 +145,70 @@ describe("DashboardScreen — Policies view", () => {
     expect(screen.getByText("Peer Policies")).toBeInTheDocument();
   });
 
-  it("Signer Policies panel shows default policy dropdown and per-method rules", () => {
+  it("Signer Policies panel shows default policy dropdown and a rule row per active override (VAL-POLICIES-014 read leg)", () => {
     renderDashboard();
     fireEvent.click(screen.getByText("Policies"));
     expect(screen.getByText("Default policy")).toBeInTheDocument();
     expect(screen.getByText("Ask every time")).toBeInTheDocument();
-    expect(screen.getByText("sign_event:1")).toBeInTheDocument();
-    expect(screen.getByText("nip44_encrypt")).toBeInTheDocument();
-    expect(screen.getByText("get_public_key")).toBeInTheDocument();
-  });
-
-  it("Signer Policies panel shows domain labels and permission badges", () => {
-    renderDashboard();
-    fireEvent.click(screen.getByText("Policies"));
-    // Domain labels
-    const domainLabels = screen.getAllByText("primal.net");
-    expect(domainLabels.length).toBeGreaterThanOrEqual(3);
-    // Permission badges
-    const alwaysBadges = screen.getAllByText("Always");
-    expect(alwaysBadges.length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("Allow once")).toBeInTheDocument();
-  });
-
-  it("Signer Policies panel shows remove buttons for each rule", () => {
-    renderDashboard();
-    fireEvent.click(screen.getByText("Policies"));
-    const removeButtons = screen.getAllByLabelText("Remove rule");
-    expect(removeButtons.length).toBe(3);
-  });
-
-  it("default policy dropdown changes value and remove buttons delete rules", () => {
-    renderDashboard();
-    fireEvent.click(screen.getByText("Policies"));
-
-    fireEvent.click(screen.getByRole("button", { name: /Ask every time/ }));
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "Deny by default" }));
-    expect(screen.getByRole("button", { name: /Deny by default/ })).toBeInTheDocument();
-
-    let removeButtons = screen.getAllByLabelText("Remove rule");
-    fireEvent.click(removeButtons[0]);
+    // One rule row per policyOverrides entry — no more
+    // MOCK_SIGNER_RULES rows (sign_event:1 / nip44_encrypt / get_public_key).
+    const rows = screen.getAllByTestId("policy-override-row");
+    expect(rows).toHaveLength(seededPolicyOverrides.length);
     expect(screen.queryByText("sign_event:1")).not.toBeInTheDocument();
-    expect(screen.getAllByLabelText("Remove rule").length).toBe(2);
+    expect(screen.queryByText("nip44_encrypt")).not.toBeInTheDocument();
+    expect(screen.queryByText("get_public_key")).not.toBeInTheDocument();
+  });
 
-    removeButtons = screen.getAllByLabelText("Remove rule");
-    fireEvent.click(removeButtons[0]);
-    fireEvent.click(screen.getAllByLabelText("Remove rule")[0]);
-    expect(screen.queryAllByLabelText("Remove rule").length).toBe(0);
+  it("Signer Policies panel shows method labels, peer shortHex, and decision pills per override", () => {
+    renderDashboard();
+    fireEvent.click(screen.getByText("Policies"));
+    // Persistent allow → "Always", session allow → "Allow once",
+    // persistent deny → "Deny" (VAL-POLICIES-014 pill mapping).
+    expect(screen.getByText("Always")).toBeInTheDocument();
+    expect(screen.getByText("Allow once")).toBeInTheDocument();
+    expect(screen.getByText("Deny")).toBeInTheDocument();
+    // Methods rendered uppercase: two SIGN rows + one ECDH row.
+    const methodCells = screen
+      .getAllByTestId("policy-override-row")
+      .map((row) => row.querySelector(".policies-method")?.textContent);
+    expect(methodCells).toEqual(
+      expect.arrayContaining(["SIGN", "ECDH", "SIGN"]),
+    );
+  });
+
+  it("Signer Policies panel shows a remove button for each override row", () => {
+    renderDashboard();
+    fireEvent.click(screen.getByText("Policies"));
+    const removeButtons = screen.getAllByLabelText(/Remove .* override for /i);
+    expect(removeButtons.length).toBe(seededPolicyOverrides.length);
+  });
+
+  it("clicking a rule's remove button dispatches removePolicyOverride with (peer, direction, method) (VAL-POLICIES-014 remove leg)", () => {
+    renderDashboard();
+    mockRemovePolicyOverride.mockClear();
+    fireEvent.click(screen.getByText("Policies"));
+    // The newest override is rendered first (createdAt=3000) → SIGN on peer zero.
+    const rows = screen.getAllByTestId("policy-override-row");
+    const firstRemove = rows[0].querySelector(
+      "button.policies-remove-btn",
+    ) as HTMLButtonElement;
+    fireEvent.click(firstRemove);
+    expect(mockRemovePolicyOverride).toHaveBeenCalledTimes(1);
+    expect(mockRemovePolicyOverride).toHaveBeenCalledWith({
+      peer: peerZeroPubkey,
+      direction: "respond",
+      method: "sign",
+    });
+  });
+
+  it("changing the default policy dropdown updates the trigger label (VAL-POLICIES-019)", () => {
+    renderDashboard();
+    fireEvent.click(screen.getByText("Policies"));
+    fireEvent.click(screen.getByRole("combobox", { name: /default policy/i }));
+    fireEvent.click(screen.getByRole("radio", { name: "Deny by default" }));
     expect(
-      screen.getByText("No explicit signer policies. Default policy applies to new requests.")
-    ).toBeInTheDocument();
+      screen.getByRole("combobox", { name: /default policy/i }),
+    ).toHaveTextContent("Deny by default");
   });
 
   it("Peer Policies panel shows per-peer rows with permission badges", () => {
@@ -158,15 +222,20 @@ describe("DashboardScreen — Policies view", () => {
   it("Peer Policies panel shows SIGN/ECDH/PING/ONBOARD badges for each peer", () => {
     renderDashboard();
     fireEvent.click(screen.getByText("Policies"));
-    // Each peer row has 4 badges: SIGN, ECDH, PING, ONBOARD
-    const signBadges = screen.getAllByText("SIGN");
-    expect(signBadges.length).toBe(3);
-    const ecdhBadges = screen.getAllByText("ECDH");
-    expect(ecdhBadges.length).toBe(3);
-    const pingBadges = screen.getAllByText("PING");
-    expect(pingBadges.length).toBe(3);
-    const onboardBadges = screen.getAllByText("ONBOARD");
-    expect(onboardBadges.length).toBe(3);
+    // Each peer row has 4 badges: SIGN, ECDH, PING, ONBOARD. Scope the
+    // query to `.policies-peer-row` so the Signer Policies rule rows
+    // (which also render "SIGN" / "ECDH" in `.policies-method`) are
+    // excluded from the count.
+    const peerRows = document.querySelectorAll(".policies-peer-row");
+    expect(peerRows.length).toBe(3);
+    peerRows.forEach((row) => {
+      const badgeText = Array.from(
+        row.querySelectorAll(".policies-peer-badges .permission-badge"),
+      ).map((el) => el.textContent);
+      expect(badgeText).toEqual(
+        expect.arrayContaining(["SIGN", "ECDH", "PING", "ONBOARD"]),
+      );
+    });
   });
 
   it("summary bar persists in Policies view", () => {

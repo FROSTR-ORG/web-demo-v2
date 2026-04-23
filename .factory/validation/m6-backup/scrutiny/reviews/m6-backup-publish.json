@@ -1,0 +1,28 @@
+{
+  "featureId": "m6-backup-publish",
+  "reviewedAt": "2026-04-22T21:07:13.743272Z",
+  "commitId": "05f2462799ba6540ab041151a4bc6f6d19cdc9c5",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "Core publish wiring (modal validation, kind-10000 event creation, relay fan-out, monotonic created_at) is present, but the feature misses the required persistent 'last publish' indicator/timestamp on Settings after success.",
+    "issues": [
+      {
+        "file": "src/app/AppStateProvider.tsx",
+        "line": 2785,
+        "severity": "blocking",
+        "description": "VAL-BACKUP-005 and VAL-BACKUP-031 require the Settings surface to retain a persistent 'most recent publish' indicator/timestamp (and reflect the race winner). `publishProfileBackup` returns `{ event, reached }` but does not persist any publish metadata to app state or IndexedDB, and the Settings UI only renders a static action row. After closing the modal or revisiting Settings, there is no persisted publish timestamp/indicator to display."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-screen-worker procedure requires agent-browser verification for changed UI and a RED-first failing test run capture, but this feature handoff still marks `followedProcedure: true` without either artifact. Skill procedure and enforcement appear out of sync.",
+      "evidence": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/.factory/skills/ui-screen-worker/SKILL.md lines 23, 33-37, 49-53; /Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/handoffs/2026-04-22T20-12-30-024Z__m6-backup-publish__d66e1bfa-4185-4de0-8161-0b3d3c7fe3e3.json lines 14-31 and 147-148; /tmp/m6_backup_publish_transcript_skeleton.md contains no `agent-browser` invocation."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed transcript skeleton, handoff, skill file, and commit 05f2462799ba6540ab041151a4bc6f6d19cdc9c5. Found one blocking gap: publish success metadata is not persisted/displayed on Settings as required by VAL-BACKUP-005/031, so the feature does not fully satisfy the contract."
+}

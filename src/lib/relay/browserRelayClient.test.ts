@@ -117,7 +117,7 @@ class FakeRelayClient implements RelayClient {
 
   constructor(
     urls: string[],
-    private readonly failAll = false,
+    failAll = false,
     optionsByUrl: Record<
       string,
       ConstructorParameters<typeof FakeRelayConnection>[1]
@@ -148,6 +148,72 @@ afterEach(() => {
 function flushTimers() {
   return new Promise((resolve) => globalThis.setTimeout(resolve, 0));
 }
+
+describe("BrowserRelayClient — onSocketEvent telemetry", () => {
+  it("emits open + close lifecycle events to the onSocketEvent observer", async () => {
+    const sockets: FakeSocket[] = [];
+    const events: unknown[] = [];
+    const client = new BrowserRelayClient({
+      createSocket: (url) => {
+        const socket = new FakeSocket(url);
+        sockets.push(socket);
+        return socket;
+      },
+      onSocketEvent: (event) => events.push(event),
+    });
+    const connection = client.connect("wss://relay.test");
+    const open = connection.connect();
+    sockets[0].open();
+    await open;
+    // Fire a real close event (simulate a server-side drop 1011) through
+    // the socket's close listeners. BrowserRelayConnection's persistent
+    // close listener must propagate it with the provided code.
+    (sockets[0] as unknown as {
+      listeners: Map<string, Set<(event: unknown) => void>>;
+    }).listeners
+      .get("close")
+      ?.forEach((listener) =>
+        listener({ code: 1011, wasClean: false } as unknown as Event),
+      );
+
+    const types = events.map((event) => (event as { type: string }).type);
+    expect(types).toContain("open");
+    expect(types).toContain("close");
+    const closeEvent = events.find(
+      (event) => (event as { type: string }).type === "close",
+    ) as { code: number; wasClean: boolean };
+    expect(closeEvent.code).toBe(1011);
+    expect(closeEvent.wasClean).toBe(false);
+    connection.close();
+  });
+
+  it("simulateAbnormalClose emits exactly one close event with the caller-supplied code and suppresses the real close", async () => {
+    const sockets: FakeSocket[] = [];
+    const events: unknown[] = [];
+    const client = new BrowserRelayClient({
+      createSocket: (url) => {
+        const socket = new FakeSocket(url);
+        sockets.push(socket);
+        return socket;
+      },
+      onSocketEvent: (event) => events.push(event),
+    });
+    const connection = client.connect("wss://relay.test");
+    const open = connection.connect();
+    sockets[0].open();
+    await open;
+    // Only BrowserRelayConnection exposes simulateAbnormalClose.
+    (
+      connection as unknown as { simulateAbnormalClose: (code: number) => void }
+    ).simulateAbnormalClose(1006);
+    const closes = events.filter(
+      (event) => (event as { type: string }).type === "close",
+    );
+    expect(closes.length).toBe(1);
+    expect((closes[0] as { code: number }).code).toBe(1006);
+    expect((closes[0] as { wasClean: boolean }).wasClean).toBe(false);
+  });
+});
 
 describe("BrowserRelayClient", () => {
   it("sends raw NIP-01 frames, handles events, captures notices, and closes", async () => {

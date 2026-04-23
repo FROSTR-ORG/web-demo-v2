@@ -1,0 +1,45 @@
+{
+  "featureId": "m5-relay-telemetry",
+  "reviewedAt": "2026-04-22T18:23:28Z",
+  "commitId": "8870273431c7de80413d7c99d53e41e11893db4d",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature substantially wires relay telemetry end-to-end (BrowserRelayClient EVENT/EOSE instrumentation, RuntimeRelayPump latency/event counters, slow-threshold constants, and dashboard rendering). However, Offline last-seen precedence is implemented incorrectly in both runtime relay-health renderers: when a relay has both `lastEventAt` and `lastDisconnectedAt`, the UI prefers `lastEventAt` instead of the disconnect timestamp. This conflicts with the feature’s stated VAL-SETTINGS-014 behavior and the in-code documentation that offline rows should prefer disconnect time.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen/panels/RelayHealthPanel.tsx",
+        "line": 61,
+        "severity": "blocking",
+        "description": "Offline rows compute `lastSeenSource` as `relay.lastEventAt ?? (...)`, so a stale pre-disconnect event timestamp overrides a newer `lastDisconnectedAt`. For VAL-SETTINGS-014 ('On disconnect ... Last Seen still real'), this can display an older, incorrect relative last-seen after disconnect instead of disconnect-time-relative copy."
+      },
+      {
+        "file": "src/screens/DashboardScreen/index.tsx",
+        "line": 113,
+        "severity": "blocking",
+        "description": "The same precedence bug exists in `relayHealthRowsFromRuntime` (used by relays-offline rendering): `lastEventAt` is chosen before `lastDisconnectedAt`, despite the nearby comment stating offline relays should prefer disconnect time. This causes inconsistent/incorrect offline last-seen semantics when events were received before disconnect."
+      },
+      {
+        "file": "src/screens/DashboardScreen/__tests__/relayHealthRows.test.ts",
+        "line": 92,
+        "severity": "non_blocking",
+        "description": "Offline last-seen test coverage only exercises `lastDisconnectedAt` without a concurrent `lastEventAt`, so it does not catch the precedence regression above."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "runtime-worker procedure adherence is unclear for this UI-facing feature: required agent-browser/manual UI verification was skipped, and required verification commands from the skill were not fully run.",
+      "evidence": ".factory/skills/runtime-worker/SKILL.md lines 22 and 49 require agent-browser/manual interactiveChecks for UI-surfaced behavior; line 44 and 46 require tsconfig.node + demo-gallery Playwright verification. Transcript skeleton for session 43ca2789-c544-4c01-a6b6-d04194e70ef7 shows only mission-worker-base/runtime-worker skills and no agent-browser invocation; handoff verification.commandsRun includes only tsc/vitest/git log (handoff lines 14,16,21,26)."
+    },
+    {
+      "area": "skills",
+      "observation": "The runtime-worker skill says omissions should be recorded via `followedProcedure: false` + deviations, but this handoff has no `skillFeedback` object, making procedure compliance non-auditable.",
+      "evidence": ".factory/skills/runtime-worker/SKILL.md line 22: 'if you omit [agent-browser], you MUST set followedProcedure: false and list the omission under deviations'; grep on handoff file 2026-04-22T17-36-10-650Z__m5-relay-telemetry__43ca2789-c544-4c01-a6b6-d04194e70ef7.json found no `skillFeedback` field."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed transcript skeleton, handoff, skill contract, and commit 8870273 diff. Result: fail due to a blocking offline last-seen precedence defect in both relay-health render paths (`lastEventAt` incorrectly overrides `lastDisconnectedAt`), plus a noted test gap that missed this case."
+}

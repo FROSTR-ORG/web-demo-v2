@@ -49,12 +49,21 @@ afterEach(() => {
   cleanup();
 });
 
+/* Real checksum-valid nsec strings (produced by bifrost_bridge_wasm::
+ * generate_nsec). Structural validation in CreateKeysetScreen now runs
+ * a bech32 decode, so test fixtures MUST be valid nsec1 bech32 rather
+ * than the synthesized-looking `nsec1pastedtestkey00…` placeholders. */
+const VALID_NSEC_A =
+  "nsec12tfx8l4x0pf3pug57hj2mvek32nr9za6lwwm08u7sqmndxpmrm4s7eetqs";
+const VALID_NSEC_B =
+  "nsec1m52qt8wg8fz0rr5h08s5eur84k0xnhnz2vwzekscvhdx2pf02r3sl43fjq";
+
 beforeEach(() => {
   mocks.navigate.mockClear();
   mocks.createKeyset.mockClear();
   mocks.generateNsec.mockReset();
   mocks.generateNsec.mockResolvedValue({
-    nsec: "nsec1generatedtestkey0000000000000000000000000000000000000000000000",
+    nsec: VALID_NSEC_B,
     signing_key_hex: "a".repeat(64),
   });
   mocks.createSession = null;
@@ -74,10 +83,10 @@ describe("CreateKeysetScreen", () => {
     expect(screen.getByText("Create New Keyset")).toBeInTheDocument();
     expect(screen.getByText("Keyset Name")).toBeInTheDocument();
     expect(screen.getByText("Private Key (nsec)")).toBeInTheDocument();
-    expect(screen.getByText("Create Keyset")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create Keyset" })).toBeInTheDocument();
   });
 
-  it("blocks existing nsec input because splitting is not supported yet", async () => {
+  it("blocks non-nsec prefix input with the 'must start with nsec1' error", async () => {
     render(
       <MemoryRouter>
         <CreateKeysetScreen />
@@ -85,18 +94,145 @@ describe("CreateKeysetScreen", () => {
     );
 
     const nsecInput = screen.getByPlaceholderText(
-      "Paste existing nsec (unsupported)",
+      "Paste your existing nsec or generate a new one",
     );
     fireEvent.change(nsecInput, { target: { value: "not-a-valid-key" } });
-    fireEvent.click(screen.getByText("Create Keyset"));
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
 
     await waitFor(() => {
       expect(
-        screen.getByText("Existing nsec splitting is not supported yet."),
+        screen.getByText("Invalid nsec format — must start with nsec1."),
       ).toBeInTheDocument();
     });
 
     expect(nsecInput).toHaveClass("input-error");
+    expect(mocks.createKeyset).not.toHaveBeenCalled();
+  });
+
+  it("blocks structurally malformed nsec1 input with the 'full secret key' error (fix-m6-nsec-structural-validation)", async () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    );
+
+    // `nsec1abc` has the correct prefix but fails bech32 structural
+    // validation (too short, bad checksum). Under the pre-fix behaviour
+    // this would slip past input validation and fail later inside
+    // createKeyset as a generic top-level error. The structural
+    // validator must now block it inline with the more precise copy.
+    fireEvent.change(nsecInput, { target: { value: "nsec1abc" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "Invalid nsec — check that you pasted the full secret key.",
+        ),
+      ).toBeInTheDocument();
+    });
+    expect(nsecInput).toHaveClass("input-error");
+    expect(mocks.createKeyset).not.toHaveBeenCalled();
+  });
+
+  it("also blocks 'nsec1' followed by non-bech32 garbage with the structural-error copy", async () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    );
+    fireEvent.change(nsecInput, { target: { value: "nsec1invalid" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "Invalid nsec — check that you pasted the full secret key.",
+        ),
+      ).toBeInTheDocument();
+    });
+    expect(mocks.createKeyset).not.toHaveBeenCalled();
+  });
+
+  it("clears the inline error once the input becomes a valid nsec1", async () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    );
+    fireEvent.change(nsecInput, { target: { value: "nsec1abc" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "Invalid nsec — check that you pasted the full secret key.",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.change(nsecInput, { target: { value: VALID_NSEC_A } });
+    await waitFor(() => {
+      expect(
+        screen.queryByText(
+          "Invalid nsec — check that you pasted the full secret key.",
+        ),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Invalid nsec format — must start with nsec1."),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("does not leak any part of the rejected nsec into console output", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      render(
+        <MemoryRouter>
+          <CreateKeysetScreen />
+        </MemoryRouter>,
+      );
+      const nsecInput = screen.getByPlaceholderText(
+        "Paste your existing nsec or generate a new one",
+      );
+      fireEvent.change(nsecInput, {
+        target: { value: "nsec1leakycanaryvaluexyz" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
+      await waitFor(() => {
+        expect(
+          screen.getByText(
+            "Invalid nsec — check that you pasted the full secret key.",
+          ),
+        ).toBeInTheDocument();
+      });
+      const allArgs = [
+        ...consoleSpy.mock.calls.flat(),
+        ...logSpy.mock.calls.flat(),
+        ...warnSpy.mock.calls.flat(),
+      ];
+      for (const arg of allArgs) {
+        expect(String(arg)).not.toContain("leakycanaryvalue");
+      }
+    } finally {
+      consoleSpy.mockRestore();
+      logSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 
   it("navigates to /create/progress on valid submission", async () => {
@@ -108,7 +244,7 @@ describe("CreateKeysetScreen", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByText("Create Keyset"));
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
 
     await waitFor(() => {
       expect(mocks.createKeyset).toHaveBeenCalledWith({
@@ -122,8 +258,7 @@ describe("CreateKeysetScreen", () => {
   });
 
   it("generates a real nsec into the same input field", async () => {
-    const generated =
-      "nsec1generatedtestkey0000000000000000000000000000000000000000000000";
+    const generated = VALID_NSEC_B;
 
     render(
       <MemoryRouter>
@@ -131,17 +266,17 @@ describe("CreateKeysetScreen", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Generate NSEC" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
 
     await waitFor(() => {
       expect(mocks.generateNsec).toHaveBeenCalled();
       expect(
-        screen.getByPlaceholderText("Paste existing nsec (unsupported)"),
+        screen.getByPlaceholderText("Paste your existing nsec or generate a new one"),
       ).toHaveValue(generated);
     });
 
     const nsecInput = screen.getByPlaceholderText(
-      "Paste existing nsec (unsupported)",
+      "Paste your existing nsec or generate a new one",
     );
     expect(nsecInput).toHaveAttribute("type", "password");
     fireEvent.click(screen.getByRole("button", { name: "Reveal nsec" }));
@@ -149,8 +284,7 @@ describe("CreateKeysetScreen", () => {
   });
 
   it("submits a generated nsec without storing it in the create draft", async () => {
-    const generated =
-      "nsec1generatedtestkey0000000000000000000000000000000000000000000000";
+    const generated = VALID_NSEC_B;
 
     render(
       <MemoryRouter>
@@ -158,13 +292,13 @@ describe("CreateKeysetScreen", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Generate NSEC" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
     await waitFor(() =>
       expect(
-        screen.getByPlaceholderText("Paste existing nsec (unsupported)"),
+        screen.getByPlaceholderText("Paste your existing nsec or generate a new one"),
       ).toHaveValue(generated),
     );
-    fireEvent.click(screen.getByText("Create Keyset"));
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
 
     await waitFor(() => {
       expect(mocks.createKeyset).toHaveBeenCalledWith({
@@ -174,6 +308,7 @@ describe("CreateKeysetScreen", () => {
         generatedNsec: generated,
       });
     });
+
     expect(mocks.navigate).toHaveBeenCalledWith("/create/progress");
   });
 
@@ -186,7 +321,7 @@ describe("CreateKeysetScreen", () => {
 
     const nameInput = screen.getByDisplayValue("My Signing Key");
     fireEvent.change(nameInput, { target: { value: "" } });
-    fireEvent.click(screen.getByText("Create Keyset"));
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
 
     await waitFor(() => {
       expect(screen.getByText("Keyset name is required.")).toBeInTheDocument();
@@ -199,11 +334,11 @@ describe("CreateKeysetScreen", () => {
         <CreateKeysetScreen />
       </MemoryRouter>,
     );
-    // Stepper step 1 "Create"; step 2 "Create Profile"; step 3 "Distribute Shares"
-    expect(screen.getByText("Create Profile")).toBeInTheDocument();
-    expect(screen.getByText("Distribute Shares")).toBeInTheDocument();
-    expect(screen.queryByText("Setup Profile")).not.toBeInTheDocument();
-    expect(screen.queryByText("Onboard Devices")).not.toBeInTheDocument();
+    // Stepper step 1 "Create Keyset"; step 2 "Setup Profile"; step 3 "Onboard Devices"
+    expect(screen.getByText("Setup Profile")).toBeInTheDocument();
+    expect(screen.getByText("Onboard Devices")).toBeInTheDocument();
+    expect(screen.queryByText("Create Profile")).not.toBeInTheDocument();
+    expect(screen.queryByText("Distribute Shares")).not.toBeInTheDocument();
   });
 
   it("renders canonical Keyset Name help text including 'peers in the keyset' (VAL-CRT-003)", () => {
@@ -264,7 +399,7 @@ describe("CreateKeysetScreen", () => {
     );
 
     fireEvent.click(screen.getByLabelText("Decrease Total Shares"));
-    fireEvent.click(screen.getByText("Create Keyset"));
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
 
     await waitFor(() => {
       expect(mocks.createKeyset).toHaveBeenCalledWith({
@@ -273,6 +408,191 @@ describe("CreateKeysetScreen", () => {
         count: 2,
       });
     });
+  });
+
+  /* ---------- m6-nsec-split-create (paste existing nsec) ---------- */
+
+  it("masks the nsec input by default (VAL-BACKUP-022)", () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    );
+    expect(nsecInput).toHaveAttribute("type", "password");
+  });
+
+  it("disables the reveal toggle when the nsec input is empty (VAL-BACKUP-022)", () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+    const revealBtn = screen.getByRole("button", { name: "Reveal nsec" });
+    expect(revealBtn).toBeDisabled();
+
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    );
+    fireEvent.change(nsecInput, {
+      target: {
+        value:
+          "nsec1pastedtestkey000000000000000000000000000000000000000000000000",
+      },
+    });
+    expect(screen.getByRole("button", { name: "Reveal nsec" })).not.toBeDisabled();
+  });
+
+  it("toggles the reveal/mask affordance when clicked (VAL-BACKUP-022)", () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    );
+    fireEvent.change(nsecInput, {
+      target: {
+        value:
+          "nsec1pastedtestkey000000000000000000000000000000000000000000000000",
+      },
+    });
+    expect(nsecInput).toHaveAttribute("type", "password");
+    fireEvent.click(screen.getByRole("button", { name: "Reveal nsec" }));
+    expect(nsecInput).toHaveAttribute("type", "text");
+    fireEvent.click(screen.getByRole("button", { name: "Hide nsec" }));
+    expect(nsecInput).toHaveAttribute("type", "password");
+  });
+
+  it("dispatches createKeyset with existingNsec when a valid nsec is pasted (VAL-BACKUP-020)", async () => {
+    const pasted = VALID_NSEC_A;
+
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    );
+    fireEvent.change(nsecInput, { target: { value: pasted } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
+
+    await waitFor(() => {
+      expect(mocks.createKeyset).toHaveBeenCalledWith({
+        groupName: "My Signing Key",
+        threshold: 2,
+        count: 3,
+        existingNsec: pasted,
+      });
+    });
+  });
+
+  it("trims whitespace/newlines from pasted nsec before validation (VAL-BACKUP-028)", async () => {
+    const pasted = VALID_NSEC_A;
+
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    );
+    fireEvent.change(nsecInput, {
+      target: { value: `\n   ${pasted}   \n` },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
+
+    await waitFor(() => {
+      expect(mocks.createKeyset).toHaveBeenCalledWith({
+        groupName: "My Signing Key",
+        threshold: 2,
+        count: 3,
+        existingNsec: pasted,
+      });
+    });
+    expect(
+      screen.queryByText("Invalid nsec format — must start with nsec1."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("reflects the trimmed nsec in input.value on change, before submit (VAL-BACKUP-028)", () => {
+    const pasted = VALID_NSEC_A;
+
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    ) as HTMLInputElement;
+
+    // Simulate a paste that includes surrounding whitespace / newline.
+    // The contract clause "Input value reflects trimmed string" requires
+    // the displayed DOM value to already be trimmed BEFORE the user
+    // clicks Create — validators check the field prior to submission.
+    fireEvent.change(nsecInput, {
+      target: { value: `   ${pasted}   \n` },
+    });
+
+    expect(nsecInput.value).toBe(pasted);
+    expect(nsecInput.value).not.toMatch(/^\s|\s$/);
+  });
+
+  it("rejects whitespace-wrapped invalid nsec with inline error (VAL-BACKUP-021)", async () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    );
+    fireEvent.change(nsecInput, { target: { value: "  not-valid-key  \n" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Invalid nsec format — must start with nsec1."),
+      ).toBeInTheDocument();
+    });
+    expect(mocks.createKeyset).not.toHaveBeenCalled();
+  });
+
+  it("clears pasted nsec from state and resets reveal state when Back is clicked (VAL-BACKUP-029)", () => {
+    render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+
+    const pasted = VALID_NSEC_A;
+    const nsecInput = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    );
+    fireEvent.change(nsecInput, { target: { value: pasted } });
+    fireEvent.click(screen.getByRole("button", { name: "Reveal nsec" }));
+    expect(nsecInput).toHaveValue(pasted);
+    expect(nsecInput).toHaveAttribute("type", "text");
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+
+    const nsecInputAfter = screen.getByPlaceholderText(
+      "Paste your existing nsec or generate a new one",
+    );
+    expect(nsecInputAfter).toHaveValue("");
+    expect(nsecInputAfter).toHaveAttribute("type", "password");
+    expect(screen.getByRole("button", { name: "Reveal nsec" })).toBeDisabled();
+    expect(mocks.navigate).toHaveBeenCalledWith("/");
   });
 });
 

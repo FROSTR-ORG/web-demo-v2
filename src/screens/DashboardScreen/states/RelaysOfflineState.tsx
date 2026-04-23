@@ -1,6 +1,14 @@
 import { Button } from "../../../components/ui";
 import { MOCK_RELAY_HEALTH_ROWS, type DashboardRelayHealthRow } from "../mocks";
 
+/**
+ * Row shape produced by the runtime-mode mapper
+ * (`relayHealthRowsFromRuntime`). Extends the Paper-fixture shape with
+ * a `slow` flag so the row can render amber (Slow) distinct from red
+ * (Offline) per VAL-SETTINGS-013.
+ */
+type RelayHealthRow = DashboardRelayHealthRow & { slow?: boolean };
+
 export function RelaysOfflineState({
   onStop,
   onRetry,
@@ -8,7 +16,7 @@ export function RelaysOfflineState({
 }: {
   onStop: () => void;
   onRetry: () => void;
-  relays?: DashboardRelayHealthRow[];
+  relays?: RelayHealthRow[];
 }) {
   return (
     <>
@@ -90,18 +98,29 @@ export function RelaysOfflineState({
             <span>Events</span>
             <span>Last Seen</span>
           </div>
-          {relays.map((relay) => (
-            <div className="relay-health-row" key={relay.relay}>
-              <span className="relay-health-url">{relay.relay}</span>
-              <span className={`relay-health-status ${relay.status.toLowerCase()}`}>
-                <span className="relay-health-dot" />
-                {relay.status}
-              </span>
-              <span>{relay.latency}</span>
-              <span>{relay.events}</span>
-              <span>{relay.lastSeen}</span>
-            </div>
-          ))}
+          {relays.map((relay) => {
+            // VAL-SETTINGS-013: render "Slow" status in amber when the
+            // row's `slow` flag is set, even though the underlying
+            // `status` value is reused from the enum. Keeps the CSS
+            // target (`.relay-health-status.slow`) independent of
+            // `.offline` so validators can distinguish the two.
+            const statusLabel = relay.slow ? "Slow" : relay.status;
+            const statusClass = relay.slow
+              ? "slow"
+              : relay.status.toLowerCase();
+            return (
+              <div className="relay-health-row" key={relay.relay}>
+                <span className="relay-health-url">{relay.relay}</span>
+                <span className={`relay-health-status ${statusClass}`}>
+                  <span className="relay-health-dot" />
+                  {statusLabel}
+                </span>
+                <span>{relay.latency}</span>
+                <span>{relay.events}</span>
+                <span>{relay.lastSeen}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </>

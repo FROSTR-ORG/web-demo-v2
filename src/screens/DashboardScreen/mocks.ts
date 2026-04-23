@@ -24,13 +24,25 @@ export interface PolicyPromptRequest {
 
 export interface DashboardApprovalRow {
   id: string;
-  kind: "SIGN" | "ECDH";
+  kind: "SIGN" | "ECDH" | "PING" | "ONBOARD";
   peer: string;
   key: string;
   detail: string;
   ttl: string;
-  domain: string;
-  request: PolicyPromptRequest;
+  /**
+   * Optional: domain context for policy-prompt display. Populated in the
+   * Paper mock fixtures; absent for runtime-derived rows sourced from
+   * `runtime_status.pending_operations`.
+   */
+  domain?: string;
+  /**
+   * Optional: the policy-prompt payload to open when the row's Open
+   * button is clicked. Present only in Paper-mode fixtures. Runtime-
+   * derived rows never carry a request payload — per VAL-APPROVALS-018
+   * the policy prompt is a reactive denial surface, not opened from
+   * pending_operations additions.
+   */
+  request?: PolicyPromptRequest;
 }
 
 export interface DashboardRelayHealthRow {
@@ -229,7 +241,13 @@ export const MOCK_PENDING_APPROVAL_ROWS: DashboardApprovalRow[] = [
   },
 ];
 
-export const DEFAULT_POLICY_PROMPT_REQUEST = MOCK_PENDING_APPROVAL_ROWS[0].request;
+// The Paper fixture's first row always carries a `request` payload — the
+// non-null assertion is safe (the type is optional on
+// `DashboardApprovalRow` to allow runtime-derived rows to omit it) and
+// keeps downstream `DEFAULT_POLICY_PROMPT_REQUEST` consumers typed as
+// `PolicyPromptRequest` rather than `PolicyPromptRequest | undefined`.
+export const DEFAULT_POLICY_PROMPT_REQUEST: PolicyPromptRequest =
+  MOCK_PENDING_APPROVAL_ROWS[0].request!;
 
 export const MOCK_RELAY_HEALTH_ROWS: DashboardRelayHealthRow[] = [
   {
@@ -257,6 +275,7 @@ export const MOCK_RELAY_HEALTH_ROWS: DashboardRelayHealthRow[] = [
 
 // Mock encrypted backup string shown in the Export Complete modal
 export const MOCK_BACKUP_STRING = "bfprofile1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4q9xgclkz4f5e0r8p2d7y6m3n0w1x4c5v6b7n8m9k0j";
+export const MOCK_SHARE_PACKAGE_STRING = "bfshare1qvz8k2afcqqszq2v5v5hnq9jxq6z9yx7s6np8pq3hm9n2c0g7m4e6a8ks0r5t";
 
 // Deterministic, paper-faithful formatters used by dashboard panels.
 export function paperGroupKey(value: string) {

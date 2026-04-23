@@ -276,16 +276,19 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
   });
 
   describe("VAL-DSH-010 / DSH-011: Settings sidebar", () => {
-    it("renders Settings sidebar with Device Profile, Group Profile, Rotate Share, Export, Security sections", () => {
+    it("renders Settings sidebar with Device Profile, Group Profile, Replace Share, Export, Security sections", () => {
       renderAt({ dashboard: { settingsOpen: true, paperPanels: true } });
       const sidebar = screen.getByTestId("settings-sidebar");
       const labels = Array.from(sidebar.querySelectorAll(".settings-section-label")).map(
         (el) => el.textContent
       );
+      // m7-onboard-sponsor-ui — "Onboard a Device" sits between
+      // Replace Share and Export & Backup per VAL-ONBOARD-001.
       expect(labels).toEqual([
         "Device Profile",
         "Group Profile",
-        "Rotate Share",
+        "Replace Share",
+        "Onboard a Device",
         "Export & Backup",
         "Profile Security",
       ]);
@@ -295,10 +298,15 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
       expect(screen.getByText("Change")).toBeInTheDocument();
       expect(screen.getByText("wss://relay.primal.net")).toBeInTheDocument();
       expect(screen.getByText("wss://relay.damus.io")).toBeInTheDocument();
-      // Group Profile content
+      // Group Profile content — Created / Updated rows are now sourced
+      // from the real activeProfile timestamps (VAL-SETTINGS-008), so
+      // assert on the row labels and the absence of the hardcoded Paper
+      // placeholders rather than literal dates.
       expect(screen.getByText("Keyset Name")).toBeInTheDocument();
-      expect(screen.getByText("Feb 24, 2026")).toBeInTheDocument();
-      expect(screen.getByText("Mar 8, 2026")).toBeInTheDocument();
+      expect(screen.getByText("Created")).toBeInTheDocument();
+      expect(screen.getByText("Updated")).toBeInTheDocument();
+      expect(sidebar.textContent ?? "").not.toContain("Feb 24, 2026");
+      expect(sidebar.textContent ?? "").not.toContain("Mar 8, 2026");
       expect(screen.getByText("Shared across all peers. Synced via Nostr.")).toBeInTheDocument();
     });
   });
@@ -345,7 +353,7 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
       renderAt({ dashboard: { settingsOpen: true, modal: "export-complete", paperPanels: true } });
       const modal = screen.getByTestId("export-complete-modal");
       expect(modal).toBeInTheDocument();
-      expect(modal.querySelector(".export-complete-title")?.textContent).toBe("Backup Ready");
+      expect(modal.querySelector(".export-complete-title")?.textContent).toBe("Profile Backup Ready");
       const actionBtns = Array.from(modal.querySelectorAll(".export-action-btn")).map(
         (el) => el.textContent
       );
@@ -359,24 +367,24 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
   });
 
   describe("VAL-DSH-017: Signer Policy Prompt modal", () => {
-    it("renders request meta table and decision CTAs", () => {
+    it("renders request meta table and peer-level decision CTAs (scoped variants hidden per VAL-APPROVALS-013 deviation)", () => {
       renderAt({ dashboard: { modal: "policy-prompt", paperPanels: true } });
       expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
       expect(
-        screen.getByText("A peer is requesting permission to sign on your behalf")
+        screen.getByText(/requesting permission to sign on your behalf/)
       ).toBeInTheDocument();
       expect(screen.getByText("EVENT KIND")).toBeInTheDocument();
       expect(screen.getByText("CONTENT")).toBeInTheDocument();
       expect(screen.getByText("PUBKEY")).toBeInTheDocument();
       expect(screen.getByText("DOMAIN")).toBeInTheDocument();
-      expect(screen.getByText("Expires in 42s")).toBeInTheDocument();
-      // decision CTAs
+      expect(screen.getByText(/Expires in/)).toBeInTheDocument();
+      // Peer-level decision CTAs (scoped kind/domain variants removed per
+      // VAL-APPROVALS-013 — documented in docs/runtime-deviations-from-paper.md).
       expect(screen.getByText("Deny")).toBeInTheDocument();
       expect(screen.getByText("Allow once")).toBeInTheDocument();
       expect(screen.getByText("Always allow")).toBeInTheDocument();
-      expect(screen.getByText("Always for kind:1")).toBeInTheDocument();
-      expect(screen.getByText("Always deny for kind:1")).toBeInTheDocument();
-      expect(screen.getByText("Always deny for primal.net")).toBeInTheDocument();
+      expect(screen.getByText("Always deny")).toBeInTheDocument();
+      expect(screen.queryByText("Always for kind:1")).not.toBeInTheDocument();
     });
   });
 
@@ -384,14 +392,16 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
     it("renders error detail with Dismiss + Retry CTAs", () => {
       renderAt({ dashboard: { modal: "signing-failed", paperPanels: true } });
       expect(screen.getByRole("heading", { name: "Signing Failed" })).toBeInTheDocument();
+      // Neutral fallback when the modal is opened without a real
+      // OperationFailure payload (see VAL-OPS-006 deviation doc entry).
       expect(
-        screen.getByText("Unable to complete signature for event kind:1. All 3 retry attempts exhausted.")
+        screen.getByText(/failure details are unavailable/i),
       ).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          "Round: r-0x4f2a · Peers responded: 1/2 · Error: insufficient partial signatures"
-        )
-      ).toBeInTheDocument();
+      const codeBox = screen.getByTestId("signing-failed-code-text");
+      expect(codeBox.textContent).toMatch(/failure details unavailable/i);
+      expect(codeBox.textContent).not.toContain("Peers responded");
+      expect(codeBox.textContent).not.toContain("1/2");
+      expect(codeBox.textContent).not.toContain("r-0x4f2a");
       expect(screen.getByText("Dismiss")).toBeInTheDocument();
       expect(screen.getByText("Retry")).toBeInTheDocument();
     });

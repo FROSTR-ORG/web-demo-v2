@@ -1,0 +1,324 @@
+{
+  "groupId": "g2-onboard-ui",
+  "testedAt": "2026-04-23T05:22:48Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "flowGuidance": "Flow Validator Guidance: shell-cli"
+  },
+  "toolsUsed": [
+    "shell-cli",
+    "vitest",
+    "playwright"
+  ],
+  "commandRuns": [
+    {
+      "command": "npx vitest run src/screens/__tests__/OnboardSponsorScreens.test.tsx src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.onboardSponsor.test.tsx src/app/__tests__/onboardSponsorFlow.test.tsx --config vitest.config.ts",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g2-onboard-ui/01-vitest-onboard-suite.transcript.txt",
+      "exitCodeFile": "m7-onboard/g2-onboard-ui/01-vitest-onboard-suite.exitcode.txt",
+      "outputSnippet": "Test Files 3 passed (3); Tests 33 passed (33)."
+    },
+    {
+      "command": "npx vitest run src/screens/__tests__/DashboardInteractions.test.tsx --config vitest.config.ts",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g2-onboard-ui/02-vitest-dashboard-interactions.transcript.txt",
+      "exitCodeFile": "m7-onboard/g2-onboard-ui/02-vitest-dashboard-interactions.exitcode.txt",
+      "outputSnippet": "Test Files 1 passed (1); Tests 19 passed (19)."
+    },
+    {
+      "command": "npx vitest run src/demo/__tests__/crossAreaFinalGate.test.tsx --config vitest.config.ts",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g2-onboard-ui/03-vitest-cross-area-final-gate.transcript.txt",
+      "exitCodeFile": "m7-onboard/g2-onboard-ui/03-vitest-cross-area-final-gate.exitcode.txt",
+      "outputSnippet": "Test Files 1 passed (1); Tests 18 passed (18)."
+    },
+    {
+      "command": "npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g2-onboard-ui/04-playwright-demo-gallery.transcript.txt",
+      "exitCodeFile": "m7-onboard/g2-onboard-ui/04-playwright-demo-gallery.exitcode.txt",
+      "outputSnippet": "desktop project: 3 passed, 1 skipped."
+    }
+  ],
+  "assertions": [
+    {
+      "id": "VAL-ONBOARD-001",
+      "title": "Dashboard exposes an \"Onboard a Device\" entry point",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned onboarding Vitest suite",
+          "expected": "Settings sidebar test confirms single Onboard action row, description copy, and blue CTA",
+          "observed": "SettingsSidebar.onboardSponsor.test.tsx passed including \"renders the Onboard a Device action row with the blue CTA\"."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g2-onboard-ui/01-vitest-onboard-suite.transcript.txt"
+        ],
+        "exitCode": 0
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ONBOARD-002",
+      "title": "Entry is discoverable from keyboard and screen readers",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Inspect evidence from assigned test runs only",
+          "expected": "Focus-ring + keyboard Enter/Space activation + accessible name + no duplicate affordance",
+          "observed": "Accessible-name and no-duplicate checks are covered, but no direct keyboard focus-ring/Enter/Space activation evidence in the assigned runs."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g2-onboard-ui/01-vitest-onboard-suite.transcript.txt"
+        ],
+        "exitCode": 0
+      },
+      "issues": "Insufficient direct evidence from the requested command set for keyboard activation/focus-ring behavior."
+    },
+    {
+      "id": "VAL-ONBOARD-003",
+      "title": "Sponsor configuration form required fields",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned onboarding Vitest suite",
+          "expected": "Three groups render in order and CTA remains disabled until valid",
+          "observed": "OnboardSponsorScreens.test.tsx passed cases covering group presence, required validations, and CTA gating/enabling."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g2-onboard-ui/01-vitest-onboard-suite.transcript.txt"
+        ],
+        "exitCode": 0
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ONBOARD-004",
+      "title": "Generated package round-trips through decode_bfonboard_package",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Inspect evidence from assigned test runs only",
+          "expected": "Generated package decoded with correct password and wrong-password decode error path",
+          "observed": "Assigned runs did not provide direct decode round-trip + wrong-password decode-path proof for this assertion."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g2-onboard-ui/01-vitest-onboard-suite.transcript.txt"
+        ],
+        "exitCode": 0
+      },
+      "issues": "No direct assertion-level evidence for decode_bfonboard_package round-trip in the specified command set."
+    },
+    {
+      "id": "VAL-ONBOARD-005",
+      "title": "Copy and QR hand-off affordances",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Inspect evidence from assigned test runs only",
+          "expected": "Textarea full package, copy affordance, and QR scannable round-trip",
+          "observed": "Assigned runs cover textarea rendering and QR canvas size, but no direct jsqr re-decode evidence for QR scannability."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g2-onboard-ui/01-vitest-onboard-suite.transcript.txt"
+        ],
+        "exitCode": 0
+      },
+      "issues": "Insufficient direct evidence for the QR scannability clause from the specified runs."
+    },
+    {
+      "id": "VAL-ONBOARD-016",
+      "title": "UI labels say \"Replace Share\", never \"Rotate Share\"",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Inspect evidence from assigned test runs only",
+          "expected": "DOM text sweep over all M7-touched surfaces proving zero visible \"Rotate Share\" strings",
+          "observed": "No dedicated DOM text sweep evidence for this assertion in the assigned command outputs."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g2-onboard-ui/01-vitest-onboard-suite.transcript.txt",
+          "m7-onboard/g2-onboard-ui/03-vitest-cross-area-final-gate.transcript.txt",
+          "m7-onboard/g2-onboard-ui/04-playwright-demo-gallery.transcript.txt"
+        ],
+        "exitCode": 0
+      },
+      "issues": "Assigned runs do not directly assert the explicit no-\"Rotate Share\" contract sweep."
+    },
+    {
+      "id": "VAL-ONBOARD-017",
+      "title": "Paper parity for any new screens",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Inspect evidence from assigned test runs only",
+          "expected": "Pixel/parity comparison against Paper references for new onboarding sponsor surfaces",
+          "observed": "Assigned Vitest/Playwright runs confirm render health but do not provide direct pixel-level parity evidence."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g2-onboard-ui/03-vitest-cross-area-final-gate.transcript.txt",
+          "m7-onboard/g2-onboard-ui/04-playwright-demo-gallery.transcript.txt"
+        ],
+        "exitCode": 0
+      },
+      "issues": "No direct Paper parity artifact (comparison/screenshot diff) in the specified runs."
+    },
+    {
+      "id": "VAL-ONBOARD-019",
+      "title": "Empty or invalid relay overrides rejected",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned onboarding Vitest suite",
+          "expected": "Whitespace/invalid relay entries block CTA with inline validation and re-enable on valid relay",
+          "observed": "OnboardSponsorScreens.test.tsx passed relay-empty and invalid-wss rejection checks with CTA disabled/cleared transitions."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g2-onboard-ui/01-vitest-onboard-suite.transcript.txt"
+        ],
+        "exitCode": 0
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ONBOARD-021",
+      "title": "Threshold misuse t=0 or t>n rejected upstream",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned onboarding Vitest suite",
+          "expected": "Invalid threshold blocks create action with inline error",
+          "observed": "OnboardSponsorScreens.test.tsx passed \"blocks CTA when the active profile threshold is invalid (VAL-ONBOARD-021)\"."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g2-onboard-ui/01-vitest-onboard-suite.transcript.txt"
+        ],
+        "exitCode": 0
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ONBOARD-022",
+      "title": "Keyboard cancellation of in-flight sponsorship",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Inspect evidence from assigned test runs only",
+          "expected": "Escape/keyboard cancel clears sponsorship and restores prior focus target",
+          "observed": "Assigned run includes cancel-confirm and Escape-to-open-confirm behavior only; no direct evidence of full cancel completion + focus restoration + pending envelope removal."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g2-onboard-ui/01-vitest-onboard-suite.transcript.txt"
+        ],
+        "exitCode": 0
+      },
+      "issues": "Insufficient direct evidence for end-to-end keyboard cancellation semantics."
+    },
+    {
+      "id": "VAL-ONBOARD-023",
+      "title": "Textarea Tab behavior does not trap focus",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Inspect evidence from assigned test runs only",
+          "expected": "Tab/Shift+Tab moves focus forward/back and does not mutate textarea content",
+          "observed": "Assigned run verifies value unchanged after Tab keydown, but does not directly verify focus traversal and reverse Shift+Tab behavior."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g2-onboard-ui/01-vitest-onboard-suite.transcript.txt"
+        ],
+        "exitCode": 0
+      },
+      "issues": "Insufficient direct evidence for focus-traversal clauses."
+    },
+    {
+      "id": "VAL-ONBOARD-024",
+      "title": "Sponsor flow blocked while signer paused",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned onboarding Vitest suite",
+          "expected": "Onboard entry disabled while paused and create action does not dispatch onboarding",
+          "observed": "SettingsSidebar and OnboardSponsorScreens paused-state checks passed; onboardSponsorFlow test passed dispatch refusal while signerPaused with no pending Onboard operation."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g2-onboard-ui/01-vitest-onboard-suite.transcript.txt"
+        ],
+        "exitCode": 0
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ONBOARD-025",
+      "title": "Copy button writes to clipboard and resets state",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Inspect evidence from assigned test runs only",
+          "expected": "Clipboard exact write, transient copied reset, subsequent interactions remain functional, repeat copy idempotent",
+          "observed": "Assigned run verifies clipboard write and transient reset; no direct coverage of post-copy interaction continuity and repeat idempotency."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g2-onboard-ui/01-vitest-onboard-suite.transcript.txt"
+        ],
+        "exitCode": 0
+      },
+      "issues": "Insufficient direct evidence for all clauses of VAL-ONBOARD-025 from the requested command set."
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Vitest jsdom emitted known environment warnings (`HTMLCanvasElement.getContext` / `window.scrollTo` not implemented) during runs while tests still passed.",
+      "resolved": true,
+      "resolution": "Recorded as transcript noise; did not affect exit codes or assertion pass/block decisions.",
+      "affectedAssertions": [
+        "VAL-ONBOARD-005",
+        "VAL-ONBOARD-017"
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "description": "Requested command set does not directly provide full evidence for some UI-contract clauses (keyboard focus-ring/activation, QR jsqr re-decode, explicit DOM no-\"Rotate Share\" sweep, Paper parity pixel comparison, full keyboard-cancel focus restoration).",
+      "affectedAssertions": [
+        "VAL-ONBOARD-002",
+        "VAL-ONBOARD-004",
+        "VAL-ONBOARD-005",
+        "VAL-ONBOARD-016",
+        "VAL-ONBOARD-017",
+        "VAL-ONBOARD-022",
+        "VAL-ONBOARD-023",
+        "VAL-ONBOARD-025"
+      ],
+      "quickFixAttempted": "Constrained to the exact assigned runs; no extra test surfaces executed."
+    }
+  ],
+  "summary": "Tested 13 assigned assertions from shell-cli evidence: 5 passed, 0 failed, 8 blocked for insufficient direct evidence in the specified run set."
+}

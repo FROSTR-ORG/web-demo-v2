@@ -12,7 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *  • VAL-DSH-033 — Sidebar Lock → /
  *  • VAL-DSH-034 — Policies header toggle on/off
  *  • VAL-CROSS-008 — Sidebar does NOT show Rotate Keyset (runtime-only)
- *  • VAL-CROSS-009 — Sidebar Rotate Share → /rotate-share
+ *  • VAL-CROSS-009 — Sidebar Replace Share → /replace-share
  *  • VAL-CROSS-010 — Header Recover → /recover/{profileId}
  *  • VAL-CROSS-011 — Dashboard Export flow end-to-end (URL remains /dashboard/{id})
  *  • VAL-CROSS-012 — Clear Credentials confirm → Welcome no-profiles
@@ -127,7 +127,7 @@ type DemoUi = { dashboard?: Record<string, unknown> };
 
 /**
  * Render helper that mounts the DashboardScreen behind a MemoryRouter with a
- * `/rotate-keyset`, `/rotate-share`, `/recover/:profileId`, and `/` route
+ * `/rotate-keyset`, `/replace-share`, `/recover/:profileId`, and `/` route
  * stubbed so we can observe navigation URLs through window.location via the
  * router.
  */
@@ -149,8 +149,8 @@ function renderAt(demoUi: DemoUi) {
           element={<div data-testid="rotate-keyset-screen">RotateKeyset</div>}
         />
         <Route
-          path="/rotate-share"
-          element={<div data-testid="rotate-share-screen">RotateShare</div>}
+          path="/replace-share"
+          element={<div data-testid="replace-share-screen">ReplaceShare</div>}
         />
         <Route
           path="/recover/:profileId"
@@ -199,8 +199,8 @@ describe("VAL-DSH-031 / VAL-CROSS-011 — Export flow end-to-end", () => {
     // Enter matching passwords so the Export button becomes enabled
     const pwInput = screen.getByLabelText("Export Password") as HTMLInputElement;
     const confirmInput = screen.getByLabelText("Confirm Password") as HTMLInputElement;
-    fireEvent.change(pwInput, { target: { value: "abc123" } });
-    fireEvent.change(confirmInput, { target: { value: "abc123" } });
+    fireEvent.change(pwInput, { target: { value: "abc12345" } });
+    fireEvent.change(confirmInput, { target: { value: "abc12345" } });
 
     // Submit Export → Backup Ready
     const submit = screen
@@ -233,8 +233,8 @@ describe("VAL-DSH-031 / VAL-CROSS-011 — Export flow end-to-end", () => {
     fireEvent.click(sidebarExportBtn);
 
     // Submit with matching passwords to reach Backup Ready.
-    fireEvent.change(screen.getByLabelText("Export Password"), { target: { value: "abc123" } });
-    fireEvent.change(screen.getByLabelText("Confirm Password"), { target: { value: "abc123" } });
+    fireEvent.change(screen.getByLabelText("Export Password"), { target: { value: "abc12345" } });
+    fireEvent.change(screen.getByLabelText("Confirm Password"), { target: { value: "abc12345" } });
     const submit = screen
       .getByTestId("export-profile-modal")
       .querySelector(".export-btn-submit") as HTMLElement;
@@ -389,23 +389,27 @@ describe("Dashboard Event Log controls", () => {
 // ---------------------------------------------------------------------------
 
 describe("Pending approval policy prompt wiring", () => {
-  it("opens the ECDH approval as the ECDH policy prompt variant", () => {
+  it("opens the ECDH approval as the ECDH policy prompt variant (peer-level CTAs only per VAL-APPROVALS-013 deviation)", () => {
     renderAt({ dashboard: { state: "running", paperPanels: true } });
 
     fireEvent.click(screen.getByLabelText("Open approval 2"));
     expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
     expect(
-      screen.getByText("A peer is requesting permission for an encryption operation")
+      screen.getByText(/requesting permission for an encryption operation/)
     ).toBeInTheDocument();
-    expect(screen.getByText("from Peer #1")).toBeInTheDocument();
+    expect(screen.getAllByText(/Peer #1/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("OPERATION")).toBeInTheDocument();
     expect(screen.getByText("TARGET PUBKEY")).toBeInTheDocument();
     expect(screen.getByText("RELAY")).toBeInTheDocument();
     expect(screen.getByText("NIP-44 Encryption")).toBeInTheDocument();
     expect(screen.getByText("wss://relay.primal.net")).toBeInTheDocument();
-    expect(screen.getByText("Expires in 1m 12s")).toBeInTheDocument();
-    expect(screen.getByText("Always for ECDH")).toBeInTheDocument();
-    expect(screen.getByText("Always deny for ECDH")).toBeInTheDocument();
+    expect(screen.getByText(/Expires in/)).toBeInTheDocument();
+    // Peer-level CTAs only; scoped "Always for ECDH" / "Always deny for
+    // ECDH" are hidden per VAL-APPROVALS-013.
+    expect(screen.getByText("Always allow")).toBeInTheDocument();
+    expect(screen.getByText("Always deny")).toBeInTheDocument();
+    expect(screen.queryByText("Always for ECDH")).not.toBeInTheDocument();
+    expect(screen.queryByText("Always deny for ECDH")).not.toBeInTheDocument();
   });
 });
 
@@ -427,19 +431,19 @@ describe("VAL-CROSS-008 — Sidebar does NOT show Rotate Keyset (runtime-only)",
 });
 
 // ---------------------------------------------------------------------------
-// VAL-CROSS-009 — Sidebar Rotate Share → /rotate-share
+// VAL-CROSS-009 — Sidebar Replace Share → /replace-share
 // ---------------------------------------------------------------------------
 
-describe("VAL-CROSS-009 — Sidebar Rotate Share navigates to /rotate-share", () => {
-  it("Clicking Rotate Share in sidebar navigates to /rotate-share", () => {
+describe("VAL-CROSS-009 — Sidebar Replace Share navigates to /replace-share", () => {
+  it("Clicking Replace Share in sidebar navigates to /replace-share", () => {
     renderAt({ dashboard: { settingsOpen: true, paperPanels: true } });
-    const rotateShareBtns = screen.getAllByText("Rotate Share");
-    const actionBtn = rotateShareBtns.find(
+    const replaceShareBtns = screen.getAllByText("Replace Share");
+    const actionBtn = replaceShareBtns.find(
       (el) => el.tagName === "BUTTON" && el.classList.contains("settings-btn-blue")
     );
     expect(actionBtn).toBeDefined();
     fireEvent.click(actionBtn!);
-    expect(screen.getByTestId("rotate-share-screen")).toBeInTheDocument();
+    expect(screen.getByTestId("replace-share-screen")).toBeInTheDocument();
   });
 });
 

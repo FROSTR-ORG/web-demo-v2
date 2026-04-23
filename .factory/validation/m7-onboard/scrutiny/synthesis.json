@@ -1,0 +1,67 @@
+{
+  "milestone": "m7-onboard",
+  "round": 2,
+  "status": "pass",
+  "validatorsRun": {
+    "typecheck": {
+      "passed": true,
+      "command": "npx tsc --noEmit -p /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/tsconfig.json --pretty false",
+      "exitCode": 0
+    },
+    "test": {
+      "passed": true,
+      "command": "npx vitest run --config /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/vitest.config.ts --maxConcurrency 2",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "npm --prefix /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2 run lint",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 9,
+    "passed": 9,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [
+    {
+      "target": "library",
+      "description": "Added .factory/library/clock-skew-constraints.md documenting bifrost-signer max_future_skew_secs=30 and why asymmetric ±120s validation is treated as deviation coverage.",
+      "sourceFeature": "fix-m7-scrutiny-r1-long-session-and-clock-skew-criteria"
+    }
+  ],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md + worker skills",
+      "suggestion": "Resolve agent-browser requirement conflicts and followedProcedure semantics across ui-screen-worker/runtime-worker/protocol-flow-worker so workers can report deviations consistently.",
+      "evidence": "Multiple m7 round-2 reviews observed contradictory rules between AGENTS.md and skill files, plus handoffs marked followedProcedure=true despite skipping required agent-browser/Playwright steps.",
+      "isSystemic": true
+    },
+    {
+      "target": ".factory/skills/ui-screen-worker, .factory/skills/runtime-worker, .factory/skills/protocol-flow-worker",
+      "suggestion": "Add explicit procedure carve-outs for docs-only and test-infrastructure micro-fixes, and require explicit deviation logging when RED-first, demo-gallery Playwright, or agent-browser steps are skipped.",
+      "evidence": "Recurring observations across fix-m7-scrutiny-r1-sponsor-ui-relay-validation, fix-m7-scrutiny-r1-sw-staleness-doc-route, fix-m7-scrutiny-r1-paper-parity-baseline-source, fix-m7-scrutiny-r1-rotate-regression-full-flow, and fix-m7-scrutiny-r1-security-sweep-snapshot-cloning.",
+      "isSystemic": true
+    },
+    {
+      "target": "docs/runtime-deviations-from-paper.md",
+      "suggestion": "Reconcile stale onboarding residual text that still describes awaiting_adoption-only behavior now superseded by full sponsor-requester handshake validation.",
+      "evidence": "Review for fix-m7-scrutiny-r1-onboard-distinct-share-full-handshake found lines describing pre-fix residual behavior inconsistent with current multi-device spec assertions.",
+      "isSystemic": false
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Treat missing tsconfig.node/demo-gallery runs in runtime-worker handoffs as immediate blocking failures for this round.",
+      "reason": "ambiguous"
+    },
+    {
+      "observation": "Record each repeated skill-procedure mismatch as separate guidance updates.",
+      "reason": "duplicate"
+    }
+  ],
+  "previousRound": ".factory/validation/m7-onboard/scrutiny/synthesis.round1.json"
+}

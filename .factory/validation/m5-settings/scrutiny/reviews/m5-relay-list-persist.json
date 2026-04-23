@@ -1,0 +1,33 @@
+{
+  "featureId": "m5-relay-list-persist",
+  "reviewedAt": "2026-04-22T18:22:38Z",
+  "commitId": "e95ade90bf2d949a1cbffb3907566b8b100faf9f",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The commit implements relay URL validation, duplicate detection, Settings Add/Remove/Edit wiring, IndexedDB persistence via AppStateValue.updateRelays, and RuntimeRelayPump hot-reload behavior with targeted unit/component coverage. However, the feature contract explicitly includes VAL-CROSS-005 relay-churn mid-sign behavior and calls for a multi-device spec, which is missing from this commit.",
+    "issues": [
+      {
+        "file": "src/e2e/multi-device/relay-churn.spec.ts",
+        "line": 1,
+        "severity": "blocking",
+        "description": "Required multi-device coverage for VAL-CROSS-005 was not delivered in this feature commit. features.json lists \"Multi-device e2e: src/e2e/multi-device/relay-churn.spec.ts\" under verificationSteps (m5-relay-list-persist), but this file does not exist in commit e95ade9 (`git show e95ade9:src/e2e/multi-device/relay-churn.spec.ts` fails). The handoff also explicitly states this work was left undone."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-screen-worker skill's skip exception for \"pure ... data-wiring fixes\" appears too broad in practice; it was used to skip agent-browser even though this feature added/changed user interactions (relay Add/Remove/Edit controls, inline validation and edit states). Consider tightening the exception wording to explicitly exclude interaction-flow changes.",
+      "evidence": "handoff.skillFeedback.followedProcedure=false with deviation \"agent-browser visual verification\"; commit adds interactive relay CRUD UI in src/screens/DashboardScreen/sidebar/SettingsSidebar.tsx"
+    },
+    {
+      "area": "conventions",
+      "observation": "AGENTS.md and ui-screen-worker both require RED-before-GREEN evidence, but the handoff verification block only shows passing runs. A stronger shared-state/process guard (e.g., explicit required red-run field in handoff schema) would make adherence auditable.",
+      "evidence": "AGENTS.md \"TDD required\" and ui-screen-worker step 4/6 require failing test evidence; handoff.verification.commandsRun includes only successful tsc/vitest executions."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review failed: core relay-list persistence/hot-reload implementation is substantial, but the feature did not include the required VAL-CROSS-005 multi-device relay-churn spec in this commit, leaving a stated acceptance slice uncovered."
+}

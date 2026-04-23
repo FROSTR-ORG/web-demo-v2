@@ -1,0 +1,281 @@
+{
+  "groupId": "g2-sign-lifecycle",
+  "testedAt": "2026-04-21T16:25:53Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "relayUrl": "ws://127.0.0.1:8194",
+    "agentBrowserSession": "g2-sign-lifecycle",
+    "tabsUsed": 2
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-OPS-002",
+      "title": "Sign trigger dispatches a command and registers a pending operation",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Fill 64-hex message and click Test Sign",
+          "expected": "New Sign pending_operation appears within next tick",
+          "observed": "Sign request_id was created in signDispatchLog and completion appeared, but pending_operations snapshot only showed Ping entries."
+        },
+        {
+          "action": "Capture observable snapshot",
+          "expected": "Pending includes Sign with fresh request_id",
+          "observed": "lastSignRequestId=c594dfe34154466bd63e74346fe291fd, pending only Ping."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-002-post-click.png"
+        ],
+        "observables": [
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-002-state.json"
+        ],
+        "consoleErrors": "none (errors-tabA.json/errors-tabB.json)",
+        "network": "Relay connected at ws://127.0.0.1:8194 during dispatch"
+      },
+      "issues": "Sign command dispatch succeeds but a Sign row was not observable in runtime_status.pending_operations."
+    },
+    {
+      "id": "VAL-OPS-004",
+      "title": "Happy-path sign completion (multi-device) surfaces in AppState",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Run two tabs unlocked to same seeded keyset against local relay",
+          "expected": "Sign completion maps request_id, pending removed, UI shows success",
+          "observed": "Sign completion recorded in AppState for request_id, but no explicit success UI (toast/badge/completions list) was observed."
+        },
+        {
+          "action": "Capture timed observable for message 777\u2026",
+          "expected": "Pending->completion transition with visible success feedback",
+          "observed": "completionHasRid=true; pendingHasRid=false at all samples; uiHasSuccessToast=false."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-004-triggered-sign.png",
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-004-013-ui-after-completion-A.png",
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-004-instance-B.png"
+        ],
+        "observables": [
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-004-013-observable.json"
+        ],
+        "consoleErrors": "none on both tabs (errors-tabA.json/errors-tabB.json)",
+        "network": "Both tabs online to ws://127.0.0.1:8194"
+      },
+      "issues": "Completion is in AppState but required explicit sign-success UI feedback was not observed."
+    },
+    {
+      "id": "VAL-OPS-005",
+      "title": "Request correlation: the right completion maps to the right pending op",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Dispatch two back-to-back signs with different messages (222\u2026 and 333\u2026)",
+          "expected": "Distinct request_ids and one completion each",
+          "observed": "request_ids 738eccfc\u2026 and ddd0479f\u2026 created."
+        },
+        {
+          "action": "Validate completion mapping",
+          "expected": "Each request_id completed exactly once; no orphaned pending for those ids",
+          "observed": "completionCounts were 1 and 1; pendingIds did not include either request_id."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-005-two-signs-ui.png"
+        ],
+        "observables": [
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-005-correlation.json"
+        ],
+        "consoleErrors": "none",
+        "network": "Round-trips over ws://127.0.0.1:8194"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-013",
+      "title": "Completions are drained every tick and not silently discarded",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Dispatch sign and inspect AppState completion slice",
+          "expected": "Completion surfaced into AppState and UI reacts within <=3s",
+          "observed": "Completion surfaced (completionCountForRid=1), but no explicit completion UI signal was observed."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-004-013-ui-after-completion-A.png"
+        ],
+        "observables": [
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-004-013-observable.json"
+        ],
+        "consoleErrors": "none",
+        "network": "Relay stable during drain checks"
+      },
+      "issues": "AppState completion slice updated, but completion-driven success UI feedback was not observable."
+    },
+    {
+      "id": "VAL-OPS-019",
+      "title": "Rapid-fire sign clicks debounce / dedupe to one dispatch per intent",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Programmatically click Test Sign 5x in ~1ms for identical message 555\u2026",
+          "expected": "At most one dispatch/pending sign",
+          "observed": "newIdCount=1 and pendingSignCount=1."
+        },
+        {
+          "action": "Dispatch distinct follow-up intent (message 565\u2026)",
+          "expected": "New dispatch accepted after dedupe window",
+          "observed": "idsDistinct contained request_id 64dfe2e6\u2026"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-019-rapid-clicks.png"
+        ],
+        "observables": [
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-019-dom-rapid.json",
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-019-distinct-intent.json"
+        ],
+        "consoleErrors": "none",
+        "network": "Relay online; dispatches accepted"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-020",
+      "title": "Concurrent sign + ECDH do not interfere",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Dispatch sign and ECDH concurrently via handleRuntimeCommand",
+          "expected": "Distinct request_ids within <=100ms and both pending",
+          "observed": "dispatchWindowMs=2; signId=9515f049\u2026 and ecdhId=69564bbc\u2026; both pending together in snapshot."
+        },
+        {
+          "action": "Wait for settlement",
+          "expected": "Both complete with unique request_ids and clear from pending",
+          "observed": "final recheck: pending=[], signCompletion=1, ecdhCompletion=1."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-020-ui.png"
+        ],
+        "observables": [
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-020-concurrent.json",
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-020-final-recheck.json"
+        ],
+        "consoleErrors": "none",
+        "network": "Local relay ws://127.0.0.1:8194"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-026",
+      "title": "No secrets logged to the browser console during OPS flows",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Clear console/errors and run sign+ECDH+ping flow",
+          "expected": "No nsec/share/secret/seed/passphrase leaks in logs",
+          "observed": "Console/error transcripts were empty on both tabs."
+        },
+        {
+          "action": "Run regex scan on captured transcripts",
+          "expected": "0 hits on all secret patterns",
+          "observed": "allZero=true (nsec_bech32=0, secret_like_key_material=0, raw_passphrase_material=0)."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-026-027-ops-flow.png"
+        ],
+        "consoleTranscripts": [
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-026-console-tabA.json",
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-026-console-tabB.json",
+          "m1-ops/g2-sign-lifecycle/errors-tabA.json",
+          "m1-ops/g2-sign-lifecycle/errors-tabB.json"
+        ],
+        "scanReport": "m1-ops/g2-sign-lifecycle/VAL-OPS-026-regex-scan.json",
+        "consoleErrors": "none",
+        "network": "Flow executed against ws://127.0.0.1:8194"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-027",
+      "title": "No plaintext operation payloads on the wire",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Hook WebSocket.send in both tabs and capture outbound payloads during sign+ECDH+ping",
+          "expected": "No plaintext message_hex_32 or raw psbt fields in outbound relay payloads",
+          "observed": "Captured payload scan found message_hex_hits=0, psbt_field_hits=0, psbt_uri_hits=0."
+        }
+      ],
+      "evidence": {
+        "wsCapture": [
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-027-ws-sent-tabA.json",
+          "m1-ops/g2-sign-lifecycle/VAL-OPS-027-ws-sent-tabB.json"
+        ],
+        "scanReport": "m1-ops/g2-sign-lifecycle/VAL-OPS-027-wire-scan.json",
+        "consoleErrors": "none",
+        "network": "Outbound ws://127.0.0.1:8194 frames inspected via send-hook capture"
+      },
+      "issues": null
+    }
+  ],
+  "summary": {
+    "total": 8,
+    "pass": 5,
+    "fail": 3,
+    "blocked": 0,
+    "skipped": 0
+  },
+  "frictions": [
+    {
+      "description": "The Demo toolbar Raw link only toggles ?chrome=0 and does not bridge into real AppStateProvider routes.",
+      "resolved": true,
+      "resolution": "Used /demo/welcome-unlock-modal and clicked Unlock to bridge into /dashboard/demo-profile for real-runtime seeding.",
+      "affectedAssertions": [
+        "VAL-OPS-002",
+        "VAL-OPS-004",
+        "VAL-OPS-005",
+        "VAL-OPS-013",
+        "VAL-OPS-019",
+        "VAL-OPS-020",
+        "VAL-OPS-026",
+        "VAL-OPS-027"
+      ]
+    },
+    {
+      "description": "Auto ping traffic adds noisy pending/completion entries during OPS testing.",
+      "resolved": true,
+      "resolution": "Re-seeded both tabs with shared keyset and filtered evidence to target request_ids/messages for assigned assertions.",
+      "affectedAssertions": [
+        "VAL-OPS-002",
+        "VAL-OPS-005",
+        "VAL-OPS-020"
+      ]
+    },
+    {
+      "description": "Sign operations frequently completed before a Sign pending row could be directly observed in runtime_status snapshots.",
+      "resolved": false,
+      "resolution": "Captured dispatch request_id and completion correlation, then marked assertions requiring visible Sign pending registration as fail where evidence was insufficient.",
+      "affectedAssertions": [
+        "VAL-OPS-002",
+        "VAL-OPS-004"
+      ]
+    }
+  ],
+  "blockers": []
+}

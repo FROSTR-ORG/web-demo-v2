@@ -95,6 +95,14 @@ export class RuntimeClient {
     this.call((runtime) => runtime.clear_policy_overrides());
   }
 
+  readConfig(): Record<string, unknown> {
+    return this.call((runtime) => parseJsonResult<Record<string, unknown>>(runtime.read_config()));
+  }
+
+  updateConfig(configPatch: Record<string, unknown>): void {
+    this.call((runtime) => runtime.update_config(JSON.stringify(configPatch)));
+  }
+
   wipeState(): void {
     this.call((runtime) => runtime.wipe_state());
   }

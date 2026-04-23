@@ -106,10 +106,10 @@ describe("CreateProfileScreen", () => {
 
   it("renders stepper with shared variant labels (VAL-SHR-002)", () => {
     renderScreen();
-    expect(screen.getByText("Create / Rotate")).toBeInTheDocument();
-    // "Create Profile" appears in stepper + page heading
+    expect(screen.getByText("Create Keyset")).toBeInTheDocument();
+    // "Create Profile" appears in page heading (stepper now says "Setup Profile")
     expect(screen.getAllByText("Create Profile").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Distribute Shares")).toBeInTheDocument();
+    expect(screen.getByText("Onboard Devices")).toBeInTheDocument();
     expect(screen.queryByText("Rotate Keyset")).not.toBeInTheDocument();
   });
 
@@ -159,6 +159,19 @@ describe("CreateProfileScreen", () => {
     expect(screen.getAllByText("ECDH").length).toBe(2);
     expect(screen.getAllByText("PING").length).toBe(2);
     expect(screen.getAllByText("ONBOARD").length).toBe(2);
+  });
+
+  it("does not render any 'Remote Package Password' text (VAL-FOLLOWUP-007)", () => {
+    renderScreen();
+    expect(
+      screen.queryAllByText(/Remote Package Password/i),
+    ).toHaveLength(0);
+    expect(
+      screen.queryAllByText(/Confirm Remote Package Password/i),
+    ).toHaveLength(0);
+    expect(
+      screen.queryByLabelText(/Remote Package Password/i),
+    ).toBeNull();
   });
 
   it("navigates to /create/distribute on successful submit (VAL-SHR-005)", async () => {

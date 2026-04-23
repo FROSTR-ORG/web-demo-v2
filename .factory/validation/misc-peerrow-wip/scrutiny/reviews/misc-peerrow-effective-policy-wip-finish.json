@@ -1,0 +1,21 @@
+{
+  "featureId": "misc-peerrow-effective-policy-wip-finish",
+  "reviewedAt": "2026-04-23T15:11:00Z",
+  "commitId": "814e27a",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The commit cleanly lands the PeerPermissionTag refactor across PeerRow/PeerPolicyChip/PoliciesState/RotateKeyset profile UI, restores PeerRow effective-policy badge semantics expected by the test contract, and adds the missing packageService helper needed by AppStateProvider for create-profile peer permission overrides. Scope is consistent with the feature objective and no blocking correctness or security regressions were found in the reviewed diff.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-screen-worker skill text is internally inconsistent with observed handoff semantics around agent-browser omission: it allows skipping agent-browser for data-wiring fixes but also says omission MUST set followedProcedure=false. This worker skipped agent-browser and recorded followedProcedure=true with no deviations.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md:23 requires followedProcedure=false when agent-browser is omitted; handoff 2026-04-23T15-06-08-715Z__misc-peerrow-effective-policy-wip-finish__c2e1c1fe-7e4f-4439-8bf5-859460ef1403.json:57-60 records followedProcedure=true, deviations=[], and explicit agent-browser skip rationale."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed feature misc-peerrow-effective-policy-wip-finish at commit 814e27a; implementation satisfies the requested effective-policy badge refactor and WIP cleanup goals with no blocking code findings. Report status: pass, with one skills shared-state observation about agent-browser procedure wording vs handoff flag usage."
+}

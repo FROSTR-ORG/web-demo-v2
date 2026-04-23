@@ -1,0 +1,26 @@
+{
+  "featureId": "fix-m3-denial-roundtrip-15s-from-dispatch",
+  "reviewedAt": "2026-04-22T03:02:14Z",
+  "commitId": "125919d",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Compared against the original failed feature review (fix-m3-nonce-prepopulate-test-hook): this rerun fix closes the exact timing gap by anchoring the 15s budget at dispatch and sharing that budget across request_id discovery and OperationFailure wait. The requestId-null path now fails fast when discovery exhausts budget, and A-side denial invariance assertions remain intact with no regression observed.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "knowledge",
+      "observation": "Shared architecture docs still describe a local A-side peer_denied runtime event as the denial-roundtrip mechanism, which conflicts with the contract/test reality used in this feature review.",
+      "evidence": ".factory/library/architecture.md (Data Flow: Approval Prompts) states denied requests emit local peer_denied on A, while validation-contract.md VAL-POLICIES-010 and policy-denial-roundtrip.spec.ts assertions focus on B OperationFailure + A pending/completion invariants and explicitly note lack of an A-side runtime event surface."
+    },
+    {
+      "area": "skills",
+      "observation": "runtime-worker procedure requires full vitest + demo-gallery Playwright on every change, but scrutiny fix features scoped to e2e spec hardening are being validated with targeted checks only; this causes procedure/feature-contract mismatch.",
+      "evidence": ".factory/skills/runtime-worker/SKILL.md step 5 mandates vitest + demo-gallery each run, while handoff for session 8105eab2-9eda-4bca-a709-5ac07a3fc376 verifies only targeted policy-denial-roundtrip Playwright + tsc and records this scoped deviation rationale."
+    }
+  ],
+  "addressesFailureFrom": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/.factory/validation/m3-policies/scrutiny/reviews/fix-m3-nonce-prepopulate-test-hook.json",
+  "summary": "Pass: the dispatch-to-failure 15s enforcement is now end-to-end in the denial round-trip spec (including request_id discovery budget), and prior A-side invariance assertions remain preserved without regression."
+}

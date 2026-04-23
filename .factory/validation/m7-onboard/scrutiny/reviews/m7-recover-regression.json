@@ -1,0 +1,33 @@
+{
+  "featureId": "m7-recover-regression",
+  "reviewedAt": "2026-04-23T03:08:56Z",
+  "commitId": "6f0d65abd2c94b3245cd158be0a47f393739acc9",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The feature adds a focused Playwright regression gate for Recover NSEC and directly verifies the two contract-critical UI behaviors called out in scope: zero console errors/Paper copy on recover screens and the masked↔revealed toggle behavior on success. The implementation is clean and test-only, and no blocking defects were found in this feature’s committed changes.",
+    "issues": [
+      {
+        "file": "src/e2e/recover-regression.spec.ts",
+        "line": 56,
+        "severity": "non_blocking",
+        "description": "The new gate validates seeded `/demo` states (`/demo/recover-collect-shares` and `/demo/recover-success`) but does not drive the live recover interaction path (`Validate Sources` -> `Recover NSEC`). The only full-browser recover journey remains `test.fixme` in `src/e2e/outside-runtime-flows.spec.ts:126`, so full-flow regressions can still slip past this specific spec."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Mission guidance says no `.skip` additions, but this feature adds project-conditional `test.skip(...)` guards for desktop-only execution. This suggests the convention needs an explicit exception (or alternate pattern) for project-scoped Playwright specs.",
+      "evidence": "`AGENTS.md:72` says \"No `.skip` additions\"; `src/e2e/recover-regression.spec.ts:46` and `:70` add `test.skip(testInfo.project.name !== \"desktop\", ...)`."
+    },
+    {
+      "area": "skills",
+      "observation": "The assigned skill requires RED-first evidence (new tests should fail before implementation), but this run recorded only passing post-addition executions and still marked `followedProcedure: true`.",
+      "evidence": "`.factory/skills/ui-screen-worker/SKILL.md:33-37` requires failing-test-first evidence; handoff `2026-04-23T00-50-47-508Z__m7-recover-regression__4283e5f8-629e-481d-9569-03de3a7e4e2f.json` `verification.commandsRun` contains only successful runs after file creation, while `skillFeedback.followedProcedure` is `true`."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review result: PASS. Commit 6f0d65abd2c94b3245cd158be0a47f393739acc9 delivers a focused Recover NSEC regression gate for console cleanliness, Paper copy presence, and masked/revealed toggle behavior. One non-blocking coverage gap and two shared-state observations (skip-rule ambiguity and RED-first skill adherence drift) were recorded."
+}

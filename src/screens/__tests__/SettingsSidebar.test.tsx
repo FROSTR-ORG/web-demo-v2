@@ -5,8 +5,35 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const mockLockProfile = vi.fn();
 const mockClearCredentials = vi.fn(() => Promise.resolve());
 const mockRefreshRuntime = vi.fn();
+const mockUpdateProfileName = vi.fn((name: string) => {
+  // Mirror the MockAppStateProvider behavior: update the live activeProfile
+  // object so the sidebar's `persistedDeviceName` (sourced from activeProfile)
+  // reflects the write without a full context re-wire.
+  fakeProfile.deviceName = name.trim();
+  return Promise.resolve();
+});
+const mockUpdateRelays = vi.fn((next: string[]) => {
+  // Mirror the real provider contract: update the shared `fakeProfile.relays`
+  // reference so the sidebar re-renders with the new list after the mutator
+  // settles. Tests that need to assert on intermediate states can reset the
+  // mock via `beforeEach`.
+  fakeProfile.relays = next.slice();
+  return Promise.resolve();
+});
 
-const fakeProfile = {
+const fakeProfile: {
+  id: string;
+  label: string;
+  deviceName: string;
+  groupName: string;
+  threshold: number;
+  memberCount: number;
+  localShareIdx: number;
+  groupPublicKey: string;
+  relays: string[];
+  createdAt: number;
+  lastUsedAt: number;
+} = {
   id: "test-profile-id",
   label: "Test Key",
   deviceName: "Igloo Web",
@@ -69,6 +96,9 @@ vi.mock("../../app/AppState", () => ({
     clearCredentials: mockClearCredentials,
     setSignerPaused: vi.fn(),
     refreshRuntime: mockRefreshRuntime,
+    updateProfileName: mockUpdateProfileName,
+    updateRelays: mockUpdateRelays,
+    changeProfilePassword: vi.fn(() => Promise.resolve()),
   }),
 }));
 
@@ -78,6 +108,12 @@ afterEach(() => {
   cleanup();
   mockLockProfile.mockClear();
   mockClearCredentials.mockClear();
+  mockUpdateProfileName.mockClear();
+  mockUpdateRelays.mockClear();
+  // Reset the shared profile so the mutable `deviceName` / `relays`
+  // used by the inline edit tests below do not leak into the next test.
+  fakeProfile.deviceName = "Igloo Web";
+  fakeProfile.relays = ["wss://relay.primal.net", "wss://relay.damus.io"];
 });
 
 function renderDashboard() {
@@ -110,7 +146,7 @@ describe("Settings Sidebar", () => {
     const labelTexts = Array.from(sectionLabels).map((el) => el.textContent);
     expect(labelTexts).toContain("Device Profile");
     expect(labelTexts).toContain("Group Profile");
-    expect(labelTexts).toContain("Rotate Share");
+    expect(labelTexts).toContain("Replace Share");
     expect(labelTexts).toContain("Export & Backup");
     expect(labelTexts).toContain("Profile Security");
   });
@@ -198,7 +234,7 @@ describe("Settings Sidebar", () => {
     expect(screen.getByText("wss://nos.lol")).toBeInTheDocument();
   });
 
-  it("edits the profile name inline and shows export-share copy feedback", () => {
+  it("edits the profile name inline and opens the Export Share flow", async () => {
     renderDashboard();
     fireEvent.click(screen.getByLabelText("Settings"));
 
@@ -206,14 +242,17 @@ describe("Settings Sidebar", () => {
     const nameInput = screen.getByLabelText("Profile Name") as HTMLInputElement;
     fireEvent.change(nameInput, { target: { value: "Igloo Desk" } });
     fireEvent.keyDown(nameInput, { key: "Enter" });
-    fireEvent.blur(nameInput);
-    expect(screen.getByText("Igloo Desk")).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(mockUpdateProfileName).toHaveBeenCalledWith("Igloo Desk");
+      expect(screen.getByText("Igloo Desk")).toBeInTheDocument();
+    });
 
     const exportShareRow = screen.getByText("Export Share").closest(".settings-action-row");
     expect(exportShareRow).not.toBeNull();
-    const copyButton = exportShareRow!.querySelector(".settings-btn-muted") as HTMLElement;
-    fireEvent.click(copyButton);
-    expect(copyButton.textContent).toBe("Copied");
+    const exportButton = exportShareRow!.querySelector(".settings-btn-blue") as HTMLElement;
+    fireEvent.click(exportButton);
+    expect(screen.getByTestId("export-profile-modal")).toBeInTheDocument();
+    expect(screen.getByLabelText("Share Export Password")).toBeInTheDocument();
   });
 });
 

@@ -1,0 +1,87 @@
+{
+  "milestone": "m1-ops",
+  "round": 2,
+  "status": "override-pass",
+  "orchestratorOverride": {
+    "overriddenAt": "2026-04-21T16:15:00Z",
+    "overriddenBy": "orchestrator",
+    "justification": "The single remaining blocking issue (fix-m1-ecdh-roundtrip-spec-real-dispatch: 'does not assert responder-side runtimeCompletions keyed by the same request_id') is not a feature defect; it is a protocol-reality constraint. bifrost-signer only emits `CompletedOperation::Ecdh` on the INITIATOR (see bifrost-rs/crates/bifrost-signer/src/lib.rs:1786-1813 for the responder path which returns `EcdhResponse` without producing a completion, and lines 1945-1949 for the initiator-only completion finalization). The shipped spec correctly correlates request_id on the initiator and witnesses the responder's participation via `lifecycleEvents.InboundAccepted` and initiator-observed `peers[B].last_seen`/online transitions, which is the strongest evidence available given the protocol's asymmetry. The deviation is documented in `docs/runtime-deviations-from-paper.md` by the implementing worker. The validation contract entries VAL-OPS-009 and VAL-OPS-020 do NOT specify responder-side completion — they speak generically of 'a completion that surfaces in AppState' and of 'two distinct pending_operations' — both of which the spec satisfies. The infeasible expectation lived only in the fix feature's internal `expectedBehavior` wording, which is now retroactively aligned with protocol reality. Proceeding to user-testing-validator-m1-ops which will exercise VAL-OPS-009/VAL-OPS-020 end-to-end via agent-browser."
+  },
+  "statusBeforeOverride": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "npx vitest run --config \"/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/vitest.config.ts\" --maxConcurrency 4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "npx tsc --noEmit -p \"/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/tsconfig.json\" --pretty false",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 4,
+    "passed": 3,
+    "failed": 1,
+    "failedFeatures": [
+      "fix-m1-ecdh-roundtrip-spec-real-dispatch"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "fix-m1-ecdh-roundtrip-spec-real-dispatch",
+      "severity": "blocking",
+      "description": "src/e2e/multi-device/ecdh-roundtrip.spec.ts still does not assert runtimeCompletions on page B keyed by the same request_id; it substitutes responder evidence (InboundAccepted/last_seen), so the explicit fix contract remains unmet."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "planning",
+      "suggestion": "Align m1 ECDH validation contract/feature expectations with bifrost protocol behavior (initiator-only ECDH completion), or expose a responder completion signal if both-side completion correlation remains required.",
+      "evidence": "fix-m1-ecdh-roundtrip review found the test cannot satisfy the stated both-pages completion requirement because responder path emits EcdhResponse without CompletedOperation::Ecdh.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "Require explicit deviation records when mandatory agent-browser/manual checks are skipped, and disallow followedProcedure=true in those cases.",
+      "evidence": "Multiple fix feature handoffs reported followedProcedure=true with no interactive checks despite runtime-worker/ui-screen-worker procedure language requiring agent-browser/manual verification.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "Refine runtime-worker/ui-screen-worker verification requirements so pure non-UI/state-derivation fixes can use an explicit command-only path without violating procedure.",
+      "evidence": "fix-m1-nonce-depletion-detection-policy-gated is a non-UI derivation change but was flagged against mandatory agent-browser wording.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "Clarify ui-screen-worker TDD enforcement by requiring explicit RED evidence in handoffs/transcripts when 'write failing tests first' is mandatory.",
+      "evidence": "fix-m1-peer-row-last-seen-progression transcript shows implementation edit before new test creation while handoff still marked followedProcedure=true.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "Reconcile ui-screen-worker Playwright pass requirement with known baseline failures marked do-not-fix in AGENTS.md (allow documented baseline-failure exceptions).",
+      "evidence": "fix-m1-peer-row-last-seen-progression recorded Playwright failure caused by known nested-button issue that AGENTS marks as pre-existing/do-not-fix.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "ui-screen-worker agent-browser omission noted in fix-m1-signing-failed-modal-real-peer-response.",
+      "reason": "duplicate"
+    },
+    {
+      "observation": "runtime-worker agent-browser ambiguity noted in fix-m1-ecdh-roundtrip and fix-m1-nonce-depletion reviews.",
+      "reason": "duplicate"
+    }
+  ],
+  "previousRound": ".factory/validation/m1-ops/scrutiny/synthesis.round1.json"
+}

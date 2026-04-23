@@ -1,6 +1,14 @@
 import { runtimeBootstrapFromParts } from "../bifrost/format";
 import { RuntimeClient } from "../bifrost/runtimeClient";
-import type { GroupPackageWire, RuntimeStatusSummary, SharePackageWire } from "../bifrost/types";
+import type {
+  CompletedOperation,
+  GroupPackageWire,
+  OperationFailure,
+  RuntimeEvent,
+  RuntimeStatusSummary,
+  SharePackageWire,
+} from "../bifrost/types";
+import type { RuntimeDrainBatch } from "./runtimeRelayPump";
 
 export interface LocalSimulatorInput {
   group: GroupPackageWire;
@@ -11,8 +19,13 @@ export interface LocalSimulatorInput {
 export class LocalRuntimeSimulator {
   private peers: RuntimeClient[] = [];
   private running = false;
+  private onDrains?: (drains: RuntimeDrainBatch) => void;
 
   constructor(private readonly local: RuntimeClient) {}
+
+  setOnDrains(onDrains: ((drains: RuntimeDrainBatch) => void) | undefined): void {
+    this.onDrains = onDrains;
+  }
 
   async attachVirtualPeers(input: LocalSimulatorInput): Promise<void> {
     this.peers = [];
@@ -39,6 +52,10 @@ export class LocalRuntimeSimulator {
     if (!this.running) {
       return this.local.runtimeStatus();
     }
+
+    const accumulatedCompletions: CompletedOperation[] = [];
+    const accumulatedFailures: OperationFailure[] = [];
+    const accumulatedEvents: RuntimeEvent[] = [];
 
     for (let i = 0; i < iterations; i += 1) {
       const now = Date.now() + i;
@@ -76,9 +93,26 @@ export class LocalRuntimeSimulator {
       }
 
       this.local.tick(now + 2);
-      this.local.drainCompletions();
-      this.local.drainFailures();
-      this.local.drainRuntimeEvents();
+      accumulatedCompletions.push(...this.local.drainCompletions());
+      accumulatedFailures.push(...this.local.drainFailures());
+      accumulatedEvents.push(...this.local.drainRuntimeEvents());
+    }
+
+    if (
+      this.onDrains &&
+      (accumulatedCompletions.length > 0 ||
+        accumulatedFailures.length > 0 ||
+        accumulatedEvents.length > 0)
+    ) {
+      try {
+        this.onDrains({
+          completions: accumulatedCompletions,
+          failures: accumulatedFailures,
+          events: accumulatedEvents,
+        });
+      } catch {
+        // Callback must not break pumping.
+      }
     }
 
     return this.local.runtimeStatus();

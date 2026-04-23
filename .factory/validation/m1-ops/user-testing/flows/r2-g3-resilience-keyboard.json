@@ -1,0 +1,203 @@
+{
+  "groupId": "r2-g3-resilience-keyboard",
+  "testedAt": "2026-04-21T18:27:51Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "relayUrl": "ws://127.0.0.1:8194",
+    "agentBrowserSession": "r2-g3-resilience-keyboard"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-OPS-016",
+      "title": "Relay disconnect mid-sign yields a real failure (not a hang)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Dispatch sign then invoke window.__iglooTestDropRelays(1006)",
+          "expected": "Pending sign transitions to timeout/disconnect failure within runtime timeout bound and SigningFailedModal opens",
+          "observed": "request_id dc28e52ce9a824b14f79231be5b763d4 failed with code=timeout message='locked peer response timeout' in 29.6s, modal opened, relayHistory recorded close code 1006"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-016-failure-modal.png"
+        ],
+        "observables": [
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-016-state.json"
+        ],
+        "consoleErrors": "none",
+        "network": "__debug.relayHistory shows ws://127.0.0.1:8194 close(1006,false) then reopen"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-021",
+      "title": "Tab backgrounding does not drop in-flight ops",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Dispatch sign, simulate hidden->visible via visibilityState override + visibilitychange events, keep tab hidden for 21s",
+          "expected": "Hidden transition is logged and op settles without manual recovery on foreground return",
+          "observed": "visibilityHistory recorded visible->hidden->visible; request_id cb2991a4e4bc679e6f4668194ac3e7ea completed successfully without manual action"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-021-after-foreground.png"
+        ],
+        "observables": [
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-021-state.json"
+        ],
+        "consoleErrors": "none",
+        "network": "Relay remained configured at ws://127.0.0.1:8194 during hidden-window simulation"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-023",
+      "title": "Relay reconnect correlates completions back to original request_ids",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Dispatch sign, force relay drop, restore relay, wait for settlement",
+          "expected": "Post-reconnect completion maps to original request_id and no unknown completion ids are introduced in this window",
+          "observed": "dispatch request_id 841be771ee8df7f7a92e1d2f97d47f0a completed after reconnect; relayHistory captured close/open; unknownNewIds=[]"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-023-post-reconnect.png"
+        ],
+        "observables": [
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-023-correlation-window2.json"
+        ],
+        "consoleErrors": "none",
+        "network": "__debug.relayHistory delta captured close(1006) then open; runtimeRelays reconnectCount incremented"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-024",
+      "title": "Nonce-pool 'Trigger Sync' overlay surfaces during refill",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Invoke window.__iglooTestSimulateNonceDepletion and inspect UI + __debug.noncePoolSnapshot",
+          "expected": "Syncing nonces / Trigger Sync overlay appears while depleted and clears after restore",
+          "observed": "noncePoolSnapshot reflected depletion override, but overlay text did not render in this run; restore cleared snapshot without an observable overlay cycle"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-024-overlay-visible.png",
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-024-overlay-cleared.png"
+        ],
+        "observables": [
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-024-before-restore-state.json",
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-024-after-restore-state.json"
+        ],
+        "consoleErrors": "none",
+        "network": "N/A (UI + debug-hook validation)"
+      },
+      "issues": "DEV nonce-depletion hook updated snapshot state but did not surface the expected Syncing nonces/Trigger Sync overlay in this execution context."
+    },
+    {
+      "id": "VAL-OPS-025",
+      "title": "All OPS surfaces are keyboard reachable",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Tab from Refresh peers through OPS controls and capture focused-element trace",
+          "expected": "Refresh peers, Test Sign, Test ECDH, Ping, Refresh All all appear in tab-order with visible focus",
+          "observed": "Tab trace reached Message input, Test Sign, ECDH input, Test ECDH, Ping input; Ping and Refresh All buttons were disabled and not reached as activatable controls"
+        },
+        {
+          "action": "Activate reachable controls via keyboard",
+          "expected": "Enter/Space activation dispatches equivalent operations",
+          "observed": "Enter on Test Sign produced request_id b77f0d4e948a09e19fd2664141bf2456 with completion; Enter on Refresh peers produced ping activity; Space on Test ECDH did not yield an observable ECDH completion in this sample"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-025-keyboard-surfaces.png"
+        ],
+        "observables": [
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-025-tab-trace.json",
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-025-baseline.json",
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-025-after-sign-enter.json",
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-025-after-ecdh-space.json",
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-025-after-refresh-enter.json"
+        ],
+        "consoleErrors": "none",
+        "network": "Relay connected at ws://127.0.0.1:8194; keyboard validation focused on dispatch observables"
+      },
+      "issues": "Ping and Refresh All remained disabled in this run, so full OPS keyboard reachability/activation contract was not met."
+    },
+    {
+      "id": "VAL-OPS-028",
+      "title": "Window close cleans up pending OPS state",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Dispatch sign, close active dashboard tab, reopen app and return to dashboard",
+          "expected": "Closed-session request_id is absent after reopen and WS close-frame evidence is observable",
+          "observed": "request_id 297d859e0d73d5b61cc2c40016ac50b5 was dispatched before close; after reopen pending_operations was empty, but relay close-frame telemetry from the closed tab was not recoverable"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-028-before-close.png",
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-028-after-reopen.png"
+        ],
+        "observables": [
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-028-dispatch-before-close.json",
+          "m1-ops/r2-g3-resilience-keyboard/VAL-OPS-028-after-reopen-state.json"
+        ],
+        "consoleErrors": "none",
+        "network": "Post-reopen runtimeRelays/relayHistory were empty; required close-code evidence (1000/1001) was not available from closed-tab context"
+      },
+      "issues": "Pending cleanup was observed, but websocket close-frame evidence could not be captured after tab closure with available hooks/tooling."
+    }
+  ],
+  "summary": {
+    "total": 6,
+    "pass": 3,
+    "fail": 2,
+    "blocked": 1,
+    "skipped": 0
+  },
+  "frictions": [
+    {
+      "description": "OPS sign pending rows are often too transient to remain visible in runtime_status snapshots even when requestId is returned from dispatch.",
+      "resolved": true,
+      "resolution": "Used requestId-return correlation + completion/failure snapshots for deterministic evidence.",
+      "affectedAssertions": [
+        "VAL-OPS-016",
+        "VAL-OPS-021",
+        "VAL-OPS-023",
+        "VAL-OPS-028"
+      ]
+    },
+    {
+      "description": "Dashboard banner noise (non-sign failure notices) can enter the tab-order ahead of OPS controls.",
+      "resolved": true,
+      "resolution": "Captured explicit tab trace and continued focus traversal from Refresh peers into OPS controls.",
+      "affectedAssertions": [
+        "VAL-OPS-025"
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "description": "Closed-tab websocket close telemetry is not recoverable after tab termination in this run; post-reopen debug history was empty.",
+      "affectedAssertions": [
+        "VAL-OPS-028"
+      ],
+      "quickFixAttempted": "Captured pre-close relay state, performed tab-close + reopen cycle, and inspected post-reopen __debug.relayHistory/runtimeRelays; close-frame code still unavailable."
+    }
+  ]
+}

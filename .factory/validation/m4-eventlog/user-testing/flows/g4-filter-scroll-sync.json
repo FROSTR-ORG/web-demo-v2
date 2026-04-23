@@ -1,0 +1,165 @@
+{
+  "groupId": "g4-filter-scroll-sync",
+  "testedAt": "2026-04-22T16:03:54Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "milestone": "m4-eventlog",
+    "flowGuidance": "Flow Validator Guidance: test-observability hooks (DEV only)",
+    "assignedAssertions": [
+      "VAL-EVENTLOG-010",
+      "VAL-EVENTLOG-013",
+      "VAL-EVENTLOG-015",
+      "VAL-EVENTLOG-018",
+      "VAL-EVENTLOG-021",
+      "VAL-EVENTLOG-023"
+    ],
+    "command": "npx vitest run src/screens/DashboardScreen/panels/__tests__/EventLogPanel.filterAndScroll.test.tsx --config vitest.config.ts",
+    "commandExitCode": 0
+  },
+  "toolsUsed": [
+    "vitest"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-EVENTLOG-010",
+      "title": "Filter dropdown hides non-matching entries; Select all / Clear all work",
+      "status": "pass",
+      "reason": "The executed test suite includes a passing case that explicitly validates SIGN/ECDH-only filtering and Select all/Clear all behavior.",
+      "steps": [
+        {
+          "action": "Run assigned vitest file",
+          "expected": "Coverage includes VAL-EVENTLOG-010 behavior and passes",
+          "observed": "Test case 'selecting only {SIGN, ECDH} hides PING / INFO rows ... (VAL-EVENTLOG-010 / VAL-EVENTLOG-013)' passed"
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g4-filter-scroll-sync/vitest-EventLogPanel.filterAndScroll.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-013",
+      "title": "Count pill reflects filtered count",
+      "status": "pass",
+      "reason": "A passing test in the executed suite asserts the filtered count pill value for SIGN/ECDH selection.",
+      "steps": [
+        {
+          "action": "Run assigned vitest file",
+          "expected": "Filtered-count assertion passes",
+          "observed": "Same VAL-EVENTLOG-010/013 test passed with expectation of '2 events'"
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g4-filter-scroll-sync/vitest-EventLogPanel.filterAndScroll.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-015",
+      "title": "Persists across intra-session route navigation",
+      "status": "pass",
+      "reason": "The test file includes and passes assertions for no-flicker remount behavior and filter persistence across unmount/remount navigation simulation.",
+      "steps": [
+        {
+          "action": "Run assigned vitest file",
+          "expected": "VAL-EVENTLOG-015 persistence behavior verified",
+          "observed": "Test 'no-flicker-to-empty on intra-session remount (VAL-EVENTLOG-015)' passed"
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g4-filter-scroll-sync/vitest-EventLogPanel.filterAndScroll.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-018",
+      "title": "Nonce pool balancing events surface as SYNC",
+      "status": "blocked",
+      "reason": "The assigned command executed only EventLogPanel.filterAndScroll tests; command output provides no explicit VAL-EVENTLOG-018 case or nonce-balancing evidence.",
+      "steps": [
+        {
+          "action": "Run assigned vitest file and inspect output",
+          "expected": "A test explicitly covering VAL-EVENTLOG-018",
+          "observed": "No VAL-EVENTLOG-018-labeled test or nonce-balancing-specific assertion appears in the command evidence"
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g4-filter-scroll-sync/vitest-EventLogPanel.filterAndScroll.log"
+        ]
+      },
+      "issues": "Coverage gap in this command-scoped evidence: VAL-EVENTLOG-018 cannot be concluded from the executed test run."
+    },
+    {
+      "id": "VAL-EVENTLOG-021",
+      "title": "Scroll position preserved on ingestion",
+      "status": "pass",
+      "reason": "A dedicated passing test explicitly asserts scroll-anchor preservation when prepending events while scrolled off top.",
+      "steps": [
+        {
+          "action": "Run assigned vitest file",
+          "expected": "VAL-EVENTLOG-021 test passes",
+          "observed": "Test 'VAL-EVENTLOG-021 — when user is scrolled off-top, prepended events do NOT shift the visible scroll anchor' passed"
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g4-filter-scroll-sync/vitest-EventLogPanel.filterAndScroll.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-EVENTLOG-023",
+      "title": "Filter selection persists across new event ingestion",
+      "status": "pass",
+      "reason": "A dedicated passing test explicitly validates that non-matching newly ingested events stay hidden while SIGN/ECDH selection is preserved.",
+      "steps": [
+        {
+          "action": "Run assigned vitest file",
+          "expected": "VAL-EVENTLOG-023 test passes",
+          "observed": "Test 'VAL-EVENTLOG-023 — filter persists across new event ingestion...' passed"
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "m4-eventlog/g4-filter-scroll-sync/vitest-EventLogPanel.filterAndScroll.log"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "summary": {
+    "total": 6,
+    "pass": 5,
+    "fail": 0,
+    "blocked": 1,
+    "skipped": 0
+  },
+  "frictions": [
+    {
+      "description": "Command-scoped evidence is limited to a single vitest file and does not include a VAL-EVENTLOG-018-labeled nonce-balancing test.",
+      "resolved": false,
+      "resolution": "Not resolved within this assignment scope.",
+      "affectedAssertions": [
+        "VAL-EVENTLOG-018"
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "description": "Assigned command evidence does not provide direct coverage for VAL-EVENTLOG-018.",
+      "affectedAssertions": [
+        "VAL-EVENTLOG-018"
+      ],
+      "quickFixAttempted": "Reviewed the test run log and assertion-labeled test names from the executed file; no VAL-EVENTLOG-018 evidence found."
+    }
+  ]
+}

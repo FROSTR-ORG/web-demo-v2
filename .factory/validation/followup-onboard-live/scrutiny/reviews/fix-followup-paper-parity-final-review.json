@@ -1,0 +1,39 @@
+{
+  "featureId": "fix-followup-paper-parity-final-review",
+  "reviewedAt": "2026-04-23T17:03:51Z",
+  "commitId": "bdadd75",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature includes useful parity fixes and artifacts, but it misses core acceptance requirements for the new visual parity harness: the spec runs against demo simulator routes instead of the live runtime path required by the feature contract, and the baseline source/scale do not match the required Paper MCP scale=2 capture procedure.",
+    "issues": [
+      {
+        "file": "src/e2e/visual/followup-paper-parity.spec.ts",
+        "line": 149,
+        "severity": "blocking",
+        "description": "The parity spec navigates `/demo/${scenarioId}?chrome=0` (simulator fixtures) rather than exercising `/create/profile`, `/create/distribute`, and `/create/complete` on the live relay-pump runtime path. This conflicts with the feature expectedBehavior requiring the spec to validate these surfaces against live runtime (NOT simulator)."
+      },
+      {
+        "file": "src/e2e/visual/baselines/followup-paper/baselines.json",
+        "line": 14,
+        "severity": "blocking",
+        "description": "The committed baseline metadata explicitly sets `baselineScale` to `1x` and documents that baselines were copied from `public/paper-reference` instead of captured via Paper MCP `get_screenshot(..., scale=2)` as required by the feature procedure. This leaves the implementation out of contract for baseline acquisition."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Skill/mission guidance is ambiguous for parity reviews: `ui-screen-worker` requires agent-browser visual verification for changed UI, while also allowing limited exceptions; this run skipped interactive browser verification and only used `playwright --list` plus unit tests.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md:23,51,53; mission AGENTS.md:89; handoff file shows `skillFeedback.followedProcedure=false` and `npx playwright test ... --list` only (handoff lines 31, 83, 87)."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Mission feature metadata contains a transposed Paper artboard mapping for create-profile vs distribute-shares (8GU-0/60R-0), which forced manual reconciliation during execution.",
+      "evidence": "mission features.json:4200 maps /create/profile to 8GU-0 and /create/distribute to 60R-0, while commit artifacts and baselines.json document corrected mapping."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed handoff, transcript skeleton, skill guidance, and commit bdadd75. Found two blocking contract mismatches (simulator-based parity spec and non-scale=2 baseline capture path), so this feature review is marked FAIL despite the targeted UI fixes and documentation updates."
+}

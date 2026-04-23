@@ -1,0 +1,67 @@
+{
+  "milestone": "m5-settings",
+  "round": 2,
+  "status": "pass",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "npx vitest run --config \"/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/vitest.config.ts\" --maxConcurrency 4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "npx tsc --noEmit -p \"/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/tsconfig.json\" --pretty false",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [
+    {
+      "target": "library",
+      "description": "Documented seeded-runtime relay update limitation and the required DEV hook (`__iglooTestUpdateRelays`) in .factory/library/architecture.md.",
+      "sourceFeature": "fix-m5-relay-churn-multidevice-spec"
+    }
+  ],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "skills",
+      "suggestion": "Align feature-assignment guidance with skill scopes: avoid assigning runtime-worker to pure settings persistence / migration fixes; route those to ui-screen-worker unless runtime protocol wiring is central.",
+      "evidence": "Both fix-m5-idb-migration follow-up reviews flagged runtime-worker assignment conflicting with runtime-worker scope text.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "Tighten procedure-compliance rules so workers must record deviations when skipping required checks (agent-browser and/or demo-gallery Playwright) even for non-UI or data-wiring fixes.",
+      "evidence": "Multiple m5 fix reviews observed `followedProcedure: true` despite omitted skill-listed verification steps.",
+      "isSystemic": true
+    },
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Resolve policy mismatch between mission-level 'agent-browser mandatory for UI validation' and skill-level skip allowances; define precedence and acceptable skip cases explicitly.",
+      "evidence": "fix-m5-replace-share-cta-guardnav review noted contradictory guidance between mission AGENTS.md and ui-screen-worker SKILL.md.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Repeated variants of the same procedure-compliance mismatch across multiple fix reviews.",
+      "reason": "duplicate: consolidated under one systemic skills guidance recommendation."
+    },
+    {
+      "observation": "Repeated variants of runtime-worker skill-scope mismatch for storage-oriented fixes.",
+      "reason": "duplicate: consolidated under one systemic skill-assignment recommendation."
+    }
+  ],
+  "previousRound": ".factory/validation/m5-settings/scrutiny/synthesis.round1.json"
+}

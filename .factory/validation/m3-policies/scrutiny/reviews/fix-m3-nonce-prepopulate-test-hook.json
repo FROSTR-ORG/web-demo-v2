@@ -1,0 +1,28 @@
+{
+  "featureId": "fix-m3-nonce-prepopulate-test-hook",
+  "reviewedAt": "2026-04-22T02:36:34Z",
+  "commitId": "f41758f",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The fix successfully adds deterministic nonce prepopulation hooks and the A-side pending-operations invariance assertions, but the denial round-trip test still does not strictly enforce the contract's 15-second failure bound from the moment B dispatches sign.",
+    "issues": [
+      {
+        "file": "src/e2e/multi-device/policy-denial-roundtrip.spec.ts",
+        "line": 864,
+        "severity": "blocking",
+        "description": "The contract requires B to receive OperationFailure within 15s of dispatch (validation-contract.md:581-584), but in the `requestId: null` path the spec first waits up to 30s to discover `signRequestId` (lines 680-761) and only then starts the 15s timeout (`failureWaitStartedAt` at line 864). This can pass even when failure arrives well after 15s from dispatch, so the timing bound from the original failure is still not fully enforced."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "knowledge",
+      "observation": "Shared architecture docs still describe a local A-side `peer_denied` runtime event as current behavior, which conflicts with the narrowed contract and current runtime reality used by these tests.",
+      "evidence": ".factory/library/architecture.md (Data Flow: Approval Prompts) says denied requests emit a local `peer_denied` runtime event on A, while validation-contract.md:581-586 and the updated policy-denial-roundtrip spec comments explicitly state this A-side runtime event is not currently available."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m3-policies/scrutiny/reviews/m3-policy-denial-and-persistence.json",
+  "summary": "Fix review failed: nonce prepopulation and A-side pending invariance were added, but the strict 15s dispatch-to-failure bound remains partially unenforced in the null-requestId branch."
+}

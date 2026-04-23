@@ -1,0 +1,33 @@
+{
+  "milestone": "followup-onboard-live",
+  "round": 2,
+  "status": "pass",
+  "validatorsRun": {
+    "typecheck": {
+      "passed": true,
+      "command": "npx tsc --noEmit -p /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/tsconfig.json --pretty false && npx tsc --noEmit -p /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/tsconfig.node.json --pretty false",
+      "exitCode": 0
+    },
+    "test": {
+      "passed": true,
+      "command": "npx vitest run --config /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/vitest.config.ts",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "npm run lint",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [],
+  "rejectedObservations": [],
+  "previousRound": ".factory/validation/followup-onboard-live/scrutiny/synthesis.round1.json"
+}

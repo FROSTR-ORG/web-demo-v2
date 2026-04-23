@@ -1,0 +1,153 @@
+{
+  "groupId": "group-policy-chip-cycle",
+  "testedAt": "2026-04-22T13:19:39Z",
+  "isolation": {
+    "milestone": "m3-policies",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "appUrl": "http://127.0.0.1:5173",
+    "assignedAssertions": [
+      "VAL-POLICIES-008",
+      "VAL-POLICIES-009",
+      "VAL-POLICIES-021",
+      "VAL-POLICIES-026"
+    ],
+    "testingTool": "vitest"
+  },
+  "toolsUsed": [
+    "vitest"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-POLICIES-008",
+      "title": "Chip click cycles unset → allow → deny → unset",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest suite including PoliciesState.peerChipCycle.test.tsx",
+          "expected": "Target test file passes",
+          "observed": "File passed (4 tests)"
+        },
+        {
+          "action": "Inspect test case 'click cycles unset → allow → deny → unset and dispatches one setPeerPolicyOverride per step'",
+          "expected": "Explicit coverage of click cycle contract",
+          "observed": "Test explicitly validates unset→allow→deny→unset sequence and one dispatch per click"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "n/a (vitest run)",
+        "network": "n/a (vitest run)",
+        "logs": [
+          "m3-policies/group-policy-chip-cycle/vitest-policy-chip-cycle.log",
+          "m3-policies/group-policy-chip-cycle/assertion-evidence-summary.json"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-POLICIES-009",
+      "title": "clear_policy_overrides resets the entire matrix",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Run assigned vitest suite (peerChipCycle + defaultPolicyDropdown files)",
+          "expected": "At least one test explicitly validates clear_policy_overrides() full-matrix reset",
+          "observed": "No direct test coverage for VAL-POLICIES-009 in the assigned files"
+        },
+        {
+          "action": "Search assigned test files for 'VAL-POLICIES-009' and 'clear_policy_overrides'",
+          "expected": "Match demonstrating direct assertion coverage",
+          "observed": "No matches found"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "n/a (vitest run)",
+        "network": "n/a (vitest run)",
+        "logs": [
+          "m3-policies/group-policy-chip-cycle/vitest-policy-chip-cycle.log",
+          "m3-policies/group-policy-chip-cycle/assertion-evidence-summary.json"
+        ]
+      },
+      "issues": "Assigned test command did not include a direct clear_policy_overrides validation for VAL-POLICIES-009, so this assertion could not be conclusively validated from available evidence."
+    },
+    {
+      "id": "VAL-POLICIES-021",
+      "title": "Peer Policies chips are keyboard operable",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest suite including PoliciesState.peerChipCycle.test.tsx",
+          "expected": "Target test file passes",
+          "observed": "File passed (4 tests)"
+        },
+        {
+          "action": "Inspect test case 'Enter and Space activate the cycle the same as click (VAL-POLICIES-021)'",
+          "expected": "Keyboard activation coverage for chip interaction",
+          "observed": "Test explicitly validates Enter/Space activation and matching dispatch behavior"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "n/a (vitest run)",
+        "network": "n/a (vitest run)",
+        "logs": [
+          "m3-policies/group-policy-chip-cycle/vitest-policy-chip-cycle.log",
+          "m3-policies/group-policy-chip-cycle/assertion-evidence-summary.json"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-POLICIES-026",
+      "title": "Optimistic UI rolls back on failed override write",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest suite including PoliciesState.peerChipCycle.test.tsx",
+          "expected": "Target test file passes",
+          "observed": "File passed (4 tests)"
+        },
+        {
+          "action": "Inspect test case 'rolls back optimistic state and surfaces an inline error when dispatch rejects (VAL-POLICIES-026)'",
+          "expected": "Rollback and inline error behavior validated",
+          "observed": "Test explicitly validates rollback to prior state and inline role=status error on dispatch rejection"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "n/a (vitest run)",
+        "network": "n/a (vitest run)",
+        "logs": [
+          "m3-policies/group-policy-chip-cycle/vitest-policy-chip-cycle.log",
+          "m3-policies/group-policy-chip-cycle/assertion-evidence-summary.json"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Validation contract marks these as agent-browser UI assertions with screenshot evidence, but this assignment constrained execution to vitest-only evidence.",
+      "resolved": true,
+      "resolution": "Recorded deterministic test-run evidence and assertion mapping logs from the assigned vitest command.",
+      "affectedAssertions": [
+        "VAL-POLICIES-008",
+        "VAL-POLICIES-009",
+        "VAL-POLICIES-021",
+        "VAL-POLICIES-026"
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "description": "No explicit VAL-POLICIES-009/clear_policy_overrides coverage in assigned test files.",
+      "affectedAssertions": [
+        "VAL-POLICIES-009"
+      ],
+      "quickFixAttempted": "Searched assigned test files and dashboard state test directory for 'VAL-POLICIES-009' and 'clear_policy_overrides'; no direct coverage found."
+    }
+  ],
+  "summary": "Tested 4 assigned assertions via the required vitest command: 3 passed (VAL-POLICIES-008/021/026) and 1 blocked due missing direct test coverage (VAL-POLICIES-009)."
+}

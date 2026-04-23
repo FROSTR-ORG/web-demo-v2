@@ -1,0 +1,360 @@
+{
+  "groupId": "g2-relay-and-churn",
+  "testedAt": "2026-04-22T19:10:06.611327+00:00",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "reportPath": ".factory/validation/m5-settings/user-testing/flows/g2-relay-and-churn.json",
+    "evidenceDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/evidence/m5-settings/g2-relay-and-churn"
+  },
+  "toolsUsed": [
+    "vitest",
+    "playwright",
+    "agent-browser",
+    "indexeddb-eval",
+    "grep",
+    "read"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-SETTINGS-003",
+      "title": "Add valid relay connects pump and renders row",
+      "status": "pass",
+      "reason": "Dedicated relay-list sidebar tests passed for valid add behavior, and relay churn e2e confirms live relay hot-reload behavior under runtime load.",
+      "steps": [
+        {
+          "action": "Run targeted vitest relay suites and relay churn Playwright spec",
+          "expected": "Valid add path updates relay list/hot-reload behavior without regression",
+          "observed": "SettingsSidebar relay-list suite and relay churn e2e both passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.relayList.test.tsx",
+          "src/e2e/multi-device/relay-churn.spec.ts"
+        ],
+        "logs": [
+          "m5-settings/g2-relay-and-churn/vitest-relay-suites.log",
+          "m5-settings/g2-relay-and-churn/playwright-relay-churn.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-004",
+      "title": "Add invalid relay URL rejected",
+      "status": "pass",
+      "reason": "Passing relay URL validation + sidebar tests explicitly cover invalid URL and malformed input rejection.",
+      "steps": [
+        {
+          "action": "Run relayUrl + SettingsSidebar relay-list suites",
+          "expected": "Invalid relay inputs are blocked with canonical errors",
+          "observed": "All invalid URL rejection checks passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/lib/relay/relayUrl.test.ts",
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.relayList.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g2-relay-and-churn/vitest-relay-suites.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-005",
+      "title": "Remove relay disconnects socket and removes dashboard row",
+      "status": "pass",
+      "reason": "Settings sidebar relay-list suite and runtime relay-pump suite passed remove/diff-path assertions including clean close behavior.",
+      "steps": [
+        {
+          "action": "Run SettingsSidebar relay-list + runtimeRelayPump tests",
+          "expected": "Removing a relay updates list and cleanly tears down removed socket path",
+          "observed": "All remove + clean close assertions passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.relayList.test.tsx",
+          "src/lib/relay/runtimeRelayPump.test.ts"
+        ],
+        "logs": [
+          "m5-settings/g2-relay-and-churn/vitest-relay-suites.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-006",
+      "title": "Edit existing relay URL reconnects to new URL",
+      "status": "pass",
+      "reason": "Relay-list sidebar edit behavior and relay-pump incremental update path both passed in executable tests.",
+      "steps": [
+        {
+          "action": "Run SettingsSidebar relay-list + runtimeRelayPump tests",
+          "expected": "Edit path updates relay URL and preserves untouched subscriptions",
+          "observed": "Edit and updateRelays assertions passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.relayList.test.tsx",
+          "src/lib/relay/runtimeRelayPump.test.ts"
+        ],
+        "logs": [
+          "m5-settings/g2-relay-and-churn/vitest-relay-suites.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-007",
+      "title": "Relay list persists across Lock / Unlock / Reload",
+      "status": "pass",
+      "reason": "Direct agent-browser flow configured 3 relays, then validated same ordered relay list after lock/unlock and after full reload+unlock, with IndexedDB snapshots matching exactly.",
+      "steps": [
+        {
+          "action": "Create profile with relays wss://relay.primal.net, wss://relay.damus.io, wss://nos.lol and open Settings",
+          "expected": "Settings relay list shows all 3 relays in configured order",
+          "observed": "Settings showed primal -> damus -> nos.lol"
+        },
+        {
+          "action": "Lock profile, unlock, reopen Settings",
+          "expected": "Same ordered 3-relay list persists",
+          "observed": "Relay list order unchanged after unlock"
+        },
+        {
+          "action": "Full page reload, unlock again, reopen Settings, read IndexedDB",
+          "expected": "Same ordered 3-relay list in UI and IndexedDB relays array",
+          "observed": "UI order unchanged and IndexedDB relays remained [primal, damus, nos.lol]"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m5-settings/g2-relay-and-churn/VAL-SETTINGS-007-08-settings-pre-lock.png",
+          "m5-settings/g2-relay-and-churn/VAL-SETTINGS-007-11-settings-after-unlock.png",
+          "m5-settings/g2-relay-and-churn/VAL-SETTINGS-007-13-settings-after-reload-unlock.png"
+        ],
+        "indexedDb": [
+          "m5-settings/g2-relay-and-churn/VAL-SETTINGS-007-idb-after-unlock.json",
+          "m5-settings/g2-relay-and-churn/VAL-SETTINGS-007-idb-after-reload.json"
+        ],
+        "consoleErrors": "none (see VAL-SETTINGS-007-browser-errors.log)",
+        "logs": [
+          "m5-settings/g2-relay-and-churn/VAL-SETTINGS-007-browser-errors.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-010",
+      "title": "Latency column shows numeric ms once relay responds",
+      "status": "pass",
+      "reason": "Relay health and telemetry suites passed numeric latency rendering/instrumentation checks.",
+      "steps": [
+        {
+          "action": "Run relay health + telemetry vitest suites",
+          "expected": "Latency renders numeric ms from real telemetry path",
+          "observed": "Latency assertions passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/__tests__/relayHealthRows.test.ts",
+          "src/lib/relay/relayTelemetry.test.ts",
+          "src/lib/relay/browserRelayClient.telemetry.test.ts"
+        ],
+        "logs": [
+          "m5-settings/g2-relay-and-churn/vitest-relay-suites.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-011",
+      "title": "Events column increments as inbound events arrive",
+      "status": "pass",
+      "reason": "Passing relay health/browser telemetry/runtime pump telemetry tests cover event counter increments and reconnect reset behavior.",
+      "steps": [
+        {
+          "action": "Run relay health + browser relay telemetry + pump telemetry suites",
+          "expected": "Per-relay inbound EVENT counters increment and remain independent",
+          "observed": "Event counter assertions passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/__tests__/relayHealthRows.test.ts",
+          "src/lib/relay/browserRelayClient.telemetry.test.ts",
+          "src/lib/relay/runtimeRelayPump.telemetry.test.ts"
+        ],
+        "logs": [
+          "m5-settings/g2-relay-and-churn/vitest-relay-suites.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-012",
+      "title": "Last-Seen column shows real relative time",
+      "status": "pass",
+      "reason": "Relay health + relay telemetry formatter tests passed relative-time behavior and update semantics.",
+      "steps": [
+        {
+          "action": "Run relay health and relay telemetry suites",
+          "expected": "Last Seen uses relative time semantics and updates/reset correctly",
+          "observed": "Relative last-seen assertions passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/__tests__/relayHealthRows.test.ts",
+          "src/lib/relay/relayTelemetry.test.ts"
+        ],
+        "logs": [
+          "m5-settings/g2-relay-and-churn/vitest-relay-suites.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-013",
+      "title": "Degraded relay shows Slow (amber) status",
+      "status": "pass",
+      "reason": "Relay health mapper and telemetry/pump tests passed slow-threshold + consecutive-sample transition checks.",
+      "steps": [
+        {
+          "action": "Run relay health + relay telemetry + pump telemetry suites",
+          "expected": "Slow state appears on sustained high RTT and clears after recovery",
+          "observed": "Slow relay transition assertions passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/__tests__/relayHealthRows.test.ts",
+          "src/lib/relay/relayTelemetry.test.ts",
+          "src/lib/relay/runtimeRelayPump.telemetry.test.ts"
+        ],
+        "logs": [
+          "m5-settings/g2-relay-and-churn/vitest-relay-suites.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-014",
+      "title": "Disconnected relay shows Offline (red) with real last-seen",
+      "status": "pass",
+      "reason": "Dedicated relay health row test for VAL-SETTINGS-014 passed offline status + real last-seen + frozen latency behavior.",
+      "steps": [
+        {
+          "action": "Run relayHealthRows test suite",
+          "expected": "Offline row preserves real last-seen/frozen latency semantics",
+          "observed": "VAL-SETTINGS-014 assertion passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/screens/DashboardScreen/__tests__/relayHealthRows.test.ts"
+        ],
+        "logs": [
+          "m5-settings/g2-relay-and-churn/vitest-relay-suites.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-022",
+      "title": "Relay list hot-reload does not leak or double-subscribe",
+      "status": "pass",
+      "reason": "Runtime relay pump updateRelays tests and relay-churn multi-device Playwright spec both passed, covering no duplicate-subscription and untouched-socket invariants.",
+      "steps": [
+        {
+          "action": "Run runtimeRelayPump updateRelays suite and relay-churn e2e",
+          "expected": "Incremental hot-reload without leaks/duplicate REQ on untouched relays",
+          "observed": "No duplicate subscription regressions; assertions passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/lib/relay/runtimeRelayPump.test.ts",
+          "src/e2e/multi-device/relay-churn.spec.ts"
+        ],
+        "logs": [
+          "m5-settings/g2-relay-and-churn/vitest-relay-suites.log",
+          "m5-settings/g2-relay-and-churn/playwright-relay-churn.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-023",
+      "title": "Duplicate relay URL rejected",
+      "status": "pass",
+      "reason": "Duplicate rejection coverage passed in both URL validation and settings sidebar relay-list tests.",
+      "steps": [
+        {
+          "action": "Run relayUrl + SettingsSidebar relay-list suites",
+          "expected": "Case-insensitive/trailing-slash duplicates are rejected",
+          "observed": "Duplicate add/edit rejection assertions passed"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/lib/relay/relayUrl.test.ts",
+          "src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.relayList.test.tsx"
+        ],
+        "logs": [
+          "m5-settings/g2-relay-and-churn/vitest-relay-suites.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-005",
+      "title": "Relay churn mid-sign (M1 + M4 + M5)",
+      "status": "pass",
+      "reason": "Dedicated multi-device relay-churn Playwright spec passed end-to-end, validating churn-mid-sign behavior and no silent hang.",
+      "steps": [
+        {
+          "action": "Run relay-churn multi-device Playwright spec with desktop project and single worker",
+          "expected": "Churn mid-sign recovers/finishes without silent hang and without duplicate untouched sockets",
+          "observed": "Spec passed in 8.4s"
+        }
+      ],
+      "evidence": {
+        "tests": [
+          "src/e2e/multi-device/relay-churn.spec.ts"
+        ],
+        "logs": [
+          "m5-settings/g2-relay-and-churn/port-8194-check.log",
+          "m5-settings/g2-relay-and-churn/playwright-relay-churn.log"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "summary": "Validated 13 assigned assertions: 13 pass, 0 fail, 0 blocked. Evidence includes targeted vitest relay suites, relay-churn Playwright run, and direct agent-browser + IndexedDB persistence proof for VAL-SETTINGS-007.",
+  "blockers": [],
+  "frictions": [
+    {
+      "description": "agent-browser element refs changed after route/state transitions (create flow, unlock, reload), requiring re-snapshot before continued interaction.",
+      "resolved": true,
+      "resolution": "Re-snapshotted before each next interaction and completed full VAL-SETTINGS-007 lock/unlock/reload evidence flow.",
+      "affectedAssertions": [
+        "VAL-SETTINGS-007"
+      ]
+    },
+    {
+      "description": "relay-churn Playwright log captured expected connection-refused console lines for decoy relay endpoints used by the spec harness.",
+      "resolved": true,
+      "resolution": "Continued because the spec explicitly passed and this behavior is part of churn harness conditions.",
+      "affectedAssertions": [
+        "VAL-CROSS-005"
+      ]
+    }
+  ]
+}

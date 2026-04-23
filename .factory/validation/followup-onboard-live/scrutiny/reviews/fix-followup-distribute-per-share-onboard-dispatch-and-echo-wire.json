@@ -1,0 +1,39 @@
+{
+  "featureId": "fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire",
+  "reviewedAt": "2026-04-23T17:04:37Z",
+  "commitId": "86a72d3",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The core onboard dispatch/drain correlation wiring is present, but I found two blocking gaps: stale request-id retention on dispatch failure and e2e coverage that bypasses the required requester UI flow.",
+    "issues": [
+      {
+        "file": "src/app/AppStateProvider.tsx",
+        "line": 2097,
+        "severity": "blocking",
+        "description": "When per-share onboard dispatch fails, `pendingDispatchRequestId` is not actually cleared because the update uses `onboardRequestId ?? entry.pendingDispatchRequestId`. This retains stale request IDs from prior attempts, allowing later completions/failures to correlate against the wrong attempt and mutate `peerOnline`/`adoptionError` incorrectly."
+      },
+      {
+        "file": "src/e2e/multi-device/create-distribute-live-bootstrap.spec.ts",
+        "line": 440,
+        "severity": "blocking",
+        "description": "The happy-path and failure-path tests do not execute the required requester-side `/onboard` paste/password UI flow. Happy path adopts via `window.__iglooTestAdoptOnboardPackage` (`page.evaluate`), and failure path injects `OperationFailure` via `window.__iglooTestAbsorbDrains` instead of a real mid-handshake abort from Device B, so the specified UI-level behavior is not fully verified."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The protocol-flow-worker skill requires agent-browser for multi-device validation, but this feature's handoff evidence uses Playwright CLI only while still marking procedure as followed. This indicates a skill/procedure mismatch that should be clarified.",
+      "evidence": ".factory/skills/protocol-flow-worker/SKILL.md:21 and :58 require agent-browser/manual validation; handoff file lines 31/36/41 show Playwright commands, line 51 has `interactiveChecks: []`, and line 109 marks `followedProcedure: true`."
+    },
+    {
+      "area": "knowledge",
+      "observation": "The worker discovered a repeatable Droid-Shield false positive pattern around `peer_pubkey32_hex` assignment, but this guidance is not captured in shared library docs.",
+      "evidence": "handoffs/2026-04-23T16-46-48-518Z__fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire__7f11906e-13b5-418d-a85a-eab93492b208.json:104-105 documents the issue/suggested workaround; grep in `.factory/library` and mission `AGENTS.md` found no matching documentation."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review failed. Runtime wiring largely matches intent, but stale pending request-id handling can mis-correlate drain envelopes, and the new multi-device e2e spec bypasses the required `/onboard` requester UI path (and simulates failure via hooks), leaving key contract behavior insufficiently validated."
+}

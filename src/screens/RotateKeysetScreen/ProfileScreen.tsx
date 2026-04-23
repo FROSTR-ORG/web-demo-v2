@@ -2,12 +2,12 @@ import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Check, X } from "lucide-react";
 import { useAppState } from "../../app/AppState";
+import { PeerPermissionTagGroup } from "../../components/PeerPermissionTags";
 import { AppShell, PageHeading } from "../../components/shell";
 import {
   BackLink,
   Button,
   PasswordField,
-  PermissionBadge,
   SectionHeader,
   Stepper,
   TextField,
@@ -250,16 +250,7 @@ export function RotateCreateProfileScreen() {
                 ) : null}
               </div>
               <div className="inline-actions">
-                {member.idx === rotatedLocalShare?.idx ? (
-                  <span className="help">Local profile</span>
-                ) : (
-                  <>
-                    <PermissionBadge>SIGN</PermissionBadge>
-                    <PermissionBadge tone="info">ECDH</PermissionBadge>
-                    <PermissionBadge tone="ping">PING</PermissionBadge>
-                    <PermissionBadge tone="onboard">ONBOARD</PermissionBadge>
-                  </>
-                )}
+                <PeerPermissionTagGroup />
               </div>
             </div>
           ))}

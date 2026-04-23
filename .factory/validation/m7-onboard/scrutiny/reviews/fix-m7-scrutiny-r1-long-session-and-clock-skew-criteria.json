@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m7-scrutiny-r1-long-session-and-clock-skew-criteria",
+  "reviewedAt": "2026-04-23T05:01:57Z",
+  "commitId": "0fffdc94720d93451fa00dac588522bfd16cfe89",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "This fix directly addresses both blocking findings from m7-clock-skew-and-leak: long-session success criteria are tightened to require per-iteration sign+ECDH completion (with 64-hex ECDH shared secret validation), and the asymmetric ±120s case is now explicitly represented as a skipped, rationale-documented protocol deviation linked to runtime-deviations-from-paper.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "knowledge",
+      "observation": "The recurring protocol constraint that drives this fix (bifrost-signer `max_future_skew_secs=30`, and why asymmetric ±120s must be treated as deviation) is documented in app docs but not in `.factory/library`, so future workers may repeatedly rediscover it during planning/review.",
+      "evidence": "Constraint is documented in `docs/runtime-deviations-from-paper.md` and referenced in `src/e2e/multi-device/clock-skew.spec.ts`, while grep over `.factory/library` for `max_future_skew_secs|VAL-CROSS-019|clock skew|LONG_SESSION_ITERATIONS` returns no matches."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m7-onboard/scrutiny/reviews/m7-clock-skew-and-leak.json",
+  "summary": "Pass. I reviewed the fix transcript skeleton and both diffs (`e93c09b` original + `0fffdc9` fix), and the fix adequately resolves the prior blocking failures: it enforces all-iteration sign/ECDH success with per-iteration shared-secret shape checks, and it documents/implements the asymmetric ±120s case as an explicit, protocol-constrained skipped deviation tied to VAL-CROSS-019/027."
+}

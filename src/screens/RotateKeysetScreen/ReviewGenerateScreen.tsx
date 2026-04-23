@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { AlertTriangle, Info } from "lucide-react";
 import { SetupFlowError, useAppState } from "../../app/AppState";
 import { AppShell, PageHeading } from "../../components/shell";
-import { BackLink, PasswordField, Stepper } from "../../components/ui";
+import { BackLink, Stepper } from "../../components/ui";
 import { useDemoUi } from "../../demo/demoUi";
 import { MOCK_SOURCE_SHARE_1 } from "./mocks";
 import { navigateWithRotateState, rotatePhaseAtLeast } from "./utils";
@@ -12,15 +12,10 @@ export function ReviewGenerateScreen() {
   const navigate = useNavigate();
   const { rotateKeysetSession, generateRotatedKeyset } = useAppState();
   const demoUi = useDemoUi();
-  const demoReview = Boolean(demoUi.rotateKeyset?.passwordPreset);
-  const presetPassword = demoUi.rotateKeyset?.passwordPreset ?? "";
-  const [distPassword, setDistPassword] = useState(presetPassword);
-  const [confirmPassword, setConfirmPassword] = useState(presetPassword);
+  const demoReview = Boolean(demoUi.rotateKeyset);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const passwordsMatch =
-    distPassword.length > 0 && distPassword === confirmPassword;
   const routeState = rotateKeysetSession
     ? { profileId: rotateKeysetSession.sourceProfile.id }
     : undefined;
@@ -41,14 +36,10 @@ export function ReviewGenerateScreen() {
       setError("Rotate keyset generation is unavailable in this session.");
       return;
     }
-    if (!passwordsMatch) {
-      setError("Distribution passwords do not match.");
-      return;
-    }
     setBusy(true);
     setError("");
     try {
-      await generateRotatedKeyset(distPassword);
+      await generateRotatedKeyset();
       navigateWithRotateState(navigate, "/rotate-keyset/progress", routeState);
     } catch (err) {
       if (err instanceof SetupFlowError && err.code === "generation_failed") {
@@ -85,10 +76,9 @@ export function ReviewGenerateScreen() {
         />
         <PageHeading
           title="Review & Generate"
-          copy="This is the irreversible step in keyset rotation. Confirm the distribution password, then generate fresh device shares for the same group public key."
+          copy="This is the irreversible step in keyset rotation. Confirm the source set, then generate fresh device shares for the same group public key. Package passwords are assigned later on the Distribute Shares step."
         />
 
-        {/* ---- Amber warning callout ---- */}
         <div className="amber-warning-callout">
           <AlertTriangle size={24} className="amber-warning-icon" />
           <div className="amber-warning-body">
@@ -127,34 +117,20 @@ export function ReviewGenerateScreen() {
           </div>
         ) : null}
 
-        {/* ---- Distribution Password section ---- */}
         <div className="dist-password-section">
-          <span className="dist-password-heading">Distribution Password</span>
-          <span className="dist-password-help">
-            Set a password for the remote bfonboard packages.
+          <span className="dist-password-heading">
+            Distribution happens per share
           </span>
-          <div className="field-row">
-            <PasswordField
-              label="Password"
-              value={distPassword}
-              onChange={(e) => setDistPassword(e.target.value)}
-              placeholder="Enter password"
-            />
-            <PasswordField
-              label="Confirm Password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter password"
-              checked={passwordsMatch}
-            />
-          </div>
+          <span className="dist-password-help">
+            You will create each remote bfonboard package on the next step and
+            choose its password there.
+          </span>
         </div>
 
-        {/* ---- Red action button ---- */}
         <button
           type="button"
           className="button button-full rotate-generate-btn"
-          disabled={busy || !passwordsMatch}
+          disabled={busy}
           onClick={() => void handleGenerate()}
         >
           {busy ? "Generating..." : "Rotate & Generate Keyset"}

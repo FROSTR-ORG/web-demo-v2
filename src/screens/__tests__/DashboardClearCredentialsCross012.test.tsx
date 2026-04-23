@@ -73,7 +73,7 @@ describe("VAL-CROSS-012 — stateful MockAppStateProvider clears credentials →
             <Route path="/dashboard/:profileId" element={<DashboardScreen />} />
             <Route path="/" element={<LandingProbe />} />
             <Route path="/rotate-keyset" element={<div />} />
-            <Route path="/rotate-share" element={<div />} />
+            <Route path="/replace-share" element={<div />} />
             <Route path="/recover/:profileId" element={<div />} />
           </Routes>
         </MockAppStateProvider>

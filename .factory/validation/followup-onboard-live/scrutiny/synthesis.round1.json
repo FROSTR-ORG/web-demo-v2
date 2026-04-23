@@ -1,0 +1,113 @@
+{
+  "milestone": "followup-onboard-live",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "npx vitest run --config /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/vitest.config.ts --maxConcurrency 2",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "npx tsc --noEmit -p /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/tsconfig.json --pretty false && npx tsc --noEmit -p /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/tsconfig.node.json --pretty false",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "npm run lint",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 6,
+    "passed": 3,
+    "failed": 3,
+    "failedFeatures": [
+      "fix-followup-create-bootstrap-live-relay-pump",
+      "fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire",
+      "fix-followup-paper-parity-final-review"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "fix-followup-create-bootstrap-live-relay-pump",
+      "severity": "blocking",
+      "description": "createProfile DEV insecure relay allowlist is broader than contract (accepts ws://localhost:* in addition to ws://127.0.0.1:*), violating VAL-FOLLOWUP-010 scope."
+    },
+    {
+      "featureId": "fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire",
+      "severity": "blocking",
+      "description": "AppStateProvider retains stale pendingDispatchRequestId when onboard dispatch fails (`onboardRequestId ?? entry.pendingDispatchRequestId`), which can mis-correlate later onboard completions/failures."
+    },
+    {
+      "featureId": "fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire",
+      "severity": "blocking",
+      "description": "Multi-device create-distribute spec bypasses required requester /onboard paste/password UI and injects failure via hooks instead of validating real mid-handshake abort behavior."
+    },
+    {
+      "featureId": "fix-followup-paper-parity-final-review",
+      "severity": "blocking",
+      "description": "Visual parity spec targets /demo simulator routes instead of required live runtime surfaces (/create/profile, /create/distribute, /create/complete)."
+    },
+    {
+      "featureId": "fix-followup-paper-parity-final-review",
+      "severity": "blocking",
+      "description": "Baseline metadata shows 1x copied baselines from public references instead of required Paper MCP get_screenshot(..., scale=2) capture path."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "skills/protocol-flow-worker",
+      "suggestion": "Tighten assignment guidance so protocol-flow-worker is used only for source-side onboarding protocol flows, or explicitly broaden the skill to cover non-protocol followup tasks with acceptable validation modes.",
+      "evidence": "Two reviewed features (fix-followup-create-bootstrap-live-relay-pump and fix-followup-distribute-2c-e2e-and-demo-fixtures) were assigned protocol-flow-worker despite being create-flow bootstrap/e2e-fixture tasks and reviewer reports flagged recurring skill mismatch.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills/protocol-flow-worker",
+      "suggestion": "Clarify when Playwright-only evidence is acceptable versus mandatory agent-browser checks, and require handoffs to reflect that choice consistently.",
+      "evidence": "Review of fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire found Playwright-only validation with no interactive checks while skill text currently mandates agent-browser workflow.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills/ui-screen-worker",
+      "suggestion": "Define an explicit exception path for visual-parity features where automated visual specs are primary evidence, and spell out minimal interactive verification requirements.",
+      "evidence": "Review of fix-followup-paper-parity-final-review reported ambiguity between mandatory agent-browser guidance and accepted automation-only parity checks.",
+      "isSystemic": true
+    },
+    {
+      "target": "AGENTS.md / mission feature-authoring conventions",
+      "suggestion": "Avoid contradictory split-feature constraints and replace brittle global grep-zero expectations with scoped checks tied to intended areas.",
+      "evidence": "fix-followup-distribute-2a contract prohibited UI/demo changes while simultaneously requiring type removals that forced downstream updates; both 2a and 2c reviews flagged over-broad distributionPassword grep expectations.",
+      "isSystemic": true
+    },
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Update insecure-relay test-flag guidance to match actual code usage and exact allowed host scope for each mutator.",
+      "evidence": "Current AGENTS text says __iglooTestAllowInsecureRelayForRestore is used only by restoreProfileFromRelay, but reviewed implementation also reads it in createProfile relay validation.",
+      "isSystemic": false
+    },
+    {
+      "target": "skills/ui-screen-worker",
+      "suggestion": "Require explicit RED-phase evidence in handoff verification (or force followedProcedure=false when omitted).",
+      "evidence": "fix-followup-distribute-2b-screen-rewrites handoff marked followedProcedure=true but did not include the required initial failing test run evidence.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Duplicate report that distributionPassword grep-zero expectation is too broad (from fix-followup-distribute-2c review).",
+      "reason": "duplicate"
+    },
+    {
+      "observation": "Droid-Shield false-positive note for peer_pubkey32_hex assignment should be documented globally.",
+      "reason": "ambiguous and not independently reproducible from scrutiny artifacts alone"
+    },
+    {
+      "observation": "Transposed Paper artboard mapping in mission metadata.",
+      "reason": "already corrected in feature artifacts and not a persistent guidance issue"
+    }
+  ],
+  "previousRound": null
+}

@@ -1,0 +1,21 @@
+{
+  "featureId": "m5-rotate-to-replace-rename",
+  "reviewedAt": "2026-04-22T18:21:23Z",
+  "commitId": "dd164267b0a648ff95f048e2d1e7bdcff09c7dab",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The rename sweep is correctly implemented for the scoped surfaces: CSS selectors were migrated to `replace-share-*`, stale `RotateShare` identifiers/comments were renamed, the residual doc phrase was updated, and the test fixture text was aligned. `CoreRoutes` has no `/rotate-share` route and already serves `/replace-share` paths. Current `rg -i \"rotate.share\"` over `src/` and `docs/` shows only intentional historical references in the new guard test file header/body.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The worker skipped the Playwright verification step mandated in `ui-screen-worker` procedure step 6, but only recorded an agent-browser deviation. This suggests either the skill is too strict for pure rename-only sweeps or deviation reporting guidance is incomplete.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md step 6 requires `npx playwright test ...`; worker transcript skeleton for session `78373ee9-b34a-49f9-85f4-ff7d487fdbc9` and handoff `verification.commandsRun` contain no Playwright command, while `skillFeedback.deviations` mentions only agent-browser omission."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed feature `m5-rotate-to-replace-rename` at commit `dd164267b0a648ff95f048e2d1e7bdcff09c7dab`; implementation matches the stated rename/route requirements and no code-level defects were found. One shared-state observation was recorded about skill-procedure vs. actual verification expectations."
+}

@@ -1,0 +1,84 @@
+{
+  "milestone": "m3-policies",
+  "round": 2,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "npx vitest run --config \"/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/vitest.config.ts\" --maxConcurrency 4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "npx tsc --noEmit -p \"/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/tsconfig.json\" --pretty false",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 5,
+    "passed": 2,
+    "failed": 3,
+    "failedFeatures": [
+      "fix-m3-default-policy-direction-respond",
+      "fix-m3-default-policy-no-clobber-user-overrides",
+      "fix-m3-nonce-prepopulate-test-hook"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "fix-m3-default-policy-no-clobber-user-overrides",
+      "severity": "blocking",
+      "description": "DefaultPolicyDropdown ownership cleanup remains snapshot-lag dependent, so a user-authored override can still be unset by a quick default switch before runtime_status reflects the user's update."
+    },
+    {
+      "featureId": "fix-m3-nonce-prepopulate-test-hook",
+      "severity": "blocking",
+      "description": "policy-denial-roundtrip still does not enforce the 15s dispatch-to-failure bound in the requestId-null branch because it may wait up to 30s for request id discovery before starting the 15s timer."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Make policy-direction semantics unambiguous across all policy surfaces by explicitly documenting PeerPolicyChip direction as implemented (or requiring a follow-up alignment change), and keep mission guidance consistent with code comments/tests.",
+      "evidence": "Both fix-m3-default-policy-direction-respond and fix-m3-default-policy-no-clobber-user-overrides reviews observed AGENTS guidance stating chips target respond.* while implementation still defaults chip writes to request.*.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "Clarify ui-screen-worker/runtime-worker agent-browser requirements for logic-only or e2e-spec-only fixes so workers can remain compliant without reporting procedural deviations when no UI-surface verification is applicable.",
+      "evidence": "Multiple fix reviews reported followedProcedure=false solely because work was non-visual (state-invariant or spec-hardening) while skill text still implied mandatory agent-browser validation.",
+      "isSystemic": true
+    },
+    {
+      "target": "validation-contract.md",
+      "suggestion": "Clarify denial-roundtrip evidence language to distinguish strict timing from dispatch time and to explicitly call out when Sign-typed pending invariance is the required observable versus total pending queue length.",
+      "evidence": "fix-m3-denial-roundtrip-15s-bound-and-a-side-invariance review noted contract/evidence wording drift versus implemented and runtime-realistic assertions.",
+      "isSystemic": false
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "No demo scenario exists for the exact runtime offline-peer/permissionState combination used by the PeerRow parity fix.",
+      "reason": "ambiguous"
+    },
+    {
+      "observation": "Repeated policy-direction mismatch observations from two fix reviews.",
+      "reason": "duplicate"
+    },
+    {
+      "observation": "Repeated skill strictness observations for non-visual fixes from multiple fix reviews.",
+      "reason": "duplicate"
+    },
+    {
+      "observation": "library/architecture.md denial-event wording drift was flagged, but not updated in this scrutiny run.",
+      "reason": "ambiguous"
+    }
+  ],
+  "previousRound": ".factory/validation/m3-policies/scrutiny/synthesis.round1.json"
+}

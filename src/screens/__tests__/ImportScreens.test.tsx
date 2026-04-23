@@ -202,6 +202,18 @@ describe("LoadBackupScreen", () => {
     fireEvent.change(textarea, { target: { value: "invalid-string" } });
     expect(screen.getByText(/Invalid backup/)).toBeInTheDocument();
   });
+
+  it("renders a 'Scan QR' button that opens the QR scanner dialog (VAL-BACKUP-016)", () => {
+    render(
+      <MemoryRouter>
+        <LoadBackupScreen />
+      </MemoryRouter>,
+    );
+    const scanBtn = screen.getByRole("button", { name: /Scan QR/i });
+    expect(scanBtn).toBeInTheDocument();
+    fireEvent.click(scanBtn);
+    expect(screen.getByRole("dialog", { name: /QR Scanner/i })).toBeInTheDocument();
+  });
 });
 
 describe("DecryptBackupScreen", () => {

@@ -1,0 +1,369 @@
+{
+  "groupId": "g4-cross-ui-runtime",
+  "testedAt": "2026-04-23T05:34:43Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "flowGuidance": [
+      "Flow Validator Guidance: playwright-cli",
+      "Flow Validator Guidance: shell-cli"
+    ],
+    "assignedAssertions": [
+      "VAL-CROSS-010",
+      "VAL-CROSS-014",
+      "VAL-CROSS-017",
+      "VAL-CROSS-019",
+      "VAL-CROSS-021",
+      "VAL-CROSS-022",
+      "VAL-CROSS-023",
+      "VAL-CROSS-025",
+      "VAL-CROSS-026",
+      "VAL-CROSS-027",
+      "VAL-CROSS-028",
+      "VAL-CROSS-031"
+    ],
+    "relayPortNote": "Port 8194 relay-using Playwright specs executed serially with --workers 1"
+  },
+  "toolsUsed": [
+    "playwright-cli",
+    "shell-cli",
+    "npx",
+    "playwright",
+    "vitest"
+  ],
+  "commandRuns": [
+    {
+      "command": "npx playwright test src/e2e/multi-device/multi-tab.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g4-cross-ui-runtime/01-playwright-multi-tab.transcript.txt",
+      "exitCodeFile": "m7-onboard/g4-cross-ui-runtime/01-playwright-multi-tab.exitcode.txt",
+      "outputSnippet": "1 passed (1.8s); includes VAL-CROSS-021 lock propagation timing evidence."
+    },
+    {
+      "command": "npx playwright test src/e2e/multi-device/clock-skew.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g4-cross-ui-runtime/02-playwright-clock-skew.transcript.txt",
+      "exitCodeFile": "m7-onboard/g4-cross-ui-runtime/02-playwright-clock-skew.exitcode.txt",
+      "outputSnippet": "4 passed, 2 skipped (asymmetric ±120s cases intentionally skipped due bifrost max_future_skew_secs=30)."
+    },
+    {
+      "command": "npx playwright test src/e2e/multi-device/long-session.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g4-cross-ui-runtime/03-playwright-long-session.transcript.txt",
+      "exitCodeFile": "m7-onboard/g4-cross-ui-runtime/03-playwright-long-session.exitcode.txt",
+      "outputSnippet": "1 passed (27.0s); periodic sign/ECDH/ping boundedness harness passed."
+    },
+    {
+      "command": "npx playwright test src/e2e/recover-regression.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g4-cross-ui-runtime/04-playwright-recover-regression.transcript.txt",
+      "exitCodeFile": "m7-onboard/g4-cross-ui-runtime/04-playwright-recover-regression.exitcode.txt",
+      "outputSnippet": "2 passed; recover collect+success views render and masked↔revealed toggle works with zero captured console errors."
+    },
+    {
+      "command": "npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g4-cross-ui-runtime/05-playwright-demo-gallery.transcript.txt",
+      "exitCodeFile": "m7-onboard/g4-cross-ui-runtime/05-playwright-demo-gallery.exitcode.txt",
+      "outputSnippet": "Desktop suite: 3 passed, 1 skipped (mobile-project test skipped under desktop project)."
+    },
+    {
+      "command": "npx playwright test src/e2e/visual/dashboard-states.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g4-cross-ui-runtime/06-playwright-dashboard-states.transcript.txt",
+      "exitCodeFile": "m7-onboard/g4-cross-ui-runtime/06-playwright-dashboard-states.exitcode.txt",
+      "outputSnippet": "7 passed; paper parity checks passed for running/connecting/stopped/relays-offline/signing-blocked states."
+    },
+    {
+      "command": "npx vitest run src/screens/__tests__/DashboardModalPrecedence.test.tsx src/screens/DashboardScreen/panels/__tests__/DashboardStateAnnouncer.test.tsx src/screens/DashboardScreen/panels/__tests__/OfflineBanner.test.tsx src/demo/__tests__/crossAreaFinalGate.test.tsx --config vitest.config.ts",
+      "exitCode": 0,
+      "transcript": "m7-onboard/g4-cross-ui-runtime/07-vitest-cross-runtime-suite.transcript.txt",
+      "exitCodeFile": "m7-onboard/g4-cross-ui-runtime/07-vitest-cross-runtime-suite.exitcode.txt",
+      "outputSnippet": "4 files passed, 40 tests passed; modal precedence + aria-live + offline banner suites green."
+    }
+  ],
+  "assertions": [
+    {
+      "id": "VAL-CROSS-010",
+      "title": "Demo gallery regression",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run demo gallery Playwright suite and cross-area final gate Vitest suite",
+          "expected": "All demo scenarios render without page errors and scenario coverage remains locked to baseline",
+          "observed": "demo-gallery desktop tests passed (3/3 desktop checks) and crossAreaFinalGate suite passed (18 tests), providing demo-scenario coverage/baseline guard evidence."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g4-cross-ui-runtime/05-playwright-demo-gallery.transcript.txt",
+          "m7-onboard/g4-cross-ui-runtime/07-vitest-cross-runtime-suite.transcript.txt"
+        ],
+        "exitCodes": [0, 0]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-014",
+      "title": "Dev server boot + HMR + deep-link routing",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Review evidence from assigned command run set",
+          "expected": "Direct npm run dev boot logs, deep-link runtime session continuity, and live HMR edit evidence",
+          "observed": "Assigned run set contained only Playwright/Vitest test commands; no direct dev-server boot/HMR transcript was produced."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g4-cross-ui-runtime/01-playwright-multi-tab.transcript.txt",
+          "m7-onboard/g4-cross-ui-runtime/05-playwright-demo-gallery.transcript.txt"
+        ],
+        "exitCodes": [0, 0]
+      },
+      "issues": "Insufficient direct evidence for the dev-server/HMR-specific contract clauses from the prescribed command list."
+    },
+    {
+      "id": "VAL-CROSS-017",
+      "title": "Paper visual parity for dashboard main states",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run dashboard visual parity Playwright suite",
+          "expected": "Dashboard running/connecting/stopped/relays-offline/signing-blocked states pass paper parity checks",
+          "observed": "All five paper parity state tests passed; suite exited 0."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g4-cross-ui-runtime/06-playwright-dashboard-states.transcript.txt"
+        ],
+        "exitCodes": [0]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-019",
+      "title": "Recover nsec regression after mission changes",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Run recover-regression Playwright suite",
+          "expected": "Full recover regression contract including live quorum recovery and post-close secret purge checks",
+          "observed": "Suite passed UI-copy and masked↔revealed toggle checks, but transcript does not provide direct evidence for live quorum recovery or storage/memory purge clauses."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g4-cross-ui-runtime/04-playwright-recover-regression.transcript.txt"
+        ],
+        "exitCodes": [0]
+      },
+      "issues": "Available run evidence is partial relative to the full VAL-CROSS-019 behavioral contract."
+    },
+    {
+      "id": "VAL-CROSS-021",
+      "title": "Multi-tab same profile stays consistent",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run multi-tab Playwright suite",
+          "expected": "Sibling tab propagation for same-profile lifecycle state without corruption",
+          "observed": "VAL-CROSS-021 lock propagation test passed with measured A/B propagation timings in transcript."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g4-cross-ui-runtime/01-playwright-multi-tab.transcript.txt"
+        ],
+        "exitCodes": [0]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-022",
+      "title": "Modal stack precedence is deterministic",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run DashboardModalPrecedence Vitest suite",
+          "expected": "Modal precedence/dismissal ordering checks pass",
+          "observed": "VAL-CROSS-022 precedence tests passed inside the targeted Vitest run."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g4-cross-ui-runtime/07-vitest-cross-runtime-suite.transcript.txt"
+        ],
+        "exitCodes": [0]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-023",
+      "title": "Browser Back button does not corrupt unlocked state",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Review outputs from assigned run list",
+          "expected": "Direct deep-route Back-navigation evidence preserving unlocked runtime + pending/event-log state",
+          "observed": "No command in the prescribed run list produced explicit Back-button navigation state evidence."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g4-cross-ui-runtime/05-playwright-demo-gallery.transcript.txt",
+          "m7-onboard/g4-cross-ui-runtime/07-vitest-cross-runtime-suite.transcript.txt"
+        ],
+        "exitCodes": [0, 0]
+      },
+      "issues": "Insufficient direct Back-button flow evidence in the mandated command set."
+    },
+    {
+      "id": "VAL-CROSS-025",
+      "title": "aria-live announces state transitions",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run DashboardStateAnnouncer Vitest suite",
+          "expected": "Accessibility live-region state-announcement checks pass",
+          "observed": "DashboardStateAnnouncer test file passed (7 tests) in targeted Vitest run."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g4-cross-ui-runtime/07-vitest-cross-runtime-suite.transcript.txt"
+        ],
+        "exitCodes": [0]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-026",
+      "title": "Offline banner surfaces when all relays disconnect",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run OfflineBanner Vitest suite",
+          "expected": "Offline banner visibility/toggle behavior checks pass",
+          "observed": "OfflineBanner test file passed (9 tests) in targeted Vitest run."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g4-cross-ui-runtime/07-vitest-cross-runtime-suite.transcript.txt"
+        ],
+        "exitCodes": [0]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-027",
+      "title": "Clock skew does not corrupt event ordering or signatures",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run clock-skew Playwright suite",
+          "expected": "Skewed-clock sign/ECDH round-trips pass for supported scenarios without runtime skew regressions",
+          "observed": "Clock-skew suite exited 0 with 4 passing scenarios (symmetric ±120s and asymmetric ±25s); asymmetric ±120s scenarios were explicitly skipped per documented signer skew-cap constraint."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g4-cross-ui-runtime/02-playwright-clock-skew.transcript.txt"
+        ],
+        "exitCodes": [0]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-028",
+      "title": "30-minute idle session does not leak memory or secrets",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run long-session Playwright suite",
+          "expected": "Long-session boundedness harness passes for relay count/event-log/heap behavior",
+          "observed": "Long-session suite passed periodic sign/ECDH/ping boundedness checks and exited 0."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g4-cross-ui-runtime/03-playwright-long-session.transcript.txt"
+        ],
+        "exitCodes": [0]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-031",
+      "title": "Console-clean baseline across every demo route",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Run demo-gallery Playwright suite",
+          "expected": "Per-route console transcript proving errors===0 and warns limited to whitelist",
+          "observed": "Run confirms no page errors for desktop scenarios, but this run set did not produce explicit per-route warning-whitelist evidence."
+        }
+      ],
+      "evidence": {
+        "transcripts": [
+          "m7-onboard/g4-cross-ui-runtime/05-playwright-demo-gallery.transcript.txt"
+        ],
+        "exitCodes": [0]
+      },
+      "issues": "Warning-whitelist clause not directly evidenced by the recorded transcript output."
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Clock-skew suite intentionally reports two skipped asymmetric ±120s cases due bifrost-signer max_future_skew_secs=30 protocol cap.",
+      "resolved": true,
+      "resolution": "Captured skip output as expected behavior and relied on the four passing supported scenarios in the same run.",
+      "affectedAssertions": [
+        "VAL-CROSS-027"
+      ]
+    },
+    {
+      "description": "Targeted Vitest run emits jsdom 'Not implemented: window.scrollTo' stderr noise while all tests still pass.",
+      "resolved": true,
+      "resolution": "Used exit code and test pass/fail summary as authoritative gate; preserved full transcript for audit context.",
+      "affectedAssertions": [
+        "VAL-CROSS-022",
+        "VAL-CROSS-025",
+        "VAL-CROSS-026"
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "description": "VAL-CROSS-014 requires direct npm dev-server/HMR/deep-link evidence not produced by the mandated command list.",
+      "affectedAssertions": [
+        "VAL-CROSS-014"
+      ],
+      "quickFixAttempted": "Reviewed all captured transcripts; none include an npm run dev + live HMR/deep-link trace."
+    },
+    {
+      "description": "VAL-CROSS-019 full contract clauses (live quorum recovery + post-close secret purge checks) are not directly proven by the recover-regression run output.",
+      "affectedAssertions": [
+        "VAL-CROSS-019"
+      ],
+      "quickFixAttempted": "Executed the prescribed recover-regression spec and captured transcript/exit code; evidence remains partial for those specific clauses."
+    },
+    {
+      "description": "VAL-CROSS-023 Back-button unlocked-state continuity is not directly exercised in the prescribed run set.",
+      "affectedAssertions": [
+        "VAL-CROSS-023"
+      ],
+      "quickFixAttempted": "Audited all run outputs for Back-navigation coverage; no direct evidence was generated."
+    },
+    {
+      "description": "VAL-CROSS-031 requires per-route warning-whitelist proof; demo-gallery transcript records error-free status but not explicit warning-whitelist accounting.",
+      "affectedAssertions": [
+        "VAL-CROSS-031"
+      ],
+      "quickFixAttempted": "Used the assigned demo-gallery run and retained transcript, but warning-whitelist evidence remained absent."
+    }
+  ],
+  "summary": "Tested 12 assigned assertions from the mandated serial command set: 8 passed, 0 failed, 4 blocked."
+}

@@ -1,0 +1,33 @@
+{
+  "featureId": "m1-signing-failed-modal",
+  "reviewedAt": "2026-04-21T14:58:26Z",
+  "commitId": "0c2e642e143347ad3e20cf4e3fae718cb79342ff",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature correctly wires sign-only failures into SigningFailedModal and implements retry/dismiss behavior, but it does not render the peer-response field from real failure data as required.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen/modals/SigningFailedModal.tsx",
+        "line": 52,
+        "severity": "blocking",
+        "description": "Timeout failures are rendered as a hard-coded \"no peers responded\" string (and non-timeout failures use other synthetic labels) rather than the real peer-response ratio from failure data. This can show incorrect information (e.g., some peers did respond before timeout), violating the feature requirement and VAL-OPS-006 expectation that description/round/peer-response/error values match the real failure observable."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-screen-worker skill requires Playwright + agent-browser verification for changed screens/modals, but this feature handoff only reports tsc + vitest and still marks followedProcedure=true.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md:23,47-53 require agent-browser and playwright verification; mission handoff for this feature lists only tsc/vitest commands at lines 14-29."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Validation contract expects a peer-response ratio in SigningFailedModal, but the OperationFailure type currently lacks a peers-responded field, creating a contract/model gap that encourages heuristic UI text.",
+      "evidence": "validation-contract.md:76-77 requires peer-response ratio from real failure payload; src/lib/bifrost/types.ts:370-375 defines OperationFailure without any peer-response count/ratio field."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review failed due to a blocking data-fidelity issue: peer-response text in SigningFailedModal is synthesized instead of sourced from real failure data, so the modal can present incorrect runtime context."
+}

@@ -1,0 +1,21 @@
+{
+  "featureId": "m4-event-log-filter-and-scroll",
+  "reviewedAt": "2026-04-22T15:38:44Z",
+  "commitId": "a9b493366668af044e985eef3e64a0d5845de4ea",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Reviewed EventLogPanel runtime-mode changes, stylesheet updates, and the new filter/scroll test suite in commit a9b4933. Implementation matches the feature contract: badge subset filtering with Select all/Clear all, filter persistence across ingestion and remount, scroll-anchor preservation while prepending, off-top Jump to newest affordance, no-empty flicker regression coverage, and 200-entry newest-first/no-duplicate assertions.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "There is a policy mismatch between required UI verification procedures and accepted feature verification: this feature added user-visible behavior but was validated with Vitest-only and marked as a skill deviation.",
+      "evidence": "Handoff skillFeedback.followedProcedure=false with deviation 'ui-screen-worker step 7 — Manual verification via agent-browser' and verification.commandsRun limited to tsc/vitest. .factory/skills/ui-screen-worker/SKILL.md states agent-browser is required for new/changed user-visible elements, while mission AGENTS.md Testing & Validation Guidance says agent-browser is mandatory for UI validation."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Pass. The feature implementation in a9b4933 satisfies the stated behavior and expected checks with strong focused tests; no actionable code defects were found in scope. One shared-state process mismatch (agent-browser requirement vs accepted Vitest-only verification) was observed."
+}

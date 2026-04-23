@@ -1,0 +1,26 @@
+{
+  "featureId": "misc-peers-panel-nested-button",
+  "reviewedAt": "2026-04-23T02:49:06Z",
+  "commitId": "b478499",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Implementation correctly removes nested button markup in PeersPanel by separating the collapsible toggle button from the refresh icon button, preserves refresh behavior and toggle behavior, and adds targeted regression tests for DOM nesting, warning absence, refresh dispatch, non-interference, and toggle interaction.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Mission AGENTS.md still lists the PeersPanel nested-button defect as a known pre-existing issue to avoid fixing, but this feature is now completed in commit b478499. This can mislead later workers/validators about current baseline behavior.",
+      "evidence": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/AGENTS.md:97-101 still documents `misc-peers-panel-nested-button` as unresolved."
+    },
+    {
+      "area": "skills",
+      "observation": "ui-screen-worker procedure requires agent-browser for changed UI surfaces and only explicitly allows skipping for copy/data-wiring changes. For this non-visual DOM/a11y structural fix, the worker had to mark followedProcedure=false despite strong automated coverage, suggesting the skip criteria may be too narrow for accessibility-only structural changes.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md:23 defines the only explicit skip case as copy/data-wiring; handoff records `followedProcedure: false` with deviation `Skipped agent-browser manual verification` at handoff file lines 74-78."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Pass. No blocking or non-blocking code defects found in b478499 for this feature; expected behavior is covered and the nested-button warning issue is addressed."
+}

@@ -3,7 +3,6 @@
  * Extracted from Paper canvas "igloo-ui" -> Foundations artboard (8B-0) only.
  * This file is regenerated from the Foundations board and intentionally does not inventory
  * every color or type treatment used elsewhere in the prototype.
- * See usage-coverage.json for explicit strict-drift coverage of current non-Foundation usage.
  */
 
 :root {
@@ -54,23 +53,21 @@
   /* Font families */
   --font-share-tech-mono: "Share Tech Mono", system-ui, sans-serif;
   --font-inter: "Inter", system-ui, sans-serif;
-  --font-ibm-plex-mono: "IBM Plex Mono", monospace;
-  --font-roboto-mono: "Roboto Mono", monospace;
 
   /* Type scale */
   --text-h1-heading-font-family: var(--font-share-tech-mono);
   --text-h1-heading-size: 36px;
   --text-h1-heading-line-height: 44px;
-  --text-h1-heading-weight: 700;
+  --text-h1-heading-weight: 400;
   --text-h1-heading-tracking: -0.01em;
   --text-h2-section-header-font-family: var(--font-share-tech-mono);
   --text-h2-section-header-size: 24px;
   --text-h2-section-header-line-height: 30px;
-  --text-h2-section-header-weight: 600;
+  --text-h2-section-header-weight: 400;
   --text-h3-card-title-font-family: var(--font-share-tech-mono);
   --text-h3-card-title-size: 20px;
   --text-h3-card-title-line-height: 24px;
-  --text-h3-card-title-weight: 600;
+  --text-h3-card-title-weight: 400;
   --text-body-text-font-family: var(--font-inter);
   --text-body-text-size: 14px;
   --text-body-text-line-height: 18px;
@@ -83,4 +80,8 @@
   --text-value-data-size: 14px;
   --text-value-data-line-height: 18px;
   --text-value-data-weight: 400;
+  --text-mono-labels-font-family: var(--font-inter);
+  --text-mono-labels-size: 12px;
+  --text-mono-labels-line-height: 16px;
+  --text-mono-labels-weight: 400;
 }

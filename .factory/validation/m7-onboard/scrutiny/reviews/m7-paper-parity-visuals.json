@@ -1,0 +1,33 @@
+{
+  "featureId": "m7-paper-parity-visuals",
+  "reviewedAt": "2026-04-23T03:09:15.727086Z",
+  "commitId": "7ec435d",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature adds a solid 5-state Playwright visual regression suite and DS primitive checks, but the core parity assertion is against app-generated baselines rather than igloo-paper source screenshots required by the contract.",
+    "issues": [
+      {
+        "file": "src/e2e/visual/dashboard-states.spec.ts",
+        "line": 97,
+        "severity": "blocking",
+        "description": "Parity checks use `toHaveScreenshot('dashboard-<state>.png')` against locally committed snapshots (generated from the app/demo itself), not against igloo-paper screenshots. This can lock in existing drift and does not satisfy the feature/VAL-CROSS-017 requirement to diff dashboard states against igloo-paper source frames."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-screen-worker skill says omitting agent-browser must set `followedProcedure: false`, but this handoff records `followedProcedure: true` while also listing an explicit agent-browser omission. The skill/procedure contract is ambiguous for test-only features and should be clarified/enforced.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md:23; /Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/handoffs/2026-04-23T02-30-46-470Z__m7-paper-parity-visuals__320a1a44-e2ce-4a75-9132-a11d7ffaa28b.json:94-99"
+    },
+    {
+      "area": "conventions",
+      "observation": "Mission guidance says 'No `.skip` additions', but established e2e practice uses project-gated `test.skip(testInfo.project.name !== \"desktop\")`; this feature followed that same pattern. The rule appears too broad and should clarify whether conditional project gating is acceptable.",
+      "evidence": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/AGENTS.md:72; src/e2e/demo-gallery.spec.ts:9,29,40; src/e2e/recover-regression.spec.ts:46,70; src/e2e/visual/dashboard-states.spec.ts:68,112,154"
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Fail: while the new visual regression suite is comprehensive for five dashboard states, it validates against self-generated snapshots rather than direct igloo-paper frames, so strict paper-parity validation is not fully satisfied."
+}

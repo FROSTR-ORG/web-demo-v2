@@ -1,0 +1,28 @@
+{
+  "featureId": "fix-m3-default-policy-direction-respond",
+  "reviewedAt": "2026-04-22T02:37:24Z",
+  "commitId": "ae8509a075350b1cedac42571a74686f05cf2d38",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The fix correctly flips DefaultPolicyDropdown dispatches/tests from request.* to respond.*, but it does not fully close the original failed review because dropdown-owned cells can still clobber later user-authored respond overrides on subsequent default switches.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen/panels/DefaultPolicyDropdown.tsx",
+        "line": 104,
+        "severity": "blocking",
+        "description": "Original failure #2 remains: `hasUserOverride` treats a non-null respond override as non-user-owned whenever its key is still present in `defaultAppliedKeys`, but there is no ownership-transfer path that removes keys when the user later edits that same cell via another respond-writing surface. On the next default change, `applyDefault` unsets all `priorKeys` first, so those user-authored values can still be reverted by dropdown cleanup instead of being preserved."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Mission guidance still documents peer chips as `respond.*`, but implementation and this fix's audit comment treat peer chips as `request.*` while the default dropdown targets `respond.*`.",
+      "evidence": "AGENTS.md lines 107-109 say PeerPolicyChip targets respond.*, but src/screens/DashboardScreen/panels/PeerPolicyChip.tsx (added audit comment in commit ae8509a) states chips write request.* and defaults to `direction?: ...` with request default."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m3-policies/scrutiny/reviews/m3-default-policy-dropdown.json",
+  "summary": "FAIL: Reviewed fix commit ae8509a, its handoff/transcript skeleton, prior review, and both feature diffs. Direction semantics are corrected to respond.*, but the prior override-clobbering failure mode is not fully resolved."
+}

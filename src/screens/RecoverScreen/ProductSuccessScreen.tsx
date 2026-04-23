@@ -35,21 +35,37 @@ export function ProductRecoverSuccessScreen() {
 
   useEffect(() => {
     if (!expiresAt || !profileId) return;
-    const delay = Math.max(0, expiresAt - Date.now());
-    const timer = window.setTimeout(() => {
-      setExiting(true);
-      expireRecoveredNsec();
-      navigate(`/dashboard/${profileId}`, { replace: true });
-    }, delay);
-    return () => window.clearTimeout(timer);
-  }, [expireRecoveredNsec, expiresAt, navigate, profileId]);
-
-  useEffect(() => {
-    if (!expiresAt || !profileId) return;
     setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [expiresAt, profileId]);
+
+    // Use a short polling interval instead of a single setTimeout so that
+    // background-tab throttling does not delay the auto-clear.
+    const timer = window.setInterval(() => {
+      const current = Date.now();
+      setNow(current);
+      if (current >= expiresAt) {
+        window.clearInterval(timer);
+        setExiting(true);
+        expireRecoveredNsec();
+        navigate(`/dashboard/${profileId}`, { replace: true });
+      }
+    }, 250);
+
+    // When the user returns to the tab, immediately check expiry.
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible" && expiresAt && Date.now() >= expiresAt) {
+        window.clearInterval(timer);
+        setExiting(true);
+        expireRecoveredNsec();
+        navigate(`/dashboard/${profileId}`, { replace: true });
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [expireRecoveredNsec, expiresAt, navigate, profileId]);
 
   if (!profileId || !activeProfile || activeProfile.id !== profileId) {
     return <Navigate to="/" replace />;

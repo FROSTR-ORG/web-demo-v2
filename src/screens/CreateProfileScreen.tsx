@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { defaultCreateProfileDraft, useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
-import { BackLink, Button, PasswordField, PermissionBadge, SectionHeader, Stepper, TextField } from "../components/ui";
+import { BackLink, Button, PasswordField, SectionHeader, Stepper, TextField } from "../components/ui";
+import { ToggleSwitch } from "../components/ToggleSwitch";
 import { useDemoUi } from "../demo/demoUi";
 import { shortHex } from "../lib/bifrost/format";
 
@@ -13,13 +14,15 @@ export function CreateProfileScreen() {
   const { createSession, createProfile } = useAppState();
   const demoUi = useDemoUi();
   const presetPassword = demoUi.shared?.passwordPreset ?? "";
+  // fix-followup-distribute-2a — distributionPassword /
+  // confirmDistributionPassword are no longer part of CreateProfileDraft.
+  // Distribution passwords are now collected per-share on the
+  // DistributeSharesScreen via encodeDistributionPackage.
   const [draft, setDraft] = useState(() => ({
     ...defaultCreateProfileDraft(),
     deviceName: demoUi.shared?.profileNamePreset ?? defaultCreateProfileDraft().deviceName,
     password: presetPassword,
     confirmPassword: presetPassword,
-    distributionPassword: presetPassword,
-    confirmDistributionPassword: presetPassword,
     relays: demoUi.shared?.relayPreset ? ["wss://relay.primal.net", demoUi.shared.relayPreset] : defaultCreateProfileDraft().relays
   }));
   const [relayInput, setRelayInput] = useState("wss://");
@@ -47,8 +50,26 @@ export function CreateProfileScreen() {
   const localShare = createSession.localShare;
   const members = createSession.keyset.group.members;
   const confirmMatches = draft.password.length > 0 && draft.password === draft.confirmPassword;
-  const distributionPasswordMatches =
-    draft.distributionPassword.length > 0 && draft.distributionPassword === draft.confirmDistributionPassword;
+
+  function getPeerPermission(idx: number, key: "sign" | "ecdh" | "ping" | "onboard"): boolean {
+    return draft.peerPermissions?.[idx]?.[key] ?? true;
+  }
+
+  function setPeerPermission(idx: number, key: "sign" | "ecdh" | "ping" | "onboard", value: boolean) {
+    setDraft((current) => ({
+      ...current,
+      peerPermissions: {
+        ...current.peerPermissions,
+        [idx]: {
+          sign: getPeerPermission(idx, "sign"),
+          ecdh: getPeerPermission(idx, "ecdh"),
+          ping: getPeerPermission(idx, "ping"),
+          onboard: getPeerPermission(idx, "onboard"),
+          [key]: value,
+        },
+      },
+    }));
+  }
 
   return (
     <AppShell headerMeta={createSession.draft.groupName} mainVariant="flow">
@@ -84,26 +105,12 @@ export function CreateProfileScreen() {
           </div>
         </div>
 
-        <div className="password-group">
-          <SectionHeader
-            title="Remote Package Password"
-            copy="This password decrypts every remote bfonboard package you distribute from this setup."
-            infoIcon
-          />
-          <div className="profile-password-row">
-            <PasswordField
-              label="Remote Package Password"
-              value={draft.distributionPassword}
-              onChange={(event) => setDraft((current) => ({ ...current, distributionPassword: event.target.value }))}
-            />
-            <PasswordField
-              label="Confirm Remote Package Password"
-              value={draft.confirmDistributionPassword}
-              checked={distributionPasswordMatches}
-              onChange={(event) => setDraft((current) => ({ ...current, confirmDistributionPassword: event.target.value }))}
-            />
-          </div>
-        </div>
+        {/* fix-followup-distribute-2b — the former shared remote-package
+            password input was removed in 2A; the paper-parity rewrite (Paper
+            60R-0) renders only Profile Name, Assigned Local Share info,
+            Profile Password + Confirm, Relays, and Peer Permissions before the
+            Continue CTA. Per-share distribution passwords are now collected on
+            the DistributeSharesScreen via encodeDistributionPackage. */}
 
         <div className="password-group">
           <SectionHeader title="Profile Password" copy="This password encrypts your profile on this device. You'll need it each time you unlock it." infoIcon />
@@ -165,15 +172,35 @@ export function CreateProfileScreen() {
                 <span className="value">Peer #{member.idx}</span>
                 {member.idx === localShare.idx ? null : <span className="help">{shortHex(member.pubkey, 8, 4)}</span>}
               </div>
-              <div className="inline-actions">
+              <div className="inline-actions permission-toggles">
                 {member.idx === localShare.idx ? (
                   <span className="help">Local profile</span>
                 ) : (
                   <>
-                    <PermissionBadge>SIGN</PermissionBadge>
-                    <PermissionBadge tone="info">ECDH</PermissionBadge>
-                    <PermissionBadge tone="ping">PING</PermissionBadge>
-                    <PermissionBadge tone="onboard">ONBOARD</PermissionBadge>
+                    <ToggleSwitch
+                      size="compact"
+                      checked={getPeerPermission(member.idx, "sign")}
+                      onChange={(e) => setPeerPermission(member.idx, "sign", e.target.checked)}
+                      onLabel="SIGN"
+                    />
+                    <ToggleSwitch
+                      size="compact"
+                      checked={getPeerPermission(member.idx, "ecdh")}
+                      onChange={(e) => setPeerPermission(member.idx, "ecdh", e.target.checked)}
+                      onLabel="ECDH"
+                    />
+                    <ToggleSwitch
+                      size="compact"
+                      checked={getPeerPermission(member.idx, "ping")}
+                      onChange={(e) => setPeerPermission(member.idx, "ping", e.target.checked)}
+                      onLabel="PING"
+                    />
+                    <ToggleSwitch
+                      size="compact"
+                      checked={getPeerPermission(member.idx, "onboard")}
+                      onChange={(e) => setPeerPermission(member.idx, "onboard", e.target.checked)}
+                      onLabel="ONBOARD"
+                    />
                   </>
                 )}
               </div>
@@ -182,7 +209,7 @@ export function CreateProfileScreen() {
         </div>
 
         {error ? <div className="error">{error}</div> : null}
-        <Button type="submit" size="full" disabled={busy || !confirmMatches || !distributionPasswordMatches}>
+        <Button type="submit" size="full" disabled={busy || !confirmMatches}>
           {busy ? "Creating Profile..." : "Continue to Distribute Shares"}
         </Button>
       </form>

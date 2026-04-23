@@ -1,0 +1,28 @@
+{
+  "featureId": "fix-m6-publish-backup-metadata",
+  "reviewedAt": "2026-04-22T21:50:40.443476Z",
+  "commitId": "c92a5f2",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly addresses the prior blocking failure: publish success now persists lastBackupPublishedAt/lastBackupReachedRelayCount to the profile record and Settings renders the required 'Last published: <relative> — reached N/M relays' indicator, with added unit and e2e coverage for null/non-null rendering and monotonic multi-publish behavior. No blocking regressions found against the original failure scope.",
+    "issues": [
+      {
+        "file": "src/app/AppStateProvider.tsx",
+        "line": 2808,
+        "severity": "non_blocking",
+        "description": "After async publish persistence, `setActiveProfile(nextSummary)` is unconditional in the `existing` branch. If the active profile changes while publish is in flight (e.g., lock/switch), this can overwrite newer activeProfile state with stale data. The neighboring branches already guard on profile id, so this branch is inconsistent."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "ui-screen-worker requires RED-first evidence (initial failing test run) for new tests, but this fix transcript shows creation of the new SettingsSidebar last-published test followed by passing runs only; no failing-run artifact is captured in the transcript/handoff verification list.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md:33,49; /tmp/fix_m6_publish_backup_metadata_transcript_skeleton.md:480 (test file create), 692 and 900 (passing vitest runs only)"
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m6-backup/scrutiny/reviews/m6-backup-publish.json",
+  "summary": "Reviewed fix feature transcript skeleton, handoff, prior failed review, and both commit diffs (05f2462799ba6540ab041151a4bc6f6d19cdc9c5 and c92a5f2). The original blocking gap (no persisted/surfaced publish metadata) is resolved by this fix; status is pass with one non-blocking race-condition note."
+}

@@ -1,0 +1,22 @@
+{
+  "featureId": "m6-nsec-split-create",
+  "reviewedAt": "2026-04-22T21:04:18Z",
+  "commitId": "0261192",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature adds strong coverage for mask/reveal, trimming, Back-submit scrubbing, and createKeysetBundleFromNsec routing, but it misses the contract requirement that structurally malformed `nsec1...` values show the inline field error before submit proceeds.",
+    "issues": [
+      {
+        "file": "src/screens/CreateKeysetScreen.tsx",
+        "line": 88,
+        "severity": "blocking",
+        "description": "Validation only checks `startsWith(\"nsec1\")`. Structurally malformed inputs that still start with `nsec1` bypass inline validation and fall through to `createKeyset`, where failure is surfaced as a top-level error (`setError(...)`) instead of the required inline field error. This violates VAL-BACKUP-021 ('not starting with nsec1 OR structurally malformed' must show inline error and block progress)."
+      }
+    ]
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed handoff, transcript skeleton, skill, mission shared-state docs, and commit 0261192. Found one blocking gap: malformed `nsec1...` values are not rejected inline in CreateKeysetScreen, so the feature does not fully satisfy VAL-BACKUP-021."
+}

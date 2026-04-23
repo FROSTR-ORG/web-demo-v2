@@ -1,0 +1,45 @@
+{
+  "featureId": "m5-idb-migration",
+  "reviewedAt": "2026-04-22T18:21:11Z",
+  "commitId": "48a4115ada9e18b23f7f8d4adb8f493f37ef687e",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The migration wiring and orphan-index sweep are partially implemented, but two blocking requirements are not fully met: the migration silently drops non-whitelisted record fields, and malformed stored rows are de-indexed but not deleted, leaving orphan records behind.",
+    "issues": [
+      {
+        "file": "src/lib/storage/profileMigration.ts",
+        "line": 113,
+        "severity": "blocking",
+        "description": "migrateProfileRecord reconstructs a new object with only `{ summary, encryptedProfilePackage }` and `migrateSummary` (line 76) rebuilds only known summary keys. Any legacy/forward-compatible fields present in stored records are silently discarded on read→save flows (e.g., `touchProfile`), which conflicts with the feature expectation of no silent field loss and VAL-SETTINGS-031's preserve-or-explicitly-drop requirement."
+      },
+      {
+        "file": "src/lib/storage/profileStore.ts",
+        "line": 33,
+        "severity": "blocking",
+        "description": "listProfiles sweeps dead IDs from the profile index (`setProfileIds(liveIds)`) but does not delete malformed backing records for IDs that resolve to unreadable rows. This can leave orphan profile records in IndexedDB even after cleanup, contrary to the feature requirement of no orphan records."
+      },
+      {
+        "file": "src/lib/storage/profileStore.migration.test.ts",
+        "line": 175,
+        "severity": "non_blocking",
+        "description": "The test named \"preserves unknown future-mission keys on the record\" does not assert preservation of unknown keys; it only asserts known fields are readable. This mismatch allowed the silent-drop behavior to pass without explicit coverage."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The selected skill (`runtime-worker`) is a poor fit for this feature type: SKILL.md says it should not be used for pure settings persistence, but this feature is storage/schema migration under settings.",
+      "evidence": "Feature metadata sets `skillName: runtime-worker` for `m5-idb-migration`, while `.factory/skills/runtime-worker/SKILL.md` says: \"Do NOT use for pure ... settings persistence (use ui-screen-worker).\""
+    },
+    {
+      "area": "skills",
+      "observation": "runtime-worker procedure has an ambiguity around agent-browser requirements when demo-gallery has known pre-existing failures.",
+      "evidence": "SKILL.md Required Skills says skipping agent-browser requires demo-gallery 'still passes'; Work Procedure step 5 allows known pre-existing gallery failures. This worker reported `followedProcedure: true` after a known gallery failure and no agent-browser run."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed feature m5-idb-migration using the handoff, commit diff, transcript skeleton, and mission shared-state docs. Result: fail due to silent dropping of non-whitelisted stored fields and incomplete orphan cleanup (index-only sweep without deleting malformed stored rows)."
+}

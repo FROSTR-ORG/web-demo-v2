@@ -1,0 +1,34 @@
+{
+  "featureId": "m7-onboard-sponsor-ui",
+  "reviewedAt": "2026-04-23T03:12:20Z",
+  "commitId": "6ff09d38bb26475b18cd97de790c8301d0137a18",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature adds the Settings entry, sponsor config/handoff routes, mutators, and focused tests, but one required validation path is not actually reachable in the UI: clearing all relay overrides does not surface the required inline error state.",
+    "issues": [
+      {
+        "file": "src/screens/OnboardSponsorScreens.tsx",
+        "line": 393,
+        "severity": "blocking",
+        "description": "The required empty-relay inline validation is effectively unreachable. The empty-relay message renders only when `submitAttempted` is true (line 393), but `submitAttempted` is set in `handleCreatePackage` (line 198) and the CTA is disabled whenever `relays.length === 0` (line 166 / button disabled line 416). After removing all relay overrides, users cannot trigger the inline error path, which misses the feature requirement of `all empty → inline error`."
+      },
+      {
+        "file": "src/screens/OnboardSponsorScreens.tsx",
+        "line": 142,
+        "severity": "non_blocking",
+        "description": "Duplicate-label handling only compares against `activeProfile.deviceName` (lines 147-151), so it does not detect collisions against existing peer labels. If VAL-ONBOARD-018 is intended to cover peer-label collisions proactively, this check is incomplete."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-screen-worker procedure requires recording a RED failing test run and running demo-gallery Playwright verification for changed UI surfaces, but this worker handoff reports `followedProcedure: true` without either command.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md lines 33-37 and 47-51; handoff commands in /Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/handoffs/2026-04-22T23-37-00-824Z__m7-onboard-sponsor-ui__8dc7c3d5-e714-4bdc-9911-9940e4ddb616.json list tsc + vitest + rg + curl only, with no pre-implementation failing test command and no `npx playwright test src/e2e/demo-gallery.spec.ts ...`."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Fail: core sponsor UI wiring is present, but the empty-relay override case does not expose the promised inline validation because the submit-attempt gate cannot be reached once the CTA is disabled."
+}

@@ -1,0 +1,40 @@
+{
+  "milestone": "m2-approvals",
+  "round": 2,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-APPROVALS-017",
+    "VAL-APPROVALS-018",
+    "VAL-APPROVALS-021",
+    "VAL-APPROVALS-022"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "flowReports": [
+    "validation/m2-approvals/user-testing/flows/group-r2-approvals-fixes.json"
+  ],
+  "toolsUsed": [
+    "agent-browser",
+    "npm run build",
+    "rg"
+  ],
+  "frictions": [
+    {
+      "description": "agent-browser heredoc eval commands fail when chained with && in a single shell line",
+      "resolved": true,
+      "resolution": "Executed heredoc eval and subsequent wait/screenshot calls as separate commands",
+      "affectedAssertions": [
+        "VAL-APPROVALS-017"
+      ]
+    }
+  ],
+  "dedupedBlockers": [],
+  "previousRound": ".factory/validation/m2-approvals/user-testing/synthesis.round1.json"
+}

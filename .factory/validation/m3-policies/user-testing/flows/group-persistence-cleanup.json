@@ -1,0 +1,147 @@
+{
+  "groupId": "group-persistence-cleanup",
+  "testedAt": "2026-04-22T13:23:06Z",
+  "isolation": {
+    "milestone": "m3-policies",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "appUrl": "http://127.0.0.1:5173",
+    "assignedAssertions": [
+      "VAL-POLICIES-015",
+      "VAL-POLICIES-016",
+      "VAL-POLICIES-017",
+      "VAL-POLICIES-024"
+    ],
+    "flowValidatorGuidanceSection": "Flow Validator Guidance: agent-browser",
+    "testingTool": "vitest"
+  },
+  "toolsUsed": [
+    "vitest"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-POLICIES-015",
+      "title": "Override persistence across page reload",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest command including persistPeerPolicyOverrides.test.tsx",
+          "expected": "VAL-POLICIES-015 test passes",
+          "observed": "PASS: \"VAL-POLICIES-015: allow-always override survives a full provider unmount + remount (simulates page reload)\""
+        },
+        {
+          "action": "Confirm assertion ID mapping in test source",
+          "expected": "Test source explicitly tags VAL-POLICIES-015",
+          "observed": "Matched in src/app/__tests__/persistPeerPolicyOverrides.test.tsx (test title and contract comment)"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "n/a (vitest run)",
+        "network": "n/a (vitest run)",
+        "logs": [
+          "m3-policies/group-persistence-cleanup/vitest-persistence-cleanup.log"
+        ],
+        "command": "npx vitest run --config /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/vitest.config.ts /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/src/app/__tests__/persistPeerPolicyOverrides.test.tsx /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/src/screens/DashboardScreen/states/__tests__/PoliciesState.selfAndRemovedPeer.test.tsx",
+        "exitCode": 0
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-POLICIES-016",
+      "title": "Overrides persist across lock / unlock cycle",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest command including persistPeerPolicyOverrides.test.tsx",
+          "expected": "VAL-POLICIES-016 test passes",
+          "observed": "PASS: \"VAL-POLICIES-016: allow-always override survives lockProfile → unlockProfile (profile persists; runtime re-applied on unlock)\""
+        },
+        {
+          "action": "Confirm assertion ID mapping in test source",
+          "expected": "Test source explicitly tags VAL-POLICIES-016",
+          "observed": "Matched in src/app/__tests__/persistPeerPolicyOverrides.test.tsx (test title and contract comment)"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "n/a (vitest run)",
+        "network": "n/a (vitest run)",
+        "logs": [
+          "m3-policies/group-persistence-cleanup/vitest-persistence-cleanup.log"
+        ],
+        "exitCode": 0
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-POLICIES-017",
+      "title": "Clear credentials wipes all overrides",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest command including persistPeerPolicyOverrides.test.tsx",
+          "expected": "VAL-POLICIES-017 test passes",
+          "observed": "PASS: \"VAL-POLICIES-017: clearCredentials wipes the profile from storage so no manual_peer_policy_overrides bleed into a replacement\""
+        },
+        {
+          "action": "Confirm assertion ID mapping in test source",
+          "expected": "Test source explicitly tags VAL-POLICIES-017",
+          "observed": "Matched in src/app/__tests__/persistPeerPolicyOverrides.test.tsx (test title and contract comment)"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "n/a (vitest run)",
+        "network": "n/a (vitest run)",
+        "logs": [
+          "m3-policies/group-persistence-cleanup/vitest-persistence-cleanup.log"
+        ],
+        "exitCode": 0
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-POLICIES-024",
+      "title": "Removed peer cleans up related policy overrides",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run assigned vitest command including PoliciesState.selfAndRemovedPeer.test.tsx",
+          "expected": "Removed-peer assertion coverage passes",
+          "observed": "PASS: test file passed (5 tests), including describe block \"PoliciesState removed-peer marker (VAL-POLICIES-024)\""
+        },
+        {
+          "action": "Confirm assertion ID mapping in test source",
+          "expected": "Test source explicitly tags VAL-POLICIES-024",
+          "observed": "Matched in src/screens/DashboardScreen/states/__tests__/PoliciesState.selfAndRemovedPeer.test.tsx describe header"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "n/a (vitest run)",
+        "network": "n/a (vitest run)",
+        "logs": [
+          "m3-policies/group-persistence-cleanup/vitest-persistence-cleanup.log"
+        ],
+        "exitCode": 0
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Validation-contract tool/evidence defaults for these assertions are agent-browser snapshots, but this assignment explicitly constrained execution to vitest.",
+      "resolved": true,
+      "resolution": "Used the required vitest command and recorded deterministic test-log evidence plus assertion-ID-to-test mapping.",
+      "affectedAssertions": [
+        "VAL-POLICIES-015",
+        "VAL-POLICIES-016",
+        "VAL-POLICIES-017",
+        "VAL-POLICIES-024"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Executed the assigned vitest command successfully (exit 0). All 2 test files and 8 tests passed; assigned assertions VAL-POLICIES-015, VAL-POLICIES-016, VAL-POLICIES-017, and VAL-POLICIES-024 are validated as pass from explicit/targeted test coverage."
+}

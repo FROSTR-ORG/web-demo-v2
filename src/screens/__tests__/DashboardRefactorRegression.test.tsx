@@ -106,12 +106,12 @@ describe("DashboardRefactorRegression — audit-gap details preserved after refa
     expect(fontFamily.replace(/['"]/g, "").replace(/_/g, " ")).toMatch(/Share Tech Mono/i);
   });
 
-  it("VAL-DSH-017 — Signer Policy Prompt modal renders detail rows (EVENT KIND, CONTENT, PUBKEY, DOMAIN) with exact paper copy", () => {
+  it("VAL-DSH-017 — Signer Policy Prompt modal renders detail rows (EVENT KIND, CONTENT, PUBKEY, DOMAIN) with exact paper copy and peer-level CTAs (scoped variants hidden per VAL-APPROVALS-013 deviation)", () => {
     renderScenario("dashboard-policy-prompt");
     // Title + subtitle
     expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
     expect(
-      screen.getByText("A peer is requesting permission to sign on your behalf")
+      screen.getByText(/requesting permission to sign on your behalf/)
     ).toBeInTheDocument();
     // Every detail-row label is present
     expect(screen.getByText("EVENT KIND")).toBeInTheDocument();
@@ -136,36 +136,45 @@ describe("DashboardRefactorRegression — audit-gap details preserved after refa
     expect(detailLabels).toEqual(["EVENT KIND", "CONTENT", "PUBKEY", "DOMAIN"]);
     expect(detailValues[2]).toBe("029c4a...1f5e");
     expect(detailValues[3]).toBe("primal.net");
-    // TTL + all 6 decision CTAs
-    expect(screen.getByText("Expires in 42s")).toBeInTheDocument();
-    for (const label of [
-      "Deny",
-      "Allow once",
-      "Always allow",
-      "Always for kind:1",
-      "Always deny for kind:1",
-      "Always deny for primal.net",
-    ]) {
+    // Countdown visible (live timer; the exact "42s" prefix is Paper-era
+    // copy superseded by the reactive denial surface's client-side
+    // countdown).
+    expect(screen.getByText(/Expires in/)).toBeInTheDocument();
+    // Peer-level CTAs only — scoped variants removed per VAL-APPROVALS-013.
+    for (const label of ["Deny", "Allow once", "Always allow", "Always deny"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    expect(screen.queryByText("Always for kind:1")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Always deny for kind:1"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Always deny for primal.net"),
+    ).not.toBeInTheDocument();
   });
 
-  it("VAL-DSH-018 — Signing Failed modal renders exact paper copy (summary + detail + Dismiss/Retry)", () => {
+  it("VAL-DSH-018 — Signing Failed modal renders neutral fallback copy (no synthesized peer-response ratio) + Dismiss/Retry", () => {
     renderScenario("dashboard-signing-failed");
     expect(screen.getByRole("heading", { name: "Signing Failed" })).toBeInTheDocument();
-    // Summary body — character-for-character match with Paper reference.
+    // `fix-m1-signing-failed-modal-real-peer-response` (VAL-OPS-006):
+    // when the modal is opened without a real OperationFailure payload
+    // (Paper-only demo entry, no runtimeFailures correlation), the summary
+    // renders a neutral fallback that does NOT fabricate a peer-response
+    // ratio, denominator, or the old hard-coded "insufficient partial
+    // signatures" copy.
     expect(
-      screen.getByText(
-        "Unable to complete signature for event kind:1. All 3 retry attempts exhausted."
-      )
+      screen.getByText(/failure details are unavailable/i),
     ).toBeInTheDocument();
-    // Detail line — including round hash and partial-signature error copy.
-    expect(
-      screen.getByText(
-        "Round: r-0x4f2a · Peers responded: 1/2 · Error: insufficient partial signatures"
-      )
-    ).toBeInTheDocument();
-    // Dual action CTAs.
+    const codeBox = screen.getByTestId("signing-failed-code-text");
+    expect(codeBox.textContent).toMatch(/failure details unavailable/i);
+    expect(codeBox.textContent).not.toContain("Peers responded");
+    expect(codeBox.textContent).not.toContain("no peers responded");
+    expect(codeBox.textContent).not.toContain("1/2");
+    expect(codeBox.textContent).not.toContain("r-0x4f2a");
+    expect(codeBox.textContent).not.toContain(
+      "insufficient partial signatures",
+    );
+    // Dual action CTAs preserved unchanged.
     expect(screen.getByText("Dismiss")).toBeInTheDocument();
     expect(screen.getByText("Retry")).toBeInTheDocument();
   });

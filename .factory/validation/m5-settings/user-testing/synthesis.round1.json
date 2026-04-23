@@ -1,0 +1,69 @@
+{
+  "milestone": "m5-settings",
+  "round": 1,
+  "status": "fail",
+  "assertionsSummary": {
+    "total": 35,
+    "passed": 34,
+    "failed": 1,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-SETTINGS-001",
+    "VAL-SETTINGS-002",
+    "VAL-SETTINGS-003",
+    "VAL-SETTINGS-004",
+    "VAL-SETTINGS-005",
+    "VAL-SETTINGS-006",
+    "VAL-SETTINGS-007",
+    "VAL-SETTINGS-008",
+    "VAL-SETTINGS-009",
+    "VAL-SETTINGS-010",
+    "VAL-SETTINGS-011",
+    "VAL-SETTINGS-012",
+    "VAL-SETTINGS-013",
+    "VAL-SETTINGS-014",
+    "VAL-SETTINGS-015",
+    "VAL-SETTINGS-016",
+    "VAL-SETTINGS-017",
+    "VAL-SETTINGS-018",
+    "VAL-SETTINGS-019",
+    "VAL-SETTINGS-020",
+    "VAL-SETTINGS-021",
+    "VAL-SETTINGS-022",
+    "VAL-SETTINGS-023",
+    "VAL-SETTINGS-024",
+    "VAL-SETTINGS-025",
+    "VAL-SETTINGS-026",
+    "VAL-SETTINGS-027",
+    "VAL-SETTINGS-028",
+    "VAL-SETTINGS-029",
+    "VAL-SETTINGS-030",
+    "VAL-SETTINGS-031",
+    "VAL-CROSS-004",
+    "VAL-CROSS-005",
+    "VAL-CROSS-006"
+  ],
+  "failedAssertions": [
+    {
+      "id": "VAL-CROSS-009",
+      "reason": "Strict contract check `rg -n \"Rotate Share\" src/` returned 4 matches in src/__tests__/noRotateShareTerminology.test.ts (lines 2, 27, 42, 44), despite zero rendered UI occurrences."
+    }
+  ],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Added m5-settings tooling note documenting strict VAL-CROSS-009 source-grep failure caused by literal \"Rotate Share\" tokens in src/__tests__/noRotateShareTerminology.test.ts while rendered UI remains clean.",
+      "source": "flow-report"
+    }
+  ],
+  "flowReports": [
+    ".factory/validation/m5-settings/user-testing/flows/g1-settings-core.json",
+    ".factory/validation/m5-settings/user-testing/flows/g2-relay-and-churn.json",
+    ".factory/validation/m5-settings/user-testing/flows/g3-rename-and-migration.json",
+    ".factory/validation/m5-settings/user-testing/flows/g4-gap-closure-rerun.json"
+  ],
+  "previousRound": null,
+  "generatedAt": "2026-04-22T19:27:19Z"
+}

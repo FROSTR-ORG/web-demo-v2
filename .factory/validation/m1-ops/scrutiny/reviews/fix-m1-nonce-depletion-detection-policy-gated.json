@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m1-nonce-depletion-detection-policy-gated",
+  "reviewedAt": "2026-04-21T16:00:17Z",
+  "commitId": "b4a2769",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Reviewed both diffs: original failing commit 342a5e1 and fix commit b4a2769. The prior failure was the broad heuristic in dashboardState.ts (`!sign_ready && onlinePeerCount >= threshold`) that misclassified policy-only blocking as nonce depletion. The fix replaces it with policy-aware gating (`peerPolicyAllowsRequestSign` + threshold check over policy-allowed online peers) and explicit runtime nonce-signal trust, then adds focused tests for policy-only, nonce-only, and mixed cases. This adequately resolves the reported false-positive Trigger Sync behavior while preserving genuine nonce-depletion handling.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The runtime-worker skill currently reads as requiring agent-browser manual verification, but this fix was implemented/reviewed as a pure state-derivation + unit-test change with no agent-browser invocation, while still marked as followedProcedure in handoff. The procedure wording appears overly strict/ambiguous for non-UI fix features.",
+      "evidence": ".factory/skills/runtime-worker/SKILL.md:22 and :49 require agent-browser/manual verification; transcript skeleton at /Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/worker-transcripts.jsonl:11 shows no Skill {\"skill\":\"agent-browser\"} invocation."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m1-ops/scrutiny/reviews/m1-signing-blocked-and-nonce-overlay.json",
+  "summary": "Pass. I reviewed the fix feature artifacts, transcript skeleton, prior failing review, and both relevant commit diffs (342a5e1 and b4a2769). The fix directly addresses the original blocking defect by preventing policy-only signing blocks from surfacing nonce depletion UI, and adds targeted tests that cover the previously failing scenario."
+}

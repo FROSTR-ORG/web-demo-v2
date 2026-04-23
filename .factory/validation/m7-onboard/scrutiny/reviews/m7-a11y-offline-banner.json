@@ -1,0 +1,26 @@
+{
+  "featureId": "m7-a11y-offline-banner",
+  "reviewedAt": "2026-04-23T03:07:11Z",
+  "commitId": "9d46842bea4a5f56e0a7b645ea1f6fc8a1443623",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Implementation covers the feature scope: a polite aria-live dashboard state announcer, navigator.onLine-driven offline banner, reconnect callback on online transition, and guarded reconnect error handling to avoid uncaught promise rejections.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The worker explicitly deviated from ui-screen-worker step 4 (RED-first tests) for new leaf components; this pattern appears common enough that the skill could better describe an acceptable RED-first flow for brand-new files.",
+      "evidence": "handoffs/2026-04-23T01-52-58-409Z__m7-a11y-offline-banner__86afe32a-45f4-40fc-8e4a-07284c6758cb.json:140-149 (followedProcedure=false; deviation on RED-first); .factory/skills/ui-screen-worker/SKILL.md:33 (Write failing tests first)."
+    },
+    {
+      "area": "conventions",
+      "observation": "There is contract-language drift for offline behavior: feature text defines navigator.onLine toggling as the trigger, while VAL-CROSS-026 describes all-relays-disconnected readiness. This can produce inconsistent implementation/validation expectations.",
+      "evidence": "missions/.../features.json:3155-3163 (navigator.onLine-triggered banner expectation) vs missions/.../validation-contract.md:1859-1863 (all configured relays drop to non-OPEN)."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed commit 9d46842 for m7-a11y-offline-banner and found it aligned with the feature's described behavior. No blocking code defects were identified; noted two shared-state observations (skill RED-first guidance and offline trigger wording drift between feature metadata and validation contract)."
+}

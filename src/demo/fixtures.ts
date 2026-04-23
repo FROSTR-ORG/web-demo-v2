@@ -6,6 +6,14 @@ import type {
 } from "../lib/bifrost/types";
 
 const now = Date.UTC(2026, 2, 8, 12, 0, 0);
+// Demo fixtures use a pre-existing createdAt / updatedAt pair so the
+// Group Profile section of the Settings sidebar renders two distinct
+// human-readable dates (VAL-SETTINGS-008). `createdAt` lands on
+// Feb 24, 2026 18:00 UTC — well clear of midnight in every IANA zone
+// so the formatted label is stable across test hosts — and `updatedAt`
+// tracks `now` (Mar 8, 2026) so demo screens show both fields exercised.
+const demoCreatedAt = Date.UTC(2026, 1, 24, 18, 0, 0);
+const demoUpdatedAt = now;
 
 export const DEMO_PROFILE_ID = "demo-profile";
 export const DEMO_GROUP_PK = "npub1qe3abcdefghijklmnopqrstuvwx7k4m";
@@ -58,7 +66,8 @@ export const demoProfile: StoredProfileSummary = {
   localShareIdx: 0,
   groupPublicKey: DEMO_GROUP_PK,
   relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
-  createdAt: now,
+  createdAt: demoCreatedAt,
+  updatedAt: demoUpdatedAt,
   lastUsedAt: now,
 };
 
@@ -150,6 +159,16 @@ export function createDemoSession(
       memberPubkey: demoKeyset.group.members[index + 1].pubkey,
       packageText: `${DEMO_BFONBOARD}${share.idx}`,
       password: DEMO_PASSWORD,
+      // fix-followup-distribute-2a — the demo scenario presumes the
+      // package has already been encoded (the gallery fixtures don't
+      // exercise the pre-encode state), so `packageCreated` defaults
+      // to true here. The distributed state is driven by
+      // `manuallyMarkedDistributed` to match the new
+      // `packageDistributed(pkg)` predicate (peerOnline ||
+      // manuallyMarkedDistributed).
+      packageCreated: true,
+      peerOnline: false,
+      manuallyMarkedDistributed: Boolean(options.distributed),
       packageCopied: Boolean(options.distributed && share.idx === 1),
       passwordCopied: Boolean(options.distributed),
       copied: Boolean(options.distributed && share.idx === 1),
@@ -267,18 +286,32 @@ export function createDemoAppState(
     profiles: [],
     activeProfile: null,
     runtimeStatus: null,
+    runtimeRelays: [],
     signerPaused: false,
     createSession: null,
     importSession: null,
     onboardSession: null,
     rotateKeysetSession: null,
+    replaceShareSession: null,
     recoverSession: null,
+    onboardSponsorSession: null,
+    onboardSponsorSessions: {},
+    activeOnboardSponsorRequestId: null,
     reloadProfiles: async () => undefined,
     createKeyset: async () => undefined,
     createProfile: async () => DEMO_PROFILE_ID,
     updatePackageState: () => undefined,
+    setPackageDeviceLabel: () => undefined,
+    // fix-followup-distribute-2a — new per-share mutators. The demo
+    // fixture is pure metadata, so both are async no-ops that satisfy
+    // the AppStateValue interface without side effects. Tests that
+    // want to observe the dispatch can pass an override in
+    // `createDemoAppState({encodeDistributionPackage: spy, ...})`.
+    encodeDistributionPackage: async () => undefined,
+    markPackageDistributed: () => undefined,
     finishDistribution: async () => DEMO_PROFILE_ID,
     clearCreateSession: () => undefined,
+    getCreateSessionPackageSecret: () => null,
     beginImport: () => undefined,
     decryptImportBackup: async () => undefined,
     saveImportedProfile: async () => DEMO_PROFILE_ID,
@@ -290,9 +323,15 @@ export function createDemoAppState(
     validateRotateKeysetSources: async () => undefined,
     generateRotatedKeyset: async () => undefined,
     createRotatedProfile: async () => DEMO_PROFILE_ID,
+    encodeRotateDistributionPackage: async () => undefined,
     updateRotatePackageState: () => undefined,
+    markRotatePackageDistributed: () => undefined,
     finishRotateDistribution: async () => DEMO_PROFILE_ID,
+    getRotateSessionPackageSecret: () => null,
     clearRotateKeysetSession: () => undefined,
+    decodeReplaceSharePackage: async () => undefined,
+    applyReplaceShareUpdate: async () => undefined,
+    clearReplaceShareSession: () => undefined,
     validateRecoverSources: async () => undefined,
     recoverNsec: async () => ({
       nsec: PAPER_RECOVERED_NSEC,
@@ -301,11 +340,114 @@ export function createDemoAppState(
     clearRecoverSession: () => undefined,
     expireRecoveredNsec: () => undefined,
     unlockProfile: async () => undefined,
+    updateProfileName: async () => undefined,
+    updateRelays: async () => undefined,
+    changeProfilePassword: async () => undefined,
     lockProfile: () => undefined,
     clearCredentials: async () => undefined,
+    exportRuntimePackages: async () => ({
+      profilePackage: "bfprofile1demo",
+      sharePackage: "bfshare1demo",
+      metadata: {
+        profileId: DEMO_PROFILE_ID,
+        groupName: "My Signing Key",
+        deviceName: "Igloo Web",
+        shareIdx: 0,
+        relayCount: 2,
+        peerCount: 3,
+      },
+    }),
+    createProfileBackup: async () => ({
+      backup: {
+        version: 1,
+        device: {
+          name: "mock-device",
+          share_public_key: "mock-pub",
+          manual_peer_policy_overrides: [],
+          relays: [],
+        },
+        group_package: {
+          group_name: "mock-group",
+          group_pk: "mock-gpk",
+          threshold: 2,
+          members: [],
+        },
+      },
+      event: { id: "mock", pubkey: "mock", created_at: 0, kind: 30078, tags: [], content: "mock", sig: "mock" },
+    }),
+    publishProfileBackup: async () => ({
+      event: { id: "mock", pubkey: "mock", created_at: 0, kind: 10000, tags: [], content: "mock", sig: "mock" },
+      reached: [],
+    }),
+    restoreProfileFromRelay: async () => {
+      throw new Error(
+        "restoreProfileFromRelay is not implemented in the demo fixture.",
+      );
+    },
     setSignerPaused: () => undefined,
     refreshRuntime: () => undefined,
+    restartRuntimeConnections: async () => undefined,
+    createOnboardSponsorPackage: async () =>
+      "bfonboard1demoSponsorPackageFixturePlaceholderStringOnly",
+    clearOnboardSponsorSession: () => undefined,
+    runtimeCompletions: [],
+    runtimeFailures: [],
+    lifecycleEvents: [],
+    runtimeEventLog: [],
+    signDispatchLog: {},
+    signLifecycleLog: [],
+    pendingDispatchIndex: {},
+    peerDenialQueue: [],
+    enqueuePeerDenial: () => undefined,
+    resolvePeerDenial: async () => undefined,
+    policyOverrides: [],
+    removePolicyOverride: async () => undefined,
+    setPeerPolicyOverride: async () => undefined,
+    clearPolicyOverrides: async () => undefined,
+    clearRuntimeEventLog: () => undefined,
+    handleRuntimeCommand: createMockHandleRuntimeCommand(),
   };
 
   return { ...state, ...overrides };
+}
+
+/**
+ * Per-instance mock implementation of `handleRuntimeCommand`. Emits
+ * monotonically-increasing `mock-request-N` ids and honours a 300ms debounce
+ * window so tests can assert the rapid-fire contract (VAL-OPS-019) without
+ * booting a WASM runtime. Each call to `createMockHandleRuntimeCommand`
+ * returns a fresh closure with isolated counter state.
+ */
+function createMockHandleRuntimeCommand(): AppStateValue["handleRuntimeCommand"] {
+  let seq = 0;
+  let lastDispatch: { key: string; at: number } | null = null;
+  return async (cmd) => {
+    const key = serializeCommand(cmd);
+    const now = Date.now();
+    if (lastDispatch && lastDispatch.key === key && now - lastDispatch.at < 300) {
+      return { requestId: null, debounced: true };
+    }
+    lastDispatch = { key, at: now };
+    seq += 1;
+    return { requestId: `mock-request-${seq}`, debounced: false };
+  };
+}
+
+function serializeCommand(
+  cmd: Parameters<AppStateValue["handleRuntimeCommand"]>[0],
+): string {
+  switch (cmd.type) {
+    case "sign":
+      return `sign:${cmd.message_hex_32}`;
+    case "ecdh":
+      return `ecdh:${cmd.pubkey32_hex}`;
+    case "ping":
+      return `ping:${cmd.peer_pubkey32_hex}`;
+    case "refresh_peer":
+      return `refresh_peer:${cmd.peer_pubkey32_hex}`;
+    case "refresh_all_peers":
+      return "refresh_all_peers";
+    case "onboard":
+      return `onboard:${cmd.peer_pubkey32_hex}`;
+  }
 }

@@ -1,0 +1,82 @@
+{
+  "milestone": "m6-backup",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "npx vitest run --config \"/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/vitest.config.ts\" --maxConcurrency 4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "npx tsc --noEmit -p \"/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/tsconfig.json\" --pretty false",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 4,
+    "passed": 1,
+    "failed": 3,
+    "failedFeatures": [
+      "m6-backup-publish",
+      "m6-backup-restore",
+      "m6-nsec-split-create"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "m6-backup-publish",
+      "severity": "blocking",
+      "description": "publishProfileBackup returns publish results but does not persist/display a 'most recent publish' indicator/timestamp in Settings, leaving VAL-BACKUP-005/VAL-BACKUP-031 unmet."
+    },
+    {
+      "featureId": "m6-backup-restore",
+      "severity": "blocking",
+      "description": "src/e2e/multi-device/backup-restore.spec.ts uses ws://127.0.0.1:8194 while restore validation accepts only wss:// URLs, so claimed restore coverage is not executable as written."
+    },
+    {
+      "featureId": "m6-backup-restore",
+      "severity": "blocking",
+      "description": "restoreProfileFromRelay queries relays sequentially under a shared timeout window; a slow/hung earlier relay can prevent querying later relays and cause false 'No backup found' outcomes."
+    },
+    {
+      "featureId": "m6-nsec-split-create",
+      "severity": "blocking",
+      "description": "CreateKeysetScreen only validates nsec input with startsWith('nsec1'), so structurally malformed nsec1 values bypass inline validation and fail later as top-level errors (VAL-BACKUP-021 gap)."
+    }
+  ],
+  "appliedUpdates": [
+    {
+      "target": "library",
+      "description": "Added a restore-flow caveat to .factory/library/user-testing.md documenting that restore relay validation is wss-only and local_relay (ws://127.0.0.1:8194) cannot be used directly for restore assertions.",
+      "sourceFeature": "m6-backup-restore"
+    }
+  ],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "skills",
+      "suggestion": "Tighten ui-screen-worker procedure compliance checks so `followedProcedure: true` cannot be reported when required evidence (RED-first artifact, required agent-browser/playwright checks) is missing from the handoff.",
+      "evidence": "m6-backup-publish, m6-backup-restore, and m6-camera-qr-scan reviews each reported procedure-required checks absent while handoffs still marked followedProcedure=true.",
+      "isSystemic": true
+    },
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Clarify that local_relay ws:// endpoint is for transport-focused local multi-device tests and does not satisfy restore-flow assertions that require wss:// relay inputs.",
+      "evidence": "m6-backup-restore review found a ws:// local relay used in restore e2e while restore input validation enforces wss://, causing non-executable claimed coverage.",
+      "isSystemic": false
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Repeated ui-screen-worker procedure-compliance notes across multiple review reports.",
+      "reason": "duplicate: consolidated into a single systemic skills guidance recommendation."
+    }
+  ],
+  "previousRound": null
+}

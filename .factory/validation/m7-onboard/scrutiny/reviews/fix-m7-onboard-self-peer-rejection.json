@@ -1,0 +1,28 @@
+{
+  "featureId": "fix-m7-onboard-self-peer-rejection",
+  "reviewedAt": "2026-04-23T03:09:49Z",
+  "commitId": "bc7a9ae216c7514f1b65fcacabf5dbe635ee709d",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix resolves the original blocking defect from m7-onboard-sponsor-flow: sponsor-side runtime onboarding is no longer dispatched against self, and the added unit assertions verify the session reaches awaiting_adoption with a non-self target plus a pending Onboard op. The prior UnknownPeer immediate-failure path is therefore addressed.",
+    "issues": [
+      {
+        "file": "src/e2e/multi-device/onboard-sponsorship.spec.ts",
+        "line": 490,
+        "severity": "non_blocking",
+        "description": "The new multi-device spec still bypasses requester-side package restoration by seeding tab B directly via __iglooTestSeedRuntime instead of consuming the generated bfonboard package. This leaves a coverage gap versus the feature requirement that tab B restore/adopt from the package path."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "protocol-flow-worker marks agent-browser as mandatory for multi-device validation, but this worker run used Playwright-only verification and still reported followedProcedure=true with no deviation.",
+      "evidence": ".factory/skills/protocol-flow-worker/SKILL.md states under Required Skills: \"agent-browser — mandatory for multi-device validation of any protocol ceremony\"; transcript skeleton for workerSessionId 2ddf03ce-039e-460a-a657-038ed8f78c01 contains no agent-browser invocation and handoff.skillFeedback shows followedProcedure=true, deviations=[]."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "PASS: reviewed handoff, transcript skeleton, and commit bc7a9ae diff for fix-m7-onboard-self-peer-rejection, plus the original failed-feature handoff (m7-onboard-sponsor-flow). The core self-peer UnknownPeer regression is fixed by non-self dispatch targeting and test coverage, with one non-blocking e2e coverage gap recorded."
+}

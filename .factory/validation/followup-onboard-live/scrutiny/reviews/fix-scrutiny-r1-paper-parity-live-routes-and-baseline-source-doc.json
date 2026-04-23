@@ -1,0 +1,15 @@
+{
+  "featureId": "fix-scrutiny-r1-paper-parity-live-routes-and-baseline-source-doc",
+  "reviewedAt": "2026-04-23T18:26:30Z",
+  "commitId": "56ac179",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly addresses the two paper-parity scrutiny blockers. The visual regression harness now drives the live `/create/profile`, `/create/distribute`, and `/create/complete` routes, and the baseline metadata is updated to reflect the `sync-paper.mjs` fallback path used when Paper MCP exports return empty file lists in this environment.",
+    "issues": []
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": ".factory/validation/followup-onboard-live/scrutiny/reviews/fix-followup-paper-parity-final-review.json",
+  "summary": "Pass. The original simulator-route and baseline-source objections are closed by commit 56ac179, and the live-route parity spec remains green on current HEAD."
+}

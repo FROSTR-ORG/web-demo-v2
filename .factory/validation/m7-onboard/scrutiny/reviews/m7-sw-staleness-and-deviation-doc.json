@@ -1,0 +1,33 @@
+{
+  "featureId": "m7-sw-staleness-and-deviation-doc",
+  "reviewedAt": "2026-04-23T03:07:42Z",
+  "commitId": "612a12feac5d5feed946ab3a66edd864e2052c84",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature adds the expected deviation documentation sections for SW/WASM freshness and source-side sponsor-screen parity, and ties them to assertion IDs. However, the new sponsor-flow documentation contains an incorrect live route path, which makes the implementation pointer inaccurate in a docs-only feature whose deliverable is documentation correctness/completeness.",
+    "issues": [
+      {
+        "file": "docs/runtime-deviations-from-paper.md",
+        "line": 1039,
+        "severity": "blocking",
+        "description": "The new deviation entry says the hand-off screen is at `/onboard-sponsor/package`, but the app routes and screen navigation use `/onboard-sponsor/handoff` (`src/app/CoreRoutes.tsx:59`, `src/screens/OnboardSponsorScreens.tsx:219`). This leaves the documentation incorrect for the exact flow it is meant to document."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The assigned skill (`ui-screen-worker`) is a poor procedural fit for pure documentation features, causing repeated required-procedure deviations even when the work is correctly scoped to docs.",
+      "evidence": "Handoff `skillFeedback.followedProcedure` is false and explicitly cites skipped `agent-browser` and RED-first test steps for this docs-only change; `.factory/skills/ui-screen-worker/SKILL.md` mandates UI-building and UI-verification workflow."
+    },
+    {
+      "area": "conventions",
+      "observation": "Mission contract expectations for VAL-ONBOARD-017 currently require a Paper artboard and a `/demo/{scenario-id}` entry, but the code/docs baseline for source-side sponsor flow states no such artboard exists and no demo scenario is present; this mismatch can cause validator ambiguity.",
+      "evidence": "`validation-contract.md:1548-1549` requires \"A Paper artboard exists and is referenced in `src/demo/scenarios.ts`\"; `docs/runtime-deviations-from-paper.md:1040-1041` states no sponsor demo scenario; `src/demo/scenarios.ts` has no `onboard-sponsor` scenario entries."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review result: FAIL. Commit 612a12fe adds the intended deviation sections, but includes a blocking route-path documentation error (`/onboard-sponsor/package` vs actual `/onboard-sponsor/handoff`). Shared-state observations were also recorded for skill fit and contract-vs-baseline parity expectations."
+}

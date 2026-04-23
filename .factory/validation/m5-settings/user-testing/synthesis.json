@@ -1,0 +1,22 @@
+{
+  "milestone": "m5-settings",
+  "round": 2,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-CROSS-009"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "flowReports": [
+    ".factory/validation/m5-settings/user-testing/flows/g5-val-cross-009-r2.json"
+  ],
+  "previousRound": ".factory/validation/m5-settings/user-testing/synthesis.round1.json",
+  "generatedAt": "2026-04-22T19:40:04Z"
+}

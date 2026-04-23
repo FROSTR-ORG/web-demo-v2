@@ -1,0 +1,21 @@
+{
+  "featureId": "m6-camera-qr-scan",
+  "reviewedAt": "2026-04-22T21:04:22.572705Z",
+  "commitId": "a2ca3c14e2a0243e96173e3e3234d3102e080c77",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Implementation matches the feature contract: Import now has Scan QR wiring, QrScanner uses getUserMedia(environment) + jsQR decoding with expected-prefix validation, denied/revoked-camera states are surfaced, invalid payloads stay inline while scanning continues, and close/unmount paths stop all tracks.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-screen-worker procedure requires a Playwright demo-gallery run, but this worker handoff reports only typecheck + vitest while still declaring followedProcedure=true. Procedure/enforcement expectations may be out of sync with current validator-owned e2e workflow.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md (Work Procedure step 6 requires `npx playwright test ...`); /Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/handoffs/2026-04-22T20-48-09-596Z__m6-camera-qr-scan__800f1174-e916-494f-a1b2-20b926ecb081.json -> verification.commandsRun lists tsc/vitest only and skillFeedback.followedProcedure=true"
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Pass: no blocking or non-blocking code defects found in the reviewed feature diff; behavior and tests align with m6-camera-qr-scan expectations. One shared-state observation was recorded about skill procedure alignment."
+}

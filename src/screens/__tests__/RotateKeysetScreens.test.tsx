@@ -43,8 +43,11 @@ const mocks = vi.hoisted(() => ({
   validateRotateKeysetSources: vi.fn().mockResolvedValue(undefined),
   generateRotatedKeyset: vi.fn().mockResolvedValue(undefined),
   createRotatedProfile: vi.fn().mockResolvedValue("test-profile-123"),
+  encodeRotateDistributionPackage: vi.fn().mockResolvedValue(undefined),
   updateRotatePackageState: vi.fn(),
+  markRotatePackageDistributed: vi.fn(),
   finishRotateDistribution: vi.fn().mockResolvedValue("test-profile-123"),
+  getRotateSessionPackageSecret: vi.fn().mockReturnValue(null),
   clearRotateKeysetSession: vi.fn(),
   demoUi: {
     rotateKeyset: { passwordPreset: "rotate-pass" },
@@ -69,8 +72,11 @@ vi.mock("../../app/AppState", () => ({
     validateRotateKeysetSources: mocks.validateRotateKeysetSources,
     generateRotatedKeyset: mocks.generateRotatedKeyset,
     createRotatedProfile: mocks.createRotatedProfile,
+    encodeRotateDistributionPackage: mocks.encodeRotateDistributionPackage,
     updateRotatePackageState: mocks.updateRotatePackageState,
+    markRotatePackageDistributed: mocks.markRotatePackageDistributed,
     finishRotateDistribution: mocks.finishRotateDistribution,
+    getRotateSessionPackageSecret: mocks.getRotateSessionPackageSecret,
     clearRotateKeysetSession: mocks.clearRotateKeysetSession,
   }),
 }));
@@ -101,9 +107,14 @@ beforeEach(() => {
   mocks.generateRotatedKeyset.mockResolvedValue(undefined);
   mocks.createRotatedProfile.mockClear();
   mocks.createRotatedProfile.mockResolvedValue("test-profile-123");
+  mocks.encodeRotateDistributionPackage.mockClear();
+  mocks.encodeRotateDistributionPackage.mockResolvedValue(undefined);
   mocks.updateRotatePackageState.mockClear();
+  mocks.markRotatePackageDistributed.mockClear();
   mocks.finishRotateDistribution.mockClear();
   mocks.finishRotateDistribution.mockResolvedValue("test-profile-123");
+  mocks.getRotateSessionPackageSecret.mockClear();
+  mocks.getRotateSessionPackageSecret.mockReturnValue(null);
   mocks.clearRotateKeysetSession.mockClear();
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
@@ -333,7 +344,9 @@ describe("ReviewGenerateScreen", () => {
     expect(
       screen.getByText("Before generating fresh shares"),
     ).toBeInTheDocument();
-    expect(screen.getByText("Distribution Password")).toBeInTheDocument();
+    expect(
+      screen.getByText("Distribution happens per share"),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Rotate & Generate Keyset/)).toBeInTheDocument();
   });
 
@@ -360,14 +373,15 @@ describe("ReviewGenerateScreen", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders distribution password inputs", () => {
+  it("renders the per-share distribution note", () => {
     render(
       <MemoryRouter>
         <ReviewGenerateScreen />
       </MemoryRouter>,
     );
-    expect(screen.getByLabelText("Password")).toBeInTheDocument();
-    expect(screen.getByLabelText("Confirm Password")).toBeInTheDocument();
+    expect(
+      screen.getByText(/You will create each remote bfonboard package/),
+    ).toBeInTheDocument();
   });
 
   it("back link navigates to /rotate-keyset", () => {
@@ -848,7 +862,7 @@ describe("RotateDistributeSharesScreen", () => {
     expect(screen.getByText("Create profile fallback")).toBeInTheDocument();
   });
 
-  it("keeps product completion disabled until package and password handoff are both accounted for", () => {
+  it("keeps product completion disabled until every remote package is distributed", () => {
     mocks.demoUi = {};
     mocks.rotateKeysetSession = {
       phase: "profile_created",
@@ -860,10 +874,13 @@ describe("RotateDistributeSharesScreen", () => {
           idx: 1,
           memberPubkey: "member",
           packageText: "bfonboard1abc",
-          password: "distribution-password",
+          password: "[redacted]",
+          packageCreated: true,
+          peerOnline: false,
+          manuallyMarkedDistributed: false,
           packageCopied: true,
           copied: true,
-          passwordCopied: false,
+          passwordCopied: true,
           qrShown: false,
         },
       ],
@@ -912,10 +929,24 @@ describe("RotateDistributeSharesScreen", () => {
     });
     expect(continueButton).toBeDisabled();
 
-    fireEvent.click(screen.getAllByRole("button", { name: /Copy Package/ })[0]);
-    fireEvent.click(
-      screen.getAllByRole("button", { name: /Copy Password/ })[0],
+    const passwordInputs = screen.getAllByLabelText(/Package password for share/i);
+    fireEvent.change(passwordInputs[0], { target: { value: "rotate-pass-1" } });
+    fireEvent.change(passwordInputs[1], { target: { value: "rotate-pass-2" } });
+    for (const button of screen.getAllByRole("button", {
+      name: /Create package/i,
+    })) {
+      fireEvent.click(button);
+    }
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Package not created"),
+      ).not.toBeInTheDocument(),
     );
+    for (const button of screen.getAllByRole("button", {
+      name: /Mark distributed/i,
+    })) {
+      fireEvent.click(button);
+    }
 
     await waitFor(() => expect(continueButton).not.toBeDisabled());
     fireEvent.click(continueButton);
@@ -943,49 +974,92 @@ describe("RotateDistributeSharesScreen", () => {
     expect(screen.getByText(/fresh share/)).toBeInTheDocument();
   });
 
-  /* VAL-RTK-005: Share 3 renders in a locked visual state — dashed "Enter
-     password to unlock" placeholder and disabled Copy/QR controls. Share 2
-     renders with masked •••••••• and enabled Copy/QR. */
-  it("Share 3 card renders locked (dashed unlock placeholder + disabled Copy/QR)", () => {
-    const { container } = render(
-      <MemoryRouter>
-        <RotateDistributeSharesScreen />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText("Enter password to unlock")).toBeInTheDocument();
-    const lockedCard = container.querySelector(".package-card.locked");
-    expect(lockedCard).toBeTruthy();
-    /* Disabled Copy + QR buttons inside the locked card */
-    const disabled = lockedCard!.querySelectorAll("button[disabled]");
-    expect(disabled.length).toBe(3);
-  });
-
-  it("Share 2 card renders masked •••••••• password with Copy + QR enabled", () => {
-    const { container } = render(
-      <MemoryRouter>
-        <RotateDistributeSharesScreen />
-      </MemoryRouter>,
-    );
-    /* There are two non-locked cards: local "Saved" card and Share 2 */
-    const cards = container.querySelectorAll(".package-card");
-    /* Share 2 is the second (index 1) — first remote package, not locked */
-    const share2 = cards[1];
-    expect(share2.textContent).toContain("Share 2");
-    expect(share2.textContent).toContain("••••••••");
-    const share2Buttons = share2.querySelectorAll("button:not([disabled])");
-    /* At least Copy + QR should be enabled */
-    expect(share2Buttons.length).toBeGreaterThanOrEqual(2);
-  });
-
-  it("renders masked bfonboard package text for remote shares", () => {
+  it("renders pending remote shares before any package is created", () => {
     render(
       <MemoryRouter>
         <RotateDistributeSharesScreen />
       </MemoryRouter>,
     );
-    /* Paper masked placeholder is used for both non-local remote packages */
-    const masked = screen.getAllByText(/bfonboard1•+/);
-    expect(masked.length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("Package not created")).toHaveLength(2);
+    expect(screen.getAllByText("Waiting for package password")).toHaveLength(2);
+    expect(
+      screen.getAllByRole("button", { name: /Copy Package/i })[0],
+    ).toBeDisabled();
+    expect(
+      screen.getAllByRole("button", { name: /Copy Password/i })[0],
+    ).toBeDisabled();
+  });
+
+  it("creates a rotate package per share through the new mutator", async () => {
+    mocks.demoUi = {};
+    mocks.rotateKeysetSession = {
+      phase: "profile_created",
+      sourceProfile: { id: "prof_work", label: "Work Key" },
+      localShare: { idx: 0 },
+      createdProfileId: "prof_rotated",
+      onboardingPackages: [
+        {
+          idx: 1,
+          memberPubkey: "member",
+          packageText: "",
+          password: "",
+          packageCreated: false,
+          peerOnline: false,
+          manuallyMarkedDistributed: false,
+          packageCopied: false,
+          copied: false,
+          passwordCopied: false,
+          qrShown: false,
+        },
+      ],
+    };
+    render(
+      <MemoryRouter>
+        <RotateDistributeSharesScreen />
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText("Package password for share 2"), {
+      target: { value: "distribution-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Create package/i }));
+    await waitFor(() =>
+      expect(mocks.encodeRotateDistributionPackage).toHaveBeenCalledWith(
+        1,
+        "distribution-password",
+      ),
+    );
+  });
+
+  it("marks a created rotate package distributed through the new mutator", () => {
+    mocks.demoUi = {};
+    mocks.rotateKeysetSession = {
+      phase: "profile_created",
+      sourceProfile: { id: "prof_work", label: "Work Key" },
+      localShare: { idx: 0 },
+      createdProfileId: "prof_rotated",
+      onboardingPackages: [
+        {
+          idx: 1,
+          memberPubkey: "member",
+          packageText: "bfonboard1preview",
+          password: "[redacted]",
+          packageCreated: true,
+          peerOnline: false,
+          manuallyMarkedDistributed: false,
+          packageCopied: false,
+          copied: false,
+          passwordCopied: false,
+          qrShown: false,
+        },
+      ],
+    };
+    render(
+      <MemoryRouter>
+        <RotateDistributeSharesScreen />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Mark distributed/i }));
+    expect(mocks.markRotatePackageDistributed).toHaveBeenCalledWith(1);
   });
 });
 
@@ -1048,23 +1122,53 @@ describe("RotateDistributionCompleteScreen", () => {
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/distribute");
   });
 
-  /* VAL-RTK-006: Distribution Status member rows mirror Paper capture exactly —
-     Member #1 — Igloo Mobile (Existing Device) with Copied + QR shown chips,
-     Member #2 — Igloo Desktop (New Device) with QR shown chip. */
-  it("renders Paper member rows with correct device labels and status chips", () => {
+  it("renders live member rows with shortHex labels and distributed statuses", () => {
+    mocks.demoUi = {};
+    mocks.rotateKeysetSession = {
+      phase: "distribution_ready",
+      sourceProfile: { id: "prof_work", label: "Work Key" },
+      localShare: { idx: 0 },
+      createdProfileId: "prof_rotated",
+      onboardingPackages: [
+        {
+          idx: 1,
+          memberPubkey:
+            "03b7d2e4f1a8c9054f6a2e83d7b1094c5e8f3a6d2b7e4c19085f6d3a2b8ea91e",
+          packageText: "bfonboard1preview",
+          password: "[redacted]",
+          packageCreated: true,
+          peerOnline: false,
+          manuallyMarkedDistributed: true,
+          packageCopied: false,
+          copied: false,
+          passwordCopied: false,
+          qrShown: false,
+        },
+        {
+          idx: 2,
+          memberPubkey:
+            "02c4e8f9a1d3b5c7e9f0a2b4c6d8e0f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c3d7",
+          packageText: "bfonboard1preview",
+          password: "[redacted]",
+          packageCreated: true,
+          peerOnline: true,
+          manuallyMarkedDistributed: false,
+          packageCopied: false,
+          copied: false,
+          passwordCopied: false,
+          qrShown: false,
+        },
+      ],
+    };
     render(
       <MemoryRouter>
         <RotateDistributionCompleteScreen />
       </MemoryRouter>,
     );
-    expect(screen.getByText("Member #1 — Igloo Mobile")).toBeInTheDocument();
-    expect(screen.getByText("Member #2 — Igloo Desktop")).toBeInTheDocument();
-    expect(screen.getByText("Existing Device")).toBeInTheDocument();
-    expect(screen.getByText("New Device")).toBeInTheDocument();
-    expect(screen.getByText("Copied")).toBeInTheDocument();
-    /* Both rows have "QR shown"; second row has only that chip */
-    const qrChips = screen.getAllByText("QR shown");
-    expect(qrChips.length).toBe(2);
+    expect(screen.getByText("Member #2 — 03b7d2e4...a91e")).toBeInTheDocument();
+    expect(screen.getByText("Member #3 — 02c4e8f9...c3d7")).toBeInTheDocument();
+    expect(screen.getByText("Marked distributed")).toBeInTheDocument();
+    expect(screen.getByText("Echo received")).toBeInTheDocument();
   });
 
   it("success callout body reads '2 of 2 remote bfonboard packages ...'", () => {

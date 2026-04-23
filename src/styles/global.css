@@ -117,10 +117,9 @@ a {
 }
 
 .brand-logo {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  object-fit: contain;
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
 }
 
 .brand-name {
@@ -328,6 +327,27 @@ a {
   color: #fff;
   font-weight: 600;
   letter-spacing: 0;
+}
+
+/*
+ * Visible focus ring for every `.button` (and the raw submit buttons inside
+ * the dev-only TestSign / TestEcdh / TestPing / TestRefreshAll panels).
+ *
+ * `:focus-visible` only paints the outline when the focus move came from the
+ * keyboard (or from another "focus-visible" signal like a screen reader)
+ * so pointer users never see a spurious outline on click. Required by
+ * feature `fix-m1-keyboard-ping-trigger-and-enter-activation` / VAL-OPS-025:
+ * "Each trigger shows a :focus-visible outline; no trigger requires pointer
+ * to operate."
+ */
+.button:focus-visible,
+.test-sign-panel button[type="submit"]:focus-visible,
+.test-ecdh-panel button[type="submit"]:focus-visible,
+.test-ping-panel button[type="submit"]:focus-visible,
+.test-refresh-all-panel button[type="submit"]:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.25);
 }
 
 .button-md {
@@ -881,6 +901,13 @@ a {
   gap: 12px;
 }
 
+.permission-toggles {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .profile-row-main > span:last-child,
 .completion-main > span:last-child {
   min-width: 0;
@@ -1180,40 +1207,122 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
+  min-width: 48px;
   min-height: 22px;
   border-radius: 3px;
-  padding: 3px 10px;
+  padding: 2px 8px;
   font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
   font-size: 11px;
   line-height: 16px;
   letter-spacing: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
   border: 1px solid rgba(34, 197, 94, 0.3);
   color: var(--ig-green);
-  background: rgba(34, 197, 94, 0.15);
+  background: rgba(22, 163, 74, 0.14);
+}
+
+.permission-badge.success {
+  color: var(--ig-green);
+  background: rgba(22, 163, 74, 0.14);
+  border-color: rgba(34, 197, 94, 0.32);
 }
 
 .permission-badge.info {
   color: var(--ig-cyan);
-  background: rgba(34, 211, 238, 0.15);
-  border-color: rgba(34, 211, 238, 0.3);
+  background: rgba(8, 145, 178, 0.14);
+  border-color: rgba(34, 211, 238, 0.32);
 }
 
 .permission-badge.ping {
   color: var(--ig-purple);
-  background: rgba(168, 85, 247, 0.15);
-  border-color: rgba(168, 85, 247, 0.3);
+  background: rgba(126, 34, 206, 0.16);
+  border-color: rgba(168, 85, 247, 0.34);
 }
 
 .permission-badge.onboard {
   color: var(--ig-yellow);
-  background: rgba(251, 191, 36, 0.15);
-  border-color: rgba(251, 191, 36, 0.3);
+  background: rgba(161, 98, 7, 0.16);
+  border-color: rgba(251, 191, 36, 0.34);
 }
 
 .permission-badge.muted {
   color: #94a3b8;
-  background: rgba(51, 65, 85, 0.15);
-  border-color: rgba(71, 85, 105, 0.3);
+  background: rgba(15, 23, 42, 0.62);
+  border-color: rgba(148, 163, 184, 0.22);
+}
+
+.peer-permission-tag-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+button.peer-permission-tag {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  outline: none;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+}
+
+button.peer-permission-tag:hover:not(:disabled) {
+  border-color: currentColor;
+}
+
+button.peer-permission-tag:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+button.peer-permission-tag:focus-visible {
+  box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.85);
+}
+
+button.peer-permission-tag:disabled {
+  cursor: default;
+}
+
+/*
+ * Peer Policies tri-state chip (m3-peer-policy-chip-cycle,
+ * VAL-POLICIES-008 / -021 / -026). Built on top of `.permission-badge`
+ * so it inherits the existing size / font / tone palette — only the
+ * interactive affordances (cursor, focus ring) and the explicit
+ * `deny` visual are chip-specific.
+ */
+button.peer-policy-chip {
+  transition:
+    background-color 80ms ease,
+    border-color 80ms ease,
+    box-shadow 80ms ease,
+    color 80ms ease,
+    transform 80ms ease;
+}
+/*
+ * Explicit-deny state uses the universal muted tag treatment. The
+ * `deny` class remains for tests/state hooks, but Paper parity is a
+ * visible muted tag rather than red destructive chrome.
+ */
+button.peer-policy-chip.deny {
+  text-decoration: none;
+}
+
+.peer-policy-chip-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  color: #f87171;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .package-card {
@@ -1449,6 +1558,35 @@ a {
 .peers-header {
   padding: 16px 20px;
   border-bottom: 1px solid var(--ig-border-faint);
+}
+
+/*
+ * Peers panel collapsible toggle. Replaces the shared <Collapsible>
+ * button wrapper for this panel so the Refresh-peers icon-button can
+ * live as a sibling (see src/screens/DashboardScreen/panels/PeersPanel.tsx
+ * — `misc-peers-panel-nested-button`). Resets native <button> chrome
+ * and lays out chevron + title group as a flex row that grows to
+ * fill the left half of the header.
+ */
+.peers-header-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.peers-header-toggle:focus-visible {
+  outline: 2px solid rgba(147, 197, 253, 0.8);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .peers-title-group,
@@ -1692,6 +1830,70 @@ a {
 .modal .page-copy {
   margin-top: 8px;
   margin-bottom: 18px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.modal-title {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+  color: var(--ig-text);
+  margin: 0;
+}
+
+.modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--ig-muted);
+  cursor: pointer;
+}
+
+.modal-close:hover {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--ig-text);
+}
+
+.modal-body {
+  color: var(--ig-subtle);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.modal-danger {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.modal-danger .modal-title {
+  color: var(--ig-red);
+}
+
+.modal-warning {
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.modal-warning .modal-title {
+  color: var(--ig-amber);
 }
 
 .qr-img {
@@ -2853,6 +3055,27 @@ a {
   color: #ef4444;
 }
 
+/*
+ * m5-relay-telemetry (VAL-SETTINGS-013) — amber "Slow" status for
+ * relays whose last 2+ latency samples exceeded SLOW_RELAY_THRESHOLD_MS
+ * while the socket is still OPEN. `#f59e0b` is the design-system
+ * --color-warn token; kept inline here alongside the red (.offline)
+ * and default (online) variants so the relay-health-table styles
+ * stay co-located.
+ */
+.relay-health-status.slow {
+  color: #f59e0b;
+}
+
+/*
+ * Online (connected) status explicitly styled so validators can assert
+ * a green indicator against both the dot and label
+ * (VAL-SETTINGS-010 / VAL-SETTINGS-013).
+ */
+.relay-health-status.online {
+  color: #34d399;
+}
+
 .relay-health-dot {
   width: 6px;
   height: 6px;
@@ -3026,6 +3249,30 @@ a {
   background: var(--ig-border-soft);
 }
 
+/**
+ * Visible marker appended to active-override rows whose peer is no
+ * longer in the current group roster (VAL-POLICIES-024). Uses the
+ * shared faint text token so the marker reads as metadata rather than
+ * a decision pill, preserving the Paper-reference row layout.
+ */
+.policies-removed-marker {
+  color: var(--ig-faint);
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px dashed var(--ig-border-soft);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.policies-rule-row-removed .policies-method,
+.policies-rule-row-removed .policies-domain {
+  opacity: 0.65;
+}
+
 .policies-permission-badge {
   display: inline-flex;
   align-items: center;
@@ -3047,6 +3294,17 @@ a {
   color: var(--ig-yellow);
   background: rgba(202, 138, 4, 0.15);
   border: 1px solid rgba(202, 138, 4, 0.3);
+}
+
+/**
+ * Persistent-deny decision pill. Uses the shared danger/red token so
+ * denied rows read as destructive at a glance, matching the Peer
+ * Policies chip deny variant (VAL-POLICIES-014 pill mapping).
+ */
+.policies-permission-badge.deny {
+  color: var(--ig-red);
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 .policies-remove-btn {
@@ -3126,6 +3384,149 @@ a {
 }
 
 /* ============================================
+   Active peer-policy overrides subsection
+   (fix-m2-peer-policies-view-persistence-and-remove)
+   ============================================ */
+
+.policies-override-section {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 10px;
+  padding-top: 14px;
+  margin-top: 14px;
+  border-top: 1px solid var(--ig-border-faint);
+}
+
+.policies-override-heading {
+  color: var(--ig-muted);
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.policies-override-list {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  gap: 8px;
+  width: 100%;
+}
+
+.policies-override-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #0f172a;
+  border: 1px solid var(--ig-border-soft);
+}
+
+.policies-override-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.policies-override-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.policies-override-verb {
+  color: #c7d2fe;
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+}
+
+.policies-override-effect {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+}
+
+.policies-override-effect.allow {
+  color: var(--ig-green);
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.policies-override-effect.deny {
+  color: var(--ig-red);
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.policies-override-persistence {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 10px;
+  line-height: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.policies-override-persistence.persistent {
+  color: var(--ig-blue-soft);
+  background: rgba(37, 99, 235, 0.15);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.policies-override-persistence.session {
+  color: var(--ig-yellow);
+  background: rgba(202, 138, 4, 0.15);
+  border: 1px solid rgba(202, 138, 4, 0.3);
+}
+
+.policies-override-remove {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--ig-border-soft);
+  background: transparent;
+  color: var(--ig-muted);
+  font-family: var(--font-inter, Inter, system-ui, sans-serif);
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.policies-override-remove:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--ig-red);
+}
+
+.policies-override-error {
+  padding: 8px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--ig-red);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* ============================================
    Signer Policy Prompt Modal
    ============================================ */
 
@@ -3143,6 +3544,12 @@ a {
 .policy-modal {
   width: 480px;
   max-width: 100%;
+  /* `min-width: 0` lets the modal collapse below its intrinsic content
+   * width so long unbreakable strings in payload rows (EVENT KIND /
+   * CONTENT / DOMAIN) cannot force it wider than the backdrop viewport
+   * (VAL-APPROVALS-022). Containment for the value cells themselves is
+   * applied on `.policy-detail-value` below. */
+  min-width: 0;
   border: 1px solid var(--ig-border);
   border-radius: 16px;
   background: #0f172a;
@@ -3221,6 +3628,8 @@ a {
   padding-bottom: 12px;
   gap: 10px;
   flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .policy-request-badge {
@@ -3263,6 +3672,14 @@ a {
   font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
   font-size: 12px;
   line-height: 16px;
+  /* A malicious or simply long domain string cannot stretch the header
+   * row beyond the modal border-box — truncate with ellipsis and expose
+   * the full value via the `title` attribute on the rendering span. */
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .policy-details-table {
@@ -3272,12 +3689,23 @@ a {
   border: 1px solid rgba(245, 158, 11, 0.1);
   padding: 10px;
   gap: 8px;
+  /* Ensure the table itself can shrink below its intrinsic width so a
+   * row's long value cell does not horizontally overflow the modal
+   * (VAL-APPROVALS-022). */
+  min-width: 0;
+  max-width: 100%;
 }
 
 .policy-detail-row {
   display: flex;
   align-items: baseline;
   gap: 12px;
+  /* Allow the value cell (flex child) to shrink past its intrinsic
+   * content width so `text-overflow: ellipsis` on the value can take
+   * effect — without this the row would force the modal wider
+   * (VAL-APPROVALS-022). */
+  min-width: 0;
+  max-width: 100%;
 }
 
 .policy-detail-label {
@@ -3299,6 +3727,21 @@ a {
   font-family: var(--font-inter, Inter, system-ui, sans-serif);
   font-size: 13px;
   line-height: 18px;
+  /* Containment for long EVENT KIND / CONTENT / DOMAIN payloads
+   * (VAL-APPROVALS-022). The cell takes the remaining row width
+   * (flex: 1 1 0%), is allowed to shrink below its intrinsic content
+   * width (min-width: 0), and clips any overflowing text with an
+   * ellipsis on a single line. The React layer sets a `title` attribute
+   * equal to the un-clipped value so the full text remains accessible
+   * to the user on hover (and to assistive tech via the accessible
+   * name). Paper parity is preserved: short values render identically
+   * to the reference design; only pathologically long values clamp. */
+  flex: 1 1 0%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .policy-detail-value.mono {
@@ -3762,6 +4205,27 @@ a {
 
 .settings-change-btn:hover {
   background: rgba(96, 165, 250, 0.06);
+}
+
+.settings-password-change {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px 12px;
+}
+
+.settings-password-change .input {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-family: var(--font-inter, "Inter", system-ui, sans-serif);
+  font-size: 13px;
+  padding: 8px 12px;
+}
+
+.settings-password-change .input::placeholder {
+  color: #64748b;
 }
 
 /* Relays */
@@ -5406,18 +5870,18 @@ a {
 }
 
 /* ========================================
-   Rotate Share Flow
+   Replace Share Flow
    ======================================== */
 
 /* --- Label row with info tooltip --- */
 
-.rotate-share-label-row {
+.replace-share-label-row {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.rotate-share-info-tooltip {
+.replace-share-info-tooltip {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5431,7 +5895,7 @@ a {
 
 /* --- Amber warning callout (Share Update Failed) --- */
 
-.rotate-share-warning-callout {
+.replace-share-warning-callout {
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -5441,7 +5905,7 @@ a {
   border: 1px solid rgba(251, 191, 36, 0.35);
 }
 
-.rotate-share-warning-icon {
+.replace-share-warning-icon {
   width: 20px;
   height: 20px;
   display: flex;
@@ -5453,20 +5917,20 @@ a {
   color: #fbbf24;
 }
 
-.rotate-share-warning-body {
+.replace-share-warning-body {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.rotate-share-warning-title {
+.replace-share-warning-title {
   color: #fbbf24;
   font-weight: 600;
   font-size: 14px;
   line-height: 20px;
 }
 
-.rotate-share-warning-description {
+.replace-share-warning-description {
   color: #fde68a;
   font-size: 13px;
   line-height: 18px;
@@ -5474,7 +5938,7 @@ a {
 
 /* --- Green success banner (Local Share Updated) --- */
 
-.rotate-share-success-banner {
+.replace-share-success-banner {
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -5484,7 +5948,7 @@ a {
   border: 1px solid rgba(34, 197, 94, 0.25);
 }
 
-.rotate-share-success-icon {
+.replace-share-success-icon {
   width: 24px;
   height: 24px;
   display: flex;
@@ -5496,20 +5960,20 @@ a {
   color: #4ade80;
 }
 
-.rotate-share-success-body {
+.replace-share-success-body {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.rotate-share-success-title {
+.replace-share-success-title {
   color: #4ade80;
   font-weight: 600;
   font-size: 14px;
   line-height: 20px;
 }
 
-.rotate-share-success-description {
+.replace-share-success-description {
   color: #86efac;
   font-size: 12px;
   line-height: 18px;
@@ -5517,7 +5981,7 @@ a {
 
 /* --- Identity Changes card --- */
 
-.rotate-share-identity-card {
+.replace-share-identity-card {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -5527,7 +5991,7 @@ a {
   border: 1px solid var(--ig-border);
 }
 
-.rotate-share-identity-header {
+.replace-share-identity-header {
   color: rgba(147, 197, 253, 0.8);
   font-family: var(--font-inter, Inter, system-ui, sans-serif);
   font-weight: 500;
@@ -5536,7 +6000,7 @@ a {
   letter-spacing: 0.08em;
 }
 
-.rotate-share-identity-row {
+.replace-share-identity-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5544,33 +6008,33 @@ a {
   border-bottom: 1px solid rgba(30, 58, 138, 0.15);
 }
 
-.rotate-share-identity-row-last {
+.replace-share-identity-row-last {
   border-bottom: none;
 }
 
-.rotate-share-identity-label {
+.replace-share-identity-label {
   color: var(--ig-subtle);
   font-size: 12px;
   line-height: 16px;
 }
 
-.rotate-share-identity-value-group {
+.replace-share-identity-value-group {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.rotate-share-identity-value-mono {
+.replace-share-identity-value-mono {
   font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
   font-size: 12px;
   line-height: 16px;
 }
 
-.rotate-share-identity-value-mono.blue {
+.replace-share-identity-value-mono.blue {
   color: var(--ig-blue);
 }
 
-.rotate-share-identity-unchanged-badge {
+.replace-share-identity-unchanged-badge {
   display: inline-flex;
   align-items: center;
   padding: 2px 6px;
@@ -5581,21 +6045,21 @@ a {
   line-height: 12px;
 }
 
-.rotate-share-identity-diff {
+.replace-share-identity-diff {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 4px;
 }
 
-.rotate-share-identity-old-row,
-.rotate-share-identity-new-row {
+.replace-share-identity-old-row,
+.replace-share-identity-new-row {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.rotate-share-identity-old-value {
+.replace-share-identity-old-value {
   color: rgba(239, 68, 68, 0.7);
   font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
   font-size: 11px;
@@ -5603,20 +6067,20 @@ a {
   text-decoration: line-through;
 }
 
-.rotate-share-identity-old-label {
+.replace-share-identity-old-label {
   color: #ef4444;
   font-size: 11px;
   line-height: 14px;
 }
 
-.rotate-share-identity-new-value {
+.replace-share-identity-new-value {
   color: #4ade80;
   font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
   font-size: 11px;
   line-height: 14px;
 }
 
-.rotate-share-identity-new-label {
+.replace-share-identity-new-label {
   color: #4ade80;
   font-size: 11px;
   line-height: 14px;
@@ -5797,6 +6261,31 @@ a {
   position: relative;
 }
 
+.event-log-list {
+  /*
+   * Scrollable container for the event-log rows. Max height allows
+   * ~8 rows before the overflow kicks in; the panel itself stays at
+   * its natural dashboard height. `overflow-y: auto` drives the
+   * scroll-anchor preservation logic in `EventLogPanel.tsx` — the
+   * component reads `scrollTop` / `scrollHeight` off this element in a
+   * `useLayoutEffect` to keep the user's visible row stable when new
+   * entries prepend (VAL-EVENTLOG-021).
+   */
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.event-log-jump {
+  /*
+   * "Jump to newest" affordance — only rendered when the user has
+   * scrolled off the top (see `atTop` gate in EventLogPanel). Reuses
+   * the `.event-log-link` base styling plus a muted blue accent so it
+   * visually distinguishes from the neutral Clear / Filter buttons.
+   */
+  color: #93c5fd;
+  font-weight: 600;
+}
+
 .event-log-item {
   border-bottom: 1px solid rgba(30, 58, 138, 0.1);
 }
@@ -5859,10 +6348,43 @@ a {
 .pending-kind.sign { color: #22c55e; border-color: rgba(34, 197, 94, 0.3); }
 .event-log-type.ecdh,
 .pending-kind.ecdh { color: #22d3ee; border-color: rgba(34, 211, 238, 0.3); }
-.event-log-type.signer-policy { color: #818cf8; border-color: rgba(129, 140, 248, 0.3); }
-.event-log-type.ping { color: #a855f7; border-color: rgba(168, 85, 247, 0.3); }
+.event-log-type.signer-policy,
+.event-log-type.peer-policy { color: #818cf8; border-color: rgba(129, 140, 248, 0.3); }
+.event-log-type.ping,
+.pending-kind.ping { color: #a855f7; border-color: rgba(168, 85, 247, 0.3); }
+.pending-kind.onboard { color: #f59e0b; border-color: rgba(245, 158, 11, 0.3); }
 .event-log-type.echo { color: #f472b6; border-color: rgba(244, 114, 182, 0.3); }
+.event-log-type.ready { color: #60a5fa; border-color: rgba(96, 165, 250, 0.3); }
+.event-log-type.info { color: #94a3b8; border-color: rgba(148, 163, 184, 0.3); }
 .event-log-type.error { color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
+.event-log-type.backup-publish { color: #fb923c; border-color: rgba(251, 146, 60, 0.3); }
+/* fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — ONBOARD badge
+   uses the same amber hue as the Pending panel's onboard badge
+   (.pending-kind.onboard) for visual consistency across panels. */
+.event-log-type.onboard { color: #f59e0b; border-color: rgba(245, 158, 11, 0.3); }
+
+.event-log-filter-actions {
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.event-log-filter-action {
+  flex: 1;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #93c5fd;
+  font-size: 11px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.event-log-filter-action:hover {
+  background: rgba(59, 130, 246, 0.12);
+}
 
 .event-log-copy,
 .pending-detail {
@@ -5933,6 +6455,13 @@ a {
   min-width: 0;
 }
 
+.pending-empty {
+  padding: 28px 20px;
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+}
+
 .recover-error-panel {
   display: flex;
   gap: 12px;
@@ -5992,4 +6521,592 @@ a {
 .import-error-alert.red {
   border-color: rgba(239, 68, 68, 0.25);
   background: rgba(239, 68, 68, 0.1);
+}
+
+/* ==========================================================
+   Missing Button Variants
+   ========================================================== */
+
+.button-outline {
+  background: transparent;
+  color: var(--ig-blue);
+  border: 1px solid var(--ig-blue);
+}
+
+.button-outline:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.button-success {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.button-success:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+.button-ghost-blue {
+  background: transparent;
+  color: var(--ig-blue);
+  border: 1px solid transparent;
+}
+
+.button-ghost-blue:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.15);
+}
+
+.button-destructive-outline-compact {
+  background: transparent;
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+.button-destructive-outline-compact:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* ==========================================================
+   Tooltip
+   ========================================================== */
+
+.tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tooltip-trigger {
+  display: inline-flex;
+  align-items: center;
+  cursor: help;
+}
+
+.info-tooltip-icon {
+  color: var(--ig-blue);
+  opacity: 0.8;
+  cursor: help;
+}
+
+.info-tooltip-icon:hover {
+  opacity: 1;
+}
+
+.tooltip-box {
+  position: absolute;
+  z-index: 300;
+  max-width: 280px;
+  padding: 10px 14px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #cbd5e1;
+  font-family: var(--font-inter, "Inter", system-ui, sans-serif);
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  white-space: normal;
+}
+
+.tooltip-right {
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.tooltip-left {
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.tooltip-top {
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tooltip-bottom {
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* ==========================================================
+   Spinner
+   ========================================================== */
+
+.spinner-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spinner {
+  border-radius: 50%;
+  animation: spinner-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.spinner-md {
+  width: 24px;
+  height: 24px;
+  border-top: 2px solid var(--ig-blue);
+  border-left: 2px solid rgba(30, 58, 138, 0.3);
+  border-bottom: 2px solid rgba(30, 58, 138, 0.3);
+  border-right: 2px solid rgba(30, 58, 138, 0.3);
+}
+
+.spinner-sm {
+  width: 16px;
+  height: 16px;
+  border-top: 2px solid var(--ig-blue);
+  border-left: 2px solid rgba(30, 58, 138, 0.3);
+  border-bottom: 2px solid rgba(30, 58, 138, 0.3);
+  border-right: 2px solid rgba(30, 58, 138, 0.3);
+}
+
+.spinner-label {
+  color: #dbeafe;
+  font-family: var(--font-inter, "Inter", system-ui, sans-serif);
+  font-size: 13px;
+}
+
+@keyframes spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================
+   Toggle Switch
+   ========================================================== */
+
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  background: #334155;
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+
+.toggle-standard .toggle-track {
+  width: 44px;
+  height: 24px;
+  padding: 2px;
+}
+
+.toggle-compact .toggle-track {
+  width: 36px;
+  height: 20px;
+  padding: 2px;
+}
+
+.toggle-thumb {
+  display: block;
+  background: #94a3b8;
+  border-radius: 50%;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.toggle-standard .toggle-thumb {
+  width: 20px;
+  height: 20px;
+}
+
+.toggle-compact .toggle-thumb {
+  width: 16px;
+  height: 16px;
+}
+
+.toggle-input:checked + .toggle-track {
+  background: #22c55e;
+}
+
+.toggle-input:checked + .toggle-track .toggle-thumb {
+  background: #ffffff;
+  transform: translateX(20px);
+}
+
+.toggle-compact .toggle-input:checked + .toggle-track .toggle-thumb {
+  transform: translateX(16px);
+}
+
+.toggle-switch.toggle-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toggle-label {
+  font-family: var(--font-inter, "Inter", system-ui, sans-serif);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.toggle-label-off {
+  color: #475569;
+}
+
+.toggle-label-on {
+  color: #22c55e;
+}
+
+/* ==========================================================
+   Collapsible
+   ========================================================== */
+
+.collapsible {
+  border-radius: 10px;
+  background: rgba(17, 24, 39, 0.4);
+  border: 1px solid rgba(30, 58, 138, 0.2);
+  overflow: hidden;
+}
+
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  font-family: var(--font-inter, "Inter", system-ui, sans-serif);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.collapsible-chevron {
+  color: #93c5fd;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.collapsible-chevron-open {
+  transform: rotate(180deg);
+}
+
+.collapsible-title {
+  flex: 1;
+}
+
+.collapsible-body {
+  padding: 0 16px 16px;
+}
+
+/* ==========================================================
+   QR Scanner
+   ========================================================== */
+
+.qr-scanner-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 17, 32, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 400;
+  padding: 20px;
+}
+
+.qr-scanner-modal {
+  width: 100%;
+  max-width: 420px;
+  background: #0f172a;
+  border: 1px solid rgba(30, 58, 138, 0.3);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.qr-scanner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(30, 58, 138, 0.2);
+}
+
+.qr-scanner-title {
+  color: #e2e8f0;
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", system-ui, sans-serif);
+  font-size: 18px;
+  margin: 0;
+}
+
+.qr-scanner-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.qr-scanner-close:hover {
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.qr-scanner-body {
+  padding: 20px;
+}
+
+.qr-scanner-video-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #020617;
+}
+
+.qr-scanner-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.qr-scanner-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.qr-scanner-overlay {
+  position: absolute;
+  inset: 0;
+  border: 2px dashed rgba(96, 165, 250, 0.4);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.qr-scanner-hint {
+  text-align: center;
+  color: #64748b;
+  font-family: var(--font-inter, "Inter", system-ui, sans-serif);
+  font-size: 13px;
+  margin-top: 12px;
+}
+
+.qr-scanner-error {
+  text-align: center;
+  color: #f87171;
+  font-family: var(--font-inter, "Inter", system-ui, sans-serif);
+  font-size: 14px;
+  padding: 20px 0;
+}
+
+.qr-scanner-error p {
+  margin-bottom: 16px;
+}
+
+.qr-scanner-invalid {
+  text-align: center;
+  color: #f87171;
+  font-family: var(--font-inter, "Inter", system-ui, sans-serif);
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+/* ==========================================================
+   ReviewPanel
+   ========================================================== */
+
+.review-panel {
+  border-radius: 10px;
+  background: var(--ig-panel);
+  border: 1px solid var(--ig-border);
+  padding: 16px 20px;
+}
+
+.review-panel-title {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--ig-blue-soft);
+  opacity: 0.8;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.review-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ig-border-soft);
+  gap: 12px;
+}
+
+.review-row-last {
+  border-bottom: none;
+}
+
+.review-row-label {
+  font-size: 13px;
+  color: var(--ig-subtle);
+}
+
+.review-row-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-row-mono {
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 13px;
+  color: var(--ig-blue);
+}
+
+.review-row-badge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(37, 99, 235, 0.12);
+  color: rgba(96, 165, 250, 0.7);
+}
+
+/* ==========================================================
+   Tabs
+   ========================================================== */
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tabs-list {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--ig-panel);
+  border: 1px solid var(--ig-border);
+}
+
+.tab-trigger {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--ig-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tab-trigger:hover {
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--ig-text);
+}
+
+.tab-trigger.active {
+  background: rgba(37, 99, 235, 0.15);
+  color: var(--ig-blue-soft);
+}
+
+.tabs-content {
+  min-height: 0;
+}
+
+/* ==========================================================
+   Table
+   ========================================================== */
+
+.table-wrap {
+  border-radius: 10px;
+  background: var(--ig-panel);
+  border: 1px solid var(--ig-border);
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table thead th {
+  text-align: left;
+  padding: 10px 16px;
+  font-weight: 500;
+  color: var(--ig-muted);
+  border-bottom: 1px solid var(--ig-border-soft);
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.table tbody td {
+  padding: 10px 16px;
+  color: var(--ig-text);
+  border-bottom: 1px solid var(--ig-border-faint);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--ig-muted);
+  font-size: 14px;
+}
+
+/* ==========================================================
+   ThresholdSelector
+   ========================================================== */
+
+.threshold-selector {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.threshold-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.threshold-divider {
+  font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
+  font-size: 20px;
+  color: var(--ig-faint);
+  padding-bottom: 10px;
 }

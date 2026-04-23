@@ -1,0 +1,105 @@
+{
+  "groupId": "g3-rename-and-migration",
+  "testedAt": "2026-04-22T18:59:16Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "appUrl": "http://127.0.0.1:5173",
+    "allowedWritePaths": [
+      ".factory/validation/m5-settings/user-testing/flows/g3-rename-and-migration.json",
+      "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/evidence/m5-settings/g3-rename-and-migration/"
+    ]
+  },
+  "toolsUsed": [
+    "vitest",
+    "ripgrep",
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-SETTINGS-020",
+      "title": "\"Rotate Share\" renamed to \"Replace Share\" everywhere",
+      "status": "pass",
+      "evidence": {
+        "logs": [
+          "m5-settings/g3-rename-and-migration/terminology-vitest.log",
+          "m5-settings/g3-rename-and-migration/rg-rotate-share.log",
+          "m5-settings/g3-rename-and-migration/rg-rotate-share-screens-styles.log",
+          "m5-settings/g3-rename-and-migration/dom-sweep-home.json",
+          "m5-settings/g3-rename-and-migration/dom-sweep-demo.json"
+        ],
+        "screenshots": [
+          "m5-settings/g3-rename-and-migration/VAL-SETTINGS-020-home-annotated.png",
+          "m5-settings/g3-rename-and-migration/VAL-CROSS-009-demo-annotated.png"
+        ],
+        "consoleErrors": [
+          "m5-settings/g3-rename-and-migration/console-errors-home.log",
+          "m5-settings/g3-rename-and-migration/console-errors-demo.log"
+        ]
+      },
+      "notes": "Key-page DOM sweep showed rotateShareCount=0 on / and /demo, with Replace Share present on /demo; source hits for \"rotate share\" were confined to test text/regex, not user-facing screen/style surfaces."
+    },
+    {
+      "id": "VAL-SETTINGS-030",
+      "title": "\"Rotate Share\" rename sweeps source code and CSS",
+      "status": "pass",
+      "evidence": {
+        "logs": [
+          "m5-settings/g3-rename-and-migration/rg-rotate-share.log",
+          "m5-settings/g3-rename-and-migration/rg-rotate-share-slugs.log",
+          "m5-settings/g3-rename-and-migration/rg-rotate-share-screens-styles.log",
+          "m5-settings/g3-rename-and-migration/rg-rotate-slugs-screens-styles.log",
+          "m5-settings/g3-rename-and-migration/rg-replace-share.log",
+          "m5-settings/g3-rename-and-migration/rg-replace-share-screens-styles.log"
+        ]
+      },
+      "notes": "No legacy rotate-share tokens found in src/screens or src/styles; Replace Share appears in expected user-facing surfaces."
+    },
+    {
+      "id": "VAL-SETTINGS-031",
+      "title": "IndexedDB schema migrations preserve data",
+      "status": "pass",
+      "evidence": {
+        "logs": [
+          "m5-settings/g3-rename-and-migration/migration-vitest.log"
+        ]
+      },
+      "notes": "Both required migration suites passed (19/19 tests): profileMigration + profileStore.migration."
+    },
+    {
+      "id": "VAL-CROSS-009",
+      "title": "Terminology migration: \"Rotate Share\" → \"Replace Share\"",
+      "status": "fail",
+      "evidence": {
+        "logs": [
+          "m5-settings/g3-rename-and-migration/terminology-vitest.log",
+          "m5-settings/g3-rename-and-migration/rg-Rotate-Share-exact.log",
+          "m5-settings/g3-rename-and-migration/dom-sweep-demo.json"
+        ],
+        "screenshots": [
+          "m5-settings/g3-rename-and-migration/VAL-CROSS-009-demo-annotated.png"
+        ]
+      },
+      "issues": "Contract clause requires `rg -n \"Rotate Share\" src` to return zero lines; exact grep returned 4 lines in src/__tests__/noRotateShareTerminology.test.ts despite UI/demo sweep showing zero rendered Rotate Share and Replace Share present."
+    }
+  ],
+  "summary": {
+    "tested": 4,
+    "pass": 3,
+    "fail": 1,
+    "blocked": 0,
+    "result": "3 assertions passed, 1 failed (VAL-CROSS-009)."
+  },
+  "blockers": [],
+  "frictions": [
+    {
+      "description": "DashboardInteractions vitest run emits known stderr warnings (nested <button> warning and jsdom window.scrollTo not implemented) even though tests pass.",
+      "resolved": true,
+      "resolution": "Continued validation because targeted suites exited 0 and warnings are pre-existing/non-blocking for assigned assertions.",
+      "affectedAssertions": [
+        "VAL-SETTINGS-020",
+        "VAL-CROSS-009"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,193 @@
+{
+  "groupId": "g2-backup-publish-relay",
+  "testedAt": "2026-04-22T22:10:13Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "relay": "ws://127.0.0.1:8194",
+    "agentBrowserSession": "g2-backup-publish-relay",
+    "sessionScope": "single isolated agent-browser session-local storage"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-BACKUP-004",
+      "title": "Event author pubkey is deterministic per share (derived from share secret)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Seed runtime with keyset share #1 and publish backup via Publish modal",
+          "expected": "Published event kind=10000 with pubkey matching share-derived author",
+          "observed": "Observed event id afa34e... kind=10000 pubkey=0afc85bca96a93a837ad38672965ba0a46dadab30886238f783dcc55e65d23cb"
+        },
+        {
+          "action": "Publish second time from same share",
+          "expected": "Same author pubkey reused",
+          "observed": "Second event id 72a567... retained same pubkey=0afc85bc..."
+        },
+        {
+          "action": "Reseed same keyset with share #2 and publish",
+          "expected": "Different share yields different author pubkey",
+          "observed": "Share #2 publish event id 07164c... pubkey=cabfa285c1f13535ac89de2958b508d09f46506cc75d20a0709e8a6536a436ac (different from share #1)"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g2-backup-publish-relay/VAL-BACKUP-004-first-publish-success.png"
+        ],
+        "consoleErrors": "Known pre-existing React nested-button warning in PeersPanel (tracked in AGENTS.md); no new publish-flow-specific console exceptions.",
+        "network": "Observer REQ/EVENT over ws://127.0.0.1:8194 captured kind=10000 event(s) for share-derived author"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-006",
+      "title": "Duplicate publish replaces prior backup event",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Publish twice from same share and query relay with filter {kinds:[10000], authors:[sharePubkey]}",
+          "expected": "Relay returns exactly one event (newer replaceable winner)",
+          "observed": "Relay returned 2 events: afa34e... (created_at=1776895664) and 72a567... (created_at=1776895685)"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g2-backup-publish-relay/VAL-BACKUP-006-second-publish-success.png"
+        ],
+        "consoleErrors": "Known pre-existing nested-button warning only.",
+        "network": "Post-second-publish REQ/EOSE response from local relay included both events instead of single replaceable winner"
+      },
+      "issues": "Local bifrost-devtools relay (ws://127.0.0.1:8194) retained both revisions for kind 10000 + author, preventing contract-level replaceable semantic validation in this deterministic environment."
+    },
+    {
+      "id": "VAL-BACKUP-007",
+      "title": "Publish fails cleanly when no relays configured or all offline",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Drop relay connectivity via __iglooTestDropRelays(1006)",
+          "expected": "Relay state offline",
+          "observed": "runtimeRelays showed ws://127.0.0.1:8194 state=offline"
+        },
+        {
+          "action": "Attempt publish from modal with valid password/confirm",
+          "expected": "Inline error shown, no success state, failure captured in runtime event log",
+          "observed": "Inline error 'No relays available to publish to.' shown and success state absent, but runtimeEventLog scan had no publish/no-relay entry"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g2-backup-publish-relay/VAL-BACKUP-007-no-relay-error.png"
+        ],
+        "consoleErrors": "Known pre-existing nested-button warning only.",
+        "network": "No outbound publish success path while relay offline; modal stayed in error state"
+      },
+      "issues": "Runtime event log did not capture a no-relay publish failure record, so assertion criterion requiring event-log capture was not met."
+    },
+    {
+      "id": "VAL-BACKUP-024",
+      "title": "Publish modal rejects confirm-mismatch passwords",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open Publish modal and enter Password=Password123!, Confirm=Password123?",
+          "expected": "Mismatch blocks publish with inline 'Passwords do not match.' and disabled/rejected CTA",
+          "observed": "Inline mismatch error rendered, publish button remained disabled, and no success state appeared"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g2-backup-publish-relay/VAL-BACKUP-024-password-mismatch.png"
+        ],
+        "consoleErrors": "Known pre-existing nested-button warning only.",
+        "network": "No publish frame dispatched while mismatch present"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-025",
+      "title": "Password strength meter reflects entropy",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Set empty password",
+          "expected": "Weakest state",
+          "observed": "data-strength=0; all segments data-filled=false"
+        },
+        {
+          "action": "Set 8-char trivial password 'abcdefgh'",
+          "expected": "Weak",
+          "observed": "data-strength=1; label=weak; only first segment filled"
+        },
+        {
+          "action": "Set 10-char trivial password 'abcdefghij'",
+          "expected": "Medium",
+          "observed": "data-strength=2; label=medium; first two segments filled"
+        },
+        {
+          "action": "Set 16-char mixed password 'StrongPass1234AB'",
+          "expected": "Medium/Strong with highest entropy sample",
+          "observed": "data-strength=3; label=strong; all three segments filled and submit enabled when confirm matched"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g2-backup-publish-relay/VAL-BACKUP-025-strength-weak.png",
+          "m6-backup/g2-backup-publish-relay/VAL-BACKUP-025-strength-strong.png"
+        ],
+        "consoleErrors": "Known pre-existing nested-button warning only.",
+        "network": "UI-only strength meter validation"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-031",
+      "title": "Replaceable-event race: only newer backup persists",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Run rapid back-to-back publishes from same share and compare created_at + relay query results",
+          "expected": "Relay query returns only newer winner; UI most-recent publish reflects winner",
+          "observed": "created_at advanced monotonically (1776895664 -> 1776895685) and app state lastBackupPublishedAt updated to newer value, but relay query still returned both events"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g2-backup-publish-relay/VAL-BACKUP-006-second-publish-success.png"
+        ],
+        "consoleErrors": "Known pre-existing nested-button warning only.",
+        "network": "Post-race REQ/EOSE from local relay returned 2 events for same author/kind instead of single replaceable winner"
+      },
+      "issues": "Validation blocked by local relay replaceable-event behavior in deterministic ws://127.0.0.1:8194 environment."
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Dashboard consistently emits known nested <button> hydration warning from PeersPanel, adding noisy console errors during backup-flow checks.",
+      "resolved": true,
+      "resolution": "Treated as pre-existing tracked issue per AGENTS.md; excluded from publish assertion pass/fail decisions.",
+      "affectedAssertions": [
+        "VAL-BACKUP-004",
+        "VAL-BACKUP-006",
+        "VAL-BACKUP-007",
+        "VAL-BACKUP-024",
+        "VAL-BACKUP-025",
+        "VAL-BACKUP-031"
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "description": "Local bifrost-devtools relay returned multiple kind=10000 events for same author after duplicate/race publish, preventing strict replaceable-single-winner verification.",
+      "affectedAssertions": [
+        "VAL-BACKUP-006",
+        "VAL-BACKUP-031"
+      ],
+      "quickFixAttempted": "Re-queried relay after delay; response still contained both event IDs"
+    }
+  ],
+  "summary": "Tested 6 assertions: 3 passed (VAL-BACKUP-004, 024, 025), 1 failed (VAL-BACKUP-007), 2 blocked by local relay replaceable-event behavior (VAL-BACKUP-006, VAL-BACKUP-031)."
+}

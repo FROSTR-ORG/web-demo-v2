@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m7-scrutiny-r1-rotate-regression-full-flow",
+  "reviewedAt": "2026-04-23T05:02:20Z",
+  "commitId": "3d5f540",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix closes both prior blocking gaps. The updated Playwright spec now drives tab A through the full UI rotate-keyset flow (form/review/progress/profile/distribute/complete), has tabs B/C adopt rotated packages via bfonboard decode, reasserts group_pk preservation and rotated-material distinctness, and adds a direct old-share rejection gate by asserting sign failure drain (and no sign completion) for a pre-rotation share.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The feature again used `protocol-flow-worker`, but that skill is scoped to source-side onboarding sponsorship and mandates agent-browser ceremony validation. This rotate-keyset regression fix is Playwright-focused and does not follow that procedure, suggesting skill assignment/procedure docs are still mismatched for this class of feature.",
+      "evidence": ".factory/skills/protocol-flow-worker/SKILL.md (scope + required agent-browser procedure) compared with handoff 2026-04-23T04-13-18-371Z__fix-m7-scrutiny-r1-rotate-regression-full-flow__39b71a40-974e-413e-898c-faa9a55e8b7a.json (verification uses tsc/vitest/playwright only; no agent-browser step) and transcript skeleton for workerSessionId 39b71a40-974e-413e-898c-faa9a55e8b7a."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m7-onboard/scrutiny/reviews/m7-rotate-keyset-live-sign.json",
+  "summary": "Pass. Compared against the original failing feature diff and prior fail review, this fix now exercises the required UI-driven rotate pipeline and directly verifies old-share rejection via runtime failure drain, while preserving rotated-share sign-success coverage."
+}

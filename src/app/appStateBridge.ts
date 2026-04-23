@@ -2,6 +2,7 @@ import type {
   RuntimeStatusSummary,
   StoredProfileSummary,
 } from "../lib/bifrost/types";
+import type { RuntimeRelayStatus } from "../lib/relay/runtimeRelayPump";
 import type { AppStateValue } from "./AppState";
 
 /**
@@ -32,11 +33,13 @@ export interface AppStateBridgeSnapshot {
   profiles: StoredProfileSummary[];
   activeProfile: StoredProfileSummary | null;
   runtimeStatus: RuntimeStatusSummary | null;
+  runtimeRelays: RuntimeRelayStatus[];
   signerPaused: boolean;
   createSession: null;
   importSession: null;
   onboardSession: null;
   rotateKeysetSession: null;
+  replaceShareSession: null;
   recoverSession: null;
 }
 
@@ -49,11 +52,13 @@ export function snapshotFromAppState(
     | "profiles"
     | "activeProfile"
     | "runtimeStatus"
+    | "runtimeRelays"
     | "signerPaused"
     | "createSession"
     | "importSession"
     | "onboardSession"
     | "rotateKeysetSession"
+    | "replaceShareSession"
     | "recoverSession"
   >,
 ): AppStateBridgeSnapshot {
@@ -61,6 +66,9 @@ export function snapshotFromAppState(
     profiles: value.profiles,
     activeProfile: value.activeProfile,
     runtimeStatus: value.runtimeStatus,
+    runtimeRelays: Array.isArray(value.runtimeRelays)
+      ? value.runtimeRelays
+      : [],
     signerPaused: value.signerPaused,
     // Setup sessions contain decoded shares, package passwords, or recovered
     // keys. The demo bridge is only a visual hand-off convenience, so never
@@ -69,6 +77,7 @@ export function snapshotFromAppState(
     importSession: null,
     onboardSession: null,
     rotateKeysetSession: null,
+    replaceShareSession: null,
     recoverSession: null,
   };
 }
@@ -81,6 +90,9 @@ function normalizeAppStateBridgeSnapshot(
     profiles: Array.isArray(snapshot.profiles) ? snapshot.profiles : [],
     activeProfile: snapshot.activeProfile ?? null,
     runtimeStatus: snapshot.runtimeStatus ?? null,
+    runtimeRelays: Array.isArray(snapshot.runtimeRelays)
+      ? snapshot.runtimeRelays
+      : [],
     signerPaused: Boolean(snapshot.signerPaused),
     // Harden reads too: older snapshots or manually injected sessionStorage
     // must not rehydrate setup-session secrets.
@@ -88,6 +100,7 @@ function normalizeAppStateBridgeSnapshot(
     importSession: null,
     onboardSession: null,
     rotateKeysetSession: null,
+    replaceShareSession: null,
     recoverSession: null,
   };
 }

@@ -11,16 +11,32 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { DistributionCompleteScreen } from "../DistributionCompleteScreen";
 import { DEMO_PROFILE_ID } from "../../demo/fixtures";
 
+interface TestOnboardingPackage {
+  idx: number;
+  memberPubkey: string;
+  deviceLabel?: string;
+  packageText: string;
+  password: string;
+  packageCreated: boolean;
+  peerOnline: boolean;
+  manuallyMarkedDistributed: boolean;
+  packageCopied: boolean;
+  passwordCopied: boolean;
+  qrShown: boolean;
+  copied?: boolean;
+}
+
 /* ---------- Mocks ---------- */
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   finishDistribution: vi.fn().mockResolvedValue("demo-profile"),
   clearCreateSession: vi.fn(),
+  markPackageDistributed: vi.fn(),
   createSession: null as {
     draft: { groupName: string; threshold: number; count: number };
     createdProfileId?: string;
-    onboardingPackages: { idx: number; copied: boolean; qrShown: boolean }[];
+    onboardingPackages: TestOnboardingPackage[];
   } | null,
   demoUi: {} as Record<string, unknown>,
 }));
@@ -47,6 +63,7 @@ vi.mock("../../app/AppState", async () => {
       createSession: mocks.createSession,
       finishDistribution: mocks.finishDistribution,
       clearCreateSession: mocks.clearCreateSession,
+      markPackageDistributed: mocks.markPackageDistributed,
     }),
   };
 });
@@ -54,6 +71,28 @@ vi.mock("../../app/AppState", async () => {
 vi.mock("../../demo/demoUi", () => ({
   useDemoUi: () => mocks.demoUi,
 }));
+
+function makeRemotePackage(
+  idx: number,
+  overrides: Partial<TestOnboardingPackage> = {},
+): TestOnboardingPackage {
+  return {
+    idx,
+    memberPubkey:
+      "02" +
+      (String(idx) +
+        "abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567").slice(0, 64),
+    packageText: "bfonboard1" + "x".repeat(12),
+    password: "[redacted]",
+    packageCreated: true,
+    peerOnline: false,
+    manuallyMarkedDistributed: false,
+    packageCopied: false,
+    passwordCopied: false,
+    qrShown: false,
+    ...overrides,
+  };
+}
 
 function renderScreen() {
   return render(
@@ -73,18 +112,126 @@ beforeEach(() => {
   mocks.finishDistribution.mockReset();
   mocks.finishDistribution.mockResolvedValue(DEMO_PROFILE_ID);
   mocks.clearCreateSession.mockClear();
+  mocks.markPackageDistributed.mockReset();
   mocks.createSession = {
     draft: { groupName: "My Signing Key", threshold: 2, count: 3 },
     createdProfileId: DEMO_PROFILE_ID,
     onboardingPackages: [
-      { idx: 1, copied: true, qrShown: false },
-      { idx: 2, copied: false, qrShown: true },
+      makeRemotePackage(1, { manuallyMarkedDistributed: true }),
+      makeRemotePackage(2, { manuallyMarkedDistributed: true }),
     ],
   };
-  mocks.demoUi = { shared: { completionPreset: true } };
+  mocks.demoUi = {};
 });
 
 afterEach(() => cleanup());
+
+describe("DistributionCompleteScreen — Paper LN7-0 parity (VAL-FOLLOWUP-012)", () => {
+  it("renders the 'Distribution Completion' header", () => {
+    renderScreen();
+    expect(
+      screen.getByRole("heading", { name: "Distribution Completion" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the subhead copy EXACT per Paper LN7-0", () => {
+    renderScreen();
+    expect(
+      screen.getByText(
+        "Track which remote bfonboard adoption packages have been distributed. Finish when each target device is ready to adopt its fresh share through the standard onboarding flow.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("renders one row per remote member with a 'Marked distributed' green chip when distributed", () => {
+    renderScreen();
+    const chips = screen.getAllByText("Marked distributed");
+    expect(chips).toHaveLength(2);
+    for (const chip of chips) {
+      expect(chip.closest(".status-pill")).toHaveClass("success");
+    }
+  });
+
+  it("prefers deviceLabel over shortHex(memberPubkey) and falls back when blank", () => {
+    mocks.createSession = {
+      draft: { groupName: "My Signing Key", threshold: 2, count: 3 },
+      createdProfileId: DEMO_PROFILE_ID,
+      onboardingPackages: [
+        makeRemotePackage(1, {
+          deviceLabel: "Igloo Mobile",
+          manuallyMarkedDistributed: true,
+        }),
+        makeRemotePackage(2, {
+          deviceLabel: "   ",
+          manuallyMarkedDistributed: true,
+        }),
+      ],
+    };
+
+    renderScreen();
+
+    expect(
+      screen.getByText("Member #2 — Igloo Mobile"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Member #3 — 022abcde\.\.\.4567/i),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the success callout EXACT when allPackagesDistributed", () => {
+    renderScreen();
+    const callout = screen
+      .getByText(/All packages distributed/)
+      .closest(".success-callout");
+    expect(callout).not.toBeNull();
+    expect(callout?.textContent).toContain(
+      "All packages distributed — 2 of 2 remote bfonboard packages have been marked distributed. Continue when device adoption handoff can proceed.",
+    );
+  });
+
+  it("ENABLES the Finish Distribution CTA iff allPackagesDistributed", () => {
+    renderScreen();
+    expect(
+      screen.getByRole("button", { name: /Finish Distribution/ }),
+    ).not.toBeDisabled();
+  });
+
+  it("DISABLES the Finish Distribution CTA when any share is still 'Ready to distribute'", () => {
+    mocks.createSession = {
+      draft: { groupName: "My Signing Key", threshold: 2, count: 3 },
+      createdProfileId: DEMO_PROFILE_ID,
+      onboardingPackages: [
+        makeRemotePackage(1, { manuallyMarkedDistributed: true }),
+        makeRemotePackage(2), // not distributed
+      ],
+    };
+    renderScreen();
+    expect(
+      screen.getByRole("button", { name: /Finish Distribution/ }),
+    ).toBeDisabled();
+    // Success callout should not render while a share is still pending.
+    expect(
+      screen.queryByText(/All packages distributed/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("exposes a Mark distributed fallback on pending rows (VAL-FOLLOWUP-005)", () => {
+    mocks.createSession = {
+      draft: { groupName: "My Signing Key", threshold: 2, count: 3 },
+      createdProfileId: DEMO_PROFILE_ID,
+      onboardingPackages: [
+        makeRemotePackage(1), // pending
+        makeRemotePackage(2, { manuallyMarkedDistributed: true }),
+      ],
+    };
+    renderScreen();
+    const pendingMark = screen.getByRole("button", {
+      name: /^Mark distributed$/i,
+    });
+    fireEvent.click(pendingMark);
+    expect(mocks.markPackageDistributed).toHaveBeenCalledWith(1);
+  });
+});
 
 describe("DistributionCompleteScreen finish handler — VAL-SHR-011", () => {
   it("navigates to /dashboard/{profileId} returned from finishDistribution", async () => {

@@ -1,0 +1,26 @@
+{
+  "featureId": "fix-followup-distribute-2c-e2e-and-demo-fixtures",
+  "reviewedAt": "2026-04-23T17:04:55Z",
+  "commitId": "3d103e8",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Reviewed commit 3d103e8 against the feature description/expected behavior. The e2e specs were correctly migrated from the removed shared Remote Package Password fields to per-share package password + Create package flow, and they now use Mark distributed as the offline fallback. The previously flow-blocked fixme tests were unskipped where appropriate, and demo sources are already clean of distributionPassword/confirmDistributionPassword references. No high-confidence actionable code defects were found in scope.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The assigned skill appears mismatched to this feature type: protocol-flow-worker is scoped to M7 source-side onboarding sponsorship and mandates agent-browser validation, while this feature is e2e/demo-fixture maintenance executed via Playwright/Vitest shell flows.",
+      "evidence": "Feature record sets skillName to protocol-flow-worker in /Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/features.json (id fix-followup-distribute-2c-e2e-and-demo-fixtures). /Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/.factory/skills/protocol-flow-worker/SKILL.md says it is for M7 onboarding sponsorship and lists agent-browser as required. Transcript skeleton for workerSessionId a9b6f4cb-4ee0-4680-a33a-95251f9f510c contains Playwright/Vitest command flow and no agent-browser usage."
+    },
+    {
+      "area": "conventions",
+      "observation": "The feature-level verification step expecting zero global hits for distributionPassword/confirmDistributionPassword conflicts with intentional rotate-keyset usage and benign variable/comment references, which can produce false negatives in future follow-up features.",
+      "evidence": "Feature verificationSteps in /Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/features.json include `rg -n 'distributionPassword|confirmDistributionPassword' src/ tests/ (expect zero hits)`. Current repo has intentional hits at src/app/AppStateTypes.ts:113 and rotate flow code paths (e.g., src/app/AppStateProvider.tsx:2942, 3002, 3061), plus test-variable/comment usages."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Pass. The feature implementation matches the requested per-share distribution e2e migration and offline fallback behavior with no in-scope blocking defects found; noted two shared-state/process observations (skill assignment mismatch and an over-broad grep convention)."
+}

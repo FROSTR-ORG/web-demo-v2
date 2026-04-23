@@ -1,0 +1,29 @@
+{
+  "milestone": "m3-policies",
+  "round": 2,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-POLICIES-007",
+    "VAL-POLICIES-009",
+    "VAL-POLICIES-023",
+    "VAL-CROSS-003"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "previousRound": ".factory/validation/m3-policies/user-testing/synthesis.round1.json",
+  "flowReports": [
+    ".factory/validation/m3-policies/user-testing/flows/group-rerun-policy-gaps.json"
+  ],
+  "toolsUsed": [
+    "playwright",
+    "vitest"
+  ],
+  "generatedAt": "2026-04-22T14:51:48Z"
+}

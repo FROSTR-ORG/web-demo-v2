@@ -107,6 +107,31 @@ describe("WelcomeScreen", () => {
     expect(mocks.navigate).toHaveBeenCalledWith("/onboard");
   });
 
+  it("VAL-BACKUP-008: first-time chip 'Restore from Relay' navigates to /restore-from-relay", () => {
+    render(
+      <MemoryRouter>
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    const chip = screen.getByRole("button", { name: "Restore from Relay" });
+    expect(chip).toBeInTheDocument();
+    fireEvent.click(chip);
+    expect(mocks.navigate).toHaveBeenCalledWith("/restore-from-relay");
+  });
+
+  it("VAL-BACKUP-008: returning users see a 'Restore from Relay' chip that navigates to /restore-from-relay", () => {
+    mocks.profiles = [makeProfile("p1", "My Signing Key")];
+    render(
+      <MemoryRouter>
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    const chip = screen.getByRole("button", { name: "Restore from Relay" });
+    expect(chip).toBeInTheDocument();
+    fireEvent.click(chip);
+    expect(mocks.navigate).toHaveBeenCalledWith("/restore-from-relay");
+  });
+
   it("renders single returning profile with subtitle, Unlock + Rotate, and chip-style 'or' row", () => {
     mocks.profiles = [makeProfile("p1", "My Signing Key")];
     render(
@@ -315,13 +340,13 @@ describe("WelcomeScreen", () => {
     expect(screen.queryByText("Unlock Profile")).not.toBeInTheDocument();
   });
 
-  it("rotate-share-first variant renders chip-pair entry without Create CTA", () => {
+  it("replace-share-first variant renders chip-pair entry without Create CTA", () => {
     mocks.profiles = [];
-    // Render with the rotate-share-first variant via location state
+    // Render with the replace-share-first variant via location state
     render(
       <MemoryRouter
         initialEntries={[
-          { pathname: "/", state: { demoUi: { welcome: { variant: "rotate-share-first" } } } }
+          { pathname: "/", state: { demoUi: { welcome: { variant: "replace-share-first" } } } }
         ]}
       >
         <WelcomeScreen />
@@ -329,24 +354,24 @@ describe("WelcomeScreen", () => {
     );
     // No "Create New Keyset" CTA visible
     expect(screen.queryByRole("button", { name: "Create New Keyset" })).not.toBeInTheDocument();
-    // Onboard + Rotate Share chip pair visible
+    // Onboard + Replace Share chip pair visible
     expect(screen.getByRole("button", { name: "Onboard" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Rotate Share" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Replace Share" })).toBeInTheDocument();
   });
 
-  it("rotate-share-first 'Rotate Share' chip navigates to /rotate-share", () => {
+  it("replace-share-first 'Replace Share' chip navigates to /replace-share", () => {
     mocks.profiles = [];
     render(
       <MemoryRouter
         initialEntries={[
-          { pathname: "/", state: { demoUi: { welcome: { variant: "rotate-share-first" } } } }
+          { pathname: "/", state: { demoUi: { welcome: { variant: "replace-share-first" } } } }
         ]}
       >
         <WelcomeScreen />
       </MemoryRouter>
     );
-    fireEvent.click(screen.getByRole("button", { name: "Rotate Share" }));
-    expect(mocks.navigate).toHaveBeenCalledWith("/rotate-share");
+    fireEvent.click(screen.getByRole("button", { name: "Replace Share" }));
+    expect(mocks.navigate).toHaveBeenCalledWith("/replace-share");
   });
 
   it("rotate-keyset-first variant renders saved-first layout with Rotate CTA", () => {

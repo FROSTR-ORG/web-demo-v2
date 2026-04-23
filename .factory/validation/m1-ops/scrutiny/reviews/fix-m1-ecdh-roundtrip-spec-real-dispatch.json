@@ -1,0 +1,33 @@
+{
+  "featureId": "fix-m1-ecdh-roundtrip-spec-real-dispatch",
+  "reviewedAt": "2026-04-21T16:00:47Z",
+  "commitId": "c740ea8",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The fix resolves two prior gaps (placeholder/raw-transport assertions and cargo-based skip gating) by dispatching real runtime ECDH and correlating request_id on the initiator, but it still does not implement the required responder-side runtimeCompletions assertion keyed by the same request_id.",
+    "issues": [
+      {
+        "file": "src/e2e/multi-device/ecdh-roundtrip.spec.ts",
+        "line": 572,
+        "severity": "blocking",
+        "description": "The spec never asserts `runtimeCompletions` on page B for the captured `request_id`. Instead, it substitutes responder checks (`lifecycleEvents` InboundAccepted and A-side peer last_seen) after explicitly documenting protocol asymmetry (lines 480+). This does not satisfy the feature/expectedBehavior contract that both pages observe an Ecdh completion keyed by the same request_id."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "knowledge",
+      "observation": "Mission/shared requirements are inconsistent with protocol behavior: feature metadata requires Ecdh completion on both pages, but bifrost-signer emits `CompletedOperation::Ecdh` only on the initiator.",
+      "evidence": "features.json:1402 requires responder completion; bifrost-rs/crates/bifrost-signer/src/lib.rs:1786-1813 handles responder `EcdhRequest` by returning `EcdhResponse` only, while completion is created in pending-response finalization at lib.rs:1945-1949."
+    },
+    {
+      "area": "skills",
+      "observation": "runtime-worker procedure requires manual `agent-browser` verification, but this fix session did not run agent-browser despite reporting `followedProcedure: true`.",
+      "evidence": "runtime-worker SKILL.md section 'Required Skills' + step 6 mandates agent-browser; transcript skeleton for workerSessionId a140aa2c-be6b-4a04-b398-972544a612f1 shows no agent-browser tool invocation; handoff verification includes command runs only."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m1-ops/scrutiny/reviews/m1-bootstrap-devtools-relay.json | .factory/validation/m1-ops/scrutiny/reviews/m1-ecdh-dispatch.json",
+  "summary": "Reviewed feature metadata, fix handoff/transcript, prior failing reviews, and diffs for commits 0466f80, 35ea40c, and c740ea8. The fix correctly replaces placeholder/raw-WS behavior and cargo skip gating, but it does not fulfill the explicit both-pages `runtimeCompletions` request_id assertion, so the original responder-correlation failure remains unresolved under the stated feature contract."
+}

@@ -1,13 +1,32 @@
 import { Button } from "../../../components/ui";
 
+/**
+ * SigningBlockedState — Paper-faithful "Signing Blocked" overlay rendered
+ * when `deriveDashboardState(...) === 'signing-blocked'` (see
+ * `dashboardState.ts` for the transition conditions).
+ *
+ * When `noncePoolDepleted` is true, we surface a dedicated "Trigger Sync"
+ * affordance that dispatches a runtime refresh/rebalance command. The
+ * affordance disappears automatically once the pool recovers and the
+ * parent stops passing `noncePoolDepleted`. Covers VAL-OPS-018 and
+ * VAL-OPS-024.
+ */
 export function SigningBlockedState({
   onStop,
   onOpenPolicies,
   onReviewApprovals,
+  noncePoolDepleted = false,
+  onTriggerSync,
 }: {
   onStop: () => void;
   onOpenPolicies?: () => void;
   onReviewApprovals?: () => void;
+  /**
+   * When true, render the nonce-pool "Syncing nonces" banner with a
+   * "Trigger Sync" button that re-balances nonce allotments with peers.
+   */
+  noncePoolDepleted?: boolean;
+  onTriggerSync?: () => void;
 }) {
   return (
     <>
@@ -36,6 +55,30 @@ export function SigningBlockedState({
         <p className="dash-blocked-copy">
           Requests are not failing outright, but they cannot complete until the blocking condition clears. Use this state for policy prompts, pending operator review, or temporary readiness gating that stops signing before execution.
         </p>
+        {noncePoolDepleted ? (
+          <div
+            className="dash-nonce-sync"
+            role="status"
+            aria-label="Syncing nonces"
+            data-testid="nonce-pool-overlay"
+          >
+            <div className="dash-nonce-sync-copy">
+              <span className="dash-nonce-sync-title">Syncing nonces</span>
+              <span className="dash-nonce-sync-detail">
+                Nonce pool with peers is exhausted. Trigger a sync to
+                rebalance before the next sign.
+              </span>
+            </div>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={onTriggerSync}
+            >
+              Trigger Sync
+            </Button>
+          </div>
+        ) : null}
         <div className="dash-capacity-alert" aria-label="Signing capacity">
           <span className="dash-capacity-label">Signing Capacity</span>
           <span className="dash-capacity-track" />

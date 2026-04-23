@@ -1,0 +1,203 @@
+{
+  "groupId": "g4-ecdh-ping-resilience",
+  "testedAt": "2026-04-21T16:30:45.969356+00:00",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "relayUrl": "ws://127.0.0.1:8194",
+    "agentBrowserSession": "g4-ecdh-ping-resilience"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-OPS-009",
+      "title": "ECDH happy path surfaces a completion",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Dispatch ECDH from Dashboard Test ECDH panel to online peer pubkey",
+          "expected": "Pending ECDH request_id appears then completion is surfaced",
+          "observed": "Dispatched request_id 3289d0d91b1338d947d9e89ae1b6b0fa; Ecdh completion surfaced with shared_secret_hex32 and pending entry removed"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g4-ecdh-ping-resilience/VAL-OPS-009-before-ecdh.png",
+          "m1-ops/g4-ecdh-ping-resilience/VAL-OPS-009-ecdh-dispatched.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Runtime relay state online at ws://127.0.0.1:8194 during dispatch/completion"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-010",
+      "title": "Ping updates PeerStatus.last_seen",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Dispatch ping to online peer via handleRuntimeCommand({type:'ping'})",
+          "expected": "Peer row last_seen increases within 3s of completion",
+          "observed": "request_id 450d33e4bf29d72f49f90a40a20d631c completed; online peer last_seen advanced from 1776788236 to 1776788256"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g4-ecdh-ping-resilience/VAL-OPS-010-before-ping.png",
+          "m1-ops/g4-ecdh-ping-resilience/VAL-OPS-010-after-ping.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Relay remained online on ws://127.0.0.1:8194"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-011",
+      "title": "refresh_all_peers fans out to every known peer",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Click Refresh peers (refresh_all_peers)",
+          "expected": "Online peers get later last_seen; offline peers do not show silent success",
+          "observed": "Online peer last_seen advanced from 1776788281 to 1776788294 within 15s; offline peer remained offline with unchanged last_seen (null) while timeout failures continued to surface"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g4-ecdh-ping-resilience/VAL-OPS-011-before-refresh-all.png",
+          "m1-ops/g4-ecdh-ping-resilience/VAL-OPS-011-after-refresh-all.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Relay online; runtime failures for offline peer were timeout-class ping failures"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-021",
+      "title": "Tab backgrounding does not drop in-flight ops",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Dispatch sign then switch to another tab for >20s and return",
+          "expected": "visibilityState hidden/visible transitions captured and in-flight op preserved across hidden window",
+          "observed": "Sign request_id 443224854f8cc82f66908d86ea3b480b transitioned to timeout failure after foreground, but visibility log remained ['visible'] (no hidden transition observable in this agent-browser run)"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g4-ecdh-ping-resilience/VAL-OPS-021-before-background-sign.png",
+          "m1-ops/g4-ecdh-ping-resilience/VAL-OPS-021-after-foreground.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No websocket/frame visibility-state linkage observable from agent-browser for background tab"
+      },
+      "issues": "Could not observe document.visibilityState hidden transition in headless agent-browser tab switching, so VAL-OPS-021 visibility evidence could not be conclusively collected."
+    },
+    {
+      "id": "VAL-OPS-022",
+      "title": "TTL expiry transitions pending op to failure deterministically",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Dispatch sign while peer unavailable; capture timeout_at from pending operation",
+          "expected": "On TTL expiry, pending request disappears and timeout failure surfaces within ~2s with failure UI",
+          "observed": "request_id 2d416b08b6743e0da084a527138fd74c had timeout_at 1776788803; timeout failure surfaced at 1776788804 (1s after timeout), pending entry removed, SigningFailedModal shown"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g4-ecdh-ping-resilience/VAL-OPS-022-timeout-failure-modal.png"
+        ],
+        "consoleErrors": "none",
+        "network": "Timeout failure observed while relay path remained configured at ws://127.0.0.1:8194"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-023",
+      "title": "Relay reconnect correlates completions back to original request_ids",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Attempt relay drop/reconnect mid-flight (set offline on/off) during pending sign",
+          "expected": "Post-reconnect completion should match original pending request_id with observable reconnect evidence",
+          "observed": "Pending sign request_id 6a4aa1c3c1323cebda291a7b27fd194b timed out; no post-reconnect completion observed and relay lastConnectedAt did not expose a reconnect transition in this run"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g4-ecdh-ping-resilience/VAL-OPS-023-reconnect-attempt.png"
+        ],
+        "consoleErrors": "none",
+        "network": "agent-browser network request capture returned no websocket request/frame data for reconnect verification"
+      },
+      "issues": "Reconnect + post-reconnect completion correlation could not be conclusively validated due missing websocket reconnect/frame observability in agent-browser and timeout outcome during reconnect attempt."
+    },
+    {
+      "id": "VAL-OPS-028",
+      "title": "Window close cleans up pending OPS state",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Start in-flight sign request, close dashboard tab, reopen same profile",
+          "expected": "Closed-session request_id absent after reopen and websocket close frame evidence available",
+          "observed": "Pre-close request_id 71e166db16b723a5082fe7be8525c712 was pending; after reopen pending_operations was empty and stale request_id absent, but websocket close frame code (1000/1001) could not be captured"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g4-ecdh-ping-resilience/VAL-OPS-028-before-window-close.png",
+          "m1-ops/g4-ecdh-ping-resilience/VAL-OPS-028-after-reopen.png"
+        ],
+        "consoleErrors": "none",
+        "network": "No websocket close-frame code capture available from agent-browser network output"
+      },
+      "issues": "Pending-state cleanup behavior verified, but required WS close frame code evidence could not be observed with available tooling."
+    }
+  ],
+  "summary": {
+    "total": 7,
+    "pass": 4,
+    "fail": 0,
+    "blocked": 3,
+    "skipped": 0
+  },
+  "frictions": [
+    {
+      "description": "In this run, headless tab switching did not expose document.visibilityState hidden transitions via in-page logging.",
+      "resolved": false,
+      "resolution": "Worked around by validating operation outcome after foreground return, but visibility transition requirement remained unobservable.",
+      "affectedAssertions": [
+        "VAL-OPS-021"
+      ]
+    },
+    {
+      "description": "agent-browser network capture returned no websocket requests/frames/close codes during relay reconnect and window-close checks.",
+      "resolved": false,
+      "resolution": "Used runtimeStatus/runtimeRelays snapshots and request_id correlation where possible, but WS-frame evidence remained unavailable.",
+      "affectedAssertions": [
+        "VAL-OPS-023",
+        "VAL-OPS-028"
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "description": "Could not collect required visibilityState hidden->visible evidence in this headless agent-browser execution.",
+      "affectedAssertions": [
+        "VAL-OPS-021"
+      ],
+      "quickFixAttempted": "Installed visibilitychange logger, backgrounded tab for >20s, and rechecked log; only 'visible' was recorded."
+    },
+    {
+      "description": "Could not obtain websocket reconnect/close frame-level telemetry (request/frame/close-code) from agent-browser network output.",
+      "affectedAssertions": [
+        "VAL-OPS-023",
+        "VAL-OPS-028"
+      ],
+      "quickFixAttempted": "Used set offline on/off, runtime relay state checks, network request capture, and post-reopen pending-state validation; frame-level evidence still unavailable."
+    }
+  ]
+}

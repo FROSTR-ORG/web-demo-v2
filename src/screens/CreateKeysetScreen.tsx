@@ -7,13 +7,14 @@ import { AppShell, PageHeading } from "../components/shell";
 import {
   BackLink,
   Button,
-  NumberStepper,
   Stepper,
   TextField,
 } from "../components/ui";
+import { ThresholdSelector } from "../components/ThresholdSelector";
 import { useDemoUi } from "../demo/demoUi";
 import { generateNsec } from "../lib/bifrost/packageService";
 import type { GeneratedNsecResult } from "../lib/bifrost/types";
+import { isValidNsec } from "../lib/nsec/validateNsec";
 
 export function CreateKeysetScreen() {
   const navigate = useNavigate();
@@ -64,6 +65,16 @@ export function CreateKeysetScreen() {
     setShowNsec(false);
   }
 
+  // Scrub any pasted/generated nsec material from component state so the
+  // revealed value is no longer reachable via the DOM (VAL-BACKUP-029).
+  // Called on Back and after successful submission.
+  function resetNsecField() {
+    setNsec("");
+    setGeneratedNsec(null);
+    setShowNsec(false);
+    setFieldErrors((prev) => ({ ...prev, nsec: undefined }));
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -74,8 +85,21 @@ export function CreateKeysetScreen() {
       errors.groupName = "Keyset name is required.";
     }
     const generatedValue = generatedNsec?.nsec ?? "";
-    if (nsec.trim() && nsec.trim() !== generatedValue) {
-      errors.nsec = "Existing nsec splitting is not supported yet.";
+    const trimmedNsec = nsec.trim();
+    const isExistingNsec = trimmedNsec.length > 0 && trimmedNsec !== generatedValue;
+    if (isExistingNsec) {
+      // Two-tier validation: the "must start with nsec1." copy is
+      // preserved for non-nsec prefixes (the typical "I pasted the
+      // wrong thing" case). Inputs that LOOK like an nsec but fail
+      // bech32 structural validation get a more precise message that
+      // hints at truncation / bad paste rather than wrong format.
+      // NEVER log any part of `trimmedNsec` — structural failures must
+      // not leak the pasted value to console / storage.
+      if (!trimmedNsec.toLowerCase().startsWith("nsec1")) {
+        errors.nsec = "Invalid nsec format — must start with nsec1.";
+      } else if (!isValidNsec(trimmedNsec)) {
+        errors.nsec = "Invalid nsec — check that you pasted the full secret key.";
+      }
     }
 
     if (Object.keys(errors).length > 0) {
@@ -91,8 +115,11 @@ export function CreateKeysetScreen() {
         threshold,
         count,
         generatedNsec: generatedNsec?.nsec,
+        existingNsec: isExistingNsec ? trimmedNsec : undefined,
       });
-      clearGeneratedNsec();
+      // Scrub any revealed nsec from component state and the DOM before
+      // navigating away (VAL-BACKUP-023 / VAL-BACKUP-029).
+      resetNsecField();
       navigate("/create/progress");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create keyset.");
@@ -107,7 +134,7 @@ export function CreateKeysetScreen() {
         <Stepper current={1} variant="create" />
         <BackLink
           onClick={() => {
-            clearGeneratedNsec();
+            resetNsecField();
             navigate("/");
           }}
         />
@@ -134,72 +161,63 @@ export function CreateKeysetScreen() {
             <span className="input-shell">
               <input
                 className={`input${fieldErrors.nsec ? " input-error" : ""}`}
-                placeholder="Paste existing nsec (unsupported)"
-                type={showNsec ? "text" : "password"}
-                value={nsec}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  setNsec(next);
-                  if (generatedNsec && next !== generatedNsec.nsec)
-                    clearGeneratedNsec();
-                  if (fieldErrors.nsec)
-                    setFieldErrors((prev) => ({ ...prev, nsec: undefined }));
-                }}
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                aria-label={showNsec ? "Hide nsec" : "Reveal nsec"}
-                onClick={() => setShowNsec((shown) => !shown)}
-                disabled={!nsec}
-              >
-                {showNsec ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </span>
-            <Button
+              placeholder="Paste your existing nsec or generate a new one"
+              type={showNsec ? "text" : "password"}
+              value={nsec}
+              onChange={(event) => {
+                // Trim surrounding whitespace on change so the input's
+                // displayed value never contains leading/trailing
+                // whitespace or newlines. Paste contract: pasting
+                // "   nsec1abc...   \n" must leave input.value === the
+                // trimmed string BEFORE the user clicks Create
+                // (VAL-BACKUP-028). Do NOT log / persist `next`.
+                const next = event.target.value.trim();
+                setNsec(next);
+                if (generatedNsec && next !== generatedNsec.nsec)
+                  clearGeneratedNsec();
+                if (fieldErrors.nsec)
+                  setFieldErrors((prev) => ({ ...prev, nsec: undefined }));
+              }}
+            />
+            <button
               type="button"
-              variant="secondary"
-              disabled={generatingNsec || busy}
-              onClick={handleGenerateNsec}
+              className="password-toggle"
+              aria-label={showNsec ? "Hide nsec" : "Reveal nsec"}
+              onClick={() => setShowNsec((shown) => !shown)}
+              disabled={!nsec}
             >
-              {generatingNsec ? "Generating..." : "Generate NSEC"}
-            </Button>
+              {showNsec ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </span>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={generatingNsec || busy}
+            onClick={handleGenerateNsec}
+          >
+            {generatingNsec ? "Generating..." : "Generate"}
+          </Button>
           </div>
           {fieldErrors.nsec ? (
             <span className="field-error-text">{fieldErrors.nsec}</span>
           ) : (
             <span className="help">
-              Generate a new nsec here to split that exact key. Manually pasted
-              nsec splitting is not supported yet.
+              Paste your existing nsec or leave blank to generate a new one
             </span>
           )}
         </div>
-        <div className="field-row">
-          <NumberStepper
-            label="Threshold"
-            value={threshold}
-            min={2}
-            max={count}
-            onChange={setThreshold}
-          />
-          <div className="divider-text">/</div>
-          <NumberStepper
-            label="Total Shares"
-            value={count}
-            min={threshold}
-            max={10}
-            onChange={(next) => {
-              setCount(next);
-              if (threshold > next) {
-                setThreshold(next);
-              }
-            }}
-          />
-        </div>
-        <div className="help">
-          Any {threshold} of {count} shares can sign — min threshold is 2, min
-          shares is {threshold}
-        </div>
+        <ThresholdSelector
+          threshold={threshold}
+          total={count}
+          onThresholdChange={setThreshold}
+          onTotalChange={(next) => {
+            setCount(next);
+            if (threshold > next) {
+              setThreshold(next);
+            }
+          }}
+          help={`Any ${threshold} of ${count} shares can sign — min threshold is 2, min shares is ${threshold}`}
+        />
         {error ? <div className="error">{error}</div> : null}
         <Button type="submit" size="full" disabled={busy}>
           {busy ? "Creating..." : "Create Keyset"}

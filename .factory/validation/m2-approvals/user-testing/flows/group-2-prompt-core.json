@@ -1,0 +1,189 @@
+{
+  "groupId": "group-2-prompt-core",
+  "testedAt": "2026-04-21T22:02:33Z",
+  "isolation": {
+    "surface": "agent-browser web UI",
+    "appUrl": "http://127.0.0.1:5173",
+    "sessionId": "m2a_g2",
+    "storage": "isolated local browser storage"
+  },
+  "toolsUsed": [
+    "agent-browser",
+    "Read",
+    "Grep"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-APPROVALS-007",
+      "status": "pass",
+      "reason": "Policy prompt stayed absent when pending operations changed without denial events, and opened reactively after synthetic peer_denied payload enqueue with payload-matched fields.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-2-prompt-core/VAL-APPROVALS-007-no-modal-on-pending-change.png",
+          "m2-approvals/group-2-prompt-core/VAL-APPROVALS-007-reactive-sign-modal.png"
+        ],
+        "observables": [
+          "pending-only refresh check: beforePending=14, afterPending=16, dialog=false",
+          "reactive modal content check: dialogOpen=true, hasSignBadge=true, hasPeerLabel=true, hasDomain=true, hasEventKind=true, foundLabels=[EVENT KIND, CONTENT, PUBKEY, DOMAIN]"
+        ],
+        "consoleErrors": "none",
+        "network": "agent-browser network requests: No requests captured"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-008",
+      "status": "pass",
+      "reason": "Prompt rendered sign and ecdh variants from injected payload fields, including expected badge/identity and per-verb detail schemas.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-2-prompt-core/VAL-APPROVALS-008-sign-context.png",
+          "m2-approvals/group-2-prompt-core/VAL-APPROVALS-008-ecdh-context.png"
+        ],
+        "observables": [
+          "sign variant: dialogOpen=true, hasSignBadge=true, hasPeerIdentity=true, hasEventKindRow=true, hasDomainRow=true",
+          "ecdh variant: dialogOpen=true, hasEcdhBadge=true, hasOperationRow=true, hasTargetPubkeyRow=true, hasRelayRow=true"
+        ],
+        "consoleErrors": "none",
+        "network": "agent-browser network requests: No requests captured"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-009",
+      "status": "pass",
+      "reason": "Allow once closed the modal; replaying the same denial id in-session did not re-open; after lock+unlock the same id re-opened, demonstrating session-scoped behavior with reset across lock cycle.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-2-prompt-core/VAL-APPROVALS-009-allow-once-before.png",
+          "m2-approvals/group-2-prompt-core/VAL-APPROVALS-009-after-lock-reprompt.png"
+        ],
+        "observables": [
+          "initial queue check after enqueue: dialog=true, queue=[g2-009-b]",
+          "after Allow once: afterAllowOnceDialog=false, queue=[]",
+          "same-session replay (same id): sameSessionDialog=false, queue=[]",
+          "after lock+unlock replay (same id): afterLockDialog=true, queue=[g2-009-b]"
+        ],
+        "consoleErrors": "none",
+        "network": "agent-browser network requests: No requests captured"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-010",
+      "status": "pass",
+      "reason": "Always allow closed the modal and persisted the peer override through lock/unlock; post-unlock policy state remained allow.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-2-prompt-core/VAL-APPROVALS-010-always-allow-modal.png",
+          "m2-approvals/group-2-prompt-core/VAL-APPROVALS-010-policies-persistent-allow.png"
+        ],
+        "observables": [
+          "primed deny then flipped: respondSignAfterAlwaysAllow=allow",
+          "post-unlock persistence check: postUnlockRespondSign=allow",
+          "policies view check: respondSign=allow, hasPoliciesHeading=true"
+        ],
+        "consoleErrors": "none",
+        "network": "agent-browser network requests: No requests captured"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-011",
+      "status": "pass",
+      "reason": "Deny dismissed the modal with unchanged policy state; a subsequent identical peer denial (new id) surfaced a new modal.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-2-prompt-core/VAL-APPROVALS-011-deny-reprompt.png"
+        ],
+        "observables": [
+          "baseline manual override before deny: allow",
+          "after deny: dialog=false, baseline=allow, afterDeny=allow",
+          "second denial enqueue: secondDialog=true, queue=[g2-011-deny-2]"
+        ],
+        "consoleErrors": "none",
+        "network": "agent-browser network requests: No requests captured"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-012",
+      "status": "pass",
+      "reason": "Always deny set deny override and it persisted across lock/unlock; policy rows remained unique per peer (no duplicates).",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-2-prompt-core/VAL-APPROVALS-012-policies-persistent-deny.png"
+        ],
+        "observables": [
+          "after Always deny + refresh: respondSign=deny, totalStates=2, uniquePeers=2",
+          "post-unlock: postUnlockRespondSign=deny, totalStates=2, uniquePeers=2",
+          "policies view check: respondSign=deny"
+        ],
+        "consoleErrors": "none",
+        "network": "agent-browser network requests: No requests captured"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-013",
+      "status": "pass",
+      "reason": "Scoped kind/domain CTA variants were not rendered in the modal, and code/docs evidence confirms only peer-level override API is exposed.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-2-prompt-core/VAL-APPROVALS-013-no-scoped-ctas.png"
+        ],
+        "observables": [
+          "modal CTA check: hasAllowOnce=true, hasAlwaysAllow=true, hasDeny=true, hasAlwaysDeny=true, hasKindScoped=false, hasDomainScoped=false",
+          "runtimeClient signature: setPolicyOverride({ peer, direction, method, value }) only",
+          "WASM d.ts exposes set_policy_override(policy_json: string) without kind/domain scope fields",
+          "docs/runtime-deviations-from-paper.md contains explicit VAL-APPROVALS-013 scoped-CTA deviation entry"
+        ],
+        "consoleErrors": "none",
+        "network": "agent-browser network requests: No requests captured"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-014",
+      "status": "pass",
+      "reason": "TTL-driven expiry countdown decremented over time with event TTL source and auto-dismissed at expiry without mutating policy state.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-2-prompt-core/VAL-APPROVALS-014-ttl-start.png"
+        ],
+        "observables": [
+          "countdown sample 1: t0=44s, ttlSource=event, dialog=true",
+          "countdown sample 2 (3s later): t3=40s, dialog=true",
+          "rate check sample: 45s -> 41s after ~3s",
+          "after expiry: dialogAfterExpiry=false, baseline=deny, afterExpiry=deny, queueLength=0"
+        ],
+        "consoleErrors": "none",
+        "network": "agent-browser network requests: No requests captured"
+      }
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Immediate post-enqueue reads can report stale queue/dialog state before React commit; a short wait (~300ms) was needed before sampling observables.",
+      "resolved": true,
+      "resolution": "Added deterministic wait steps before each modal-state capture.",
+      "affectedAssertions": [
+        "VAL-APPROVALS-007",
+        "VAL-APPROVALS-008",
+        "VAL-APPROVALS-009",
+        "VAL-APPROVALS-011",
+        "VAL-APPROVALS-014"
+      ]
+    },
+    {
+      "description": "Console contained one relay warning (`wss://relay.damus.io` WebSocket closed before established) while running locally with offline peers.",
+      "resolved": true,
+      "resolution": "Continued with local synthetic denial-event validation; warning did not block modal/policy assertions.",
+      "affectedAssertions": [
+        "VAL-APPROVALS-007",
+        "VAL-APPROVALS-008",
+        "VAL-APPROVALS-009",
+        "VAL-APPROVALS-010",
+        "VAL-APPROVALS-011",
+        "VAL-APPROVALS-012",
+        "VAL-APPROVALS-013",
+        "VAL-APPROVALS-014"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Validated 8 assertions for prompt core behavior using agent-browser (8 pass, 0 fail, 0 blocked)."
+}

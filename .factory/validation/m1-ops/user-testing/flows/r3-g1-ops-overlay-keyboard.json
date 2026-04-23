@@ -1,0 +1,125 @@
+{
+  "groupId": "r3-g1-ops-overlay-keyboard",
+  "testedAt": "2026-04-21T19:24:52Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "relayUrl": "ws://127.0.0.1:8194",
+    "agentBrowserSession": "r3-g1-ops-overlay-keyboard",
+    "tabsUsed": 2,
+    "storageIsolation": "single dedicated agent-browser session with localStorage scoped to this session"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-OPS-024",
+      "title": "Nonce-pool 'Trigger Sync' overlay surfaces during refill",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Capture baseline nonce/UI state on dashboard",
+          "expected": "No nonce sync overlay before depletion simulation",
+          "observed": "Baseline had nonceSnapshot {nonce_pool_size:70, nonce_pool_threshold:1} and no 'Syncing nonces'/'Trigger Sync' text"
+        },
+        {
+          "action": "Invoke window.__iglooTestSimulateNonceDepletion({ nonce_pool_size: 0, nonce_pool_threshold: 8, reason: 'nonce_pool_depleted' })",
+          "expected": "Syncing nonces + Trigger Sync overlay appears while depleted",
+          "observed": "During state showed nonceSnapshot {0,8}, sign_ready=false, degraded_reasons included nonce_pool_depleted, and both overlay strings rendered"
+        },
+        {
+          "action": "Invoke window.__iglooTestRestoreNonce() and re-check",
+          "expected": "Overlay clears once pool is back above threshold",
+          "observed": "After restore, nonceSnapshot returned to {70,1}, sign_ready=true, and overlay strings were absent"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-024-overlay-visible.png",
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-024-overlay-cleared.png"
+        ],
+        "observables": [
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-024-before.json",
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-024-during.json",
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-024-after.json"
+        ],
+        "consoleErrors": "none (m1-ops/r3-g1-ops-overlay-keyboard/console-errors.txt is empty)",
+        "network": "m1-ops/r3-g1-ops-overlay-keyboard/network-requests.txt (No requests captured); relay runtime validated via in-app readiness against ws://127.0.0.1:8194"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-025",
+      "title": "All OPS surfaces are keyboard reachable",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Populate valid dev-panel inputs and run Tab trace from Recover through OPS controls",
+          "expected": "Refresh peers, Test Sign, Test ECDH, Ping, Refresh All are all reachable in Tab order with visible focus",
+          "observed": "Trace reached all five controls in order; focused entries show outline/box-shadow focus-ring styles and controls were enabled"
+        },
+        {
+          "action": "Activate Refresh peers, Test Sign, Ping, Refresh All with Enter",
+          "expected": "Keyboard Enter activation dispatches equivalent operations",
+          "observed": "Enter on Refresh peers produced Ping pending request_id 4dd8d3d3082c456a2a17179a9729cda4; Enter on Test Sign produced sign dispatch request_id a07a2b2a1a88f893c3ee3da02a3764e4 with completed lifecycle; Enter on Ping produced ping dispatch request_id fdf6ed1d55145aadfb13c1d30e2c9f9c; Enter on Refresh All rotated ping pending request_id to 8bd602dfd80f6386060f38a0983d43cb"
+        },
+        {
+          "action": "Activate Test ECDH with Space",
+          "expected": "Keyboard Space activation dispatches equivalent ECDH operation",
+          "observed": "Space on Test ECDH produced pendingDispatchIndex ecdh request_id fefd755d08477ddec685867ddb4d80f6 for peer bd242ec568fd1c447d4fd3a08349d578e94cbaf51f6fd02825cf616af5fce169"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-025-baseline-controls.png",
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-025-focus-refresh-peers.png",
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-025-focus-test-sign.png",
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-025-focus-test-ecdh.png",
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-025-focus-ping.png",
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-025-focus-refresh-all.png"
+        ],
+        "observables": [
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-025-tab-trace-from-recover.jsonl",
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-025-tab-trace.jsonl",
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-025-activation-baseline.json",
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-025-after-refresh-enter.json",
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-025-after-test-sign-enter.json",
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-025-after-test-ecdh-space.json",
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-025-after-ping-enter.json",
+          "m1-ops/r3-g1-ops-overlay-keyboard/VAL-OPS-025-after-refresh-all-enter.json"
+        ],
+        "consoleErrors": "none (m1-ops/r3-g1-ops-overlay-keyboard/console-errors.txt is empty)",
+        "network": "m1-ops/r3-g1-ops-overlay-keyboard/network-requests.txt (No requests captured); keyboard assertions validated via runtime observables"
+      },
+      "issues": null
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "pass": 2,
+    "fail": 0,
+    "blocked": 0,
+    "skipped": 0
+  },
+  "frictions": [
+    {
+      "description": "Tab traversal can start from the last focused element if focus is not reset, which can make the initial order look offset.",
+      "resolved": true,
+      "resolution": "Anchored focus on the top-level Recover button and captured a deterministic Tab trace from that point.",
+      "affectedAssertions": [
+        "VAL-OPS-025"
+      ]
+    },
+    {
+      "description": "Single-tab dashboard context did not provide a dispatch-capable runtime for these assertions.",
+      "resolved": true,
+      "resolution": "Used DEV hooks to seed paired runtimes across two tabs in the same isolated session via ws://127.0.0.1:8194.",
+      "affectedAssertions": [
+        "VAL-OPS-024",
+        "VAL-OPS-025"
+      ]
+    }
+  ],
+  "blockers": []
+}

@@ -8,6 +8,7 @@ import { DistributionCompleteScreen } from "../screens/DistributionCompleteScree
 import { GenerationProgressScreen } from "../screens/GenerationProgressScreen";
 import { LoadBackupScreen, DecryptBackupScreen, ReviewSaveScreen, ImportErrorScreen } from "../screens/ImportScreens";
 import { EnterPackageScreen, HandshakeScreen, OnboardingFailedScreen, OnboardingCompleteScreen } from "../screens/OnboardScreens";
+import { OnboardSponsorConfigScreen, OnboardSponsorHandoffScreen } from "../screens/OnboardSponsorScreens";
 import { CollectSharesScreen, RecoverSuccessScreen } from "../screens/RecoverScreens";
 import {
   RotateKeysetFormScreen,
@@ -21,11 +22,12 @@ import {
   RotateDistributionCompleteScreen
 } from "../screens/RotateKeysetScreens";
 import {
-  EnterRotatePackageScreen,
-  ApplyingShareUpdateScreen,
-  ShareUpdateFailedScreen,
-  LocalShareUpdatedScreen
-} from "../screens/RotateShareScreens";
+  EnterReplacePackageScreen,
+  ApplyingReplacementScreen,
+  ReplacementFailedScreen,
+  ShareReplacedScreen
+} from "../screens/ReplaceShareScreens";
+import { RestoreFromRelayScreen } from "../screens/RestoreFromRelayScreen";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
 
 type RoutesLocation = Parameters<typeof Routes>[0]["location"];
@@ -44,6 +46,7 @@ export function CoreRoutes({ location, extraRoutes, relative = false }: { locati
       <Route path={pathFor("/create/profile", relative)} element={<CreateProfileScreen />} />
       <Route path={pathFor("/create/distribute", relative)} element={<DistributeSharesScreen />} />
       <Route path={pathFor("/create/complete", relative)} element={<DistributionCompleteScreen />} />
+      <Route path={pathFor("/restore-from-relay", relative)} element={<RestoreFromRelayScreen />} />
       <Route path={pathFor("/import", relative)} element={<LoadBackupScreen />} />
       <Route path={pathFor("/import/decrypt", relative)} element={<DecryptBackupScreen />} />
       <Route path={pathFor("/import/review", relative)} element={<ReviewSaveScreen />} />
@@ -52,6 +55,8 @@ export function CoreRoutes({ location, extraRoutes, relative = false }: { locati
       <Route path={pathFor("/onboard/handshake", relative)} element={<HandshakeScreen />} />
       <Route path={pathFor("/onboard/failed", relative)} element={<OnboardingFailedScreen />} />
       <Route path={pathFor("/onboard/complete", relative)} element={<OnboardingCompleteScreen />} />
+      <Route path={pathFor("/onboard-sponsor", relative)} element={<OnboardSponsorConfigScreen />} />
+      <Route path={pathFor("/onboard-sponsor/handoff", relative)} element={<OnboardSponsorHandoffScreen />} />
       <Route path={pathFor("/rotate-keyset", relative)} element={<RotateKeysetFormScreen />} />
       <Route path={pathFor("/rotate-keyset/review", relative)} element={<ReviewGenerateScreen />} />
       <Route path={pathFor("/rotate-keyset/progress", relative)} element={<RotateGenerationProgressScreen />} />
@@ -61,10 +66,10 @@ export function CoreRoutes({ location, extraRoutes, relative = false }: { locati
       <Route path={pathFor("/rotate-keyset/profile", relative)} element={<RotateCreateProfileScreen />} />
       <Route path={pathFor("/rotate-keyset/distribute", relative)} element={<RotateDistributeSharesScreen />} />
       <Route path={pathFor("/rotate-keyset/complete", relative)} element={<RotateDistributionCompleteScreen />} />
-      <Route path={pathFor("/rotate-share", relative)} element={<EnterRotatePackageScreen />} />
-      <Route path={pathFor("/rotate-share/applying", relative)} element={<ApplyingShareUpdateScreen />} />
-      <Route path={pathFor("/rotate-share/failed", relative)} element={<ShareUpdateFailedScreen />} />
-      <Route path={pathFor("/rotate-share/updated", relative)} element={<LocalShareUpdatedScreen />} />
+      <Route path={pathFor("/replace-share", relative)} element={<EnterReplacePackageScreen />} />
+      <Route path={pathFor("/replace-share/applying", relative)} element={<ApplyingReplacementScreen />} />
+      <Route path={pathFor("/replace-share/failed", relative)} element={<ReplacementFailedScreen />} />
+      <Route path={pathFor("/replace-share/replaced", relative)} element={<ShareReplacedScreen />} />
       <Route path={pathFor("/recover/:profileId", relative)} element={<CollectSharesScreen />} />
       <Route path={pathFor("/recover/:profileId/success", relative)} element={<RecoverSuccessScreen />} />
       <Route path={pathFor("/dashboard/:profileId", relative)} element={<DashboardScreen />} />

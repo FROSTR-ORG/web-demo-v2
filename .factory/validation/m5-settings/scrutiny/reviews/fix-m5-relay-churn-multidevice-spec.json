@@ -1,0 +1,26 @@
+{
+  "featureId": "fix-m5-relay-churn-multidevice-spec",
+  "reviewedAt": "2026-04-22T18:48:52Z",
+  "commitId": "afb590e79e70fb528a0f65919e9741c49b2cc434",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "This fix directly resolves the prior failure: the original feature commit e95ade90bf2d949a1cbffb3907566b8b100faf9f did not contain src/e2e/multi-device/relay-churn.spec.ts, while fix commit afb590e79e70fb528a0f65919e9741c49b2cc434 adds that spec plus a DEV-only __iglooTestUpdateRelays hook and observability tests. The new spec covers symmetric mid-sign relay churn and asserts untouched real-relay socket continuity (single open event, reconnectCount stays 0) with repeat-each=3 evidence in handoff verification.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "runtime-worker procedure compliance signaling appears inconsistent for this run: handoff marks followedProcedure=true, but the logged verification set omits skill-listed tsconfig.node/demo-gallery checks and transcript skeleton shows no agent-browser invocation.",
+      "evidence": ".factory/skills/runtime-worker/SKILL.md verification/manually-verify steps; mission handoff /Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/handoffs/2026-04-22T17-04-36-071Z__fix-m5-relay-churn-multidevice-spec__68a204af-acd6-4775-9ea9-4e191d0dc7d5.json (verification.commandsRun + skillFeedback.followedProcedure=true); transcript skeleton entry for workerSessionId 68a204af-acd6-4775-9ea9-4e191d0dc7d5 contains no agent-browser tool call."
+    },
+    {
+      "area": "knowledge",
+      "observation": "The seeded-runtime testing limitation that AppStateValue.updateRelays is profile/unlock-gated (and thus unusable from __iglooTestSeedRuntime) still is not explicitly captured in shared architecture/mission docs, despite now driving the new __iglooTestUpdateRelays hook pattern.",
+      "evidence": "src/app/AppStateProvider.tsx updateRelays gate path (~2433-2443) and DEV hook addition (~3807-3809); handoff implementation notes this blocker in /Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/handoffs/2026-04-22T17-04-36-071Z__fix-m5-relay-churn-multidevice-spec__68a204af-acd6-4775-9ea9-4e191d0dc7d5.json."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m5-settings/scrutiny/reviews/m5-relay-list-persist.json",
+  "summary": "PASS: the fix adequately addresses the original scrutiny failure by delivering the missing VAL-CROSS-005 multi-device relay-churn spec and supporting test hook coverage; no blocking defects were identified in the reviewed fix commit."
+}

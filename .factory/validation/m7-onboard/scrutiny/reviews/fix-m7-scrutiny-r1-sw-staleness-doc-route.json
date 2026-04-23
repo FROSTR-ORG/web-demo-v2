@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m7-scrutiny-r1-sw-staleness-doc-route",
+  "reviewedAt": "2026-04-23T05:02:01Z",
+  "commitId": "fdafb0bd997ccd7116750dd2c07e73a4aea9b494",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix fully addresses the prior blocking defect: the deviation doc now references `/onboard-sponsor/handoff` (not `/onboard-sponsor/package`) and the companion stale component name was corrected to `OnboardSponsorHandoffScreen`. Reviewing both the original failing diff (612a12f) and fix diff (fdafb0b) confirms the route mismatch is resolved and sponsor live-route references align with `src/app/CoreRoutes.tsx`.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The assigned `ui-screen-worker` skill remains a poor fit for docs-only work, so procedure deviations recur even on straightforward documentation fixes.",
+      "evidence": "Fix handoff (`d3205af6-cee5-4ecb-a361-be71465953fb`) records `skillFeedback.followedProcedure: false` with explicit skips for RED-first tests and agent-browser manual verification because only `docs/runtime-deviations-from-paper.md` changed; `.factory/skills/ui-screen-worker/SKILL.md` still mandates UI-centric steps."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m7-onboard/scrutiny/reviews/m7-sw-staleness-and-deviation-doc.json",
+  "summary": "PASS: commit fdafb0bd corrects the documented sponsor hand-off route to `/onboard-sponsor/handoff`, removes the stale `/onboard-sponsor/package` reference, and adequately resolves the prior scrutiny failure."
+}

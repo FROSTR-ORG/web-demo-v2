@@ -1,10 +1,22 @@
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mockLockProfile = vi.fn();
 const mockClearCredentials = vi.fn(() => Promise.resolve());
 const mockRefreshRuntime = vi.fn();
+const mockExportRuntimePackages = vi.fn(async () => ({
+  profilePackage: "bfprofile1realprofile",
+  sharePackage: "bfshare1realshare",
+  metadata: {
+    profileId: "test-profile-id",
+    groupName: "My Signing Key",
+    deviceName: "Igloo Web",
+    shareIdx: 0,
+    relayCount: 2,
+    peerCount: 3,
+  },
+}));
 
 const fakeProfile = {
   id: "test-profile-id",
@@ -69,6 +81,7 @@ vi.mock("../../app/AppState", () => ({
     clearCredentials: mockClearCredentials,
     setSignerPaused: vi.fn(),
     refreshRuntime: mockRefreshRuntime,
+    exportRuntimePackages: mockExportRuntimePackages,
   }),
 }));
 
@@ -76,6 +89,7 @@ import { DashboardScreen } from "../DashboardScreen";
 
 afterEach(() => {
   cleanup();
+  mockExportRuntimePackages.mockClear();
 });
 
 function renderDashboard() {
@@ -164,7 +178,7 @@ describe("Export Profile Modal", () => {
     expect(confirmShell?.classList.contains("matched")).toBe(true);
   });
 
-  it("Export button transitions to Export Complete modal", () => {
+  it("Export button transitions to Export Complete modal", async () => {
     renderDashboard();
     fireEvent.click(screen.getAllByText("Export")[0]);
 
@@ -176,13 +190,16 @@ describe("Export Profile Modal", () => {
     const submitBtn = Array.from(modalExportBtns).find((btn) => btn.textContent === "Export");
     fireEvent.click(submitBtn!);
 
-    expect(screen.queryByTestId("export-profile-modal")).not.toBeInTheDocument();
-    expect(screen.getByTestId("export-complete-modal")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByTestId("export-profile-modal")).not.toBeInTheDocument();
+      expect(screen.getByTestId("export-complete-modal")).toBeInTheDocument();
+    });
+    expect(mockExportRuntimePackages).toHaveBeenCalledWith("StrongPass1");
   });
 });
 
 describe("Export Complete Modal", () => {
-  function openExportComplete() {
+  async function openExportComplete() {
     renderDashboard();
     // Open export profile
     fireEvent.click(screen.getAllByText("Export")[0]);
@@ -193,12 +210,13 @@ describe("Export Complete Modal", () => {
     const modalExportBtns = screen.getByTestId("export-profile-modal").querySelectorAll("button");
     const submitBtn = Array.from(modalExportBtns).find((btn) => btn.textContent === "Export");
     fireEvent.click(submitBtn!);
+    await screen.findByTestId("export-complete-modal");
   }
 
-  it("renders green checkmark, Backup Ready title, masked backup, Copy, Download, warning, Done", () => {
-    openExportComplete();
+  it("renders green checkmark, Backup Ready title, masked backup, Copy, Download, warning, Done", async () => {
+    await openExportComplete();
 
-    expect(screen.getByText("Backup Ready")).toBeInTheDocument();
+    expect(screen.getByText("Profile Backup Ready")).toBeInTheDocument();
     expect(screen.getByTestId("backup-string")).toBeInTheDocument();
     expect(screen.getByText("Copy")).toBeInTheDocument();
     expect(screen.getByText("Download")).toBeInTheDocument();
@@ -206,15 +224,15 @@ describe("Export Complete Modal", () => {
     expect(screen.getByText("Done")).toBeInTheDocument();
   });
 
-  it("backup string starts masked with bullets", () => {
-    openExportComplete();
+  it("backup string starts masked with bullets", async () => {
+    await openExportComplete();
     const backupText = screen.getByTestId("backup-string").textContent!;
     expect(backupText).toContain("•");
     expect(backupText.startsWith("bfprofile1")).toBe(true);
   });
 
-  it("reveal toggle shows/hides full backup text", () => {
-    openExportComplete();
+  it("reveal toggle shows/hides full backup text", async () => {
+    await openExportComplete();
 
     // Initially masked
     const backupEl = screen.getByTestId("backup-string");
@@ -223,30 +241,32 @@ describe("Export Complete Modal", () => {
     // Click reveal
     fireEvent.click(screen.getByLabelText("Reveal backup string"));
     expect(backupEl.textContent).not.toContain("•");
+    expect(backupEl.textContent).toBe("bfprofile1realprofile");
 
     // Click hide
     fireEvent.click(screen.getByLabelText("Hide backup string"));
     expect(backupEl.textContent).toContain("•");
   });
 
-  it("Done button dismisses modal and returns to dashboard", () => {
-    openExportComplete();
+  it("Done button dismisses modal and returns to dashboard", async () => {
+    await openExportComplete();
     expect(screen.getByTestId("export-complete-modal")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Done"));
     expect(screen.queryByTestId("export-complete-modal")).not.toBeInTheDocument();
   });
 
-  it("Copy button shows 'Copied!' feedback", () => {
+  it("Copy button shows 'Copied!' feedback", async () => {
     // Mock clipboard
     Object.assign(navigator, {
       clipboard: { writeText: vi.fn(() => Promise.resolve()) },
     });
 
-    openExportComplete();
+    await openExportComplete();
 
     fireEvent.click(screen.getByText("Copy"));
     expect(screen.getByText("Copied!")).toBeInTheDocument();
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("bfprofile1realprofile");
   });
 });
 
@@ -262,7 +282,7 @@ describe("Export from Settings Sidebar", () => {
     const sidebar = screen.getByTestId("settings-sidebar");
     const sidebarExportBtn = sidebar.querySelector(".settings-btn-blue");
     expect(sidebarExportBtn).toBeTruthy();
-    // The first .settings-btn-blue might be Rotate Share; find the Export one
+    // The first .settings-btn-blue might be Replace Share; find the Export one
     const sidebarButtons = sidebar.querySelectorAll(".settings-btn-blue");
     const exportBtn = Array.from(sidebarButtons).find((btn) => btn.textContent === "Export");
     expect(exportBtn).toBeTruthy();
@@ -274,5 +294,32 @@ describe("Export from Settings Sidebar", () => {
     // Backup Ready modal returns the user to the same sidebar rows.
     expect(screen.getByTestId("settings-sidebar")).toBeInTheDocument();
     expect(screen.getByTestId("export-profile-modal")).toBeInTheDocument();
+  });
+
+  it("Settings sidebar Export Share opens share export mode and produces bfshare", async () => {
+    renderDashboard();
+    fireEvent.click(screen.getByLabelText("Settings"));
+
+    const exportShareRow = screen.getByText("Export Share").closest(".settings-action-row");
+    expect(exportShareRow).not.toBeNull();
+    fireEvent.click(exportShareRow!.querySelector(".settings-btn-blue")!);
+
+    expect(screen.getByTestId("export-profile-modal")).toBeInTheDocument();
+    expect(screen.getAllByText("Export Share").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByLabelText("Share Export Password")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Share Export Password"), { target: { value: "StrongPass1" } });
+    fireEvent.change(screen.getByLabelText("Confirm Password"), { target: { value: "StrongPass1" } });
+    const submitBtn = Array.from(
+      screen.getByTestId("export-profile-modal").querySelectorAll("button"),
+    ).find((btn) => btn.textContent === "Export");
+    fireEvent.click(submitBtn!);
+
+    await screen.findByTestId("export-complete-modal");
+    expect(screen.getByText("Share Package Ready")).toBeInTheDocument();
+    const backupEl = screen.getByTestId("backup-string");
+    expect(backupEl.textContent).toBe(`bfshare1${"•".repeat(28)}`);
+    fireEvent.click(screen.getByLabelText("Reveal backup string"));
+    expect(backupEl.textContent).toBe("bfshare1realshare");
   });
 });

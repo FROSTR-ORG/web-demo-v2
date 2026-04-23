@@ -1,0 +1,33 @@
+{
+  "featureId": "fix-followup-create-bootstrap-live-relay-pump",
+  "reviewedAt": "2026-04-23T17:05:46Z",
+  "commitId": "9be2e00ed6cf4da0f07d60dee60753cb8c38bc12",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature mostly implements the requested runtime bootstrap switch and test hook, but one blocking contract mismatch remains in createProfile relay validation.",
+    "issues": [
+      {
+        "file": "src/app/AppStateProvider.tsx",
+        "line": 1705,
+        "severity": "blocking",
+        "description": "With `__iglooTestAllowInsecureRelayForRestore` enabled, `createProfile` allows both `ws://127.0.0.1:*` and `ws://localhost:*`. The feature contract/VAL-FOLLOWUP-010 scopes the DEV insecure exception to `ws://127.0.0.1:*`; accepting `localhost` broadens the allowlist to a non-specified ws:// URL."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The assigned `protocol-flow-worker` skill is scoped to source-side onboarding sponsorship ceremonies and mandates agent-browser validation, but this feature is a createProfile relay-bootstrap fix and the reviewed transcript skeleton does not show agent-browser execution.",
+      "evidence": ".factory/skills/protocol-flow-worker/SKILL.md:3,13,19-21,47,58 describe onboarding-sponsorship + mandatory agent-browser workflow; worker transcript skeleton for session fcb0146c-3932-4fa1-9250-cd6a47ca4262 shows skill calls to mission-worker-base/protocol-flow-worker and CLI vitest/tsc work, with no agent-browser step."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Mission shared guidance for `__iglooTestAllowInsecureRelayForRestore` is now stale after this feature.",
+      "evidence": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/AGENTS.md:17 says the flag is for restoreProfileFromRelay only and \"is NOT read anywhere else\", but the reviewed commit reads it in createProfile relay validation (`src/app/AppStateProvider.tsx` around lines 1693-1699 in commit 9be2e00...)."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review failed due to one blocking requirement mismatch: DEV insecure relay allowlisting at createProfile is broader than the specified `ws://127.0.0.1:*` exception. I also noted shared-state gaps around skill fit and AGENTS guidance drift."
+}

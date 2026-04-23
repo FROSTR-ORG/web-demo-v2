@@ -1,0 +1,28 @@
+{
+  "featureId": "fix-m2-persist-always-allow-to-profile",
+  "reviewedAt": "2026-04-21T21:34:49Z",
+  "commitId": "2403e51c32f43fddf2087c277af6af18d24aaa3c",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix adequately addresses the original failure by persisting always-* policy overrides through the encrypted profile write path before runtime mutation, reapplying stored manual overrides on unlock, and adding focused lock/unlock persistence tests. Comparing against the original failed feature diff confirms the previous lock/unlock-loss behavior is now covered. One non-blocking issue remains in the receiving-tab BroadcastChannel path: it captures a stale persistence callback due an empty-effect dependency array.",
+    "issues": [
+      {
+        "file": "src/app/AppStateProvider.tsx",
+        "line": 2340,
+        "severity": "non_blocking",
+        "description": "The BroadcastChannel install effect uses `[]` dependencies but `applyRemoteDecision` inside it calls `persistPolicyOverrideToProfile`, whose closure depends on `activeProfile` (`persistPolicyOverrideToProfile` defined at line 511 with `[activeProfile]`). Because the effect never rebinds, receiving-tab `allow-always`/`deny-always` decisions (lines 2230/2245) can use the initial callback (often with `activeProfile === null`), making persistence in that path a no-op despite the intent to share the same persistence-first flow."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "runtime-worker's skip criteria for agent-browser mention requiring demo-gallery to pass, but mission policy explicitly allows a known pre-existing demo-gallery failure; this mismatch can force ambiguous skillFeedback reporting.",
+      "evidence": "`/.factory/skills/runtime-worker/SKILL.md` says non-UI fixes may skip agent-browser only if demo-gallery run passes, while mission `AGENTS.md` documents a known pre-existing failure (`misc-peers-panel-nested-button`) that should not fail features. This reviewed handoff reports `followedProcedure: true` with a demo-gallery run that still had the known failure."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m2-approvals/scrutiny/reviews/m2-reactive-policy-prompt-modal.json",
+  "summary": "PASS: reviewed fix transcript skeleton, prior failed review, and both diffs (`6c69d3fc...` and `2403e51...`). The original always-allow lock/unlock persistence gap is addressed by persistence-first writes plus unlock reapplication and targeted tests; noted one non-blocking BroadcastChannel dependency issue in the receiving-tab persistence path."
+}

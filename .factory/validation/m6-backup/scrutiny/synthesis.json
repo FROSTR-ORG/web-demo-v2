@@ -1,0 +1,45 @@
+{
+  "milestone": "m6-backup",
+  "round": 2,
+  "status": "pass",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "npx vitest run --config \"/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/vitest.config.ts\" --maxConcurrency 4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "npx tsc --noEmit -p \"/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/tsconfig.json\" --pretty false",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "skills",
+      "suggestion": "Tighten ui-screen-worker procedure wording so RED-first evidence is explicitly required in verification artifacts, and the manual agent-browser skip exception cannot be used for behavior-changing validation logic fixes.",
+      "evidence": "fix-m6-publish-backup-metadata review notes missing RED-first failing-run evidence; fix-m6-nsec-structural-validation review notes copy/data exception usage despite behavior-changing validation gating.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "ui-screen-worker RED-first compliance note from fix-m6-publish-backup-metadata.",
+      "reason": "duplicate: same procedure-compliance class was already raised in round 1; retained one consolidated skills recommendation in this synthesis."
+    }
+  ],
+  "previousRound": ".factory/validation/m6-backup/scrutiny/synthesis.round1.json"
+}

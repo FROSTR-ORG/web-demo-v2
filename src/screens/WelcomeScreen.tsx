@@ -32,7 +32,7 @@ export function WelcomeScreen() {
   const returning = profiles.length > 0;
   const isMulti = profiles.length >= 2;
   const isMany = profiles.length >= 4;
-  const showRotateShareFirst = !returning && variant === "rotate-share-first";
+  const showReplaceShareFirst = !returning && variant === "replace-share-first";
 
   /* --- Scrollable list overflow tracking for 4+ profiles --- */
   const listRef = useRef<HTMLDivElement>(null);
@@ -172,12 +172,19 @@ export function WelcomeScreen() {
         >
           Onboard
         </button>
+        <button
+          type="button"
+          className="returning-chip-btn"
+          onClick={() => navigate("/restore-from-relay")}
+        >
+          Restore from Relay
+        </button>
       </div>
     );
   }
 
-  /** Chip-pair entry shown when no profiles yet and the user wants the rotate-share entry path. */
-  function renderRotateShareFirstActions() {
+  /** Chip-pair entry shown when no profiles yet and the user wants the replace-share entry path. */
+  function renderReplaceShareFirstActions() {
     return (
       <div className="returning-chip-actions">
         <span>or</span>
@@ -191,9 +198,9 @@ export function WelcomeScreen() {
         <button
           type="button"
           className="returning-chip-btn"
-          onClick={() => navigate("/rotate-share")}
+          onClick={() => navigate("/replace-share")}
         >
-          Rotate Share
+          Replace Share
         </button>
       </div>
     );
@@ -221,7 +228,7 @@ export function WelcomeScreen() {
         ) : null}
 
         {/* ---- First-time welcome (no profiles) ---- */}
-        {!returning && !showRotateShareFirst && (
+        {!returning && !showReplaceShareFirst && (
           <div className="panel welcome-card">
             <div className="welcome-card-body">
               <div className="welcome-card-title">
@@ -263,13 +270,20 @@ export function WelcomeScreen() {
               >
                 Onboard
               </button>
+              <button
+                type="button"
+                className="returning-chip-btn"
+                onClick={() => navigate("/restore-from-relay")}
+              >
+                Restore from Relay
+              </button>
             </div>
           </div>
         )}
 
-        {/* ---- Rotate-share-first entry (no profiles, chip-pair entry) ---- */}
-        {showRotateShareFirst && (
-          <div className="panel welcome-card welcome-rotate-share-card">
+        {/* ---- Replace-share-first entry (no profiles, chip-pair entry) ---- */}
+        {showReplaceShareFirst && (
+          <div className="panel welcome-card welcome-replace-share-card">
             <div className="welcome-card-body">
               <div className="welcome-card-title">
                 <span className="icon-tile">
@@ -285,7 +299,7 @@ export function WelcomeScreen() {
                 this browser to an existing keyset.
               </p>
             </div>
-            {renderRotateShareFirstActions()}
+            {renderReplaceShareFirstActions()}
           </div>
         )}
 

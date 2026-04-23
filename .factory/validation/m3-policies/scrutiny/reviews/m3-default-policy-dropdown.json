@@ -1,0 +1,39 @@
+{
+  "featureId": "m3-default-policy-dropdown",
+  "reviewedAt": "2026-04-22T01:34:20Z",
+  "commitId": "7d5e7cb42585ac5de8de7b5899fcf6670238cb12",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The dropdown UI and keyboard mechanics are largely implemented, but there are two blocking correctness issues: policy writes target `request` cells instead of the feature’s specified `respond` cells, and the internal ownership tracking can overwrite later user manual overrides when switching defaults.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen/panels/DefaultPolicyDropdown.tsx",
+        "line": 232,
+        "severity": "blocking",
+        "description": "Default-policy application dispatches `direction: \"request\"` for both \"Deny by default\" and \"Allow known peers\" (also keyed as `:request:` in tracking), but the feature description specifies `Deny by default = respond.*=deny` for inbound-request handling. This wiring cannot enforce the described reactive-denial semantics."
+      },
+      {
+        "file": "src/screens/DashboardScreen/panels/DefaultPolicyDropdown.tsx",
+        "line": 206,
+        "severity": "blocking",
+        "description": "The component unsets every previously dropdown-applied key on each selection change (`priorKeys`), while `hasUserOverride` treats keys in `defaultAppliedKeys` as non-user-owned. If a user manually changes a cell after a default was applied, that cell can still be in `priorKeys` and gets unset on the next default switch, clobbering manual overrides and violating the 'peers with overrides are unaffected' invariant."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Mission artifacts disagree on policy direction semantics for this dropdown, which likely contributed to incorrect direction wiring and tests.",
+      "evidence": "features.json:2120 defines \"Deny by default\" as `respond.*=deny`; validation-contract.md:590-592 asserts `effective_policy.request.*`; architecture.md:76 states inbound denial checks `respond.sign`."
+    },
+    {
+      "area": "skills",
+      "observation": "The ui-screen-worker skill requirement around `ui-builder` appears too rigid/unclear for component-level UI changes, and workers can mark followedProcedure=true without invoking it.",
+      "evidence": ".factory/skills/ui-screen-worker/SKILL.md:22 requires invoking `ui-builder` for Paper-derived UI work; transcript skeleton for worker session c0b287e1-4acc-4139-a744-d81ae6b4d7b1 shows skills `mission-worker-base` and `ui-screen-worker` only; handoff JSON lines 124-126 records `followedProcedure: true` with no deviations."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "FAIL: Reviewed the feature handoff, transcript skeleton, and commit 7d5e7cb. The implementation does not fully satisfy the feature contract due to direction-mapping and override-clobbering bugs in DefaultPolicyDropdown."
+}

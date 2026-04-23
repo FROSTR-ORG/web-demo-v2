@@ -1,0 +1,28 @@
+{
+  "featureId": "m4-event-log-panel",
+  "reviewedAt": "2026-04-22T15:38:26Z",
+  "commitId": "5ce39c8",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature largely wires EventLogPanel to RuntimeEventLog as intended (newest-first rows, typed badges, expandable pretty JSON, scrubber, and clear mutator wiring), but it contains a blocking post-clear regression: after clearing, newly ingested events remain hidden until their seq exceeds the pre-clear max seq.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen/panels/EventLogPanel.tsx",
+        "line": 232,
+        "severity": "blocking",
+        "description": "`clearedBaselineSeq` is only cleared when an incoming entry has `entry.seq > clearedBaselineSeq` (lines 232-233), but `clearRuntimeEventLog()` resets seq to 0 in AppStateProvider (src/app/AppStateProvider.tsx line 993). After Clear, new entries start again at seq 1 and fail the `> baseline` condition, so `visibleRows` continues filtering with `entry.seq > clearedBaselineSeq` (line 247) and hides legitimate post-clear events until seq surpasses the old maximum. This violates expected event-log behavior immediately after clearing."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The worker session shows no agent-browser execution even though both AGENTS.md and ui-screen-worker require agent-browser for changed UI surfaces; handoff still marks followedProcedure=true with no deviations.",
+      "evidence": "mission AGENTS.md (Testing & Validation Guidance) says agent-browser is mandatory for UI validation; .factory/skills/ui-screen-worker/SKILL.md lists agent-browser as required for new/changed user-visible elements; transcript skeleton for session efb076ad-fd5e-43fe-b520-6b08328dc9e0 contains Skill/TodoWrite/Execute calls but no agent-browser call."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed feature m4-event-log-panel via features.json metadata, handoff, transcript skeleton, skill instructions, and commit 5ce39c8 diff. Found one blocking correctness defect in EventLogPanel clear-baseline handling that suppresses valid post-clear events due to seq reset semantics; report marked fail."
+}

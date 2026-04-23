@@ -1,0 +1,126 @@
+{
+  "groupId": "g6-backup-rerun-fixes",
+  "testedAt": "2026-04-22T23:08:34Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "flowValidatorGuidance": "playwright-cli",
+    "serialExecutionRequired": true,
+    "assignedAssertions": [
+      "VAL-BACKUP-006",
+      "VAL-BACKUP-007",
+      "VAL-BACKUP-010",
+      "VAL-BACKUP-013",
+      "VAL-BACKUP-028",
+      "VAL-BACKUP-030",
+      "VAL-BACKUP-031"
+    ]
+  },
+  "toolsUsed": [
+    "playwright-cli",
+    "vitest"
+  ],
+  "commandsRun": [
+    {
+      "command": "npx playwright test src/e2e/multi-device/backup-publish-restore-live.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "status": "pass",
+      "evidence": {
+        "transcript": "m6-backup/g6-backup-rerun-fixes/01-backup-publish-restore-live.txt",
+        "exitCodeFile": "m6-backup/g6-backup-rerun-fixes/01-backup-publish-restore-live.exit",
+        "snippet": "1 passed (8.3s)"
+      }
+    },
+    {
+      "command": "npx playwright test src/e2e/multi-device/backup-publish.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "status": "pass",
+      "evidence": {
+        "transcript": "m6-backup/g6-backup-rerun-fixes/02-backup-publish.txt",
+        "exitCodeFile": "m6-backup/g6-backup-rerun-fixes/02-backup-publish.exit",
+        "snippet": "1 passed (1.7s)"
+      }
+    },
+    {
+      "command": "npx vitest run src/screens/__tests__/CreateFlow.test.tsx -t \"reflects the trimmed nsec in input.value on change, before submit (VAL-BACKUP-028)\"",
+      "exitCode": 0,
+      "status": "inconclusive",
+      "evidence": {
+        "transcript": "m6-backup/g6-backup-rerun-fixes/03-createflow-val-backup-028.txt",
+        "exitCodeFile": "m6-backup/g6-backup-rerun-fixes/03-createflow-val-backup-028.exit",
+        "snippet": "Test Files 1 skipped; Tests 26 skipped"
+      }
+    }
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-BACKUP-006",
+      "title": "Duplicate publish replaces prior backup event",
+      "status": "pass",
+      "reason": "Authoritative harness command passed and explicitly covered VAL-BACKUP-006 behavior in its test title/output.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/backup-publish-restore-live.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-BACKUP-007",
+      "title": "Publish fails cleanly when no relays configured or all offline",
+      "status": "pass",
+      "reason": "backup-publish.spec.ts passed and includes canonical no-relay publish error coverage in test output.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/backup-publish.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-BACKUP-010",
+      "title": "Decrypt on correct password adds new profile entry",
+      "status": "pass",
+      "reason": "Authoritative live restore harness passed and explicitly covered restore-adds-profile behavior.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/backup-publish-restore-live.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-BACKUP-013",
+      "title": "Restored profile unlocks and loads runtime successfully",
+      "status": "pass",
+      "reason": "Authoritative live restore harness passed and explicitly covered unlock with matching group pubkey.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/backup-publish-restore-live.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-BACKUP-028",
+      "title": "Pasted nsec whitespace is trimmed without losing material",
+      "status": "blocked",
+      "reason": "Required targeted Vitest command exited 0 but executed no matching test (all tests skipped), so no direct pass/fail evidence was produced for this assertion.",
+      "commandEvidence": "npx vitest run src/screens/__tests__/CreateFlow.test.tsx -t \"reflects the trimmed nsec in input.value on change, before submit (VAL-BACKUP-028)\""
+    },
+    {
+      "id": "VAL-BACKUP-030",
+      "title": "Duplicate restore produces a single profile entry",
+      "status": "pass",
+      "reason": "Authoritative live restore harness passed and explicitly covered duplicate-restore idempotence.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/backup-publish-restore-live.spec.ts --project=desktop --workers 1"
+    },
+    {
+      "id": "VAL-BACKUP-031",
+      "title": "Replaceable-event race: only newer backup persists",
+      "status": "pass",
+      "reason": "Authoritative harness passed and explicitly covered strictly monotonic created_at behavior for replay publishes.",
+      "commandEvidence": "npx playwright test src/e2e/multi-device/backup-publish-restore-live.spec.ts --project=desktop --workers 1"
+    }
+  ],
+  "frictions": [
+    {
+      "description": "The exact provided Vitest -t string behaved as a regex that did not match any test names, resulting in a fully skipped run despite exit code 0.",
+      "resolved": false,
+      "resolution": "Not resolved in this assignment; captured as evidence and marked VAL-BACKUP-028 blocked.",
+      "affectedAssertions": [
+        "VAL-BACKUP-028"
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "description": "No executable targeted unit test evidence was produced for VAL-BACKUP-028 from the mandated command because the run skipped all tests.",
+      "affectedAssertions": [
+        "VAL-BACKUP-028"
+      ],
+      "quickFixAttempted": "Executed the exact required command once serially and captured transcript/exit code."
+    }
+  ],
+  "overallSummary": "7 assertions targeted: 6 pass, 0 fail, 1 blocked (VAL-BACKUP-028 due to skipped targeted Vitest run)."
+}

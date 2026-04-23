@@ -1,0 +1,69 @@
+{
+  "groupId": "r3-g2-ops-tab-close",
+  "testedAt": "2026-04-21T19:22:30Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "relayUrl": "ws://127.0.0.1:8194",
+    "agentBrowserSession": "r3-g2-ops-tab-close"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-OPS-028",
+      "title": "Window close cleans up pending OPS state",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Open app in isolated agent-browser session, install explicit WebSocket close-event capture hook, and seed runtime via DEV hook (__iglooTestSeedRuntime) on ws://127.0.0.1:8194",
+          "expected": "Live relay connection with in-flight pending operation before close/navigation-away",
+          "observed": "runtimeRelays showed ws://127.0.0.1:8194 online; pending_operations contained in-flight Ping request_ids b14f6c6e59290d6e86750df043c6a70d and fb047c6af0f1a096694c6d30ecbf3975"
+        },
+        {
+          "action": "Navigate away (about:blank) to trigger unload cleanup, then reopen app in the same browser session",
+          "expected": "Relay socket closes cleanly with close code 1000/1001 and close-frame evidence is observable after reopen",
+          "observed": "__debug.relayHistory after reopen contained only open entries; explicit close-event hook captured close code 1006 (wasClean=false), not 1000/1001"
+        },
+        {
+          "action": "Reseed same runtime identity from session seed after reopen and compare against pre-close pending request_ids",
+          "expected": "Fresh runtime starts with no stale pending operations from closed session",
+          "observed": "pendingImmediately was []; stalePresent=[] (pre-close request_ids did not reappear)"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r3-g2-ops-tab-close/VAL-OPS-028-before-close.png",
+          "m1-ops/r3-g2-ops-tab-close/VAL-OPS-028-after-reopen.png"
+        ],
+        "observables": [
+          "m1-ops/r3-g2-ops-tab-close/VAL-OPS-028-pre-close-state.json",
+          "m1-ops/r3-g2-ops-tab-close/VAL-OPS-028-after-reopen-state.json",
+          "m1-ops/r3-g2-ops-tab-close/VAL-OPS-028-reseed-pending-check.json"
+        ],
+        "consoleErrors": "none",
+        "network": "agent-browser network requests had no WS-frame telemetry; explicit WebSocket close hook captured close event code=1006 (wasClean=false) during navigation-away"
+      },
+      "issues": "Pending cleanup semantics were observed, but required clean close-frame evidence (1000/1001) was not met; observed close event was 1006 abnormal closure."
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "pass": 0,
+    "fail": 1,
+    "blocked": 0,
+    "skipped": 0
+  },
+  "frictions": [
+    {
+      "description": "agent-browser network capture did not expose websocket frame-level close telemetry for this run.",
+      "resolved": true,
+      "resolution": "Added explicit in-page WebSocket close-event capture hook as backup evidence attempt.",
+      "affectedAssertions": [
+        "VAL-OPS-028"
+      ]
+    }
+  ],
+  "blockers": []
+}

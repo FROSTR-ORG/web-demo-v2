@@ -5,11 +5,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // Paper content-parity tests for the Settings sidebar variant at
 // /demo/dashboard-settings-lock-profile (VAL-DSH-010..013 + VAL-DSH-021).
 //
-// The AppState mock below pins activeProfile.relays to the two-entry list
-// that all other dashboard assertions depend on; the third relay row
-// (`wss://nos.lol`) is added by the SettingsSidebar component itself as a
-// paper-parity hint so VAL-DSH-001 / VAL-DSH-004 / VAL-DSH-015 (which key off
-// `activeProfile.relays.length`) remain green.
+// As of `m5-relay-list-persist` the Settings sidebar no longer auto-
+// appends a paper-parity `wss://nos.lol` hint — the relay list now
+// reflects the active profile exactly (so Add/Remove/Edit persist the
+// real IDB record without smuggling fake rows into the write). This
+// test fixture therefore seeds the active profile with the three Paper
+// reference relays directly; every other test file in this repo still
+// pins its own two-entry activeProfile.relays to preserve VAL-DSH-001 /
+// VAL-DSH-004 / VAL-DSH-015 content parity.
 
 const mockLockProfile = vi.fn();
 const mockClearCredentials = vi.fn(() => Promise.resolve());
@@ -27,7 +30,11 @@ const fakeProfile = {
   // flag it; value starts with "npub1qe3" so paperGroupKey() collapses it to
   // the paper-reference short form "npub1qe3...7k4m".
   ["group" + "PublicKey"]: ["npub1", "qe3", "abc", "def", "123", "456", "789", "0abc", "def7", "k4m"].join(""),
-  relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
+  relays: [
+    "wss://relay.primal.net",
+    "wss://relay.damus.io",
+    "wss://nos.lol",
+  ],
   createdAt: Date.now(),
   lastUsedAt: Date.now(),
 } as const as unknown as {
@@ -139,16 +146,19 @@ function renderWith(demoUi: DemoUi) {
 
 describe("dashboard-settings-sidebar-fidelity", () => {
   describe("VAL-DSH-010: Sidebar section order + Paper-parity rows", () => {
-    it("renders Device Profile, Group Profile, Rotate Share, Export & Backup, Profile Security sections in order", () => {
+    it("renders Device Profile, Group Profile, Replace Share, Onboard a Device, Export & Backup, Profile Security sections in order", () => {
       renderWith({ dashboard: { settingsOpen: true, paperPanels: true } });
       const sidebar = screen.getByTestId("settings-sidebar");
       const labels = Array.from(
         sidebar.querySelectorAll(".settings-section-label")
       ).map((el) => el.textContent);
+      // m7-onboard-sponsor-ui — "Onboard a Device" sits between
+      // Replace Share and Export & Backup per VAL-ONBOARD-001.
       expect(labels).toEqual([
         "Device Profile",
         "Group Profile",
-        "Rotate Share",
+        "Replace Share",
+        "Onboard a Device",
         "Export & Backup",
         "Profile Security",
       ]);
@@ -163,14 +173,20 @@ describe("dashboard-settings-sidebar-fidelity", () => {
       expect(screen.getByPlaceholderText("wss://...")).toBeInTheDocument();
     });
 
-    it("Group Profile section shows Keyset Name, npub, Threshold, Created/Updated dates and sync note", () => {
+    it("Group Profile section shows Keyset Name, npub, Threshold, Created/Updated rows and sync note", () => {
       renderWith({ dashboard: { settingsOpen: true, paperPanels: true } });
       expect(screen.getByText("Keyset Name")).toBeInTheDocument();
       expect(screen.getByText("Keyset npub")).toBeInTheDocument();
       expect(screen.getByText("Threshold")).toBeInTheDocument();
       expect(screen.getByText("2 of 3")).toBeInTheDocument();
-      expect(screen.getByText("Feb 24, 2026")).toBeInTheDocument();
-      expect(screen.getByText("Mar 8, 2026")).toBeInTheDocument();
+      // Created / Updated rows are sourced from the active profile's real
+      // epoch-ms timestamps (VAL-SETTINGS-008) — the hardcoded Paper
+      // placeholders "Feb 24, 2026" / "Mar 8, 2026" have been removed.
+      expect(screen.getByText("Created")).toBeInTheDocument();
+      expect(screen.getByText("Updated")).toBeInTheDocument();
+      const sidebar = screen.getByTestId("settings-sidebar");
+      expect(sidebar.textContent ?? "").not.toContain("Feb 24, 2026");
+      expect(sidebar.textContent ?? "").not.toContain("Mar 8, 2026");
       expect(
         screen.getByText("Shared across all peers. Synced via Nostr.")
       ).toBeInTheDocument();
@@ -183,7 +199,7 @@ describe("dashboard-settings-sidebar-fidelity", () => {
         screen.getByText("Encrypted backup of your share and configuration")
       ).toBeInTheDocument();
       expect(screen.getByText("Export Share")).toBeInTheDocument();
-      expect(screen.getByText("Unencrypted share key in hex")).toBeInTheDocument();
+      expect(screen.getByText("Password-protected bfshare package")).toBeInTheDocument();
     });
 
     it("Profile Security exposes Lock Profile + Clear Credentials rows with Paper copy", () => {

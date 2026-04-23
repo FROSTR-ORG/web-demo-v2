@@ -15,10 +15,12 @@ import {
 } from "../../lib/bifrost/packageService";
 import { packagePasswordForShare } from "../../lib/bifrost/format";
 import type {
-  BfProfilePayload,
   StoredProfileRecord,
 } from "../../lib/bifrost/types";
-import { SetupFlowError } from "../AppState";
+import {
+  BRIDGE_EVENT,
+  BRIDGE_STORAGE_KEY,
+} from "../appStateBridge";
 
 const storage = new Map<string, unknown>();
 
@@ -121,6 +123,55 @@ describe("AppState setup flows", () => {
     await waitFor(() => expect(getState().createSession).toBeNull());
   }, 45_000);
 
+  it("splits a pasted existing nsec into a keyset whose group pubkey matches the nsec and whose shares round-trip to the pasted value (VAL-BACKUP-020 / m6-nsec-split-create)", async () => {
+    const getState = await renderProvider();
+    // Pretend the user pasted an existing nsec by generating one up-front
+    // and feeding it into `createKeyset` via the `existingNsec` field.
+    const pasted = await generateNsec();
+
+    await act(async () => {
+      await getState().createKeyset({
+        groupName: "Pasted Nsec Key",
+        threshold: 2,
+        count: 3,
+        existingNsec: pasted.nsec,
+      });
+    });
+    await waitFor(() =>
+      expect(getState().createSession?.keyset?.group.group_name).toBe(
+        "Pasted Nsec Key",
+      ),
+    );
+
+    const session = getState().createSession!;
+    const keyset = session.keyset!;
+    // The group pubkey is a BIP-340 x-only key derived from the pasted
+    // nsec; we can't derive it directly from the secret without WASM, so
+    // the round-trip recovery below is the canonical proof the pasted
+    // nsec is the signing root (VAL-BACKUP-020).
+    expect(keyset.group.group_pk).toMatch(/^[0-9a-f]{64}$/);
+
+    // Any threshold of shares reconstructs the original pasted nsec.
+    const recovered = await recoverNsecFromShares({
+      group: keyset.group,
+      shares: keyset.shares.slice(0, keyset.group.threshold),
+    });
+    expect(recovered.nsec).toBe(pasted.nsec);
+    expect(recovered.signing_key_hex).toBe(pasted.signing_key_hex);
+
+    // The pasted nsec must NOT appear in the in-memory create draft nor in
+    // any idb-keyval store (VAL-BACKUP-023).
+    expect(JSON.stringify(session.draft)).not.toContain(pasted.nsec);
+    expect(JSON.stringify(Array.from(storage.entries()))).not.toContain(
+      pasted.nsec,
+    );
+
+    act(() => {
+      getState().clearCreateSession();
+    });
+    await waitFor(() => expect(getState().createSession).toBeNull());
+  }, 45_000);
+
   it("creates real remote onboarding packages with one chosen distribution password and default peer policies", async () => {
     const getState = await renderProvider();
 
@@ -142,8 +193,6 @@ describe("AppState setup flows", () => {
         deviceName: "Create Browser",
         password: "local-password",
         confirmPassword: "local-password",
-        distributionPassword: "remote-password",
-        confirmDistributionPassword: "remote-password",
         relays: ["wss://relay.example.test"],
       });
     });
@@ -151,16 +200,52 @@ describe("AppState setup flows", () => {
     await waitFor(() =>
       expect(getState().createSession?.onboardingPackages).toHaveLength(1),
     );
+    // fix-followup-distribute-2a — createProfile no longer encrypts
+    // onboarding packages eagerly. Each remote share enters the
+    // Distribute screen in a "Package not created" state
+    // (packageCreated === false, no packageText). The per-share
+    // `encodeDistributionPackage(idx, password)` mutator is the sole
+    // call-site that produces a populated bfonboard package; it
+    // populates a redacted preview on the React state and stashes the
+    // plaintext in the provider's secret ref.
+    {
+      const preEncodePkg = getState().createSession!.onboardingPackages[0];
+      expect(preEncodePkg.packageCreated).toBe(false);
+      expect(preEncodePkg.packageText).toBe("");
+      expect(preEncodePkg.password).toBe("");
+    }
+    await act(async () => {
+      for (const pkg of getState().createSession!.onboardingPackages) {
+        await getState().encodeDistributionPackage(pkg.idx, "remote-password");
+      }
+    });
     const session = getState().createSession!;
     const remotePackage = session.onboardingPackages[0];
+    expect(remotePackage.packageCreated).toBe(true);
+    // The post-encodeDistributionPackage `packageText` on the
+    // React state is the first 24 chars of the bfonboard1… string
+    // (redacted preview). The full plaintext lives on the
+    // provider's per-share secret ref.
+    expect(remotePackage.packageText.startsWith("bfonboard1")).toBe(true);
+    expect(remotePackage.packageText.length).toBeLessThanOrEqual(24);
+    expect(remotePackage.password).toBe("[redacted]");
+    const plaintextRemotePackage =
+      getState().getCreateSessionPackageSecret(remotePackage.idx);
+    expect(plaintextRemotePackage).not.toBeNull();
+    expect(plaintextRemotePackage!.packageText.startsWith("bfonboard1")).toBe(
+      true,
+    );
     await expect(
-      decodeBfonboardPackage(remotePackage.packageText, "remote-password"),
+      decodeBfonboardPackage(
+        plaintextRemotePackage!.packageText,
+        "remote-password",
+      ),
     ).resolves.toMatchObject({
       relays: ["wss://relay.example.test"],
     });
     await expect(
       decodeBfonboardPackage(
-        remotePackage.packageText,
+        plaintextRemotePackage!.packageText,
         packagePasswordForShare("Create Flow Key", remotePackage.idx),
       ),
     ).rejects.toThrow();
@@ -196,6 +281,96 @@ describe("AppState setup flows", () => {
     });
     await waitFor(() => expect(getState().createSession).toBeNull());
   }, 45_000);
+
+  it(
+    "clears the package-secrets ref when createSession is reset by the AppState bridge (fix-m7-scrutiny-r1-createsession-packagesecrets-ref-reset)",
+    async () => {
+      const getState = await renderProvider();
+
+      await act(async () => {
+        await getState().createKeyset({
+          groupName: "Bridge Reset Key",
+          threshold: 2,
+          count: 3,
+        });
+      });
+      await waitFor(() =>
+        expect(getState().createSession?.keyset?.group.group_name).toBe(
+          "Bridge Reset Key",
+        ),
+      );
+
+      await act(async () => {
+        await getState().createProfile({
+          deviceName: "Bridge Reset Browser",
+          password: "local-password",
+          confirmPassword: "local-password",
+          relays: ["wss://relay.example.test"],
+        });
+      });
+
+      await waitFor(() =>
+        expect(getState().createSession?.onboardingPackages?.length ?? 0)
+          .toBeGreaterThan(0),
+      );
+      // fix-followup-distribute-2a — explicitly encode each remote
+      // share so the per-share secret ref is populated before we
+      // assert on plaintext retrievability.
+      await act(async () => {
+        for (const pkg of getState().createSession!.onboardingPackages) {
+          await getState().encodeDistributionPackage(pkg.idx, "remote-password");
+        }
+      });
+      const packages = getState().createSession!.onboardingPackages;
+      // Sanity: the plaintext stash is populated for every remote package.
+      for (const pkg of packages) {
+        const secret = getState().getCreateSessionPackageSecret(pkg.idx);
+        expect(secret).not.toBeNull();
+        expect(secret!.packageText.startsWith("bfonboard1")).toBe(true);
+      }
+
+      // Simulate a bridge-driven reset of createSession. The real
+      // `AppStateProvider.applyBridge` handler sets createSession to null
+      // (along with every other setup session) whenever a BRIDGE_EVENT
+      // delivers a fresh snapshot — most commonly during demo→real app
+      // handoffs and test reset paths. Writing directly to sessionStorage
+      // and dispatching BRIDGE_EVENT mirrors what `writeBridgeSnapshot`
+      // does in production without depending on the MockAppStateProvider
+      // shape.
+      const bridgeSnapshot = {
+        profiles: [],
+        activeProfile: null,
+        runtimeStatus: null,
+        runtimeRelays: [],
+        signerPaused: false,
+        createSession: null,
+        importSession: null,
+        onboardSession: null,
+        rotateKeysetSession: null,
+        replaceShareSession: null,
+        recoverSession: null,
+      };
+      await act(async () => {
+        window.sessionStorage.setItem(
+          BRIDGE_STORAGE_KEY,
+          JSON.stringify(bridgeSnapshot),
+        );
+        window.dispatchEvent(new CustomEvent(BRIDGE_EVENT));
+      });
+
+      await waitFor(() => expect(getState().createSession).toBeNull());
+
+      // The plaintext stash must be cleared for every previously-known
+      // package idx, and also for unknown idxs to prove the ref itself is
+      // reset (not just individual entries).
+      for (const pkg of packages) {
+        expect(getState().getCreateSessionPackageSecret(pkg.idx)).toBeNull();
+      }
+      expect(getState().getCreateSessionPackageSecret(-1)).toBeNull();
+      expect(getState().getCreateSessionPackageSecret(99)).toBeNull();
+    },
+    45_000,
+  );
 
   it("imports a generated bfprofile, stores only encrypted profile material, and unlocks after reload", async () => {
     const generated = await makeProfilePackage();
@@ -541,7 +716,7 @@ describe("AppState setup flows", () => {
     );
 
     await act(async () => {
-      await getState().generateRotatedKeyset("dist-password");
+      await getState().generateRotatedKeyset();
     });
     await waitFor(() =>
       expect(getState().rotateKeysetSession?.rotated?.next.group.group_pk).toBe(
@@ -576,26 +751,44 @@ describe("AppState setup flows", () => {
     );
     expect(decodedRotated.device.manual_peer_policy_overrides).toHaveLength(4);
 
-    const rotatedPackage =
-      getState().rotateKeysetSession!.onboardingPackages[0];
+    const pendingRotatePackages = getState().rotateKeysetSession!.onboardingPackages;
+    expect(pendingRotatePackages).toHaveLength(4);
+    for (const pkg of pendingRotatePackages) {
+      expect(pkg.packageCreated).toBe(false);
+      expect(pkg.packageText).toBe("");
+      expect(pkg.password).toBe("");
+    }
+
+    await act(async () => {
+      for (const pkg of getState().rotateKeysetSession!.onboardingPackages) {
+        await getState().encodeRotateDistributionPackage(
+          pkg.idx,
+          `dist-password-${pkg.idx}`,
+        );
+      }
+    });
+
+    const rotatedPackage = getState().rotateKeysetSession!.onboardingPackages[0];
+    expect(rotatedPackage.packageCreated).toBe(true);
+    expect(rotatedPackage.password).toBe("[redacted]");
     await expect(
-      decodeBfonboardPackage(rotatedPackage.packageText, "dist-password"),
+      decodeBfonboardPackage(
+        getState().getRotateSessionPackageSecret(rotatedPackage.idx)!.packageText,
+        `dist-password-${rotatedPackage.idx}`,
+      ),
     ).resolves.toMatchObject({
       relays: ["wss://relay.example.test"],
     });
     await expect(
       decodeBfonboardPackage(
-        rotatedPackage.packageText,
+        getState().getRotateSessionPackageSecret(rotatedPackage.idx)!.packageText,
         packagePasswordForShare("Flow Key", rotatedPackage.idx),
       ),
     ).rejects.toThrow();
 
     act(() => {
       for (const pkg of getState().rotateKeysetSession!.onboardingPackages) {
-        getState().updateRotatePackageState(pkg.idx, {
-          packageCopied: true,
-          passwordCopied: true,
-        });
+        getState().markRotatePackageDistributed(pkg.idx);
       }
     });
     await waitFor(() =>

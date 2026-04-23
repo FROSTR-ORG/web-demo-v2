@@ -9,6 +9,48 @@ import type {
 /* ---------- IndexedDB mock ---------- */
 
 const storage = new Map<string, unknown>();
+const relayPumpMock = vi.hoisted(() => ({
+  instances: [] as Array<{
+    relays: string[];
+    startCalls: number;
+    refreshAllCalls: number;
+    stopCalls: number;
+    relayStatuses: () => Array<{ url: string; state: "connecting" }>;
+    start: () => Promise<unknown>;
+    refreshAll: () => Promise<unknown>;
+    stop: () => void;
+  }>,
+  status: {
+    status: {
+      device_id: "device",
+      pending_ops: 0,
+      last_active: 1,
+      known_peers: 2,
+      request_seq: 1,
+    },
+    metadata: {
+      device_id: "device",
+      member_idx: 0,
+      share_public_key: "share",
+      group_public_key: "group",
+      peers: ["peer-a", "peer-b"],
+    },
+    readiness: {
+      runtime_ready: true,
+      restore_complete: true,
+      sign_ready: true,
+      ecdh_ready: true,
+      threshold: 1,
+      signing_peer_count: 1,
+      ecdh_peer_count: 1,
+      last_refresh_at: 1,
+      degraded_reasons: [],
+    },
+    peers: [],
+    peer_permission_states: [],
+    pending_operations: [],
+  },
+}));
 
 vi.mock("idb-keyval", () => ({
   get: vi.fn(async (key: string) => storage.get(key)),
@@ -52,6 +94,38 @@ vi.mock("../../lib/relay/localSimulator", () => ({
     }
     async attachVirtualPeers() {
       /* no-op */
+    }
+  },
+}));
+
+vi.mock("../../lib/relay/runtimeRelayPump", () => ({
+  RuntimeRelayPump: class {
+    relays: string[];
+    startCalls = 0;
+    refreshAllCalls = 0;
+    stopCalls = 0;
+
+    constructor(options: { relays: string[] }) {
+      this.relays = options.relays;
+      relayPumpMock.instances.push(this);
+    }
+
+    relayStatuses() {
+      return this.relays.map((url) => ({ url, state: "connecting" as const }));
+    }
+
+    async start() {
+      this.startCalls += 1;
+      return relayPumpMock.status;
+    }
+
+    async refreshAll() {
+      this.refreshAllCalls += 1;
+      return relayPumpMock.status;
+    }
+
+    stop() {
+      this.stopCalls += 1;
     }
   },
 }));
@@ -142,14 +216,26 @@ function makeSnapshot(
     profiles: [makeProfile()],
     activeProfile: makeProfile(),
     runtimeStatus: null,
+    runtimeRelays: [],
     signerPaused: false,
     createSession: null,
     importSession: null,
     onboardSession: null,
     rotateKeysetSession: null,
+    replaceShareSession: null,
     recoverSession: null,
     ...overrides,
   };
+}
+
+function seedStoredProfile(summary = makeProfile()): StoredProfileSummary {
+  const record: StoredProfileRecord = {
+    summary,
+    encryptedProfilePackage: "bfprofile1fake",
+  };
+  storage.set("igloo.web-demo-v2.profile-index", [summary.id]);
+  storage.set(`igloo.web-demo-v2.profile.${summary.id}`, record);
+  return summary;
 }
 
 function CapturedState({
@@ -174,6 +260,7 @@ function CapturedState({
 
 beforeEach(() => {
   storage.clear();
+  relayPumpMock.instances = [];
   window.sessionStorage.clear();
 });
 
@@ -275,11 +362,14 @@ describe("appStateBridge helpers", () => {
       "onboardSession",
       "profiles",
       "recoverSession",
+      "replaceShareSession",
       "rotateKeysetSession",
+      "runtimeRelays",
       "runtimeStatus",
       "signerPaused",
     ]);
     expect(snapshot.signerPaused).toBe(true);
+    expect(snapshot.runtimeRelays).toEqual([]);
     expect(snapshot.createSession).toBeNull();
     expect(snapshot.importSession).toBeNull();
     expect(snapshot.onboardSession).toBeNull();
@@ -296,6 +386,24 @@ describe("appStateBridge helpers", () => {
 /* ============================================================================ */
 
 describe("AppStateProvider bridge integration", () => {
+  it("exportRuntimePackages fails cleanly without an unlocked runtime", async () => {
+    let captured!: AppStateValue;
+    render(
+      <AppStateProvider>
+        <CapturedState onState={(state) => {
+          captured = state;
+        }} />
+      </AppStateProvider>,
+    );
+
+    await waitFor(() => {
+      expect(captured).toBeDefined();
+    });
+    await expect(captured.exportRuntimePackages("export-password")).rejects.toThrow(
+      "No unlocked runtime is available to export.",
+    );
+  });
+
   it("with empty sessionStorage and empty IndexedDB it starts with empty state", async () => {
     const states: AppStateValue[] = [];
     render(
@@ -427,18 +535,29 @@ describe("MockAppStateProvider bridge arming", () => {
     profiles: [makeProfile({ id: "prof_mock", label: "Mock Key" })],
     activeProfile: makeProfile({ id: "prof_mock", label: "Mock Key" }),
     runtimeStatus: null,
+    runtimeRelays: [],
     signerPaused: false,
     createSession: null,
     importSession: null,
     onboardSession: null,
     rotateKeysetSession: null,
+    replaceShareSession: null,
     recoverSession: null,
+    onboardSponsorSession: null,
+    onboardSponsorSessions: {},
+    activeOnboardSponsorRequestId: null,
+    createOnboardSponsorPackage: async () => "bfonboard1mock",
+    clearOnboardSponsorSession: () => undefined,
     reloadProfiles: async () => undefined,
     createKeyset: async () => undefined,
     createProfile: async () => "prof_mock",
     updatePackageState: () => undefined,
+    setPackageDeviceLabel: () => undefined,
+    encodeDistributionPackage: async () => undefined,
+    markPackageDistributed: () => undefined,
     finishDistribution: async () => "prof_mock",
     clearCreateSession: () => undefined,
+    getCreateSessionPackageSecret: () => null,
     beginImport: () => undefined,
     decryptImportBackup: async () => undefined,
     saveImportedProfile: async () => "prof_mock",
@@ -450,9 +569,15 @@ describe("MockAppStateProvider bridge arming", () => {
     validateRotateKeysetSources: async () => undefined,
     generateRotatedKeyset: async () => undefined,
     createRotatedProfile: async () => "prof_mock",
+    encodeRotateDistributionPackage: async () => undefined,
     updateRotatePackageState: () => undefined,
+    markRotatePackageDistributed: () => undefined,
     finishRotateDistribution: async () => "prof_mock",
+    getRotateSessionPackageSecret: () => null,
     clearRotateKeysetSession: () => undefined,
+    decodeReplaceSharePackage: async () => undefined,
+    applyReplaceShareUpdate: async () => undefined,
+    clearReplaceShareSession: () => undefined,
     validateRecoverSources: async () => undefined,
     recoverNsec: async () => ({
       nsec: "nsec1mock",
@@ -461,10 +586,67 @@ describe("MockAppStateProvider bridge arming", () => {
     clearRecoverSession: () => undefined,
     expireRecoveredNsec: () => undefined,
     unlockProfile: async () => undefined,
+    updateProfileName: async () => undefined,
+    updateRelays: async () => undefined,
+    changeProfilePassword: async () => undefined,
     lockProfile: () => undefined,
     clearCredentials: async () => undefined,
+    exportRuntimePackages: async () => ({
+      profilePackage: "bfprofile1mock",
+      sharePackage: "bfshare1mock",
+      metadata: {
+        profileId: "prof_mock",
+        groupName: "Mock Key",
+        deviceName: "Igloo Web",
+        shareIdx: 0,
+        relayCount: 0,
+        peerCount: 0,
+      },
+    }),
+    createProfileBackup: async () => ({
+      backup: {
+        version: 1,
+        device: {
+          name: "mock-device",
+          share_public_key: "mock-pub",
+          manual_peer_policy_overrides: [],
+          relays: [],
+        },
+        group_package: {
+          group_name: "mock-group",
+          group_pk: "mock-gpk",
+          threshold: 2,
+          members: [],
+        },
+      },
+      event: { id: "mock", pubkey: "mock", created_at: 0, kind: 30078, tags: [], content: "mock", sig: "mock" },
+    }),
+    publishProfileBackup: async () => ({
+      event: { id: "mock", pubkey: "mock", created_at: 0, kind: 10000, tags: [], content: "mock", sig: "mock" },
+      reached: [],
+    }),
+    restoreProfileFromRelay: async () => {
+      throw new Error("mock");
+    },
     setSignerPaused: () => undefined,
     refreshRuntime: () => undefined,
+    restartRuntimeConnections: async () => undefined,
+    runtimeCompletions: [],
+    runtimeFailures: [],
+    lifecycleEvents: [],
+    runtimeEventLog: [],
+    signDispatchLog: {},
+    signLifecycleLog: [],
+    pendingDispatchIndex: {},
+    peerDenialQueue: [],
+    enqueuePeerDenial: () => undefined,
+    resolvePeerDenial: async () => undefined,
+    policyOverrides: [],
+    removePolicyOverride: async () => undefined,
+    setPeerPolicyOverride: async () => undefined,
+    clearPolicyOverrides: async () => undefined,
+    clearRuntimeEventLog: () => undefined,
+    handleRuntimeCommand: async () => ({ requestId: null, debounced: false }),
   };
 
   it("writes a snapshot of its value to sessionStorage on mount", async () => {
@@ -576,6 +758,7 @@ describe("MockAppStateProvider bridge arming", () => {
     expect(parsed.profiles).toEqual([]);
     expect(parsed.activeProfile).toBeNull();
     expect(parsed.runtimeStatus).toBeNull();
+    expect(parsed.runtimeRelays).toEqual([]);
   });
 
   it("MockAppStateProvider.lockProfile clears runtimeStatus and activeProfile", async () => {
@@ -634,6 +817,9 @@ describe("MockAppStateProvider bridge arming", () => {
             memberPubkey: "02" + "1".repeat(64),
             packageText: "bfonboard1secret",
             password: "package-password",
+            packageCreated: true,
+            peerOnline: false,
+            manuallyMarkedDistributed: false,
             packageCopied: false,
             passwordCopied: false,
             copied: false,
@@ -843,5 +1029,175 @@ describe("AppStateProvider runtime-polling and bridge hydration", () => {
       setIntervalSpy.mockRestore();
       clearIntervalSpy.mockRestore();
     }
+  });
+});
+
+describe("AppStateProvider runtime relay lifecycle", () => {
+  it("unlockProfile starts live relay statuses from the stored profile relays", async () => {
+    const profile = seedStoredProfile(
+      makeProfile({
+        id: "prof_runtime_relays",
+        relays: ["wss://one.test", "wss://two.test"],
+      }),
+    );
+    let captured!: AppStateValue;
+
+    render(
+      <AppStateProvider>
+        <CapturedState onState={(state) => {
+          captured = state;
+        }} />
+      </AppStateProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-count").textContent).toBe("1");
+    });
+
+    await act(async () => {
+      await captured.unlockProfile(profile.id, "pw");
+    });
+
+    await waitFor(() => {
+      expect(captured.activeProfile?.id).toBe(profile.id);
+      expect(captured.runtimeRelays).toEqual([
+        { url: "wss://one.test", state: "connecting" },
+        { url: "wss://two.test", state: "connecting" },
+      ]);
+    });
+    expect(relayPumpMock.instances[0].relays).toEqual(profile.relays);
+    expect(relayPumpMock.instances[0].startCalls).toBe(1);
+  });
+
+  it("Stop Signer stops live relay work but preserves the active profile", async () => {
+    const profile = seedStoredProfile(makeProfile({ id: "prof_runtime_stop" }));
+    let captured!: AppStateValue;
+
+    render(
+      <AppStateProvider>
+        <CapturedState onState={(state) => {
+          captured = state;
+        }} />
+      </AppStateProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-count").textContent).toBe("1");
+    });
+    await act(async () => {
+      await captured.unlockProfile(profile.id, "pw");
+    });
+    const pump = relayPumpMock.instances[0];
+
+    act(() => {
+      captured.setSignerPaused(true);
+    });
+
+    await waitFor(() => {
+      expect(captured.signerPaused).toBe(true);
+      expect(captured.activeProfile?.id).toBe(profile.id);
+      expect(captured.runtimeRelays.map((relay) => relay.state)).toEqual([
+        "offline",
+        "offline",
+      ]);
+    });
+    expect(pump.stopCalls).toBeGreaterThanOrEqual(1);
+  });
+
+  it("restartRuntimeConnections reconnects relays and queues a refresh", async () => {
+    const profile = seedStoredProfile(makeProfile({ id: "prof_runtime_restart" }));
+    let captured!: AppStateValue;
+
+    render(
+      <AppStateProvider>
+        <CapturedState onState={(state) => {
+          captured = state;
+        }} />
+      </AppStateProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-count").textContent).toBe("1");
+    });
+    await act(async () => {
+      await captured.unlockProfile(profile.id, "pw");
+    });
+    act(() => {
+      captured.setSignerPaused(true);
+    });
+
+    await act(async () => {
+      await captured.restartRuntimeConnections();
+    });
+
+    await waitFor(() => {
+      expect(relayPumpMock.instances.length).toBeGreaterThanOrEqual(2);
+    });
+    const restarted = relayPumpMock.instances.at(-1)!;
+    expect(restarted.relays).toEqual(profile.relays);
+    expect(restarted.startCalls).toBe(1);
+    expect(restarted.refreshAllCalls).toBe(1);
+    expect(captured.signerPaused).toBe(false);
+  });
+
+  it("lockProfile and clearCredentials tear down relay resources", async () => {
+    const profile = seedStoredProfile(makeProfile({ id: "prof_runtime_teardown" }));
+    let captured!: AppStateValue;
+
+    const { unmount } = render(
+      <AppStateProvider>
+        <CapturedState onState={(state) => {
+          captured = state;
+        }} />
+      </AppStateProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-count").textContent).toBe("1");
+    });
+    await act(async () => {
+      await captured.unlockProfile(profile.id, "pw");
+    });
+    const lockedPump = relayPumpMock.instances[0];
+
+    act(() => {
+      captured.lockProfile();
+    });
+
+    await waitFor(() => {
+      expect(captured.activeProfile).toBeNull();
+      expect(captured.runtimeRelays).toEqual([]);
+    });
+    expect(lockedPump.stopCalls).toBeGreaterThanOrEqual(1);
+    unmount();
+
+    relayPumpMock.instances = [];
+    seedStoredProfile(profile);
+    render(
+      <AppStateProvider>
+        <CapturedState onState={(state) => {
+          captured = state;
+        }} />
+      </AppStateProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-count").textContent).toBe("1");
+    });
+    await act(async () => {
+      await captured.unlockProfile(profile.id, "pw");
+    });
+    const clearedPump = relayPumpMock.instances[0];
+
+    await act(async () => {
+      await captured.clearCredentials();
+    });
+
+    await waitFor(() => {
+      expect(captured.activeProfile).toBeNull();
+      expect(captured.runtimeRelays).toEqual([]);
+      expect(captured.profiles).toEqual([]);
+    });
+    expect(clearedPump.stopCalls).toBeGreaterThanOrEqual(1);
   });
 });

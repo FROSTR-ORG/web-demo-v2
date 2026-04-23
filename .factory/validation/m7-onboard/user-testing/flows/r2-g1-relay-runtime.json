@@ -1,0 +1,119 @@
+{
+  "groupId": "r2-g1-relay-runtime",
+  "testedAt": "2026-04-23T06:29:02Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "guidanceSection": "Flow Validator Guidance: playwright-cli",
+    "project": "desktop",
+    "workers": 1,
+    "assignedAssertions": [
+      "VAL-CROSS-008",
+      "VAL-CROSS-014",
+      "VAL-CROSS-018",
+      "VAL-CROSS-023",
+      "VAL-ONBOARD-007",
+      "VAL-ONBOARD-009"
+    ]
+  },
+  "toolsUsed": [
+    "playwright-cli"
+  ],
+  "commandRuns": [
+    {
+      "order": 1,
+      "command": "npx playwright test src/e2e/multi-device/rotate-keyset-live-sign.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "transcriptPath": "m7-onboard/r2-g1-relay-runtime/01-rotate-keyset-live-sign.txt",
+      "transcriptAbsolutePath": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/evidence/m7-onboard/r2-g1-relay-runtime/01-rotate-keyset-live-sign.txt"
+    },
+    {
+      "order": 2,
+      "command": "npx playwright test src/e2e/dev-server/dev-server-boot-hmr.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "transcriptPath": "m7-onboard/r2-g1-relay-runtime/02-dev-server-boot-hmr.txt",
+      "transcriptAbsolutePath": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/evidence/m7-onboard/r2-g1-relay-runtime/02-dev-server-boot-hmr.txt"
+    },
+    {
+      "order": 3,
+      "command": "npx playwright test src/e2e/multi-device/onboard-token-reuse.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "transcriptPath": "m7-onboard/r2-g1-relay-runtime/03-onboard-token-reuse.txt",
+      "transcriptAbsolutePath": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/evidence/m7-onboard/r2-g1-relay-runtime/03-onboard-token-reuse.txt"
+    },
+    {
+      "order": 4,
+      "command": "npx playwright test src/e2e/browser-back/dashboard-back.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "transcriptPath": "m7-onboard/r2-g1-relay-runtime/04-dashboard-back.txt",
+      "transcriptAbsolutePath": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/evidence/m7-onboard/r2-g1-relay-runtime/04-dashboard-back.txt"
+    },
+    {
+      "order": 5,
+      "command": "npx playwright test src/e2e/multi-device/onboard-per-relay-fanout.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "transcriptPath": "m7-onboard/r2-g1-relay-runtime/05-onboard-per-relay-fanout.txt",
+      "transcriptAbsolutePath": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/evidence/m7-onboard/r2-g1-relay-runtime/05-onboard-per-relay-fanout.txt"
+    },
+    {
+      "order": 6,
+      "command": "npx playwright test src/e2e/multi-device/onboard-peer-row-persistence.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "transcriptPath": "m7-onboard/r2-g1-relay-runtime/06-onboard-peer-row-persistence.txt",
+      "transcriptAbsolutePath": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/evidence/m7-onboard/r2-g1-relay-runtime/06-onboard-peer-row-persistence.txt"
+    }
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-CROSS-008",
+      "status": "pass",
+      "reason": "Direct coverage from rotate-keyset live-sign regression spec run; command exited 0 and scenario assertions passed.",
+      "commandEvidence": [
+        1
+      ]
+    },
+    {
+      "id": "VAL-CROSS-014",
+      "status": "pass",
+      "reason": "Spec title explicitly targets VAL-CROSS-014 and passed with exit code 0.",
+      "commandEvidence": [
+        2
+      ]
+    },
+    {
+      "id": "VAL-CROSS-018",
+      "status": "pass",
+      "reason": "Spec title explicitly targets VAL-CROSS-018 and passed with exit code 0 (including idempotent re-onboard safety invariants).",
+      "commandEvidence": [
+        3
+      ]
+    },
+    {
+      "id": "VAL-CROSS-023",
+      "status": "pass",
+      "reason": "Spec title explicitly targets VAL-CROSS-023 and passed with exit code 0.",
+      "commandEvidence": [
+        4
+      ]
+    },
+    {
+      "id": "VAL-ONBOARD-007",
+      "status": "pass",
+      "reason": "Spec title explicitly targets VAL-ONBOARD-007 and both onboard publish and relay-drop path tests passed.",
+      "commandEvidence": [
+        5
+      ]
+    },
+    {
+      "id": "VAL-ONBOARD-009",
+      "status": "pass",
+      "reason": "Spec title explicitly targets VAL-ONBOARD-009 and peer-row persistence after reload passed.",
+      "commandEvidence": [
+        6
+      ]
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Executed all 6 required Playwright commands serially with --workers 1; every command exited 0 and all assigned assertions have direct command evidence marked pass. Post-run checks found no bifrost-devtools process and no listener on relay port 8194."
+}

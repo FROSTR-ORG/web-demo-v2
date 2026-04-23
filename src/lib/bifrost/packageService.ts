@@ -12,17 +12,21 @@ import {
   RecoveredNsecResultSchema,
   SharePackageWireSchema,
   StructuredBridgeResultSchema,
+  EncryptedProfileBackupSchema,
+  ProfileBackupEventSchema,
   type BifrostPackageErrorCode,
   type BfManualPeerPolicyOverride,
   type BfMethodPolicyOverride,
   type BfSharePayload,
   type BfOnboardPayload,
   type BfProfilePayload,
+  type EncryptedProfileBackup,
   type GeneratedNsecResult,
   type GroupPackageWire,
   type KeysetBundle,
   type OnboardingRequestBundle,
   type OnboardingResponse,
+  type ProfileBackupEvent,
   type ProfilePackagePair,
   type RecoveredNsecResult,
   type RotateKeysetBundleResult,
@@ -397,23 +401,47 @@ export function defaultManualPeerPolicyOverrides(
   group: GroupPackageWire,
   localShareIdx: number,
 ): BfManualPeerPolicyOverride[] {
+  return peerPolicyOverridesFromPermissions(group, localShareIdx);
+}
+
+export type PeerPolicyPermissionMethod = "sign" | "ecdh" | "ping" | "onboard";
+
+export type PeerPolicyPermissionInput = Partial<
+  Record<PeerPolicyPermissionMethod, boolean>
+>;
+
+export function peerPolicyOverridesFromPermissions(
+  group: GroupPackageWire,
+  localShareIdx: number,
+  permissions?: Record<number, PeerPolicyPermissionInput>,
+): BfManualPeerPolicyOverride[] {
   GroupPackageWireSchema.parse(group);
-  const allowAll: BfMethodPolicyOverride = {
-    echo: "allow",
-    ping: "allow",
-    onboard: "allow",
-    sign: "allow",
-    ecdh: "allow",
+  const methodPolicyFor = (
+    memberPermissions?: PeerPolicyPermissionInput,
+  ): BfMethodPolicyOverride => {
+    const valueFor = (method: PeerPolicyPermissionMethod) =>
+      memberPermissions?.[method] === false ? "deny" : "allow";
+    return {
+      echo: "allow",
+      ping: valueFor("ping"),
+      onboard: valueFor("onboard"),
+      sign: valueFor("sign"),
+      ecdh: valueFor("ecdh"),
+    };
   };
   return group.members
     .filter((member) => member.idx !== localShareIdx)
-    .map((member) => ({
-      pubkey: memberPubkeyXOnly(member),
-      policy: {
-        request: { ...allowAll },
-        respond: { ...allowAll },
-      },
-    }));
+    .map((member) => {
+      const request = methodPolicyFor(permissions?.[member.idx]);
+      const respond = { ...request };
+      return {
+        pubkey: memberPubkeyXOnly(member),
+        policy: {
+          request,
+          respond,
+        },
+      };
+    });
 }
 
 export function onboardPayloadForRemoteShare(params: {
@@ -428,4 +456,50 @@ export function onboardPayloadForRemoteShare(params: {
     relays: params.relays,
     peer_pk: memberPubkeyXOnly(localMember),
   });
+}
+
+export async function createEncryptedProfileBackup(
+  profile: BfProfilePayload,
+): Promise<EncryptedProfileBackup> {
+  const bridge = await loadBridge();
+  const json = bridge.create_encrypted_profile_backup(
+    JSON.stringify(BfProfilePayloadSchema.parse(profile)),
+  );
+  return EncryptedProfileBackupSchema.parse(parseJsonResult(json));
+}
+
+export async function buildProfileBackupEvent(params: {
+  shareSecret: string;
+  backup: EncryptedProfileBackup;
+  createdAtSeconds?: number;
+}): Promise<ProfileBackupEvent> {
+  const bridge = await loadBridge();
+  const json = bridge.build_profile_backup_event(
+    params.shareSecret,
+    JSON.stringify(params.backup),
+    params.createdAtSeconds ?? Math.floor(Date.now() / 1000),
+  );
+  return ProfileBackupEventSchema.parse(parseJsonResult(json));
+}
+
+export async function parseProfileBackupEvent(params: {
+  eventJson: string;
+  shareSecret: string;
+}): Promise<EncryptedProfileBackup> {
+  const bridge = await loadBridge();
+  const json = bridge.parse_profile_backup_event(
+    params.eventJson,
+    params.shareSecret,
+  );
+  return EncryptedProfileBackupSchema.parse(parseJsonResult(json));
+}
+
+export async function profileBackupEventKind(): Promise<number> {
+  const bridge = await loadBridge();
+  return bridge.profile_backup_event_kind();
+}
+
+export async function profileBackupKeyDomain(): Promise<string> {
+  const bridge = await loadBridge();
+  return bridge.profile_backup_key_domain();
 }

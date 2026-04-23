@@ -1,0 +1,39 @@
+{
+  "featureId": "m6-backup-restore",
+  "reviewedAt": "2026-04-22T21:06:56Z",
+  "commitId": "0aae6cf702ea0d6c554f24b6d0c616e104b1ff81",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "Restore flow wiring is substantial, but two blocking correctness gaps remain: the claimed multi-device VAL-CROSS-007 coverage is not executable as written, and relay querying is not actually parallel so a slow first relay can mask a valid backup on later relays.",
+    "issues": [
+      {
+        "file": "src/e2e/multi-device/backup-restore.spec.ts",
+        "line": 31,
+        "severity": "blocking",
+        "description": "The spec hard-codes `RELAY_URL` as `ws://127.0.0.1:8194`, but restore calls go through `restoreProfileFromRelay` which validates every relay via `validateRelayUrl` and rejects non-`wss://` URLs before any REQ is emitted (`src/app/AppStateProvider.tsx:2836`, `src/lib/relay/relayUrl.ts:64,73`). As a result, the first restore call in this spec cannot succeed, so VAL-CROSS-007/VAL-BACKUP-010..030 coverage claimed by this test is not actually achieved."
+      },
+      {
+        "file": "src/app/AppStateProvider.tsx",
+        "line": 2915,
+        "severity": "blocking",
+        "description": "Relay fan-out is implemented with a sequential loop (`for ... await conn.connect()`), not parallel connect/subscribe. Because the timeout is global (5s at line 2898) and `BrowserRelayConnection.connect()` has no built-in timeout (`src/lib/relay/browserRelayClient.ts:217-258`), a slow/hung earlier relay can consume the window and prevent later relays from ever receiving REQ subscriptions. This violates VAL-BACKUP-009's expected per-relay query behavior and can yield false \"No backup found\" failures despite an available backup on another relay."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The ui-screen-worker procedure requires a RED test run capture and `npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop --workers 1` in verification, but this feature handoff marks `followedProcedure: true` while reporting only typecheck + vitest.",
+      "evidence": "Skill requirement: `.factory/skills/ui-screen-worker/SKILL.md:33,49-50`; handoff verification commands: `/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/handoffs/2026-04-22T20-36-34-885Z__m6-backup-restore__be2601e6-e2ef-4ea7-9fac-b6d5e3129a6c.json:14-21`."
+    },
+    {
+      "area": "services",
+      "observation": "Mission docs recommend local relay fallback for multi-device validation, but restore flow enforces `wss://` inputs while `services.local_relay` exposes a plain ws endpoint on 8194. This protocol mismatch is not documented and directly contributed to the broken restore e2e.",
+      "evidence": "Fallback guidance: `AGENTS.md:86,89`; local relay definition: `.factory/services.yaml:36-40`; restore validation: `src/lib/relay/relayUrl.ts:64,73`."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed feature commit and transcript artifacts; status is FAIL due to two blocking issues: (1) restore multi-device e2e uses `ws://` and cannot pass against enforced `wss://` restore validation, and (2) restore relay querying is sequential (not parallel), so a slow first relay can cause false 'No backup found' outcomes."
+}

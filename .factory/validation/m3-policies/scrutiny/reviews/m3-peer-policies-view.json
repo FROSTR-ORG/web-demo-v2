@@ -1,0 +1,28 @@
+{
+  "featureId": "m3-peer-policies-view",
+  "reviewedAt": "2026-04-22T01:34:55Z",
+  "commitId": "f134a071196cf20878e2c1f5e4fef499f47a180c",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature correctly introduces a shared effective_policy resolver and threads peer_permission_states into both PoliciesState and PeerRow, but it still breaks cross-surface parity for offline peers.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen/panels/PeerRow.tsx",
+        "line": 160,
+        "severity": "blocking",
+        "description": "PeerRow suppresses all SIGN/ECDH/PING/ONBOARD badges whenever peer.online is false, while PoliciesState always renders all four policy chips from effective_policy for each configured peer. This creates a deterministic mismatch between PeersPanel and Peer Policies for offline peers, violating the feature requirement that both surfaces show identical per-(peer,verb) policy state."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Transcript and handoff verification log use piped test commands (e.g., `vitest ... | tail -N`) while also recording exit codes. This can mask test failures because pipeline exit status reflects `tail`, not `vitest`, unless pipefail is set.",
+      "evidence": "worker-transcript skeleton shows multiple commands ending with `| tail -...`; handoff verification records `npx vitest run ... (pre-impl)` with `exitCode: 0` while observation says `4 failed / 2 passed`."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed feature m3-peer-policies-view using the assigned handoff, commit diff, and transcript skeleton. Result: fail due to a blocking parity gap—offline peers hide PeerRow badges even when effective_policy grants methods, so PeersPanel and PoliciesState can disagree for the same peer/method snapshot."
+}

@@ -1,0 +1,33 @@
+{
+  "featureId": "m1-signing-blocked-and-nonce-overlay",
+  "reviewedAt": "2026-04-21T15:00:06Z",
+  "commitId": "342a5e1",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature correctly broadens dashboard state derivation to show `signing-blocked` when `readiness.sign_ready` is false and adds the Trigger Sync UI wiring, but nonce-pool detection is too broad and can incorrectly show the nonce exhaustion overlay when signing is blocked by policy rather than nonce depletion.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen/dashboardState.ts",
+        "line": 43,
+        "severity": "blocking",
+        "description": "`isNoncePoolDepleted` currently returns true whenever `!readiness.sign_ready` and `onlinePeerCount >= readiness.threshold`, which does not isolate nonce exhaustion. In the runtime, `sign_ready` is derived from peers that are both `can_sign` and policy-allowed (`effective_policy.request.sign`), so policy-denied peers can produce `sign_ready=false` without nonce depletion. This causes false-positive 'Syncing nonces' / 'Trigger Sync' overlays and violates the requirement that this affordance appear for nonce-pool exhaustion signals specifically."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Mission guidance says known pre-existing issues must not be re-reported in handoff `discoveredIssues`, but this handoff still re-reported the tracked nested-button issue.",
+      "evidence": "Mission AGENTS.md:93-95 explicitly says not to re-report known issues; handoff file `...m1-signing-blocked-and-nonce-overlay__9276da49-6ed1-43b0-a4b7-69c585774bc3.json`:110-114 includes the known nested `<button>` issue again."
+    },
+    {
+      "area": "skills",
+      "observation": "The runtime-worker skill requires manual agent-browser verification with recorded `interactiveChecks`, but this feature handoff/transcript does not include that verification artifact.",
+      "evidence": ".factory/skills/runtime-worker/SKILL.md:49 requires agent-browser checks for fulfilled assertions; handoff has no `interactiveChecks` section, and transcript skeleton entry (`worker-transcripts.jsonl`:7) shows no `Skill {\"skill\":\"agent-browser\"}` invocation."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed feature metadata, handoff, transcript skeleton, runtime-worker skill, and commit 342a5e1 diff. Found one blocking correctness issue: nonce depletion detection can misclassify policy-gated sign unavailability and incorrectly show Trigger Sync. Also recorded two shared-state observations about known-issue re-reporting and missing agent-browser verification artifacts."
+}

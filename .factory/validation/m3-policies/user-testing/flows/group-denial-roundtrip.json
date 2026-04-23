@@ -1,0 +1,204 @@
+{
+  "groupId": "group-denial-roundtrip",
+  "testedAt": "2026-04-22T13:27:38Z",
+  "isolation": {
+    "milestone": "m3-policies",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "appUrl": "http://127.0.0.1:5173",
+    "relayUrl": "ws://127.0.0.1:8194",
+    "assignedAssertions": [
+      "VAL-POLICIES-007",
+      "VAL-POLICIES-010",
+      "VAL-POLICIES-023",
+      "VAL-POLICIES-025",
+      "VAL-CROSS-003"
+    ],
+    "flowValidatorGuidanceSection": "Flow Validator Guidance: test-observability hooks (DEV only)",
+    "testingTool": "playwright + targeted vitest"
+  },
+  "toolsUsed": [
+    "playwright",
+    "vitest"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-POLICIES-007",
+      "title": "Setting a manual override propagates to the UI in under 500 ms",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Run multi-device policy denial roundtrip Playwright spec",
+          "expected": "Direct \u2264500ms UI+PeerRow propagation measurement for set_policy_override respond.sign=deny",
+          "observed": "Spec includes a propagation check to effective_policy.respond.sign=false but uses a 15s wait and does not assert a \u2264500ms UI timing bound."
+        },
+        {
+          "action": "Run targeted policy-related Vitest suites",
+          "expected": "Existing tests explicitly enforce VAL-POLICIES-007 timing bound",
+          "observed": "No existing targeted test provided a direct \u2264500ms propagation assertion for both Peer Policies chip and PeerRow surfaces."
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none surfaced in Playwright/Vitest command output",
+        "network": "relay-backed runtime path exercised via ws://127.0.0.1:8194 in Playwright spec",
+        "logs": [
+          "m3-policies/group-denial-roundtrip/playwright-policy-denial-roundtrip.log",
+          "m3-policies/group-denial-roundtrip/vitest-targeted-policy-assertions.log",
+          "m3-policies/group-denial-roundtrip/assertion-evidence-summary.json"
+        ]
+      },
+      "issues": "Direct contract timing requirement (\u2264500ms UI propagation) is not asserted by available existing tests run in this assignment."
+    },
+    {
+      "id": "VAL-POLICIES-010",
+      "title": "respond.sign=deny blocks incoming signs (requester receives policy failure)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run Playwright spec src/e2e/multi-device/policy-denial-roundtrip.spec.ts (desktop, workers=1)",
+          "expected": "B sign dispatch fails within 15s with denied/policy failure; A sees no sign completion/pending admission",
+          "observed": "Test 'A.respond.sign=deny \u2192 ... OperationFailure matching /denied|policy/ within 15s' passed."
+        },
+        {
+          "action": "Review run output",
+          "expected": "Spec exits cleanly with all tests passing",
+          "observed": "2/2 Playwright tests passed in 6.4s (exit code 0)."
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none surfaced in Playwright output",
+        "network": "Local relay handshake/dispatch path via ws://127.0.0.1:8194 exercised by the spec",
+        "logs": [
+          "m3-policies/group-denial-roundtrip/playwright-policy-denial-roundtrip.log",
+          "m3-policies/group-denial-roundtrip/vitest-targeted-policy-assertions.log",
+          "m3-policies/group-denial-roundtrip/assertion-evidence-summary.json"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-POLICIES-023",
+      "title": "Concurrent multi-tab policy writes converge without loss",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Run multi-device policy denial roundtrip Playwright spec",
+          "expected": "Direct conflicting-write (deny then allow) convergence assertion across two tabs within 2s",
+          "observed": "Spec does not include a concurrent conflicting-write scenario for the same peer/method cell."
+        },
+        {
+          "action": "Run targeted cross-tab Vitest coverage (broadcastReceiverStaleClosure)",
+          "expected": "Evidence for last-writer-wins convergence of conflicting writes",
+          "observed": "Coverage validates receiver persistence/single-listener behavior, but not a deny\u2192allow conflicting-write LWW convergence assertion for the same cell."
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none surfaced in Vitest output",
+        "network": "n/a (Vitest + in-memory BroadcastChannel/runtime harness)",
+        "logs": [
+          "m3-policies/group-denial-roundtrip/playwright-policy-denial-roundtrip.log",
+          "m3-policies/group-denial-roundtrip/vitest-targeted-policy-assertions.log",
+          "m3-policies/group-denial-roundtrip/assertion-evidence-summary.json"
+        ]
+      },
+      "issues": "No existing test run here directly validates VAL-POLICIES-023 last-writer-wins + both-tab convergence within 2s."
+    },
+    {
+      "id": "VAL-POLICIES-025",
+      "title": "Self-peer cannot be granted or denied",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run Playwright policy-denial-roundtrip spec",
+          "expected": "Bridge-level self override attempt rejected",
+          "observed": "Test 'setPeerPolicyOverride(... propagates...)' includes selfGuard assertion; test passed."
+        },
+        {
+          "action": "Run Vitest PoliciesState.selfAndRemovedPeer suite",
+          "expected": "UI excludes self pubkey row from Peer Policies",
+          "observed": "Suite passed (5 tests), including self-peer exclusion behavior for policies rendering."
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none surfaced in Playwright/Vitest output",
+        "network": "n/a for UI exclusion test; relay path exercised in Playwright run",
+        "logs": [
+          "m3-policies/group-denial-roundtrip/playwright-policy-denial-roundtrip.log",
+          "m3-policies/group-denial-roundtrip/vitest-targeted-policy-assertions.log",
+          "m3-policies/group-denial-roundtrip/assertion-evidence-summary.json"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-003",
+      "title": "Policy denial round-trip with runtime Allow-Once",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Run Playwright policy-denial-roundtrip spec",
+          "expected": "Full Allow-once flow: denial -> prompt -> allow once -> retry success with correlation evidence",
+          "observed": "Spec validates denial failure path and policy-denial invariants, but does not execute the allow-once retry-success sequence from the contract text."
+        },
+        {
+          "action": "Run targeted allow-once persistence Vitest suite",
+          "expected": "Supplemental evidence for post-Allow-once policy persistence semantics",
+          "observed": "alwaysAllowPersistence test confirms allow-once is non-persistent, but does not cover multi-device retry success/event correlation end-to-end."
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none surfaced in Playwright/Vitest output",
+        "network": "Relay-backed denial roundtrip path exercised in Playwright; no full allow-once retry capture in available run",
+        "logs": [
+          "m3-policies/group-denial-roundtrip/playwright-policy-denial-roundtrip.log",
+          "m3-policies/group-denial-roundtrip/vitest-targeted-policy-assertions.log",
+          "m3-policies/group-denial-roundtrip/assertion-evidence-summary.json"
+        ]
+      },
+      "issues": "Available existing tests run for this assignment do not fully cover the contract's allow-once retry-success multi-device sequence."
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Assigned execution path used Playwright/Vitest CLI automation; assertion contracts for these IDs are written as agent-browser DOM-flow validations with screenshot/event-log evidence.",
+      "resolved": true,
+      "resolution": "Captured deterministic CLI test evidence and explicit coverage gaps per assertion.",
+      "affectedAssertions": [
+        "VAL-POLICIES-007",
+        "VAL-POLICIES-010",
+        "VAL-POLICIES-023",
+        "VAL-POLICIES-025",
+        "VAL-CROSS-003"
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "description": "No direct existing test run in this assignment asserted the \u2264500ms propagation bound required by VAL-POLICIES-007.",
+      "affectedAssertions": [
+        "VAL-POLICIES-007"
+      ],
+      "quickFixAttempted": "Executed assigned Playwright spec and targeted policy Vitest suites; reviewed available coverage and found no explicit \u2264500ms UI timing assertion."
+    },
+    {
+      "description": "No direct existing test run in this assignment validated VAL-POLICIES-023 conflicting-write last-writer-wins convergence (deny->allow) within 2s across two tabs.",
+      "affectedAssertions": [
+        "VAL-POLICIES-023"
+      ],
+      "quickFixAttempted": "Executed targeted BroadcastChannel/policy persistence tests to probe multi-tab behavior, but they do not assert the exact conflicting-write convergence contract."
+    },
+    {
+      "description": "Available run set did not include a full multi-device Allow-once retry-success roundtrip with request_id correlation required by VAL-CROSS-003 contract text.",
+      "affectedAssertions": [
+        "VAL-CROSS-003"
+      ],
+      "quickFixAttempted": "Ran policy-denial Playwright spec plus allow-once persistence Vitest; evidence remained partial for the full cross assertion."
+    }
+  ],
+  "summary": "Tested 5 assigned assertions using the required Playwright spec plus targeted Vitest: 2 passed (VAL-POLICIES-010, VAL-POLICIES-025) and 3 blocked due missing direct existing-test coverage for the full contract requirements (VAL-POLICIES-007, VAL-POLICIES-023, VAL-CROSS-003)."
+}

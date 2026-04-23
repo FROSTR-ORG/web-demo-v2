@@ -1,0 +1,39 @@
+{
+  "featureId": "m2-pending-approvals-panel",
+  "reviewedAt": "2026-04-21T20:30:28Z",
+  "commitId": "50ac56d6cac446f163a2be865e9d23a6a56b60bb",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The panel wiring and collapse/empty-state behavior are largely correct, but the SIGN row detail extraction does not match real runtime `pending_operations` context shape, so required sign message previews are missing in practice.",
+    "issues": [
+      {
+        "file": "src/screens/DashboardScreen/panels/PendingApprovalsPanel.tsx",
+        "line": 78,
+        "severity": "blocking",
+        "description": "`extractMessagePreview` only reads `context.message_hex_32` / `context.message_hex`, but real runtime SIGN pending ops serialize context as nested `SignSession` data (e.g. `context.SignSession.session.hashes`) rather than those top-level fields. Result: SIGN rows omit the required first-10-hex message preview from real `pending_operations`, violating VAL-APPROVALS-002 and the feature contract. Evidence: the mission runtime capture shows `context.SignSession` in `/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/evidence/m1-ops/r2-g2-failure-paused/06-sign-dispatch-state.json` lines 116-117 and hash bytes at line 302."
+      },
+      {
+        "file": "src/screens/DashboardScreen/panels/__tests__/PendingApprovalsPanel.test.tsx",
+        "line": 85,
+        "severity": "non_blocking",
+        "description": "The test suite validates SIGN message preview using a synthetic context shape (`{ message_hex_32: ... }`) that does not reflect observed runtime snapshots, so it misses the production parsing failure and gives false confidence."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Mission policy and skill guidance conflict on agent-browser for UI changes, which caused procedure ambiguity for this feature.",
+      "evidence": "Mission AGENTS says agent-browser is mandatory for UI validation (`/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/AGENTS.md:84`), while `ui-screen-worker` allows skipping agent-browser for data-wiring fixes (`.factory/skills/ui-screen-worker/SKILL.md:23`). The worker marked `followedProcedure: false` and skipped agent-browser in handoff."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Runtime `pending_operations.context` schema for SIGN is not captured in shared docs/types strongly enough, which likely contributed to incorrect UI parsing and unrealistic tests.",
+      "evidence": "`PendingOperation.context` is typed as `unknown` (`src/lib/bifrost/types.ts:324`), and architecture docs do not spell out SIGN context payload fields. The implementation assumed top-level `message_hex_32` (`src/screens/DashboardScreen/panels/PendingApprovalsPanel.tsx:82-85`), but captured runtime evidence shows nested `SignSession` (`.../evidence/m1-ops/r2-g2-failure-paused/06-sign-dispatch-state.json:116-117`)."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review result: FAIL. The feature mostly wires the panel correctly, but SIGN message preview extraction is incompatible with real runtime context, so contract-required sign detail rendering is not reliably met. Report saved at the required scrutiny review path."
+}

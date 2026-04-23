@@ -1,0 +1,275 @@
+{
+  "groupId": "g3-backup-restore",
+  "testedAt": "2026-04-22T22:28:24Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "session": "g3-backup-restore",
+    "relayContext": [
+      "wss://relay.damus.io",
+      "wss://relay.primal.net",
+      "wss://127.0.0.1:9443 (local TLS proxy to ws://127.0.0.1:8194)"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser",
+    "agent-browser eval",
+    "node websocket probe"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-BACKUP-008",
+      "title": "Welcome exposes Restore from Relay entry point",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open / with no profiles",
+          "expected": "First-visit Welcome shows Restore from Relay control",
+          "observed": "Restore from Relay button visible on first-visit Welcome"
+        },
+        {
+          "action": "Tab through actions",
+          "expected": "Restore from Relay is keyboard-focusable",
+          "observed": "Focused element after tabbing: button text 'Restore from Relay'"
+        },
+        {
+          "action": "Open / with saved profile(s)",
+          "expected": "Returning Welcome also exposes Restore from Relay",
+          "observed": "Restore from Relay button visible and keyboard-focusable on returning variant"
+        },
+        {
+          "action": "Activate Restore from Relay",
+          "expected": "Navigates to dedicated restore screen",
+          "observed": "Navigated to /restore-from-relay"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g3-backup-restore/VAL-BACKUP-008-first-visit-welcome.png",
+          "m6-backup/g3-backup-restore/VAL-BACKUP-008-returning-welcome.png",
+          "m6-backup/g3-backup-restore/VAL-BACKUP-008-restore-screen-nav.png"
+        ],
+        "consoleErrors": "none during this flow",
+        "network": "navigation to /restore-from-relay confirmed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-009",
+      "title": "Restore screen queries relays by share pubkey",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Populate restore form with bfshare/password/relay list and submit",
+          "expected": "Loading state and relay REQ subscription by derived author pubkey",
+          "observed": "Button changed to 'Restoring…'; captured relay subscribe filter kinds:[10000], authors:[<derived share pubkey32>]"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g3-backup-restore/VAL-BACKUP-009-loading-state.png",
+          "m6-backup/g3-backup-restore/VAL-BACKUP-009-010-local-loading.png"
+        ],
+        "consoleErrors": "none during submit",
+        "network": "Captured subscription filter: {\"kinds\":[10000],\"authors\":[\"04d0ece325ddf28370510bd8b201bab66c9850acb30d79513afa773a11b81d58\"]}"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-010",
+      "title": "Decrypt on correct password adds new profile entry",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Publish backup event via seeded profile and submit restore with correct bfshare/password",
+          "expected": "Success message and new SavedProfile appended",
+          "observed": "Restore repeatedly ended in 'No backup found for this share.' despite publish calls reporting reached relays"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g3-backup-restore/VAL-BACKUP-010-loading-state.png",
+          "m6-backup/g3-backup-restore/VAL-BACKUP-009-010-local-loading.png",
+          "m6-backup/g3-backup-restore/VAL-BACKUP-012-empty-state.png"
+        ],
+        "consoleErrors": "none from app during submit",
+        "network": "REQ/subscribe filter emitted, but relay queries returned no matching EVENT"
+      },
+      "issues": "Relay dependency blocked success path: no retrievable kind-10000 event for derived author on queried relays during this run."
+    },
+    {
+      "id": "VAL-BACKUP-011",
+      "title": "Invalid password surfaces inline error, no profile added",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Submit restore with wrong password",
+          "expected": "Inline invalid-password error and no new profile write",
+          "observed": "Inline 'Invalid password — could not decrypt this backup.' shown; profile count unchanged; form values retained"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g3-backup-restore/VAL-BACKUP-011-invalid-password.png"
+        ],
+        "consoleErrors": "none during this flow",
+        "network": "UI handled error path; no successful restore mutation"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-012",
+      "title": "No matching backup event shows empty state",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Submit restore for share with no published backup",
+          "expected": "Empty-state copy with retry affordance and no profile side effects",
+          "observed": "Displayed 'No backup found for this share.' empty state; no profile appended"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g3-backup-restore/VAL-BACKUP-012-empty-state.png"
+        ],
+        "consoleErrors": "none during this flow",
+        "network": "Restore subscription attempt made; no EVENT matched"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-013",
+      "title": "Restored profile unlocks and loads runtime",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Attempt to restore profile via relay success path",
+          "expected": "Restored profile appears and unlocks to dashboard runtime",
+          "observed": "Blocked by VAL-BACKUP-010 dependency (restore success not achieved in this run)"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g3-backup-restore/VAL-BACKUP-009-010-local-loading.png"
+        ],
+        "consoleErrors": "n/a (blocked before unlock step)",
+        "network": "REQ emitted but no matching event returned"
+      },
+      "issues": "Cannot validate unlock of relay-restored profile without a successful restore event retrieval."
+    },
+    {
+      "id": "VAL-BACKUP-030",
+      "title": "Duplicate restore produces a single profile entry",
+      "status": "blocked",
+      "steps": [
+        {
+          "action": "Plan was restore same backup twice",
+          "expected": "Second restore idempotent (single profile record)",
+          "observed": "Blocked because first restore success (VAL-BACKUP-010) could not be achieved"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g3-backup-restore/VAL-BACKUP-009-010-local-loading.png"
+        ],
+        "consoleErrors": "n/a (blocked)",
+        "network": "initial restore attempts returned no matching event"
+      },
+      "issues": "Upstream relay retrieval blocker prevented duplicate/idempotence verification."
+    },
+    {
+      "id": "VAL-BACKUP-032",
+      "title": "Invalid relay in restore list surfaces error and blocks submit",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Enter malformed relay URL in list",
+          "expected": "Inline validation error and blocked submission",
+          "observed": "Rendered 'Relay URL must start with wss://'; Restore button disabled"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g3-backup-restore/VAL-BACKUP-032-invalid-relay-validation.png"
+        ],
+        "consoleErrors": "none during this flow",
+        "network": "submit prevented in invalid state"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-007",
+      "title": "Export + Restore round-trip",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Unlock dashboard profile and export backup (Profile Backup Ready)",
+          "expected": "Exported backup payload generated",
+          "observed": "Export modal produced bfprofile payload; payload saved as file evidence"
+        },
+        {
+          "action": "Wipe IndexedDB/session/local storage and return to Welcome",
+          "expected": "No saved profiles remain",
+          "observed": "Welcome returned to first-visit variant"
+        },
+        {
+          "action": "Import using uploaded exported backup file and decrypt with passphrase",
+          "expected": "Review -> Import & Launch -> dashboard",
+          "observed": "Import flow completed to /dashboard/{profileId}"
+        },
+        {
+          "action": "Compare identity/state after restore",
+          "expected": "group pubkey/share index/member count preserved; no plaintext share in bridge snapshot",
+          "observed": "groupPublicKey/shareIdx/memberCount preserved; regex scan over __appState found no share_secret or nsec plaintext"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g3-backup-restore/VAL-CROSS-007-export-ready.png",
+          "m6-backup/g3-backup-restore/VAL-CROSS-007-after-clear-welcome.png",
+          "m6-backup/g3-backup-restore/VAL-CROSS-007-uploaded-backup-file.png",
+          "m6-backup/g3-backup-restore/VAL-CROSS-007-review-screen.png",
+          "m6-backup/g3-backup-restore/VAL-CROSS-007-restored-dashboard.png"
+        ],
+        "files": [
+          "m6-backup/g3-backup-restore/VAL-CROSS-007-exported-backup.txt"
+        ],
+        "consoleErrors": "No restore-flow app errors observed; one automation-induced eval error occurred outside the functional path.",
+        "network": "Round-trip completed via user-surface import flow; dashboard route loaded for restored profile id 64111cb82f70b673c609ca661c9dab70f55b3a61e2408e8450eaa345e80f3acf"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Export Complete modal Done button was reported outside viewport by agent-browser and needed in-page click fallback.",
+      "resolved": true,
+      "resolution": "Used eval to trigger .export-done-btn click after capturing evidence.",
+      "affectedAssertions": [
+        "VAL-CROSS-007"
+      ]
+    },
+    {
+      "description": "A diagnostic eval produced 'Cannot set properties of null (setting value)' in browser errors during exploratory form instrumentation.",
+      "resolved": true,
+      "resolution": "Retried using direct form interactions and continued with clean functional evidence paths.",
+      "affectedAssertions": [
+        "VAL-BACKUP-010",
+        "VAL-BACKUP-013",
+        "VAL-BACKUP-030"
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "description": "Relay-backed restore success path unavailable in this run: restore REQ/subscription emitted correctly but no matching kind-10000 backup EVENT was retrievable from queried relays.",
+      "affectedAssertions": [
+        "VAL-BACKUP-010",
+        "VAL-BACKUP-013",
+        "VAL-BACKUP-030"
+      ],
+      "quickFixAttempted": "Tested public wss relays and local TLS proxy to ws://127.0.0.1:8194; captured subscribe filters and repeated publish+restore attempts, but restore remained 'No backup found for this share.'"
+    }
+  ],
+  "summary": "Tested 9 assigned assertions: 6 passed (VAL-BACKUP-008/009/011/012/032 and VAL-CROSS-007), 3 blocked by relay event retrieval (VAL-BACKUP-010/013/030)."
+}

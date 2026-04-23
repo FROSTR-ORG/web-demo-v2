@@ -1,0 +1,46 @@
+{
+  "milestone": "m6-backup",
+  "round": 2,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 7,
+    "passed": 7,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-BACKUP-006",
+    "VAL-BACKUP-007",
+    "VAL-BACKUP-010",
+    "VAL-BACKUP-013",
+    "VAL-BACKUP-028",
+    "VAL-BACKUP-030",
+    "VAL-BACKUP-031"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Added Flow Validator Guidance: playwright-cli section with serial port-8194 rule and authoritative harness rule for VAL-BACKUP-006/010/013/030/031.",
+      "source": "setup"
+    }
+  ],
+  "flowReports": [
+    {
+      "groupId": "g6-backup-rerun-fixes",
+      "file": ".factory/validation/m6-backup/user-testing/flows/g6-backup-rerun-fixes.json"
+    },
+    {
+      "groupId": "g7-backup-028-rerun",
+      "file": ".factory/validation/m6-backup/user-testing/flows/g7-backup-028-rerun.json"
+    }
+  ],
+  "toolsUsed": [
+    "playwright-cli",
+    "vitest"
+  ],
+  "dedupedBlockers": [],
+  "previousRound": ".factory/validation/m6-backup/user-testing/synthesis.round1.json",
+  "generatedAt": "2026-04-22T23:12:17Z"
+}

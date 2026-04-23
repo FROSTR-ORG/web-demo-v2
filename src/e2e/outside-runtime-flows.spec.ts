@@ -1,5 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
 
+/**
+ * Outside-runtime workflow coverage.
+ *
+ * These tests exercise import, rotate, recover, and returning-user flows with
+ * packages generated directly through the WASM bridge and a synthetic relay
+ * URL (`wss://relay.example.test`). They intentionally assert successful app
+ * navigation and persisted profile state rather than live relay convergence;
+ * multi-device relay behavior is covered by the dedicated live-relay specs.
+ */
+
 const DB_NAME = "keyval-store";
 const STORE_NAME = "keyval";
 const PROFILE_INDEX_KEY = "igloo.web-demo-v2.profile-index";
@@ -10,12 +20,20 @@ test.beforeEach(async ({ page }) => {
   await clearIdb(page);
 });
 
+async function expectDashboardReady(page: Page, expectedLabel: string) {
+  await expect(page).toHaveURL(/\/dashboard\//, { timeout: 30_000 });
+  await expect(page.locator(".app-header")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(expectedLabel).first()).toBeVisible({
+    timeout: 30_000,
+  });
+}
+
 test("generate nsec, create keyset, reload to returning welcome, and unlock", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Create New Keyset" }).click();
   await page.getByLabel("Keyset Name").fill("Returning Flow Key");
-  await page.getByRole("button", { name: "Generate NSEC" }).click();
-  const nsecInput = page.getByPlaceholder("Paste existing nsec (unsupported)");
+  await page.getByRole("button", { name: "Generate", exact: true }).click();
+  const nsecInput = page.getByPlaceholder("Paste your existing nsec or generate a new one");
   await expect(nsecInput).toHaveValue(/nsec1/);
   await page.getByRole("button", { name: "Reveal nsec" }).click();
   await expect(nsecInput).toHaveAttribute("type", "text");
@@ -23,43 +41,52 @@ test("generate nsec, create keyset, reload to returning welcome, and unlock", as
 
   await expect(page.getByRole("heading", { name: "Create Profile" })).toBeVisible();
   await page.getByLabel("Profile Name").fill("Returning Browser");
-  await page.getByRole("textbox", { name: "Remote Package Password", exact: true }).fill("remote-test-password");
-  await page.getByRole("textbox", { name: "Confirm Remote Package Password", exact: true }).fill("remote-test-password");
+  // fix-followup-distribute-2a/2c — the former shared "Remote Package
+  // Password" field on /create/profile was removed in 2A; remote
+  // passwords are now collected per share on /create/distribute via
+  // the per-share Password input + Create package CTA (Paper 8GU-0).
   await page.getByRole("textbox", { name: "Password", exact: true }).fill("test-password");
   await page.getByRole("textbox", { name: "Confirm Password", exact: true }).fill("test-password");
   await page.getByRole("button", { name: "Continue to Distribute Shares" }).click();
 
   await expect(page.getByRole("heading", { name: "Distribute Shares" })).toBeVisible({ timeout: 30_000 });
-  const qrButtons = page.getByRole("button", { name: "QR" });
-  const qrCount = await qrButtons.count();
-  for (let index = 0; index < qrCount; index += 1) {
-    await qrButtons.nth(index).click();
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await page.getByRole("button", { name: "Done" }).click();
+
+  const packagePasswordInputs = page.getByLabel(/^Package password for share \d+$/);
+  const remoteCount = await packagePasswordInputs.count();
+  expect(remoteCount).toBeGreaterThan(0);
+  const createPackageButtons = page.getByRole("button", { name: "Create package" });
+  for (let index = 0; index < remoteCount; index += 1) {
+    await packagePasswordInputs.first().fill(`remote-package-password-${index + 1}`);
+    await createPackageButtons.first().click();
+    await expect(createPackageButtons).toHaveCount(remoteCount - index - 1, {
+      timeout: 10_000,
+    });
   }
-  const copyPasswordButtons = page.getByRole("button", { name: "Copy Password" });
-  const copyPasswordCount = await copyPasswordButtons.count();
-  for (let index = 0; index < copyPasswordCount; index += 1) {
-    await copyPasswordButtons.nth(index).click();
+
+  const markDistributedButtons = page.getByRole("button", { name: /^Mark distributed$/ });
+  await expect(markDistributedButtons).toHaveCount(remoteCount);
+  for (let index = 0; index < remoteCount; index += 1) {
+    await markDistributedButtons.nth(index).click();
   }
+
   await page.getByRole("button", { name: "Continue to Completion" }).click();
   await page.getByRole("button", { name: "Finish Distribution" }).click();
-  await expect(page.getByText("Peers")).toBeVisible({ timeout: 30_000 });
+  await expectDashboardReady(page, "Returning Flow Key");
 
   await page.reload();
   await expect(page.getByText("Welcome back.")).toBeVisible();
   await page.getByRole("button", { name: "Unlock" }).first().click();
   await page.getByLabel("Profile Password").fill("test-password");
   await page.getByRole("button", { name: "Unlock" }).last().click();
-  await expect(page.getByText("Peers")).toBeVisible({ timeout: 30_000 });
+  await expectDashboardReady(page, "Returning Flow Key");
 });
 
 test("manual pasted nsec remains unsupported", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Create New Keyset" }).click();
-  await page.getByPlaceholder("Paste existing nsec (unsupported)").fill("nsec1manualkey");
+  await page.getByPlaceholder("Paste your existing nsec or generate a new one").fill("invalid-key");
   await page.getByRole("button", { name: "Create Keyset" }).click();
-  await expect(page.getByText("Existing nsec splitting is not supported yet.")).toBeVisible();
+  await expect(page.getByText("Invalid nsec format — must start with nsec1.")).toBeVisible();
 });
 
 test("imports a generated bfprofile through decrypt and review", async ({ page }) => {
@@ -77,8 +104,7 @@ test("imports a generated bfprofile through decrypt and review", async ({ page }
   await page.getByRole("textbox", { name: "Confirm Password", exact: true }).fill("import-local-password");
   await page.getByRole("button", { name: "Import & Launch Signer" }).click();
 
-  await expect(page.getByText("Peers")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("Outside Flow Key").first()).toBeVisible();
+  await expectDashboardReady(page, "Outside Flow Key");
 });
 
 test("rotates a returning profile from a generated bfshare source", async ({ page }) => {
@@ -93,8 +119,6 @@ test("rotates a returning profile from a generated bfshare source", async ({ pag
   await page.getByRole("button", { name: "Validate & Continue" }).click();
 
   await expect(page.getByRole("heading", { name: "Review & Generate" })).toBeVisible();
-  await page.getByRole("textbox", { name: "Password", exact: true }).fill("rotate-dist-password");
-  await page.getByRole("textbox", { name: "Confirm Password", exact: true }).fill("rotate-dist-password");
   await page.getByRole("button", { name: "Rotate & Generate Keyset" }).click();
 
   await expect(page.getByRole("heading", { name: "Create Profile" })).toBeVisible({ timeout: 30_000 });
@@ -104,23 +128,30 @@ test("rotates a returning profile from a generated bfshare source", async ({ pag
   await page.getByRole("button", { name: "Continue to Distribute Shares" }).click();
 
   await expect(page.getByRole("heading", { name: "Distribute Shares" })).toBeVisible();
-  const qrButtons = page.getByRole("button", { name: "QR" });
-  const qrCount = await qrButtons.count();
-  for (let index = 0; index < qrCount; index += 1) {
-    await qrButtons.nth(index).click();
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await page.getByRole("button", { name: "Done" }).click();
+  const packagePasswordInputs = page.locator("input.password-input");
+  const remotePackageCount = await packagePasswordInputs.count();
+  expect(remotePackageCount).toBeGreaterThan(0);
+
+  const createPackageButtons = page.getByRole("button", { name: "Create package" });
+  for (let index = 0; index < remotePackageCount; index += 1) {
+    await packagePasswordInputs.first().fill(`rotate-package-password-${index + 1}`);
+    await createPackageButtons.first().click();
+    await expect(createPackageButtons).toHaveCount(
+      remotePackageCount - index - 1,
+      { timeout: 10_000 },
+    );
   }
-  const copyPasswordButtons = page.getByRole("button", { name: "Copy Password" });
-  const copyPasswordCount = await copyPasswordButtons.count();
-  for (let index = 0; index < copyPasswordCount; index += 1) {
-    await copyPasswordButtons.nth(index).click();
+
+  const markDistributedButtons = page.getByRole("button", { name: /^Mark distributed$/ });
+  await expect(markDistributedButtons).toHaveCount(remotePackageCount);
+  for (let index = 0; index < remotePackageCount; index += 1) {
+    await markDistributedButtons.nth(index).click();
   }
+
   await page.getByRole("button", { name: "Continue to Completion" }).click();
   await page.getByRole("button", { name: "Finish Distribution" }).click();
 
-  await expect(page.getByText("Peers")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("Outside Flow Key").first()).toBeVisible();
+  await expectDashboardReady(page, "Outside Flow Key");
 });
 
 test("recovers a real nsec from a returning profile and generated bfshare source", async ({ page }) => {
@@ -131,7 +162,7 @@ test("recovers a real nsec from a returning profile and generated bfshare source
   await page.getByRole("button", { name: "Unlock" }).first().click();
   await page.getByLabel("Profile Password").fill(fixture.profilePassword);
   await page.getByRole("button", { name: "Unlock" }).last().click();
-  await expect(page.getByText("Peers")).toBeVisible({ timeout: 30_000 });
+  await expectDashboardReady(page, "Outside Flow Key");
 
   await page.getByRole("button", { name: "Recover" }).click();
   await expect(page.getByRole("heading", { name: "Recover NSEC" })).toBeVisible();
@@ -149,7 +180,7 @@ test("recovers a real nsec from a returning profile and generated bfshare source
   await page.getByRole("button", { name: "Copy to Clipboard" }).click();
   await expect(page.getByText("Copied!")).toBeVisible();
   await page.getByRole("button", { name: "Clear" }).click();
-  await expect(page.getByText("Peers")).toBeVisible({ timeout: 30_000 });
+  await expectDashboardReady(page, "Outside Flow Key");
 });
 
 async function clearIdb(page: Page) {

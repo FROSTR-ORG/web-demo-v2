@@ -1,0 +1,143 @@
+{
+  "groupId": "group-4-safety-multitab",
+  "testedAt": "2026-04-21T21:53:15Z",
+  "isolation": {
+    "surface": "agent-browser web UI",
+    "appUrl": "http://127.0.0.1:5173",
+    "sessionIds": [
+      "m2a_g4a"
+    ],
+    "tabsUsedForMultitab": [
+      "tab-0",
+      "tab-1"
+    ],
+    "profileId": "c36e08351268b3f25f8f1a26e2e29c658b070fa90bc101e282ddc9b469cb5825"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-APPROVALS-022",
+      "status": "fail",
+      "reason": "Long content was not truncated/clamped in the CONTENT row; modal width expanded to content width causing horizontal overflow.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-4-safety-multitab/VAL-APPROVALS-022-long-content-modal.png"
+        ],
+        "domChecks": {
+          "contentLength": 1413,
+          "modalClientWidth": 478,
+          "modalScrollWidth": 12298,
+          "modalNoHorizontalOverflow": false,
+          "contentRowClientWidth": 12157,
+          "contentRowScrollWidth": 12157,
+          "contentTitleLength": 1413,
+          "contentTitleMatchesText": true
+        },
+        "consoleErrors": "none",
+        "network": "No requests captured"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-023",
+      "status": "pass",
+      "reason": "Injected attacker payload rendered as literal text; no script/image injection and no alert execution occurred.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-4-safety-multitab/VAL-APPROVALS-023-xss-payload-modal.png"
+        ],
+        "domChecks": {
+          "attackString": "<img src=x onerror=alert(1)><script>alert(1)</script>",
+          "contentMatchesLiteral": true,
+          "domainMatchesLiteral": true,
+          "scriptCountInModal": 0,
+          "imgWithOnerrorCountInModal": 0,
+          "anyImgTagCountInModal": 0,
+          "alertCalls": 0
+        },
+        "consoleErrors": "none",
+        "network": "No requests captured"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-024",
+      "status": "pass",
+      "reason": "With the same profile open in two tabs, resolving the modal in tab A closed tab B's modal automatically within 360ms and both queues converged to empty.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-4-safety-multitab/VAL-APPROVALS-024-tab-a-modal-open.png",
+          "m2-approvals/group-4-safety-multitab/VAL-APPROVALS-024-tab-b-modal-open.png",
+          "m2-approvals/group-4-safety-multitab/VAL-APPROVALS-024-tab-b-modal-closed.png"
+        ],
+        "syncChecks": {
+          "promptId": "g4-multitab-024",
+          "tabAResolveAt": 1776808294413,
+          "tabBRemovedAt": 1776808294773,
+          "tabBUnmountLatencyMs": 360,
+          "tabAQueueLengthAfterResolve": 0,
+          "tabBQueueLengthAfterResolve": 0,
+          "tabAModalOpenAfterResolve": false,
+          "tabBModalOpenAfterResolve": false,
+          "decisionUsedInTabA": "deny"
+        },
+        "consoleErrors": "none",
+        "network": "No requests captured"
+      }
+    },
+    {
+      "id": "VAL-APPROVALS-025",
+      "status": "pass",
+      "reason": "On queued transition from first to second prompt, focus stayed inside modal controls, re-anchored on the new prompt, and keyboard Tab remained modal-scoped.",
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-4-safety-multitab/VAL-APPROVALS-025-first-queued-modal.png",
+          "m2-approvals/group-4-safety-multitab/VAL-APPROVALS-025-second-queued-modal.png"
+        ],
+        "focusTrace": {
+          "sampleCount": 1153,
+          "bodySamples": 0,
+          "inModalSamples": 1153,
+          "modalIdsSeen": [
+            "g4-focus-025-a",
+            "g4-focus-025-b"
+          ],
+          "firstSampleActiveText": "Allow once",
+          "lastSampleActiveText": "Always allow",
+          "tabKeyAfterTransition": {
+            "activeTag": "BUTTON",
+            "activeText": "Always allow",
+            "inModal": true,
+            "isBody": false
+          }
+        },
+        "consoleErrors": "none",
+        "network": "No requests captured"
+      }
+    }
+  ],
+  "frictions": [
+    {
+      "description": "agent-browser command chaining after heredoc eval failed with shell parsing when appending '&&'; I split eval and follow-up commands into separate calls.",
+      "resolved": true,
+      "resolution": "Executed eval, wait, and screenshot as separate commands.",
+      "affectedAssertions": [
+        "VAL-APPROVALS-022",
+        "VAL-APPROVALS-024"
+      ]
+    },
+    {
+      "description": "Dashboard showed multiple pre-existing 'Dismiss ping failure notice' controls during modal tests, adding noise to interactive snapshots.",
+      "resolved": true,
+      "resolution": "Targeted modal controls by label and validated by queue/modal DOM state rather than relying on element index alone.",
+      "affectedAssertions": [
+        "VAL-APPROVALS-022",
+        "VAL-APPROVALS-023",
+        "VAL-APPROVALS-024",
+        "VAL-APPROVALS-025"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Validated 4 assertions: 3 passed (VAL-APPROVALS-023/024/025) and 1 failed (VAL-APPROVALS-022 due long-content overflow without truncation)."
+}

@@ -1,0 +1,156 @@
+{
+  "groupId": "g1-backup-publish-core",
+  "testedAt": "2026-04-22T22:10:18Z",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "relayUrl": "ws://127.0.0.1:8194",
+    "agentBrowserSession": "g1-backup-publish-core-b48100dd",
+    "assignedAssertions": [
+      "VAL-BACKUP-001",
+      "VAL-BACKUP-002",
+      "VAL-BACKUP-003",
+      "VAL-BACKUP-005"
+    ]
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-BACKUP-001",
+      "title": "Settings exposes \"Publish Backup to Relay\" action",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Open /dashboard/:profileId settings sidebar and inspect Export & Backup section",
+          "expected": "Publish Backup to Relay action row is visible",
+          "observed": "Action row and Publish button were visible in Settings > Export & Backup"
+        },
+        {
+          "action": "Click Publish button",
+          "expected": "Password-prompt modal appears with password/confirm, strength bar, Cancel/Publish controls",
+          "observed": "Publish Backup modal appeared with password input, confirm input, strength meter, Cancel, and Publish"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g1-backup-publish-core/VAL-BACKUP-001-settings-publish-row.png",
+          "m6-backup/g1-backup-publish-core/VAL-BACKUP-001-publish-modal.png"
+        ],
+        "observables": [
+          "m6-backup/g1-backup-publish-core/VAL-BACKUP-001-modal-structure.json"
+        ],
+        "consoleErrors": "none (m6-backup/g1-backup-publish-core/console-errors.txt is empty)",
+        "network": "not required for this assertion"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-002",
+      "title": "Publish requires password, dispatches through WASM helpers",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Fill Backup Password + Confirm Password with StrongPass123",
+          "expected": "Matching >=8-char password enables Publish CTA",
+          "observed": "Publish button became enabled after matching passwords"
+        },
+        {
+          "action": "Submit Publish from modal",
+          "expected": "Backup is published and success UI references reached relay URL",
+          "observed": "Success state showed \"Backup published to 1 relay.\" and reached list \"ws://127.0.0.1:8194\""
+        },
+        {
+          "action": "Inspect relay observer feed for authored kind-10000 event",
+          "expected": "Publish dispatch reaches configured relay",
+          "observed": "Observer websocket received EVENT for author with ids fcd11c5f... and bac328fd..."
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g1-backup-publish-core/VAL-BACKUP-002-publish-success.png"
+        ],
+        "observables": [
+          "m6-backup/g1-backup-publish-core/VAL-BACKUP-002-success-observation.json",
+          "m6-backup/g1-backup-publish-core/VAL-BACKUP-002-observation.json"
+        ],
+        "consoleErrors": "none (m6-backup/g1-backup-publish-core/console-errors.txt is empty)",
+        "network": "NIP-01 observer REQ on ws://127.0.0.1:8194 with filter {kinds:[10000],authors:[derived-share-pubkey]} received matching EVENTs (latest id bac328fd9bf456dd9583795380a29812e160da592970bd41d624fb044e943bd7)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-003",
+      "title": "Published event is kind 10000 with encrypted content payload",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Capture latest published relay EVENT payload from observer",
+          "expected": "Event kind matches profile_backup_event_kind() and payload is ciphertext",
+          "observed": "Latest event kind=10000, content length=1796, non-JSON ciphertext-like body"
+        },
+        {
+          "action": "Run substring checks against sensitive/plaintext markers",
+          "expected": "Ciphertext does not include groupName, relay URL, or share secret",
+          "observed": "All plaintext substring checks returned false; JSON parse check returned false"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g1-backup-publish-core/VAL-BACKUP-003-publish-success-context.png"
+        ],
+        "observables": [
+          "m6-backup/g1-backup-publish-core/VAL-BACKUP-003-event-ciphertext-check.json"
+        ],
+        "consoleErrors": "none (m6-backup/g1-backup-publish-core/console-errors.txt is empty)",
+        "network": "Observed EVENT id bac328fd9bf456dd9583795380a29812e160da592970bd41d624fb044e943bd7 on ws://127.0.0.1:8194 with kind=10000 and encrypted content"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-BACKUP-005",
+      "title": "Success UI confirms publish; modal advances to completion state",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Publish backup from modal",
+          "expected": "Modal advances to completion state with success copy",
+          "observed": "Completion state displayed \"Backup published to 1 relay.\" with Done action"
+        },
+        {
+          "action": "Close/reopen Settings sidebar after publish",
+          "expected": "Persistent last-published indicator remains visible",
+          "observed": "\"Last published: <relative> — reached 1/1 relays\" row remained visible after reopen"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m6-backup/g1-backup-publish-core/VAL-BACKUP-005-last-published-indicator.png",
+          "m6-backup/g1-backup-publish-core/VAL-BACKUP-002-publish-success.png"
+        ],
+        "observables": [
+          "m6-backup/g1-backup-publish-core/VAL-BACKUP-005-last-published-text.json"
+        ],
+        "consoleErrors": "none (m6-backup/g1-backup-publish-core/console-errors.txt is empty)",
+        "network": "Publish success backed by relay observer events on ws://127.0.0.1:8194"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Seeded runtime kept showing repeated ping-timeout notices for offline peers, adding noisy dismiss buttons in dashboard while validating backup modal flows.",
+      "resolved": true,
+      "resolution": "Continued validation in Settings sidebar/modal where backup actions are unaffected; no functional impact on backup assertions.",
+      "affectedAssertions": [
+        "VAL-BACKUP-001",
+        "VAL-BACKUP-002",
+        "VAL-BACKUP-003",
+        "VAL-BACKUP-005"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 4 assertions (VAL-BACKUP-001/002/003/005): 4 passed, 0 failed, 0 blocked."
+}

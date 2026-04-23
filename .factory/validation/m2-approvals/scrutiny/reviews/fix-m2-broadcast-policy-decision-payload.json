@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-m2-broadcast-policy-decision-payload",
+  "reviewedAt": "2026-04-21T21:33:50Z",
+  "commitId": "46fb265c21ebf05125632491c7a39f801086d779",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly addresses the prior failure: the sender now broadcasts a full `decision` payload (`promptId`, `peerPubkey`, `decision`, `scope.verb`) and receivers both dismiss the mirrored prompt and apply `setPolicyOverride` locally, while preserving legacy `policy-resolved` compatibility and avoiding re-broadcast loops. This closes the original cross-tab state divergence gap identified in the prior review.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The runtime-worker RED-first testing procedure appears to have been skipped without being captured in skillFeedback.",
+      "evidence": "Transcript skeleton for worker session `db446435-26c1-45c3-89c4-3c13676b81a5` shows `Edit` operations on `src/app/AppStateProvider.tsx` before creation of `src/app/__tests__/broadcastPolicyDecision.test.tsx`, and no failing test run for the new spec prior to implementation. Handoff skillFeedback in `.../handoffs/2026-04-21T21-09-00-614Z__fix-m2-broadcast-policy-decision-payload__db446435-26c1-45c3-89c4-3c13676b81a5.json` only records the agent-browser deviation."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/m2-approvals/scrutiny/reviews/m2-reactive-policy-prompt-modal.json",
+  "summary": "PASS: reviewed the original failed feature diff (6c69d3fc...) and the fix diff (46fb265c...). The fix adequately resolves the original multi-tab broadcast-payload failure by propagating and applying full policy decisions across tabs with compatibility and no-echo behavior; no blocking code defects were found in the fix."
+}

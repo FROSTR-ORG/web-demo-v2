@@ -183,7 +183,7 @@ describe("VAL-DSH-016 — Export Complete modal", () => {
       dashboard: { settingsOpen: true, modal: "export-complete", paperPanels: true },
     });
     const modal = screen.getByTestId("export-complete-modal");
-    expect(modal.querySelector(".export-complete-title")?.textContent).toBe("Backup Ready");
+    expect(modal.querySelector(".export-complete-title")?.textContent).toBe("Profile Backup Ready");
     const actionBtns = Array.from(modal.querySelectorAll(".export-action-btn")).map(
       (el) => el.textContent?.trim()
     );
@@ -206,11 +206,11 @@ describe("VAL-DSH-016 — Export Complete modal", () => {
 });
 
 describe("VAL-DSH-017 / VAL-DSH-022 — Signer Policy Prompt modal", () => {
-  it("renders title, subtitle, metadata grid, countdown, and decision CTAs", () => {
+  it("renders title, subtitle, metadata grid, countdown, and peer-level decision CTAs (scoped variants hidden per VAL-APPROVALS-013 deviation)", () => {
     renderAt({ dashboard: { modal: "policy-prompt", paperPanels: true } });
     expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
     expect(
-      screen.getByText("A peer is requesting permission to sign on your behalf")
+      screen.getByText(/requesting permission to sign on your behalf/)
     ).toBeInTheDocument();
     // Metadata grid labels
     expect(screen.getByText("EVENT KIND")).toBeInTheDocument();
@@ -219,13 +219,23 @@ describe("VAL-DSH-017 / VAL-DSH-022 — Signer Policy Prompt modal", () => {
     expect(screen.getByText("DOMAIN")).toBeInTheDocument();
     // Detail value — kind:1
     expect(screen.getByText("kind:1 (Short Text Note)")).toBeInTheDocument();
-    // Countdown
-    expect(screen.getByText("Expires in 42s")).toBeInTheDocument();
-    // Six decision CTAs
-    ["Deny", "Allow once", "Always allow", "Always for kind:1", "Always deny for kind:1", "Always deny for primal.net"]
+    // Countdown — reactive denial surface renders a live countdown
+    expect(screen.getByText(/Expires in/)).toBeInTheDocument();
+    // Four peer-level decision CTAs. Scoped variants removed per
+    // VAL-APPROVALS-013 since bifrost-rs `setPolicyOverride` only exposes
+    // peer-level granularity — see docs/runtime-deviations-from-paper.md.
+    ["Deny", "Allow once", "Always allow", "Always deny"]
       .forEach((label) => {
         expect(screen.getByText(label)).toBeInTheDocument();
       });
+    // Scoped buttons must NOT be rendered.
+    expect(screen.queryByText("Always for kind:1")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Always deny for kind:1"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Always deny for primal.net"),
+    ).not.toBeInTheDocument();
   });
 
   it("VAL-DSH-022 — clicking Open on the first Pending Approvals row opens the Signer Policy modal", () => {
@@ -247,16 +257,18 @@ describe("VAL-DSH-018 / VAL-DSH-023 — Signing Failed modal", () => {
   it("renders title, summary, detail line, and Dismiss + Retry CTAs", () => {
     renderAt({ dashboard: { modal: "signing-failed", paperPanels: true } });
     expect(screen.getByRole("heading", { name: "Signing Failed" })).toBeInTheDocument();
+    // With no real OperationFailure payload (Paper-only demo entry), the
+    // modal renders a neutral fallback rather than the old hard-coded
+    // "Peers responded: 1/2 · insufficient partial signatures" ratio. See
+    // `fix-m1-signing-failed-modal-real-peer-response` and VAL-OPS-006.
     expect(
-      screen.getByText(
-        "Unable to complete signature for event kind:1. All 3 retry attempts exhausted."
-      )
+      screen.getByText(/failure details are unavailable/i),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Round: r-0x4f2a · Peers responded: 1/2 · Error: insufficient partial signatures"
-      )
-    ).toBeInTheDocument();
+    const codeBox = screen.getByTestId("signing-failed-code-text");
+    expect(codeBox.textContent).toMatch(/failure details unavailable/i);
+    expect(codeBox.textContent).not.toContain("Peers responded");
+    expect(codeBox.textContent).not.toContain("1/2");
+    expect(codeBox.textContent).not.toContain("r-0x4f2a");
     expect(screen.getByText("Dismiss")).toBeInTheDocument();
     expect(screen.getByText("Retry")).toBeInTheDocument();
   });

@@ -1,0 +1,59 @@
+{
+  "milestone": "m2-approvals",
+  "round": 2,
+  "status": "pass",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "npx vitest run --config \"/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/vitest.config.ts\" --maxConcurrency 4",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "npx tsc --noEmit -p \"/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2/tsconfig.json\" --pretty false",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "echo \"No lint configured\"",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "skills",
+      "suggestion": "Align ui-screen-worker/runtime-worker guidance with mission AGENTS policy for agent-browser usage and known baseline validator failures, and add explicit allowed fallbacks when UI state cannot be driven through agent-browser (e.g., demo-only queue-state without debug hooks).",
+      "evidence": "Multiple m2 fix reviews flagged inconsistent procedure outcomes: AGENTS marks agent-browser mandatory, while skills currently allow/condition skips differently, causing conflicting followedProcedure reporting across fix-m2-sign-message-preview-from-nested-context, fix-m2-policy-prompt-modal-ttl-reset, and fix-m2-persist-always-allow-to-profile.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "Require explicit RED-first evidence and accurate skillFeedback deviation reporting in worker handoffs for scrutiny traceability.",
+      "evidence": "fix-m2-broadcast-policy-decision-payload and fix-m2-allow-once-rollback-reconcile-doc-and-code reviews observed procedure/reporting mismatch around test-first sequencing and omitted deviation disclosure, despite no blocking code defects.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Add new MockAppStateProvider debug hook solely for queue manipulation during modal verification.",
+      "reason": "ambiguous"
+    },
+    {
+      "observation": "Agent-browser policy mismatch observation variants repeated across multiple reports.",
+      "reason": "duplicate"
+    },
+    {
+      "observation": "Runtime-worker followedProcedure wording variants repeated across multiple reports.",
+      "reason": "duplicate"
+    }
+  ],
+  "previousRound": ".factory/validation/m2-approvals/scrutiny/synthesis.round1.json"
+}

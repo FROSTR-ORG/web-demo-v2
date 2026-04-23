@@ -117,6 +117,72 @@ export type BfOnboardPayload = z.infer<typeof BfOnboardPayloadSchema>;
 export type BfSharePayload = z.infer<typeof BfSharePayloadSchema>;
 export type ProfilePackagePair = z.infer<typeof ProfilePackagePairSchema>;
 
+/**
+ * Decrypted profile-backup payload as returned by the WASM bridge
+ * helper `create_encrypted_profile_backup` (and as consumed by
+ * `build_profile_backup_event` / `encrypt_profile_backup_content` /
+ * `parse_profile_backup_event`). This is the plaintext shape of the
+ * backup — the WASM bridge internally encrypts it and wraps it in a
+ * signed kind-10000 Nostr event, so this type is never transmitted
+ * over the wire in plaintext. Fields are `snake_case` to match the
+ * bifrost-bridge-wasm serde serialization (no `rename_all`).
+ */
+export interface EncryptedProfileBackup {
+  version: number;
+  device: {
+    name: string;
+    share_public_key: string;
+    manual_peer_policy_overrides: BfManualPeerPolicyOverride[];
+    relays: string[];
+  };
+  group_package: {
+    group_name: string;
+    group_pk: string;
+    threshold: number;
+    members: { idx: number; pubkey: string }[];
+  };
+}
+
+export const EncryptedProfileBackupSchema = z.object({
+  version: z.number(),
+  device: z.object({
+    name: z.string(),
+    share_public_key: z.string(),
+    manual_peer_policy_overrides: z
+      .array(BfManualPeerPolicyOverrideSchema)
+      .default([]),
+    relays: z.array(z.string()),
+  }),
+  group_package: z.object({
+    group_name: z.string(),
+    group_pk: z.string(),
+    threshold: z.number(),
+    members: z.array(
+      z.object({ idx: z.number(), pubkey: z.string() }),
+    ),
+  }),
+});
+
+export interface ProfileBackupEvent {
+  id: string;
+  pubkey: string;
+  created_at: number;
+  kind: number;
+  tags: string[][];
+  content: string;
+  sig: string;
+}
+
+export const ProfileBackupEventSchema = z.object({
+  id: z.string(),
+  pubkey: z.string(),
+  created_at: z.number(),
+  kind: z.number(),
+  tags: z.array(z.array(z.string())),
+  content: z.string(),
+  sig: z.string(),
+});
+
 export interface RotateKeysetBundleResult {
   previous_group_id: string;
   next_group_id: string;
@@ -353,22 +419,180 @@ export interface StoredProfileSummary {
   localShareIdx: number;
   groupPublicKey: string;
   relays: string[];
+  /** Epoch-ms creation timestamp. Set once when the profile is first saved. */
   createdAt: number;
+  /**
+   * Epoch-ms "last mutated" timestamp. Refreshed every time a persisted
+   * profile field is edited (name, relays, password, persistent peer
+   * policies). Optional for backward compatibility with records written
+   * before this field existed; callers rendering "Updated" should fall
+   * back to `createdAt` when this is absent (VAL-SETTINGS-008). Fresh
+   * saves via `buildStoredProfileRecord` always populate it.
+   */
+  updatedAt?: number;
   lastUsedAt: number;
+  /**
+   * m6-backup-publish — unix-seconds timestamp of the most recent
+   * successful `publishProfileBackup` from this profile. Written to
+   * the stored record after each publish so the SettingsSidebar can
+   * render a "Last published" indicator that survives lock/unlock
+   * (VAL-BACKUP-005 / VAL-BACKUP-031). `undefined` until the first
+   * successful publish; the SettingsSidebar renders nothing when
+   * absent.
+   */
+  lastBackupPublishedAt?: number;
+  /**
+   * m6-backup-publish — number of relays that acknowledged the most
+   * recent successful `publishProfileBackup` (the length of
+   * `PublishEventOutcome.reached`). Mirrored into the rendered "Last
+   * published" row as `reached N/M relays`. `undefined` until the
+   * first successful publish.
+   */
+  lastBackupReachedRelayCount?: number;
 }
 
 export interface StoredProfileRecord {
   summary: StoredProfileSummary;
   encryptedProfilePackage: string;
+  /**
+   * fix-m7-onboard-distinct-share-allocation — canonical JSON envelope
+   * produced by
+   * {@link import("../storage/unadoptedSharesPool").encryptUnadoptedSharesPool}
+   * containing the profile's NON-SELF share secrets encrypted under
+   * the profile password.
+   *
+   * Populated by the Create flow after keyset generation; written
+   * again each time the pool allocation ledger changes (allocation,
+   * completion, cancellation). Absent on legacy records (migration
+   * leaves them un-populated; the sponsor flow will refuse to
+   * onboard when the pool is missing or exhausted).
+   *
+   * SECURITY: decrypted only inside
+   * `AppStateValue.createOnboardSponsorPackage`; the decrypted pool
+   * is never written to React state, `sessionStorage`,
+   * `localStorage`, `window.__debug`, or any non-envelope IndexedDB
+   * store. See `docs/runtime-deviations-from-paper.md > M7 onboard
+   * unadopted share pool` for the full design + security rationale.
+   */
+  unadoptedSharesCiphertext?: string;
+  /**
+   * fix-m7-onboard-distinct-share-allocation — unencrypted ledger of
+   * pool-share allocations issued by the Dashboard "Onboard a Device"
+   * flow. One entry per sponsor-initiated onboard ceremony, keyed by
+   * the runtime-assigned `request_id`.
+   *
+   * Only share indices + allocation metadata (request_id, device
+   * label, timestamps, status, optional failure reason) live here —
+   * NO share secrets, NO passwords, NO ciphertext. The ledger is
+   * therefore safe to store unencrypted alongside the record. Shape
+   * is validated on read via
+   * {@link import("../storage/unadoptedSharesPool").ShareAllocationEntrySchema}.
+   *
+   * On successful onboard completion the entry's `status` transitions
+   * to `"completed"` and the underlying share is permanently removed
+   * from the available pool. On failure or cancel the entry's
+   * `status` transitions to `"failed"` / `"cancelled"` and the share
+   * RETURNS to the available pool for a subsequent sponsor attempt.
+   */
+  shareAllocations?: import("../storage/unadoptedSharesPool").ShareAllocationEntry[];
 }
 
 export interface OnboardingPackageView {
   idx: number;
   memberPubkey: string;
+  /**
+   * Optional human-readable recipient label collected during the
+   * Create/Distribute flow. Used by Distribution Completion to render
+   * "Member #N — {deviceLabel}" when present; blank/whitespace values
+   * fall back to the member pubkey suffix.
+   */
+  deviceLabel?: string;
+  /**
+   * fix-followup-distribute-2a — after `createProfile` returns, the
+   * remote-share package text is empty for every entry in the create
+   * session. The mutator `encodeDistributionPackage(idx, password)`
+   * is the sole call-site that populates this field — and even then
+   * the value stored here is a REDACTED PREVIEW (first 24 chars of
+   * the full bfonboard1… string). The plaintext package text lives
+   * in the provider's per-share secret ref, addressable via
+   * `getCreateSessionPackageSecret(idx)`. The local-share entry
+   * retains its legacy "Saved securely in this browser" path (no
+   * package text ever produced).
+   */
   packageText: string;
+  /**
+   * fix-followup-distribute-2a — same contract as {@link packageText}:
+   * empty until `encodeDistributionPackage` has been called for this
+   * share, then stored here as a redaction sentinel ("[redacted]")
+   * — the plaintext password lives on the per-share secret ref.
+   */
   password: string;
+  /**
+   * fix-followup-distribute-2a — `true` once a caller has invoked
+   * `encodeDistributionPackage(idx, password)` and the per-share
+   * secret ref has been populated. `false` directly after
+   * `createProfile` returns (which no longer encrypts onboarding
+   * packages). The DistributeSharesScreen gates its "Ready to
+   * distribute" / "Package not created" chip and the enabled state
+   * of the Copy / QR / Mark-distributed action row on this flag.
+   */
+  packageCreated: boolean;
+  /**
+   * fix-followup-distribute-2a — runtime-assigned `request_id` of
+   * the outbound Onboard command dispatched for this share.
+   *
+   * fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire
+   * (feature 3) — populated inside `encodeDistributionPackage(idx,
+   * password)` immediately after the per-share bfonboard package is
+   * encoded: the same atomic mutator call also dispatches
+   * `handleRuntimeCommand({type: "onboard", peer_pubkey32_hex})` for
+   * the share's target member and stashes the returned requestId
+   * here. `AppStateProvider.absorbDrains` then correlates this id
+   * against drained `CompletedOperation::Onboard` (flip
+   * `peerOnline = true`) and `OperationFailure { op_type: "onboard" }`
+   * (surface `adoptionError` inline) envelopes.
+   */
+  pendingDispatchRequestId?: string;
+  /**
+   * fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire
+   * — non-fatal inline error surfaced on this share's Distribute
+   * card when the sponsor-side runtime yields an
+   * `OperationFailure { op_type: "onboard" }` matching
+   * {@link pendingDispatchRequestId}. The copy is
+   * "Peer adoption failed — retry or mark distributed manually" —
+   * the user can still proceed via the manual fallback (the
+   * "Mark distributed" button remains enabled). Defaults to
+   * `undefined` (never surfaces until a real onboard failure is
+   * drained).
+   */
+  adoptionError?: string;
+  /**
+   * fix-followup-distribute-2a — `true` when the paired peer has
+   * come online (handshake echo observed from the runtime). Feeds
+   * into {@link import("../../app/distributionPackages").packageDistributed}
+   * alongside {@link manuallyMarkedDistributed}. Defaults to `false`.
+   */
+  peerOnline: boolean;
+  /**
+   * fix-followup-distribute-2a — `true` when the user has manually
+   * confirmed hand-off via the "Mark distributed" button (offline
+   * fallback for QR / manual handoff). Flipped by the mutator
+   * `markPackageDistributed(idx)`. Feeds into
+   * {@link import("../../app/distributionPackages").packageDistributed}
+   * alongside {@link peerOnline}. Defaults to `false`.
+   */
+  manuallyMarkedDistributed: boolean;
+  /**
+   * fix-followup-distribute-2a — informational sub-state telemetry
+   * only (retained for existing UI affordances). Does NOT participate
+   * in the `packageDistributed` predicate, which is
+   * `(peerOnline || manuallyMarkedDistributed)`.
+   */
   packageCopied: boolean;
+  /** Informational sub-state telemetry only (see {@link packageCopied}). */
   passwordCopied: boolean;
+  /** Informational sub-state telemetry only (see {@link packageCopied}). */
   qrShown: boolean;
+  /** Informational sub-state telemetry only (legacy alias). */
   copied?: boolean;
 }

@@ -1,0 +1,220 @@
+{
+  "groupId": "group-r2-approvals-fixes",
+  "testedAt": "2026-04-21T23:07:49Z",
+  "isolation": {
+    "surface": "agent-browser web UI",
+    "appUrl": "http://127.0.0.1:5173",
+    "sessionId": "m2a_r2_fix",
+    "profileId": "cf47397e4d61d030c50a81e9b516c7e88c96046dea9a2970ccc8a766236a3b3f",
+    "singleBrowserSession": true
+  },
+  "toolsUsed": [
+    "agent-browser",
+    "rg",
+    "npm run build"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-APPROVALS-017",
+      "title": "Persisted overrides appear in Peer Policies view",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Enqueue peer_denied(sign) event for Peer #2 and resolve with Always allow",
+          "expected": "Persistent respond.sign allow override is written and modal closes",
+          "observed": "Override row appears in Peer Policies Active overrides with method sign, value allow, source persistent"
+        },
+        {
+          "action": "Inspect Active overrides row metadata and controls",
+          "expected": "Row includes verb, effect, persistence indicator, and Remove action",
+          "observed": "Row showed persistence label \"Persistent\" and remove control aria-label \"Remove sign override for Peer #2\""
+        },
+        {
+          "action": "Click Remove from Peer Policies and replay identical request",
+          "expected": "Override removed and next identical request re-prompts",
+          "observed": "Override row count became 0; replayed peer_denied event reopened PolicyPromptModal (data-peer-denial-id=val-approvals-017-r2-b)"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-r2-approvals-fixes/VAL-APPROVALS-017-modal-before-allow.png",
+          "m2-approvals/group-r2-approvals-fixes/VAL-APPROVALS-017-peer-policies-with-override.png",
+          "m2-approvals/group-r2-approvals-fixes/VAL-APPROVALS-017-reprompt-after-remove.png"
+        ],
+        "observables": {
+          "overrideRowBeforeRemove": {
+            "overrideRowCount": 1,
+            "method": "sign",
+            "value": "allow",
+            "source": "persistent",
+            "persistence": "Persistent"
+          },
+          "afterRemove": {
+            "overrideRows": 0,
+            "policyOverrides": 0
+          },
+          "replayPrompt": {
+            "modalCount": 1,
+            "activePeerDenialId": "val-approvals-017-r2-b",
+            "queueLength": 1
+          }
+        },
+        "consoleErrors": "none",
+        "network": "No assertion-specific request deltas captured"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-APPROVALS-018",
+      "title": "No upfront / proactive prompt is ever shown",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run non-peer_denied triggers (focus blur/focus, refreshRuntime, handleRuntimeCommand(refresh_all_peers))",
+          "expected": "PolicyPromptModal remains unmounted",
+          "observed": "Modal count stayed 0 before/after actions; refresh_all_peers returned { requestId: null, debounced: false }"
+        },
+        {
+          "action": "Run lockProfile + unlockProfile cycle and return to dashboard",
+          "expected": "No proactive PolicyPromptModal mount during lock/unlock",
+          "observed": "modalAfterLock=0 and modalAfterUnlock=0"
+        },
+        {
+          "action": "Inspect source and production build for proactive-open paths",
+          "expected": "Runtime open trigger tied to peer_denied handling and proactive openings absent from production output",
+          "observed": "Dashboard source shows peer_denied -> enqueuePeerDenial path and setActiveModal(\"policy-prompt\") callsites guarded by import.meta.env.DEV; build succeeded and dist grep returned NO_MATCHES for proactive patterns"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-r2-approvals-fixes/VAL-APPROVALS-018-no-proactive-modal-after-non-peer-denied-actions.png"
+        ],
+        "artifacts": [
+          "m2-approvals/group-r2-approvals-fixes/VAL-APPROVALS-018-source-grep.txt",
+          "m2-approvals/group-r2-approvals-fixes/VAL-APPROVALS-018-build.log",
+          "m2-approvals/group-r2-approvals-fixes/VAL-APPROVALS-018-dist-grep.txt"
+        ],
+        "observables": {
+          "nonPeerDeniedActions": {
+            "modalCountBefore": 0,
+            "modalCountAfter": 0
+          },
+          "lockUnlockCycle": {
+            "modalAfterLock": 0,
+            "modalAfterUnlock": 0
+          },
+          "distScanResult": "NO_MATCHES"
+        },
+        "consoleErrors": "none",
+        "network": "No assertion-specific request deltas captured"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-APPROVALS-021",
+      "title": "Modal open engages scroll lock on page body",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Scroll page to Y=400 and open PolicyPromptModal from peer_denied event",
+          "expected": "Body enters scroll-lock mode while modal is open",
+          "observed": "Body style became overflow=hidden, position=fixed, top=-400px while modal mounted"
+        },
+        {
+          "action": "Attempt background wheel/PageDown scroll during open modal",
+          "expected": "Background scroll remains unchanged",
+          "observed": "window.scrollY stayed 0 during scroll attempts"
+        },
+        {
+          "action": "Dismiss modal",
+          "expected": "Body styles restore to pre-open values and scroll position restored",
+          "observed": "After close body restored to overflow=visible, position=static, top=auto and scrollY=400"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-r2-approvals-fixes/VAL-APPROVALS-021-modal-open-scroll-lock.png"
+        ],
+        "observables": {
+          "before": {
+            "overflow": "visible",
+            "position": "static",
+            "top": "auto",
+            "scrollY": 400
+          },
+          "open": {
+            "overflow": "hidden",
+            "position": "fixed",
+            "top": "-400px",
+            "scrollY": 0
+          },
+          "afterScrollAttempt": {
+            "overflow": "hidden",
+            "position": "fixed",
+            "top": "-400px",
+            "scrollY": 0
+          },
+          "afterClose": {
+            "overflow": "visible",
+            "position": "static",
+            "top": "auto",
+            "scrollY": 400
+          }
+        },
+        "consoleErrors": "none",
+        "network": "No assertion-specific request deltas captured"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-APPROVALS-022",
+      "title": "Long content truncates with tooltip / disclosure and no modal overflow",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inject peer_denied payload with long CONTENT (~1.4KB) and long DOMAIN value",
+          "expected": "Values truncate visually with full value available via title/tooltip",
+          "observed": "CONTENT and DOMAIN value cells rendered in truncated state (scrollWidth > clientWidth) and preserved full text in title attributes"
+        },
+        {
+          "action": "Measure modal/layout overflow",
+          "expected": "No horizontal overflow beyond modal border-box",
+          "observed": "policy-modal scrollWidth == clientWidth (478), so no horizontal overflow"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m2-approvals/group-r2-approvals-fixes/VAL-APPROVALS-022-long-content-truncated.png"
+        ],
+        "observables": {
+          "modalClientWidth": 478,
+          "modalScrollWidth": 478,
+          "modalHasHorizontalOverflow": false,
+          "contentClientWidth": 298,
+          "contentScrollWidth": 10925,
+          "contentIsTruncated": true,
+          "contentTextLength": 1455,
+          "contentTitleLength": 1455,
+          "contentTitleMatchesText": true,
+          "domainIsTruncated": true,
+          "domainTitleLength": 279
+        },
+        "consoleErrors": "none",
+        "network": "No assertion-specific request deltas captured"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "agent-browser heredoc eval commands fail when chained with && in a single shell line",
+      "resolved": true,
+      "resolution": "Executed heredoc eval and subsequent wait/screenshot calls as separate commands",
+      "affectedAssertions": [
+        "VAL-APPROVALS-017"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Validated 4 rerun assertions (VAL-APPROVALS-017, 018, 021, 022): all 4 passed with UI evidence and source/build verification for VAL-APPROVALS-018."
+}

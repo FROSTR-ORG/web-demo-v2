@@ -1,0 +1,56 @@
+{
+  "milestone": "misc-polish-e2e-review",
+  "round": 1,
+  "status": "pass",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "npx vitest run --config vitest.config.ts --maxConcurrency 2",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "npx tsc --noEmit -p tsconfig.json --pretty false",
+      "exitCode": 0
+    },
+    "typecheck_node": {
+      "passed": true,
+      "command": "npx tsc --noEmit -p tsconfig.node.json --pretty false",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "npm run lint",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Clarify AGENTS update target path for mission tasks (mission-scoped AGENTS vs repo-root AGENTS) and explicitly note when repo-root AGENTS.md is absent.",
+      "evidence": "Review for polish-2nd-pass-docs-config-deps observed worker path ambiguity and transcript attempts against both /web-demo-v2/AGENTS.md and mission AGENTS.md.",
+      "isSystemic": false
+    },
+    {
+      "target": "skill",
+      "suggestion": "Clarify runtime-worker procedure for non-UI docs/config/refactor features by explicitly allowing no-agent-browser/no-demo-gallery validation when there is no user-visible runtime UI behavior.",
+      "evidence": "Both reviewed features recorded runtime-worker guidance mismatch: accepted runs relied on tsc/vitest (plus targeted Playwright where relevant) without agent-browser/demo-gallery despite current runtime-worker verification defaults.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Feature-specific runtime-worker mismatch note from polish-2nd-pass-code-tests",
+      "reason": "duplicate of the broader runtime-worker guidance mismatch captured in suggestedGuidanceUpdates"
+    }
+  ],
+  "previousRound": null
+}

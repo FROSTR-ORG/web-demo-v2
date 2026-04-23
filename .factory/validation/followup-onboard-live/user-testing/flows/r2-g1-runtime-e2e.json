@@ -1,0 +1,82 @@
+{
+  "groupId": "r2-g1-runtime-e2e",
+  "testedAt": "2026-04-23T18:26:30Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "guidanceSections": [
+      "Flow Validator Guidance: vitest",
+      "Flow Validator Guidance: playwright-cli"
+    ],
+    "project": "desktop",
+    "workers": 1,
+    "assignedAssertions": [
+      "VAL-FOLLOWUP-001",
+      "VAL-FOLLOWUP-002",
+      "VAL-FOLLOWUP-003",
+      "VAL-FOLLOWUP-010"
+    ]
+  },
+  "toolsUsed": [
+    "playwright-cli",
+    "vitest"
+  ],
+  "commandRuns": [
+    {
+      "id": "cmd-01-create-bootstrap-runtime",
+      "command": "npx vitest run src/app/__tests__/AppStateProvider.createBootstrapRuntime.test.tsx --config vitest.config.ts",
+      "exitCode": 0,
+      "result": "1 file passed; 4 tests passed"
+    },
+    {
+      "id": "cmd-02-onboard-dispatch",
+      "command": "npx vitest run src/app/__tests__/encodeDistributionPackage.onboard-dispatch.test.tsx --config vitest.config.ts",
+      "exitCode": 0,
+      "result": "1 file passed; 7 tests passed"
+    },
+    {
+      "id": "cmd-03-create-distribute-live-bootstrap",
+      "command": "npx playwright test src/e2e/multi-device/create-distribute-live-bootstrap.spec.ts --project=desktop --workers 1 --repeat-each=3",
+      "exitCode": 0,
+      "result": "6 passed (repeat-each=3); happy path + OperationFailure fallback both green"
+    }
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-FOLLOWUP-001",
+      "status": "pass",
+      "reason": "The create-bootstrap Vitest suite proves `window.__iglooTestGetRuntimeSource()` is installed and returns `relay_pump` after `createProfile` with a valid relay, while the live multi-device spec waits for the same DEV hook to report `relay_pump` on `/create/distribute` before proceeding through the real adoption flow.",
+      "commandEvidence": [
+        "cmd-01-create-bootstrap-runtime",
+        "cmd-03-create-distribute-live-bootstrap"
+      ]
+    },
+    {
+      "id": "VAL-FOLLOWUP-002",
+      "status": "pass",
+      "reason": "The focused provider suite covers the atomic per-share `encodeDistributionPackage(idx, password)` behavior: exactly one onboard dispatch per click, correct target peer x-only pubkey, persisted request id, and zero onboard dispatches before any click.",
+      "commandEvidence": [
+        "cmd-02-onboard-dispatch"
+      ]
+    },
+    {
+      "id": "VAL-FOLLOWUP-003",
+      "status": "pass",
+      "reason": "The live multi-device Playwright spec passed on all three repetitions, exercising Device A `/create/distribute` → Device B real `/onboard` UI → Device A auto-flip to `Distributed` within the expected echo path, plus the documented OperationFailure fallback path.",
+      "commandEvidence": [
+        "cmd-03-create-distribute-live-bootstrap"
+      ]
+    },
+    {
+      "id": "VAL-FOLLOWUP-010",
+      "status": "pass",
+      "reason": "The create-bootstrap runtime suite directly covers the relay validation matrix: `wss://` accepted, `ws://example.com` rejected with the canonical error, `ws://localhost:*` rejected even with the DEV flag, and `ws://127.0.0.1:*` accepted only when the DEV opt-in is enabled.",
+      "commandEvidence": [
+        "cmd-01-create-bootstrap-runtime"
+      ]
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Runtime/bootstrap/dispatched-onboard proof set passed cleanly: 3 commands run, 4 assigned assertions passed, 0 failed, 0 blocked."
+}

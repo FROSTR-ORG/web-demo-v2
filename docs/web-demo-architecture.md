@@ -29,10 +29,11 @@ on rendering and route-level orchestration.
 ## Setup Sessions
 
 Setup flows keep decoded package material in React memory only. Create, import,
-onboard, rotate-keyset, and recover sessions should be cleared on cancel,
-finish, lock, credential clearing, or invalid direct navigation. Browser code
-may coordinate WASM calls and relay requests, but Nostr private-key operations
-and FROST key material handling stay behind the bifrost bridge.
+onboard (requester and source-side sponsor), rotate-keyset, replace-share, and
+recover sessions should be cleared on cancel, finish, lock, credential clearing,
+or invalid direct navigation. Browser code may coordinate WASM calls and relay
+requests, but Nostr private-key operations and FROST key material handling stay
+behind the bifrost bridge.
 
 ## Screen Organization
 

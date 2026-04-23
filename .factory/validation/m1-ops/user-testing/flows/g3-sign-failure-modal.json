@@ -1,0 +1,375 @@
+{
+  "groupId": "g3-sign-failure-modal",
+  "testedAt": "2026-04-21T16:20:34.716944+00:00",
+  "isolation": {
+    "milestone": "m1-ops",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "relay": "ws://127.0.0.1:8194",
+    "sessionId": "g3-sign-failure-modal"
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-OPS-006",
+      "title": "Multi-device sign failure drives SigningFailedModal with real data",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Seeded runtime via dev hooks and dispatched sign to induce OperationFailure",
+          "expected": "SigningFailedModal opens with failure payload fields including round id, peer-response ratio, and error",
+          "observed": "Modal opened with real round/code/error from failure payload, but no peer-response ratio field was present"
+        },
+        {
+          "action": "Checked modal code text for placeholders",
+          "expected": "No hard-coded placeholders",
+          "observed": "Placeholders were absent"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-006-modal-open-real-failure.png"
+        ],
+        "observables": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-006-014-modal-observable.json",
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-006-dispatch-observable.json"
+        ],
+        "consoleErrors": "m1-ops/g3-sign-failure-modal/VAL-OPS-006-console-errors.txt",
+        "network": "m1-ops/g3-sign-failure-modal/VAL-OPS-006-network-requests.txt"
+      },
+      "issues": "Peer-response ratio was not rendered in the modal for the observed real failure payload."
+    },
+    {
+      "id": "VAL-OPS-007",
+      "title": "Retry in SigningFailedModal re-dispatches the sign",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Opened SigningFailedModal from sign failure",
+          "expected": "Retry should be actionable and re-dispatch sign with same message_hex_32",
+          "observed": "Retry button was disabled/non-interactable"
+        },
+        {
+          "action": "Inspected signDispatchLog and pending_operations",
+          "expected": "Failure request_id maps to original message_hex_32 and retry creates new request_id/pending sign",
+          "observed": "signDispatchLog had no entry for failure request_id; no sign pending operation was created"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-007-before-retry.png",
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-007-after-retry-attempt.png"
+        ],
+        "observables": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-007-retry-observable.json",
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-007-retry-click-error.txt"
+        ],
+        "consoleErrors": "m1-ops/g3-sign-failure-modal/VAL-OPS-007-console-errors.txt",
+        "network": "m1-ops/g3-sign-failure-modal/VAL-OPS-007-network.txt"
+      },
+      "issues": "Retry path could not dispatch because failure request_id had no correlated message in signDispatchLog; Retry stayed disabled."
+    },
+    {
+      "id": "VAL-OPS-008",
+      "title": "Dismiss in SigningFailedModal closes without re-dispatch",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Clicked Dismiss on open SigningFailedModal",
+          "expected": "Modal closes without new command dispatch",
+          "observed": "Modal closed"
+        },
+        {
+          "action": "Waited and inspected runtime status/failures",
+          "expected": "No new sign pending operation and same failure does not immediately re-open",
+          "observed": "No sign pending operation; modal stayed closed after wait"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-008-after-dismiss.png"
+        ],
+        "observables": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-008-after-dismiss-observable.json"
+        ],
+        "consoleErrors": "m1-ops/g3-sign-failure-modal/VAL-OPS-008-console-errors.txt",
+        "network": "m1-ops/g3-sign-failure-modal/VAL-OPS-008-network.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-014",
+      "title": "Failures are drained every tick and drive the SigningFailedModal",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Observed drained sign failure in runtimeFailures",
+          "expected": "Sign failure should surface via SigningFailedModal (not console-only)",
+          "observed": "Modal opened with sign failure summary from runtime failure payload"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-014-modal-open-after-drained-failure.png"
+        ],
+        "observables": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-014-failures-observable.json"
+        ],
+        "consoleErrors": "m1-ops/g3-sign-failure-modal/VAL-OPS-014-console-errors.txt",
+        "network": "m1-ops/g3-sign-failure-modal/VAL-OPS-014-network.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-015",
+      "title": "Non-sign failures do NOT open the SigningFailedModal",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Observed large set of non-sign (ping) failures in runtimeFailures",
+          "expected": "No SigningFailedModal AND non-modal error surface for non-sign failures",
+          "observed": "SigningFailedModal stayed closed, but no non-modal error surface was visible in UI"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-015-non-sign-failures-no-modal.png"
+        ],
+        "observables": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-015-observable.json"
+        ],
+        "consoleErrors": "m1-ops/g3-sign-failure-modal/VAL-OPS-015-console-errors.txt",
+        "network": "m1-ops/g3-sign-failure-modal/VAL-OPS-015-network.txt"
+      },
+      "issues": "Non-sign failures were present and modal stayed closed, but no visible toast/row error indicator was found for those failures."
+    },
+    {
+      "id": "VAL-OPS-016",
+      "title": "Relay disconnect mid-sign yields a real failure (not a hang)",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Set browser offline and dispatched sign command",
+          "expected": "Within timeout, sign transitions from pending to failure modal with disconnect/timeout cause",
+          "observed": "Dispatch returned requestId null, no new sign pending entry, and no new timeout/disconnect sign failure/modal appeared"
+        },
+        {
+          "action": "Checked console errors during window",
+          "expected": "console.error lines match /relay|websocket|disconnect|timeout/i",
+          "observed": "No console errors captured for the attempted flow"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-016-after-offline-sign-attempt.png"
+        ],
+        "observables": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-016-offline-dispatch-observable.json"
+        ],
+        "consoleErrors": "m1-ops/g3-sign-failure-modal/VAL-OPS-016-console-errors.txt",
+        "network": "m1-ops/g3-sign-failure-modal/VAL-OPS-016-network.txt"
+      },
+      "issues": "Unable to observe disconnect/timeout sign-failure transition for the offline-mid-sign path in this run."
+    }
+  ],
+  "summary": {
+    "total": 6,
+    "pass": 2,
+    "fail": 4,
+    "blocked": 0,
+    "skipped": 0
+  },
+  "frictions": [
+    {
+      "description": "Dashboard Test Sign/Test ECDH controls were disabled because runtime readiness stayed false; sign dispatch had to be triggered through window.__appState.handleRuntimeCommand for validation.",
+      "resolved": true,
+      "resolution": "Used dev hook dispatch + runtime observable snapshots to continue testing.",
+      "affectedAssertions": [
+        "VAL-OPS-006",
+        "VAL-OPS-007",
+        "VAL-OPS-008",
+        "VAL-OPS-014",
+        "VAL-OPS-016"
+      ]
+    },
+    {
+      "description": "agent-browser network requests did not capture websocket-level relay frames for this flow ('No requests captured').",
+      "resolved": true,
+      "resolution": "Recorded network capture output files showing no captured requests and relied on runtime observable snapshots for operation evidence.",
+      "affectedAssertions": [
+        "VAL-OPS-006",
+        "VAL-OPS-007",
+        "VAL-OPS-008",
+        "VAL-OPS-014",
+        "VAL-OPS-015",
+        "VAL-OPS-016"
+      ]
+    }
+  ],
+  "blockers": [],
+  "assertions": [
+    {
+      "id": "VAL-OPS-006",
+      "title": "Multi-device sign failure drives SigningFailedModal with real data",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Seeded runtime via dev hooks and dispatched sign to induce OperationFailure",
+          "expected": "SigningFailedModal opens with failure payload fields including round id, peer-response ratio, and error",
+          "observed": "Modal opened with real round/code/error from failure payload, but no peer-response ratio field was present"
+        },
+        {
+          "action": "Checked modal code text for placeholders",
+          "expected": "No hard-coded placeholders",
+          "observed": "Placeholders were absent"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-006-modal-open-real-failure.png"
+        ],
+        "observables": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-006-014-modal-observable.json",
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-006-dispatch-observable.json"
+        ],
+        "consoleErrors": "m1-ops/g3-sign-failure-modal/VAL-OPS-006-console-errors.txt",
+        "network": "m1-ops/g3-sign-failure-modal/VAL-OPS-006-network-requests.txt"
+      },
+      "issues": "Peer-response ratio was not rendered in the modal for the observed real failure payload."
+    },
+    {
+      "id": "VAL-OPS-007",
+      "title": "Retry in SigningFailedModal re-dispatches the sign",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Opened SigningFailedModal from sign failure",
+          "expected": "Retry should be actionable and re-dispatch sign with same message_hex_32",
+          "observed": "Retry button was disabled/non-interactable"
+        },
+        {
+          "action": "Inspected signDispatchLog and pending_operations",
+          "expected": "Failure request_id maps to original message_hex_32 and retry creates new request_id/pending sign",
+          "observed": "signDispatchLog had no entry for failure request_id; no sign pending operation was created"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-007-before-retry.png",
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-007-after-retry-attempt.png"
+        ],
+        "observables": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-007-retry-observable.json",
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-007-retry-click-error.txt"
+        ],
+        "consoleErrors": "m1-ops/g3-sign-failure-modal/VAL-OPS-007-console-errors.txt",
+        "network": "m1-ops/g3-sign-failure-modal/VAL-OPS-007-network.txt"
+      },
+      "issues": "Retry path could not dispatch because failure request_id had no correlated message in signDispatchLog; Retry stayed disabled."
+    },
+    {
+      "id": "VAL-OPS-008",
+      "title": "Dismiss in SigningFailedModal closes without re-dispatch",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Clicked Dismiss on open SigningFailedModal",
+          "expected": "Modal closes without new command dispatch",
+          "observed": "Modal closed"
+        },
+        {
+          "action": "Waited and inspected runtime status/failures",
+          "expected": "No new sign pending operation and same failure does not immediately re-open",
+          "observed": "No sign pending operation; modal stayed closed after wait"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-008-after-dismiss.png"
+        ],
+        "observables": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-008-after-dismiss-observable.json"
+        ],
+        "consoleErrors": "m1-ops/g3-sign-failure-modal/VAL-OPS-008-console-errors.txt",
+        "network": "m1-ops/g3-sign-failure-modal/VAL-OPS-008-network.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-014",
+      "title": "Failures are drained every tick and drive the SigningFailedModal",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Observed drained sign failure in runtimeFailures",
+          "expected": "Sign failure should surface via SigningFailedModal (not console-only)",
+          "observed": "Modal opened with sign failure summary from runtime failure payload"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-014-modal-open-after-drained-failure.png"
+        ],
+        "observables": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-014-failures-observable.json"
+        ],
+        "consoleErrors": "m1-ops/g3-sign-failure-modal/VAL-OPS-014-console-errors.txt",
+        "network": "m1-ops/g3-sign-failure-modal/VAL-OPS-014-network.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-015",
+      "title": "Non-sign failures do NOT open the SigningFailedModal",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Observed large set of non-sign (ping) failures in runtimeFailures",
+          "expected": "No SigningFailedModal AND non-modal error surface for non-sign failures",
+          "observed": "SigningFailedModal stayed closed, but no non-modal error surface was visible in UI"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-015-non-sign-failures-no-modal.png"
+        ],
+        "observables": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-015-observable.json"
+        ],
+        "consoleErrors": "m1-ops/g3-sign-failure-modal/VAL-OPS-015-console-errors.txt",
+        "network": "m1-ops/g3-sign-failure-modal/VAL-OPS-015-network.txt"
+      },
+      "issues": "Non-sign failures were present and modal stayed closed, but no visible toast/row error indicator was found for those failures."
+    },
+    {
+      "id": "VAL-OPS-016",
+      "title": "Relay disconnect mid-sign yields a real failure (not a hang)",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Set browser offline and dispatched sign command",
+          "expected": "Within timeout, sign transitions from pending to failure modal with disconnect/timeout cause",
+          "observed": "Dispatch returned requestId null, no new sign pending entry, and no new timeout/disconnect sign failure/modal appeared"
+        },
+        {
+          "action": "Checked console errors during window",
+          "expected": "console.error lines match /relay|websocket|disconnect|timeout/i",
+          "observed": "No console errors captured for the attempted flow"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-016-after-offline-sign-attempt.png"
+        ],
+        "observables": [
+          "m1-ops/g3-sign-failure-modal/VAL-OPS-016-offline-dispatch-observable.json"
+        ],
+        "consoleErrors": "m1-ops/g3-sign-failure-modal/VAL-OPS-016-console-errors.txt",
+        "network": "m1-ops/g3-sign-failure-modal/VAL-OPS-016-network.txt"
+      },
+      "issues": "Unable to observe disconnect/timeout sign-failure transition for the offline-mid-sign path in this run."
+    }
+  ]
+}

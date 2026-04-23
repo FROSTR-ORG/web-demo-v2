@@ -1,0 +1,148 @@
+{
+  "groupId": "r2-g1-dispatch-success",
+  "testedAt": "2026-04-21T18:21:01.235739+00:00",
+  "isolation": {
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "appUrl": "http://127.0.0.1:5173",
+    "relayUrl": "ws://127.0.0.1:8194",
+    "agentBrowserSession": "r2-g1-dispatch-success",
+    "tabsUsed": 2
+  },
+  "toolsUsed": [
+    "agent-browser"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-OPS-002",
+      "title": "Sign trigger dispatches a command and registers a pending operation",
+      "status": "pass",
+      "reason": "A valid Test Sign click created a fresh sign request_id in signDispatchLog and a corresponding Sign pending_operation was observed within the next tick window.",
+      "steps": [
+        {
+          "action": "Capture baseline sign pending count and dispatch ids",
+          "expected": "Known baseline before click",
+          "observed": "signPendingCount=0, dispatchIds had no new id for this attempt"
+        },
+        {
+          "action": "Enter valid 64-hex message and click Test Sign",
+          "expected": "Runtime handleCommand(sign) dispatches with fresh request_id",
+          "observed": "new request_id=9210c89c3ee51dbb80f4e020ea7f2231 appeared in signDispatchLog"
+        },
+        {
+          "action": "Sample runtime_status.pending_operations for up to 3s",
+          "expected": "Pending Sign grows by exactly one and includes new request_id",
+          "observed": "pendingGrowth=+1, maxSignPendingCount=1, hadPendingForRid=true"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r2-g1-dispatch-success/VAL-OPS-002-post-click-rerun.png"
+        ],
+        "observables": [
+          "m1-ops/r2-g1-dispatch-success/VAL-OPS-002-observable-rerun.json"
+        ],
+        "consoleErrors": "none (errors-final-tab0.json, errors-final-tab1.json)",
+        "network": "Relay online via AppState runtimeRelays: ws://127.0.0.1:8194"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-004",
+      "title": "Happy-path sign completion (multi-device) surfaces in AppState",
+      "status": "pass",
+      "reason": "With two seeded dashboard tabs on the same local relay, sign request_id f9d2cf07ae115c0c0b1eb5bee6da95f4 completed on instance A, was removed from pending, and success surfaced in the Recent Sign Activity UI as completed.",
+      "steps": [
+        {
+          "action": "Seed tab A and tab B runtime sessions and verify relay online",
+          "expected": "Two active browser instances participate on ws://127.0.0.1:8194",
+          "observed": "Both tabs had runtimeRelays[0].state='online' and signReady=true"
+        },
+        {
+          "action": "Dispatch Test Sign on tab A with valid 64-hex message",
+          "expected": "Fresh sign request_id tracked in AppState",
+          "observed": "request_id=f9d2cf07ae115c0c0b1eb5bee6da95f4"
+        },
+        {
+          "action": "Check completion and pending correlation on tab A",
+          "expected": "Completion for request_id exists and pending entry removed",
+          "observed": "completionHasRequestId=true and pendingHasRequestId=false"
+        },
+        {
+          "action": "Check dashboard success UI",
+          "expected": "Completion reflected in UI",
+          "observed": "Recent Sign Activity row shows SIGN + message preview + completed"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r2-g1-dispatch-success/VAL-OPS-004-013-completion-full-final.png",
+          "m1-ops/r2-g1-dispatch-success/VAL-OPS-004-instance-B-final.png"
+        ],
+        "observables": [
+          "m1-ops/r2-g1-dispatch-success/VAL-OPS-004-013-observable-final2.json",
+          "m1-ops/r2-g1-dispatch-success/VAL-OPS-004-multi-instance.json"
+        ],
+        "consoleErrors": "none (errors-final-tab0.json, errors-final-tab1.json)",
+        "network": "Relay state online in both tabs at ws://127.0.0.1:8194"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-OPS-013",
+      "title": "Completions are drained every tick and not silently discarded",
+      "status": "pass",
+      "reason": "The drained Sign completion for request_id f9d2cf07ae115c0c0b1eb5bee6da95f4 was present in AppState runtimeCompletions and surfaced into UI (Recent Sign Activity completed row), confirming it was not dropped.",
+      "steps": [
+        {
+          "action": "Dispatch sign and read AppState completion slice",
+          "expected": "CompletedOperation appears in runtimeCompletions",
+          "observed": "completionEntry.Sign.request_id matched dispatched request_id"
+        },
+        {
+          "action": "Inspect UI reaction within assertion window",
+          "expected": "Completion-driven UI change appears",
+          "observed": "Recent Sign Activity displayed completed state for the dispatched sign"
+        }
+      ],
+      "evidence": {
+        "screenshots": [
+          "m1-ops/r2-g1-dispatch-success/VAL-OPS-004-013-completion-full-final.png"
+        ],
+        "observables": [
+          "m1-ops/r2-g1-dispatch-success/VAL-OPS-004-013-observable-final2.json"
+        ],
+        "consoleErrors": "none (errors-final-tab0.json, errors-final-tab1.json)",
+        "network": "Relay remained online at ws://127.0.0.1:8194 during completion observation"
+      },
+      "issues": null
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "pass": 3,
+    "fail": 0,
+    "blocked": 0,
+    "skipped": 0
+  },
+  "frictions": [
+    {
+      "description": "Intermittent stale SigningFailed modal from background ping timeouts blocked Test Sign clicks during rerun setup.",
+      "resolved": true,
+      "resolution": "Dismissed modal before dispatch attempts; then re-ran assertion capture.",
+      "affectedAssertions": [
+        "VAL-OPS-002"
+      ]
+    },
+    {
+      "description": "agent-browser network request capture did not provide websocket frame-level records in this run.",
+      "resolved": true,
+      "resolution": "Used AppState relay observability (runtimeRelays + request_id correlation) as network evidence.",
+      "affectedAssertions": [
+        "VAL-OPS-002",
+        "VAL-OPS-004",
+        "VAL-OPS-013"
+      ]
+    }
+  ],
+  "blockers": []
+}

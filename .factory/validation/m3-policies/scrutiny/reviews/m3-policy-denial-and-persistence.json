@@ -1,0 +1,45 @@
+{
+  "featureId": "m3-policy-denial-and-persistence",
+  "reviewedAt": "2026-04-22T01:34:13Z",
+  "commitId": "b1f9835199e304e554d1d487c725cc39830e5e07",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature successfully adds persistence tests for VAL-POLICIES-015/016/017 and un-fixmes the multi-device denial spec, but the round-trip spec does not fully enforce the narrowed contract requirements and the requested nonce prepopulation test hook was not implemented.",
+    "issues": [
+      {
+        "file": "src/e2e/multi-device/policy-denial-roundtrip.spec.ts",
+        "line": 66,
+        "severity": "blocking",
+        "description": "VAL-POLICIES-010 requires B to observe policy failure within 15s (validation-contract.md:583), but the spec uses SIGN_FAILURE_TIMEOUT_MS = 60_000 and waits that full window (line 693). This allows slow failures to pass and does not enforce the contract timing bound."
+      },
+      {
+        "file": "src/e2e/multi-device/policy-denial-roundtrip.spec.ts",
+        "line": 720,
+        "severity": "blocking",
+        "description": "The contract requires that A's pending_operations gains no entry for B's denied sign (validation-contract.md:584), but the test only checks for absence of Sign completions (lines 720-761). Without asserting pending_operations invariance, a transiently-enqueued/cleared sign op on A would go undetected."
+      },
+      {
+        "file": "src/app/AppStateProvider.tsx",
+        "line": 3141,
+        "severity": "blocking",
+        "description": "Feature expected behavior requires a nonce prepopulation hook (features.json:2220) to skip ping negotiation for deterministic denial round-trip setup, but only __iglooTestSeedRuntime is exposed and no __iglooTestSeedNoncePool/__iglooTestPrePopulateNonces equivalent is available."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "knowledge",
+      "observation": "Architecture shared-state docs still describe a local `peer_denied` runtime event on A, which conflicts with the narrowed VAL-POLICIES-010 contract and current runtime behavior.",
+      "evidence": ".factory/library/architecture.md:73-77 says denied requests emit a local `peer_denied` runtime event; validation-contract.md:581-586 and this feature's e2e spec comments indicate A-side peer_denied runtime event is not currently available."
+    },
+    {
+      "area": "skills",
+      "observation": "runtime-worker procedure enforcement appears inconsistent with reported compliance: required demo-gallery and agent-browser verification steps were not logged in handoff, yet skillFeedback marks procedure as fully followed.",
+      "evidence": ".factory/skills/runtime-worker/SKILL.md:42-49 requires demo-gallery Playwright run plus agent-browser interactive checks; handoff commands list (.factory/missions/.../handoffs/...dc4cbb31....json:14-39) has no demo-gallery run and no interactiveChecks section while skillFeedback.followedProcedure is true (lines 74-76)."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Failing review due to three blocking coverage gaps: 15s timing bound not enforced, missing A pending_operations assertion, and missing nonce prepopulation test hook requested by feature expectations. Persistence tests are strong, but the denial round-trip coverage is still incomplete against the contract."
+}

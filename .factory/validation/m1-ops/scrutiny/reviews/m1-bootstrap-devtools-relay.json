@@ -1,0 +1,39 @@
+{
+  "featureId": "m1-bootstrap-devtools-relay",
+  "reviewedAt": "2026-04-21T14:57:32Z",
+  "commitId": "0466f80",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature correctly adds build/bootstrap wiring for bifrost-devtools in services/init/docs, but the multi-device ECDH spec does not implement the required runtime ECDH round-trip assertion. The test currently validates only relay transport-level REQ/EOSE behavior.",
+    "issues": [
+      {
+        "file": "src/e2e/multi-device/ecdh-roundtrip.spec.ts",
+        "line": 167,
+        "severity": "blocking",
+        "description": "The spec does not dispatch an ECDH runtime command from one context and verify a matching completion on the other. Instead it opens raw WebSockets and asserts NIP-01 EOSE for a shared subscription id, which does not satisfy the feature requirement for ECDH completion correlation by request_id."
+      },
+      {
+        "file": "src/e2e/multi-device/ecdh-roundtrip.spec.ts",
+        "line": 99,
+        "severity": "blocking",
+        "description": "Skip gating is based on missing binary (`!existsSync(DEVTOOLS_BINARY)`), not specifically on cargo-unavailable environments. This can silently skip on machines where cargo exists but the binary is missing for other reasons, contrary to the requirement to keep graceful skip only for environments without cargo."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The runtime-worker procedure asks for multi-device specs following the pairing pattern with seeded artifacts, but this feature's worker deferred the true ECDH round-trip due missing profile-seeding hooks and implemented only transport checks. Skill/procedure expectations and current test harness capability appear misaligned.",
+      "evidence": "Handoff `whatWasLeftUndone` explicitly states full FROST-level ECDH round-trip was deferred because shared-keyset profile seeding is unavailable; spec comments at src/e2e/multi-device/ecdh-roundtrip.spec.ts:28-32 repeat this deferral."
+    },
+    {
+      "area": "conventions",
+      "observation": "Mission metadata has conflicting relay-port guidance: feature text says 8787-8799, while AGENTS.md allows only 8194. This creates ambiguity for implementation and review criteria.",
+      "evidence": "features.json:1297 and 1302 reference the 8787-8799 range; mission AGENTS.md:13-14 declares only port 8194 is allowed."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed handoff, transcript skeleton, skill procedure, and commit 0466f80 diff. Build/init/docs changes are present, but the ecdh-roundtrip spec does not execute or assert the required ECDH completion flow and therefore does not meet the feature's core expected behavior."
+}
