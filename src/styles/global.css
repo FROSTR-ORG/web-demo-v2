@@ -1531,6 +1531,35 @@ button.peer-policy-chip.deny:focus-visible {
   border-bottom: 1px solid var(--ig-border-faint);
 }
 
+/*
+ * Peers panel collapsible toggle. Replaces the shared <Collapsible>
+ * button wrapper for this panel so the Refresh-peers icon-button can
+ * live as a sibling (see src/screens/DashboardScreen/panels/PeersPanel.tsx
+ * — `misc-peers-panel-nested-button`). Resets native <button> chrome
+ * and lays out chevron + title group as a flex row that grows to
+ * fill the left half of the header.
+ */
+.peers-header-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.peers-header-toggle:focus-visible {
+  outline: 2px solid rgba(147, 197, 253, 0.8);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 .peers-title-group,
 .peers-badges {
   min-width: 0;

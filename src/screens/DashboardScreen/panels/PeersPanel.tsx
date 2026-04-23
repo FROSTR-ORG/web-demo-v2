@@ -1,7 +1,6 @@
-import { HelpCircle, RotateCw } from "lucide-react";
-import { useMemo } from "react";
+import { ChevronDown, HelpCircle, RotateCw } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Button, StatusPill } from "../../../components/ui";
-import { Collapsible } from "../../../components/Collapsible";
 import type {
   PeerPermissionState,
   PeerStatus,
@@ -55,55 +54,81 @@ export function PeersPanel({
     }
     return map;
   }, [peerPermissionStates]);
-  const header = (
-    <div className="peers-header">
-      <div className="peers-title-group">
-        <div className="peers-title">Peers</div>
-        <HelpCircle size={15} color="#93c5fd" />
-        <span className={`health-dot ${onlineCount > 0 ? "online" : "offline"}`} />
-        <StatusPill tone={onlineCount > 0 ? "success" : "warning"}>{onlineCount} online</StatusPill>
-        <StatusPill>{peers.length} total</StatusPill>
-      </div>
-      <div className="peers-badges">
-        <StatusPill tone="info">{paperPanels ? "~186 ready" : signReadyLabel}</StatusPill>
-        <StatusPill>{paperPanels ? "Avg: 31ms" : "Avg: --"}</StatusPill>
-        <Button
-          type="button"
-          variant="header"
-          size="icon"
-          onClick={(event) => {
-            // The PeersPanel header is itself a `<button>` (Collapsible
-            // toggle) and React synthetic click events bubble. Without
-            // stopping propagation here, clicking the refresh icon would
-            // also collapse/expand the Peers panel. stopPropagation keeps
-            // the click scoped to the refresh dispatch intent.
-            event.stopPropagation();
-            void onRefresh();
-          }}
-          aria-label="Refresh peers"
-        >
-          <RotateCw size={16} />
-        </Button>
-      </div>
-    </div>
-  );
+
+  // Inline collapsible state. PeersPanel owns its expand/collapse rather
+  // than delegating to `<Collapsible>` because the Peers header needs to
+  // host a "Refresh peers" icon button. Wrapping the whole header in a
+  // single `<button>` (as `<Collapsible>` does) would nest that icon
+  // button inside another `<button>`, which React flags as invalid DOM
+  // ("<button> cannot be a descendant of <button>") and breaks
+  // keyboard/screen-reader focus semantics. Tracked by
+  // `misc-peers-panel-nested-button`.
+  const [open, setOpen] = useState(true);
+  const toggle = () => setOpen((prev) => !prev);
 
   return (
-    <Collapsible title={header} defaultOpen className="peers-panel-collapsible">
-      <div className="peer-list">
-        {peers.map((peer) => (
-          <PeerRow
-            key={peer.pubkey}
-            peer={peer}
-            paper={paperPanels}
-            sidebarOpen={sidebarOpen}
-            refreshError={peerRefreshErrors?.[peer.pubkey] ?? null}
-            permissionState={
-              permissionStateByPubkey?.get(peer.pubkey) ?? null
-            }
+    <div className="collapsible peers-panel-collapsible">
+      <div className="peers-header">
+        <button
+          type="button"
+          className="peers-header-toggle"
+          onClick={toggle}
+          aria-expanded={open}
+          aria-label={open ? "Collapse peers panel" : "Expand peers panel"}
+        >
+          <ChevronDown
+            size={14}
+            className={`collapsible-chevron${open ? " collapsible-chevron-open" : ""}`}
+            aria-hidden="true"
           />
-        ))}
+          <span className="peers-title-group">
+            <span className="peers-title">Peers</span>
+            <HelpCircle size={15} color="#93c5fd" />
+            <span
+              className={`health-dot ${onlineCount > 0 ? "online" : "offline"}`}
+            />
+            <StatusPill tone={onlineCount > 0 ? "success" : "warning"}>
+              {onlineCount} online
+            </StatusPill>
+            <StatusPill>{peers.length} total</StatusPill>
+          </span>
+        </button>
+        <div className="peers-badges">
+          <StatusPill tone="info">
+            {paperPanels ? "~186 ready" : signReadyLabel}
+          </StatusPill>
+          <StatusPill>{paperPanels ? "Avg: 31ms" : "Avg: --"}</StatusPill>
+          <Button
+            type="button"
+            variant="header"
+            size="icon"
+            onClick={() => {
+              void onRefresh();
+            }}
+            aria-label="Refresh peers"
+          >
+            <RotateCw size={16} />
+          </Button>
+        </div>
       </div>
-    </Collapsible>
+      {open && (
+        <div className="collapsible-body">
+          <div className="peer-list">
+            {peers.map((peer) => (
+              <PeerRow
+                key={peer.pubkey}
+                peer={peer}
+                paper={paperPanels}
+                sidebarOpen={sidebarOpen}
+                refreshError={peerRefreshErrors?.[peer.pubkey] ?? null}
+                permissionState={
+                  permissionStateByPubkey?.get(peer.pubkey) ?? null
+                }
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
