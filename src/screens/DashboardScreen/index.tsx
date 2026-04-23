@@ -230,6 +230,17 @@ export function DashboardScreen() {
   // VAL-OPS-006 / VAL-OPS-014 / VAL-OPS-015: Observe runtimeFailures for new
   // sign-type failures and surface them via SigningFailedModal. ECDH/ping/
   // onboard failures are intentionally ignored here (they surface elsewhere).
+  //
+  // VAL-CROSS-022 / fix-m7-multi-tab-and-modal-stack — the SigningFailed
+  // modal does NOT overwrite an open `clear-credentials` confirmation.
+  // We still capture the failure in `activeSignFailure` so the modal
+  // becomes visible the moment the user resolves the ClearCredentials
+  // modal. The render pass below enforces the precedence:
+  // ClearCredentials > SigningFailed > PolicyPrompt. Previously this
+  // effect also called `setActiveModal("signing-failed")` which blindly
+  // clobbered any in-flight user-initiated modal (e.g. the
+  // ClearCredentials confirmation). The precedence is now
+  // render-derived from `activeSignFailure`.
   useEffect(() => {
     if (!runtimeFailures || runtimeFailures.length === 0) return;
     for (const failure of runtimeFailures) {
@@ -246,7 +257,6 @@ export function DashboardScreen() {
         break;
       }
       setActiveSignFailure(failure);
-      setActiveModal("signing-failed");
       // Log the failure so VAL-OPS-016's relay-disconnect-timeout console
       // scan observes messaging matching /relay|websocket|disconnect|timeout/i
       // (the runtime's failure code or message always includes at least
@@ -264,7 +274,13 @@ export function DashboardScreen() {
       consumedFailureIdsRef.current.add(activeSignFailure.request_id);
     }
     setActiveSignFailure(null);
-    setActiveModal("none");
+    // Preserve any unrelated `activeModal` (e.g. `clear-credentials` that
+    // was suppressing the sign-failed modal per VAL-CROSS-022). Only
+    // reset when the demo path explicitly opened the signing-failed
+    // modal via `activeModal === "signing-failed"`.
+    setActiveModal((current) =>
+      current === "signing-failed" ? "none" : current,
+    );
   }, [activeSignFailure]);
 
   const handleRetrySigningFailed = useCallback(async () => {
@@ -284,7 +300,11 @@ export function DashboardScreen() {
     // must not linger (VAL-OPS-007).
     consumedFailureIdsRef.current.add(failure.request_id);
     setActiveSignFailure(null);
-    setActiveModal("none");
+    // Preserve any unrelated `activeModal` (e.g. `clear-credentials`).
+    // See VAL-CROSS-022 / handleDismissSigningFailed for rationale.
+    setActiveModal((current) =>
+      current === "signing-failed" ? "none" : current,
+    );
     if (!messageHex || !handleRuntimeCommand) return;
     try {
       await handleRuntimeCommand({ type: "sign", message_hex_32: messageHex });
@@ -953,31 +973,67 @@ export function DashboardScreen() {
         ) : null}
       </section>
 
-      {policyModalOpen && policyModalEvent ? (
-        <PolicyPromptModal
-          event={policyModalEvent}
-          onResolve={handleResolvePolicyPrompt}
-          onDismiss={handleDismissPolicyPrompt}
-        />
-      ) : null}
-      {activeModal === "signing-failed" && (
-        <SigningFailedModal
-          failure={activeSignFailure ?? undefined}
-          messageHex={activeSignFailureMessageHex}
-          onClose={handleDismissSigningFailed}
-          onDismiss={handleDismissSigningFailed}
-          onRetry={activeSignFailure ? handleRetrySigningFailed : undefined}
-        />
-      )}
-      {activeModal === "clear-credentials" && (
-        <ClearCredentialsModal
-          groupName={activeProfile.groupName}
-          shareIdx={runtimeStatus.metadata.member_idx}
-          deviceName={activeProfile.deviceName}
-          onCancel={() => setActiveModal("none")}
-          onConfirm={handleClearCredentials}
-        />
-      )}
+      {/*
+        VAL-CROSS-022 / fix-m7-multi-tab-and-modal-stack — enforce the
+        documented modal stack precedence:
+          ClearCredentials > SigningFailed > PolicyPrompt.
+        Only ONE of the three runtime-critical / destructive-confirm
+        modals is ever mounted at a time so focus traps never overlap
+        and dismissing the top modal cleanly reveals the next one.
+
+        - `clearCredsModalOpen` is user-initiated (destructive
+          confirmation) and takes the highest precedence — a background
+          sign failure or peer denial must never steal focus from the
+          user's explicit "Clear Credentials" decision.
+        - `signingFailedModalOpen` aggregates both the reactive runtime
+          path (`activeSignFailure !== null`) AND the Paper/demo path
+          (`activeModal === "signing-failed"` set by MockStateToggle
+          under `import.meta.env.DEV`).
+        - `policyPromptModalOpen` renders only when neither of the
+          higher-precedence modals is visible. The underlying
+          `peerDenialQueue` is preserved while suppressed so the modal
+          appears cleanly once the top modal dismisses.
+      */}
+      {(() => {
+        const clearCredsModalOpen = activeModal === "clear-credentials";
+        const signingFailedModalOpen =
+          !clearCredsModalOpen &&
+          (activeSignFailure !== null || activeModal === "signing-failed");
+        const policyPromptModalOpen =
+          !clearCredsModalOpen &&
+          !signingFailedModalOpen &&
+          policyModalOpen &&
+          policyModalEvent !== null;
+        return (
+          <>
+            {clearCredsModalOpen && (
+              <ClearCredentialsModal
+                groupName={activeProfile.groupName}
+                shareIdx={runtimeStatus.metadata.member_idx}
+                deviceName={activeProfile.deviceName}
+                onCancel={() => setActiveModal("none")}
+                onConfirm={handleClearCredentials}
+              />
+            )}
+            {signingFailedModalOpen && (
+              <SigningFailedModal
+                failure={activeSignFailure ?? undefined}
+                messageHex={activeSignFailureMessageHex}
+                onClose={handleDismissSigningFailed}
+                onDismiss={handleDismissSigningFailed}
+                onRetry={activeSignFailure ? handleRetrySigningFailed : undefined}
+              />
+            )}
+            {policyPromptModalOpen && policyModalEvent && (
+              <PolicyPromptModal
+                event={policyModalEvent}
+                onResolve={handleResolvePolicyPrompt}
+                onDismiss={handleDismissPolicyPrompt}
+              />
+            )}
+          </>
+        );
+      })()}
       {activeModal === "export-profile" && (
         <ExportProfileModal
           mode={exportMode}

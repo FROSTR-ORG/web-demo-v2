@@ -269,6 +269,34 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   // non-browser tests (jsdom without BroadcastChannel) don't crash on
   // mount.
   const policyResolvedChannelRef = useRef<BroadcastChannel | null>(null);
+  // VAL-CROSS-021 / fix-m7-multi-tab-and-modal-stack — multi-tab profile
+  // lifecycle channel. Each tab maintains an independent WASM runtime
+  // for the same unlocked profile, so a Lock or Clear Credentials in
+  // tab A does NOT implicitly propagate to tab B. This channel fans out
+  // the user-level decision so sibling tabs drop their live session
+  // within the next tick — matching the feature contract
+  // "Lock in A locks/prompts B within next tick".
+  //
+  // Message shape: `{ type: "locked" | "cleared", profileId }`.
+  // Receivers whose `activeProfile?.id === profileId` (matched via ref
+  // so the effect identity stays stable across profile transitions)
+  // invoke `lockProfile()` / `clearCredentials()` locally WITHOUT
+  // re-broadcasting — the
+  // `suppressNextLifecycleBroadcastRef` guard below prevents an echo
+  // loop.
+  const profileLifecycleChannelRef = useRef<BroadcastChannel | null>(null);
+  // When set to `true`, the NEXT call to `lockProfile` /
+  // `clearCredentials` skips posting a lifecycle broadcast. Consumed by
+  // the lifecycle receive handler so a remote-driven lock/clear does
+  // not echo back to the originating tab.
+  const suppressNextLifecycleBroadcastRef = useRef(false);
+  // Stable mirrors of `lockProfile` / `clearCredentials` so the
+  // `[]`-deps lifecycle receive effect can invoke the CURRENT callback
+  // identity without re-subscribing to the BroadcastChannel on every
+  // mutator re-creation. Kept in lock-step with the callback state via
+  // the effects below.
+  const lockProfileRef = useRef<(() => void) | null>(null);
+  const clearCredentialsRef = useRef<(() => Promise<void>) | null>(null);
   const [signDispatchLog, setSignDispatchLog] = useState<
     Record<string, string>
   >({});
@@ -3168,6 +3196,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const lockProfile = useCallback(() => {
     abortOnboardHandshake();
+    // VAL-CROSS-021 — broadcast the lock to sibling tabs of the same
+    // profile so they tear down their live session within the next
+    // tick. Skipped when the current call originates from a remote
+    // broadcast (echo suppression) or when the channel isn't
+    // instantiated (non-browser test environments). The profile id is
+    // captured from the ref so jsdom tests that never populated
+    // `activeProfile` don't crash.
+    const lockingProfileId = activeProfileRef.current?.id;
+    if (suppressNextLifecycleBroadcastRef.current) {
+      suppressNextLifecycleBroadcastRef.current = false;
+    } else if (lockingProfileId) {
+      try {
+        profileLifecycleChannelRef.current?.postMessage({
+          type: "locked",
+          profileId: lockingProfileId,
+        });
+      } catch {
+        // BroadcastChannel is best-effort — a failed post must not
+        // block the local lock.
+      }
+    }
     // VAL-APPROVALS-009: "Allow once" overrides are session-scoped — before
     // the runtime ref is dropped, roll each one back to an explicit `deny`
     // so a subsequent unlock (new runtime from the stored profile) does
@@ -3237,6 +3286,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const clearCredentials = useCallback(async () => {
     abortOnboardHandshake();
     const id = activeProfile?.id;
+    // VAL-CROSS-021 — broadcast the clear to sibling tabs of the same
+    // profile so they also tear down their session and navigate back
+    // to Welcome. Skipped when this call originates from a remote
+    // broadcast (echo suppression).
+    if (suppressNextLifecycleBroadcastRef.current) {
+      suppressNextLifecycleBroadcastRef.current = false;
+    } else if (id) {
+      try {
+        profileLifecycleChannelRef.current?.postMessage({
+          type: "cleared",
+          profileId: id,
+        });
+      } catch {
+        // best-effort — failure must not block local clear.
+      }
+    }
     // Reset the phase log so validators only observe entries from the
     // current flow (VAL-SETTINGS-015 / VAL-CROSS-006).
     resetClearCredentialsLog();
@@ -3836,6 +3901,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     activeProfileRef.current = activeProfile;
   }, [activeProfile]);
 
+  // VAL-CROSS-021 / fix-m7-multi-tab-and-modal-stack — mirror the
+  // current `lockProfile` / `clearCredentials` callbacks into stable
+  // refs so the `[]`-deps profile-lifecycle receive handler can invoke
+  // the CURRENT callback identity without resubscribing to the channel
+  // on every mutator recreation. Without these mirrors, a remote lock
+  // delivered after an unrelated profile transition would land on a
+  // stale closure whose captured `activeProfile` was the profile at
+  // mount.
+  useEffect(() => {
+    lockProfileRef.current = lockProfile;
+  }, [lockProfile]);
+  useEffect(() => {
+    clearCredentialsRef.current = clearCredentials;
+  }, [clearCredentials]);
+
   // Mirror `policyOverrides` to a ref so `removePolicyOverride`
   // (stable-identity callback consumed by the Peer Policies view)
   // can look up the target entry by (peer, direction, method) without
@@ -4015,6 +4095,76 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       channel.close();
       if (policyResolvedChannelRef.current === channel) {
         policyResolvedChannelRef.current = null;
+      }
+    };
+  }, []);
+
+  // VAL-CROSS-021 / fix-m7-multi-tab-and-modal-stack — install the
+  // profile-lifecycle BroadcastChannel for multi-tab lock / clear
+  // propagation. Gated on `BroadcastChannel` availability
+  // (jsdom / Node test environments may not provide it). Handler deps
+  // are `[]` so the channel stays stable across the life of the
+  // provider; `activeProfileRef`, `lockProfileRef`, and
+  // `clearCredentialsRef` capture the CURRENT values inside the
+  // message handler (see the effect bodies below).
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    let channel: BroadcastChannel;
+    try {
+      channel = new BroadcastChannel("igloo-profile-lifecycle");
+    } catch {
+      return;
+    }
+    profileLifecycleChannelRef.current = channel;
+
+    function onMessage(event: MessageEvent) {
+      const data = event.data as
+        | { type?: string; profileId?: string }
+        | null;
+      if (!data || typeof data.type !== "string") return;
+      const profileId = data.profileId;
+      if (typeof profileId !== "string" || profileId.length === 0) return;
+      const current = activeProfileRef.current;
+      // Ignore broadcasts targeting a profile this tab is not holding
+      // open. A tab with no active profile, or a tab unlocked into a
+      // different profile, must not tear down its own state in
+      // response to an unrelated sibling's lock.
+      if (!current || current.id !== profileId) return;
+      if (data.type === "locked") {
+        // Suppress the re-broadcast so the remote-driven lock does
+        // not echo back to the originating tab.
+        suppressNextLifecycleBroadcastRef.current = true;
+        try {
+          lockProfileRef.current?.();
+        } catch {
+          // best-effort — a thrown lockProfile still leaves the ref
+          // state consistent via the refs below.
+          suppressNextLifecycleBroadcastRef.current = false;
+        }
+        return;
+      }
+      if (data.type === "cleared") {
+        suppressNextLifecycleBroadcastRef.current = true;
+        // clearCredentials is async; fire-and-forget. Errors are
+        // already surfaced via the phase log / console.
+        const clearFn = clearCredentialsRef.current;
+        if (!clearFn) {
+          suppressNextLifecycleBroadcastRef.current = false;
+          return;
+        }
+        void clearFn().catch(() => {
+          suppressNextLifecycleBroadcastRef.current = false;
+        });
+        return;
+      }
+    }
+
+    channel.addEventListener("message", onMessage);
+    return () => {
+      channel.removeEventListener("message", onMessage);
+      channel.close();
+      if (profileLifecycleChannelRef.current === channel) {
+        profileLifecycleChannelRef.current = null;
       }
     };
   }, []);
