@@ -118,8 +118,6 @@ describe("AppStateProvider.createProfile — bootstrap runtime source (VAL-FOLLO
           deviceName: "Bootstrap Browser",
           password: "profile-password",
           confirmPassword: "profile-password",
-          distributionPassword: "distro-password",
-          confirmDistributionPassword: "distro-password",
           relays: ["wss://relay.example.test"],
         });
       });
@@ -162,8 +160,6 @@ describe("AppStateProvider.createProfile — bootstrap runtime source (VAL-FOLLO
           deviceName: "Bootstrap Browser",
           password: "profile-password",
           confirmPassword: "profile-password",
-          distributionPassword: "distro-password",
-          confirmDistributionPassword: "distro-password",
           relays: ["ws://example.com"],
         }),
       ).rejects.toThrow("Relay URL must start with wss://");
@@ -203,8 +199,6 @@ describe("AppStateProvider.createProfile — bootstrap runtime source (VAL-FOLLO
           deviceName: "Bootstrap Browser",
           password: "profile-password",
           confirmPassword: "profile-password",
-          distributionPassword: "distro-password",
-          confirmDistributionPassword: "distro-password",
           relays: ["ws://127.0.0.1:8194"],
         }),
       ).rejects.toThrow("Relay URL must start with wss://");
@@ -224,8 +218,6 @@ describe("AppStateProvider.createProfile — bootstrap runtime source (VAL-FOLLO
           deviceName: "Bootstrap Browser",
           password: "profile-password",
           confirmPassword: "profile-password",
-          distributionPassword: "distro-password",
-          confirmDistributionPassword: "distro-password",
           relays: ["ws://127.0.0.1:8194"],
         });
       });

@@ -133,8 +133,6 @@ describe("lockProfile rolls back 'Allow once' overrides to explicit 'deny' (VAL-
           password: "profile-password",
           confirmPassword: "profile-password",
           relays: ["wss://relay.local"],
-          distributionPassword: "distro-password",
-          confirmDistributionPassword: "distro-password",
         });
       });
       await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());

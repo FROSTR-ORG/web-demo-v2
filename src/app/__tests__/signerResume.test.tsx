@@ -138,8 +138,6 @@ describe("AppStateProvider — signer resume restores readiness (VAL-OPS-017)", 
         password: "profile-password",
         confirmPassword: "profile-password",
         relays: ["wss://relay.local"],
-        distributionPassword: "distro-password",
-        confirmDistributionPassword: "distro-password",
       });
     });
     await waitFor(() =>
@@ -319,8 +317,6 @@ describe("AppStateProvider — signer resume restores readiness (VAL-OPS-017)", 
         // entry and rely on lockProfile+unlockProfile to reset into the
         // no-simulator path below.
         relays: ["wss://relay.local"],
-        distributionPassword: "distro-password",
-        confirmDistributionPassword: "distro-password",
       });
     });
     await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());

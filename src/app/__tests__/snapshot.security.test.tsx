@@ -381,8 +381,6 @@ describe("m7-security-live-sweep — snapshot.security", () => {
           password: "profile-password",
           confirmPassword: "profile-password",
           relays: ["wss://relay.local"],
-          distributionPassword: "distro-password",
-          confirmDistributionPassword: "distro-password",
         });
       });
       await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());
@@ -430,13 +428,38 @@ describe("m7-security-live-sweep — snapshot.security", () => {
       // transition, and its unit coverage lives in
       // `DistributionCompleteScreen.test.tsx`.
       expect(latest.createSession).toBeTruthy();
+      // fix-followup-distribute-2a — createProfile no longer encrypts
+      // onboarding packages eagerly; `onboardingPackages[i].packageText`
+      // is empty and `packageCreated === false` until the per-share
+      // `encodeDistributionPackage(idx, password)` mutator is invoked.
+      // The security sweep's invariant is strictly about the absence
+      // of plaintext on `window.__appState`, so an empty string is
+      // equally scan-clean. Local-share seckey redaction is unchanged.
       expect(
         latest.createSession?.onboardingPackages[0]?.packageText,
-      ).toBe("[redacted-bfprofile]");
+      ).toBe("");
+      expect(latest.createSession?.onboardingPackages[0]?.password).toBe("");
+      expect(
+        latest.createSession?.onboardingPackages[0]?.packageCreated,
+      ).toBe(false);
+      expect(latest.createSession?.localShare?.seckey).toBe("[redacted]");
+      // Drive a single per-share encodeDistributionPackage so the
+      // downstream mid-sign / mid-ECDH snapshots observe a populated
+      // (but redacted-preview) packageText + stashed plaintext in the
+      // provider secret ref — mirrors the Distribute screen's
+      // "user sets a password for share N" action.
+      await act(async () => {
+        const pkg = latest.createSession!.onboardingPackages[0];
+        await latest.encodeDistributionPackage(pkg.idx, "distro-password");
+      });
+      expect(
+        latest.createSession?.onboardingPackages[0]?.packageText.startsWith(
+          "bfonboard1",
+        ),
+      ).toBe(true);
       expect(latest.createSession?.onboardingPackages[0]?.password).toBe(
         "[redacted]",
       );
-      expect(latest.createSession?.localShare?.seckey).toBe("[redacted]");
 
       /* ------------------- Snapshot 1: post-unlock ------------------- */
       const snap1 = buildSnapshot("post-unlock");
@@ -603,14 +626,20 @@ describe("m7-security-live-sweep — snapshot.security", () => {
           password: "profile-password",
           confirmPassword: "profile-password",
           relays: ["wss://relay.local"],
-          distributionPassword: "distro-password",
-          confirmDistributionPassword: "distro-password",
         });
       });
       await waitFor(() =>
         expect(latest.createSession?.onboardingPackages?.length ?? 0)
           .toBeGreaterThan(0),
       );
+      // fix-followup-distribute-2a — explicitly encode each remote
+      // share so the per-share secret ref is populated before we
+      // assert that bridge-driven reset wipes plaintext.
+      await act(async () => {
+        for (const pkg of latest.createSession!.onboardingPackages) {
+          await latest.encodeDistributionPackage(pkg.idx, "distro-password");
+        }
+      });
       const packages = latest.createSession!.onboardingPackages;
       // Sanity: the out-of-band plaintext stash is populated.
       for (const pkg of packages) {

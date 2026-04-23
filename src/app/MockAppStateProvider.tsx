@@ -8,10 +8,7 @@ import {
 } from "react";
 import { snapshotFromAppState, writeBridgeSnapshot } from "./appStateBridge";
 import { AppStateContext } from "./AppStateContext";
-import {
-  allPackagesDistributed,
-  normalizePackageStatePatch,
-} from "./distributionPackages";
+import { normalizePackageStatePatch } from "./distributionPackages";
 import type {
   AppStateValue,
   CreateKeysetDraft,
@@ -321,6 +318,67 @@ export function MockAppStateProvider({
     [value],
   );
 
+  // fix-followup-distribute-2a — mirror encodeDistributionPackage
+  // so screens driven by MockAppStateProvider (demo gallery, component
+  // tests) see the same packageCreated flip + redacted-preview path.
+  // Delegates to the seeded implementation (tests typically inject a
+  // spy via `value.encodeDistributionPackage`) then mutates the local
+  // createSession mirror so UI state stays consistent.
+  const encodeDistributionPackage = useCallback(
+    async (idx: number, password: string) => {
+      await value.encodeDistributionPackage(idx, password);
+      setCreateSession((session) => {
+        if (!session) return session;
+        return {
+          ...session,
+          onboardingPackages: session.onboardingPackages.map((entry) => {
+            if (entry.idx !== idx) return entry;
+            // Best-effort preview: if the caller-supplied seed
+            // implementation populated a packageText on its own
+            // createSession we mirror that; otherwise we fall back to
+            // a stable placeholder so tests that inspect the preview
+            // observe a non-empty value.
+            const seedEntry = value.createSession?.onboardingPackages.find(
+              (candidate) => candidate.idx === idx,
+            );
+            const preview =
+              seedEntry && seedEntry.packageText.length > 0
+                ? seedEntry.packageText
+                : "bfonboard1mock-preview";
+            return {
+              ...entry,
+              packageText: preview,
+              password: "[redacted]",
+              packageCreated: true,
+            };
+          }),
+        };
+      });
+    },
+    [value],
+  );
+
+  // fix-followup-distribute-2a — mirror markPackageDistributed so
+  // screens driven by MockAppStateProvider see the chip flip to
+  // "Distributed" immediately.
+  const markPackageDistributed = useCallback(
+    (idx: number) => {
+      value.markPackageDistributed(idx);
+      setCreateSession((session) => {
+        if (!session) return session;
+        return {
+          ...session,
+          onboardingPackages: session.onboardingPackages.map((entry) =>
+            entry.idx === idx
+              ? { ...entry, manuallyMarkedDistributed: true }
+              : entry,
+          ),
+        };
+      });
+    },
+    [value],
+  );
+
   const clearCreateSession = useCallback(() => {
     value.clearCreateSession();
     setCreateSession(null);
@@ -501,7 +559,19 @@ export function MockAppStateProvider({
         const onboardingPackages = session.onboardingPackages.map((entry) =>
           entry.idx === idx ? { ...entry, ...normalizedPatch } : entry,
         );
-        const distributed = allPackagesDistributed(onboardingPackages);
+        // fix-followup-distribute-2a — legacy rotate-flow heuristic
+        // preserved (see the matching comment in AppStateProvider's
+        // updateRotatePackageState). The new `packageDistributed`
+        // predicate is specific to the Create flow; the rotate flow
+        // still uses packageCopied / passwordCopied / qrShown sub-state
+        // until it is refactored in a follow-up.
+        const distributed =
+          onboardingPackages.length > 0 &&
+          onboardingPackages.every(
+            (pkg) =>
+              (pkg.packageCopied || pkg.copied || pkg.qrShown) &&
+              pkg.passwordCopied,
+          );
         return {
           ...session,
           phase:
@@ -844,6 +914,8 @@ export function MockAppStateProvider({
       createKeyset,
       createProfile,
       updatePackageState,
+      encodeDistributionPackage,
+      markPackageDistributed,
       clearCreateSession,
       beginImport,
       decryptImportBackup,
@@ -916,6 +988,8 @@ export function MockAppStateProvider({
       createKeyset,
       createProfile,
       updatePackageState,
+      encodeDistributionPackage,
+      markPackageDistributed,
       clearCreateSession,
       beginImport,
       decryptImportBackup,

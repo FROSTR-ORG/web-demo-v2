@@ -105,8 +105,6 @@ async function seedProfile(): Promise<{
       password: profilePassword,
       confirmPassword: profilePassword,
       relays: ["wss://relay.local"],
-      distributionPassword: "distro-password",
-      confirmDistributionPassword: "distro-password",
     });
   });
   await waitFor(() => expect(latestRef.activeProfile).toBeTruthy());

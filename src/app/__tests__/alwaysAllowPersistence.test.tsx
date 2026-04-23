@@ -154,8 +154,6 @@ describe("fix-m2-persist-always-allow-to-profile — always-allow persists", () 
           password: profilePassword,
           confirmPassword: profilePassword,
           relays: ["wss://relay.local"],
-          distributionPassword: "distro-password",
-          confirmDistributionPassword: "distro-password",
         });
       });
       await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());
@@ -322,8 +320,6 @@ describe("fix-m2-persist-always-allow-to-profile — always-allow persists", () 
           password: profilePassword,
           confirmPassword: profilePassword,
           relays: ["wss://relay.local"],
-          distributionPassword: "distro-password",
-          confirmDistributionPassword: "distro-password",
         });
       });
       await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());

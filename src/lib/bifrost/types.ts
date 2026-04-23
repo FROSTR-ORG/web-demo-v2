@@ -500,10 +500,71 @@ export interface StoredProfileRecord {
 export interface OnboardingPackageView {
   idx: number;
   memberPubkey: string;
+  /**
+   * fix-followup-distribute-2a — after `createProfile` returns, the
+   * remote-share package text is empty for every entry in the create
+   * session. The mutator `encodeDistributionPackage(idx, password)`
+   * is the sole call-site that populates this field — and even then
+   * the value stored here is a REDACTED PREVIEW (first 24 chars of
+   * the full bfonboard1… string). The plaintext package text lives
+   * in the provider's per-share secret ref, addressable via
+   * `getCreateSessionPackageSecret(idx)`. The local-share entry
+   * retains its legacy "Saved securely in this browser" path (no
+   * package text ever produced).
+   */
   packageText: string;
+  /**
+   * fix-followup-distribute-2a — same contract as {@link packageText}:
+   * empty until `encodeDistributionPackage` has been called for this
+   * share, then stored here as a redaction sentinel ("[redacted]")
+   * — the plaintext password lives on the per-share secret ref.
+   */
   password: string;
+  /**
+   * fix-followup-distribute-2a — `true` once a caller has invoked
+   * `encodeDistributionPackage(idx, password)` and the per-share
+   * secret ref has been populated. `false` directly after
+   * `createProfile` returns (which no longer encrypts onboarding
+   * packages). The DistributeSharesScreen gates its "Ready to
+   * distribute" / "Package not created" chip and the enabled state
+   * of the Copy / QR / Mark-distributed action row on this flag.
+   */
+  packageCreated: boolean;
+  /**
+   * fix-followup-distribute-2a — runtime-assigned `request_id` of
+   * the outbound Onboard command dispatched for this share. Populated
+   * by a future mutator (feature 3 / 2C) once the sponsor flow
+   * dispatches the onboarding runtime command. Present here so the
+   * type surfaces the lifecycle field; populated in 2C.
+   */
+  pendingDispatchRequestId?: string;
+  /**
+   * fix-followup-distribute-2a — `true` when the paired peer has
+   * come online (handshake echo observed from the runtime). Feeds
+   * into {@link import("../../app/distributionPackages").packageDistributed}
+   * alongside {@link manuallyMarkedDistributed}. Defaults to `false`.
+   */
+  peerOnline: boolean;
+  /**
+   * fix-followup-distribute-2a — `true` when the user has manually
+   * confirmed hand-off via the "Mark distributed" button (offline
+   * fallback for QR / manual handoff). Flipped by the mutator
+   * `markPackageDistributed(idx)`. Feeds into
+   * {@link import("../../app/distributionPackages").packageDistributed}
+   * alongside {@link peerOnline}. Defaults to `false`.
+   */
+  manuallyMarkedDistributed: boolean;
+  /**
+   * fix-followup-distribute-2a — informational sub-state telemetry
+   * only (retained for existing UI affordances). Does NOT participate
+   * in the `packageDistributed` predicate, which is
+   * `(peerOnline || manuallyMarkedDistributed)`.
+   */
   packageCopied: boolean;
+  /** Informational sub-state telemetry only (see {@link packageCopied}). */
   passwordCopied: boolean;
+  /** Informational sub-state telemetry only (see {@link packageCopied}). */
   qrShown: boolean;
+  /** Informational sub-state telemetry only (legacy alias). */
   copied?: boolean;
 }

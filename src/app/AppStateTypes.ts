@@ -45,8 +45,14 @@ export interface PeerPermissionMap {
 }
 
 export interface CreateProfileDraft extends ProfileDraft {
-  distributionPassword: string;
-  confirmDistributionPassword: string;
+  // fix-followup-distribute-2a — the former `distributionPassword` /
+  // `confirmDistributionPassword` fields were removed. Distribution
+  // passwords are now collected PER-SHARE on the DistributeSharesScreen
+  // (via the `encodeDistributionPackage(idx, password)` mutator), not
+  // as part of the Create Profile form. Stored drafts from prior
+  // releases that still include these keys are silently dropped on
+  // load (see `defaultCreateProfileDraft` + the profile-drafts
+  // migration comment in `src/app/profileDrafts.ts`).
   peerPermissions?: Record<number, PeerPermissionMap>;
 }
 
@@ -961,6 +967,38 @@ export interface AppStateValue {
   createKeyset: (draft: CreateKeysetDraft) => Promise<void>;
   createProfile: (draft: CreateProfileDraft) => Promise<string>;
   updatePackageState: (idx: number, patch: OnboardingPackageStatePatch) => void;
+  /**
+   * fix-followup-distribute-2a — encode the bfonboard package for a
+   * single remote share at {@link idx} using a user-supplied
+   * per-share {@link password}.
+   *
+   * Responsibilities:
+   *   - Validates `password.length >= 8` and throws a readable Error
+   *     when the invariant is violated.
+   *   - Looks up the plaintext share secrets from the provider's
+   *     per-create-session stash (populated by `createProfile`).
+   *   - Invokes `buildRemoteOnboardingPackages` /
+   *     `encodeOnboardPackage` for that single share and stashes the
+   *     resulting `{packageText, password}` in the per-share secret
+   *     ref (addressable via `getCreateSessionPackageSecret(idx)`).
+   *   - Flips `onboardingPackages[idx].packageCreated = true` on the
+   *     current createSession and populates a REDACTED preview
+   *     (first 24 chars of the bfonboard1… string) into
+   *     `onboardingPackages[idx].packageText`.
+   *
+   * Does NOT dispatch any onboard runtime command — that lives in
+   * feature 3 / 2C.
+   */
+  encodeDistributionPackage: (idx: number, password: string) => Promise<void>;
+  /**
+   * fix-followup-distribute-2a — unconditionally mark the remote
+   * share at {@link idx} as "Distributed" by flipping
+   * `onboardingPackages[idx].manuallyMarkedDistributed = true` on
+   * the current create session. Offline fallback for QR / manual
+   * handoff; independent of relay state or echo observation
+   * (VAL-FOLLOWUP-005).
+   */
+  markPackageDistributed: (idx: number) => void;
   finishDistribution: () => Promise<string>;
   clearCreateSession: () => void;
   /**

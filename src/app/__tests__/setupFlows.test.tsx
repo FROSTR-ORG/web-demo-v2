@@ -193,8 +193,6 @@ describe("AppState setup flows", () => {
         deviceName: "Create Browser",
         password: "local-password",
         confirmPassword: "local-password",
-        distributionPassword: "remote-password",
-        confirmDistributionPassword: "remote-password",
         relays: ["wss://relay.example.test"],
       });
     });
@@ -202,16 +200,34 @@ describe("AppState setup flows", () => {
     await waitFor(() =>
       expect(getState().createSession?.onboardingPackages).toHaveLength(1),
     );
+    // fix-followup-distribute-2a — createProfile no longer encrypts
+    // onboarding packages eagerly. Each remote share enters the
+    // Distribute screen in a "Package not created" state
+    // (packageCreated === false, no packageText). The per-share
+    // `encodeDistributionPackage(idx, password)` mutator is the sole
+    // call-site that produces a populated bfonboard package; it
+    // populates a redacted preview on the React state and stashes the
+    // plaintext in the provider's secret ref.
+    {
+      const preEncodePkg = getState().createSession!.onboardingPackages[0];
+      expect(preEncodePkg.packageCreated).toBe(false);
+      expect(preEncodePkg.packageText).toBe("");
+      expect(preEncodePkg.password).toBe("");
+    }
+    await act(async () => {
+      for (const pkg of getState().createSession!.onboardingPackages) {
+        await getState().encodeDistributionPackage(pkg.idx, "remote-password");
+      }
+    });
     const session = getState().createSession!;
     const remotePackage = session.onboardingPackages[0];
-    // fix-m7-createsession-redact-secrets-on-finalize — after
-    // createProfile resolves, the on-session `packageText` / `password`
-    // fields are redaction sentinels, not the plaintext. The plaintext
-    // continues to be addressable through the provider's out-of-band
-    // accessor so the DistributeSharesScreen Copy / QR affordances and
-    // tests asserting decoder round-trips can still verify that a real
-    // bfonboard package was produced.
-    expect(remotePackage.packageText).toBe("[redacted-bfprofile]");
+    expect(remotePackage.packageCreated).toBe(true);
+    // The post-encodeDistributionPackage `packageText` on the
+    // React state is the first 24 chars of the bfonboard1… string
+    // (redacted preview). The full plaintext lives on the
+    // provider's per-share secret ref.
+    expect(remotePackage.packageText.startsWith("bfonboard1")).toBe(true);
+    expect(remotePackage.packageText.length).toBeLessThanOrEqual(24);
     expect(remotePackage.password).toBe("[redacted]");
     const plaintextRemotePackage =
       getState().getCreateSessionPackageSecret(remotePackage.idx);
@@ -289,8 +305,6 @@ describe("AppState setup flows", () => {
           deviceName: "Bridge Reset Browser",
           password: "local-password",
           confirmPassword: "local-password",
-          distributionPassword: "remote-password",
-          confirmDistributionPassword: "remote-password",
           relays: ["wss://relay.example.test"],
         });
       });
@@ -299,6 +313,14 @@ describe("AppState setup flows", () => {
         expect(getState().createSession?.onboardingPackages?.length ?? 0)
           .toBeGreaterThan(0),
       );
+      // fix-followup-distribute-2a — explicitly encode each remote
+      // share so the per-share secret ref is populated before we
+      // assert on plaintext retrievability.
+      await act(async () => {
+        for (const pkg of getState().createSession!.onboardingPackages) {
+          await getState().encodeDistributionPackage(pkg.idx, "remote-password");
+        }
+      });
       const packages = getState().createSession!.onboardingPackages;
       // Sanity: the plaintext stash is populated for every remote package.
       for (const pkg of packages) {

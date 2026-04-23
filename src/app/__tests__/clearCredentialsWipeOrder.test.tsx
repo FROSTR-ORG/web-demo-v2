@@ -123,8 +123,6 @@ describe("clearCredentials — wipe_state call order (VAL-SETTINGS-015 / VAL-CRO
           password: profilePassword,
           confirmPassword: profilePassword,
           relays: ["wss://relay.local"],
-          distributionPassword: "distro-password",
-          confirmDistributionPassword: "distro-password",
         });
       });
       await waitFor(() => expect(latestRef.runtimeStatus).toBeTruthy());
@@ -233,8 +231,6 @@ describe("clearCredentials — wipe_state call order (VAL-SETTINGS-015 / VAL-CRO
           password: profilePassword,
           confirmPassword: profilePassword,
           relays: ["wss://relay.local"],
-          distributionPassword: "distro-password",
-          confirmDistributionPassword: "distro-password",
         });
       });
       await waitFor(() => expect(latestRef.runtimeStatus).toBeTruthy());

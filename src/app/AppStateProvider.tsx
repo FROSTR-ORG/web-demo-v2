@@ -26,6 +26,7 @@ import {
   decodeOnboardingResponseEvent,
   decodeProfilePackage,
   deriveProfileIdFromShareSecret,
+  onboardPayloadForRemoteShare,
   parseProfileBackupEvent,
   peerPolicyOverridesFromPermissions,
   profileBackupEventKind,
@@ -73,7 +74,7 @@ import {
 import { BRIDGE_EVENT, consumeBridgeSnapshot } from "./appStateBridge";
 import { AppStateContext } from "./AppStateContext";
 import {
-  allPackagesDistributed,
+  buildPendingOnboardingPackageView,
   buildRemoteOnboardingPackages,
   normalizePackageStatePatch,
 } from "./distributionPackages";
@@ -467,8 +468,33 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     Map<number, { packageText: string; password: string }>
   >(new Map());
 
+  /**
+   * fix-followup-distribute-2a — stash the plaintext share-context
+   * for the Create flow (remoteShares + localShare + group + relays)
+   * so the per-share `encodeDistributionPackage(idx, password)` mutator
+   * can later re-invoke the bfonboard encoder without keeping the
+   * share secrets on the serialised `createSession` state.
+   *
+   * Lifecycle: populated inside `createProfile` (before the React
+   * state is updated with the redacted share material); cleared by
+   * {@link clearCreateSessionShareContext} via `clearCreateSession`,
+   * `lockProfile`, `clearCredentials`, or whenever `createSession`
+   * transitions to null (bridge hydration / test reset paths).
+   *
+   * The stashed values are NEVER surfaced on the React state, the
+   * AppState bridge snapshot, or `window.__appState` — they live on
+   * this provider-local ref alone.
+   */
+  const createSessionShareContextRef = useRef<{
+    remoteShares: SharePackageWire[];
+    localShare: SharePackageWire;
+    group: GroupPackageWire;
+    relays: string[];
+  } | null>(null);
+
   const clearCreateSessionPackageSecrets = useCallback(() => {
     createSessionPackageSecretsRef.current = new Map();
+    createSessionShareContextRef.current = null;
   }, []);
 
   const getCreateSessionPackageSecret = useCallback(
@@ -494,6 +520,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (createSession === null) {
       createSessionPackageSecretsRef.current = new Map();
+      createSessionShareContextRef.current = null;
     }
   }, [createSession]);
 
@@ -1655,7 +1682,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       const deviceName = draft.deviceName.trim();
       const relays = draft.relays.map((relay) => relay.trim()).filter(Boolean);
-      const distributionPassword = draft.distributionPassword.trim();
       if (!deviceName) {
         throw new Error("Profile name is required.");
       }
@@ -1665,14 +1691,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (draft.password !== draft.confirmPassword) {
         throw new Error("Profile passwords do not match.");
       }
-      if (distributionPassword.length < 8) {
-        throw new Error(
-          "Remote package password must be at least 8 characters.",
-        );
-      }
-      if (distributionPassword !== draft.confirmDistributionPassword) {
-        throw new Error("Remote package passwords do not match.");
-      }
+      // fix-followup-distribute-2a — `distributionPassword` /
+      // `confirmDistributionPassword` have been removed from
+      // CreateProfileDraft. Distribution passwords are now collected
+      // per-share on the Distribute Shares screen via
+      // `encodeDistributionPackage(idx, password)`.
       if (relays.length === 0) {
         throw new Error(RELAY_EMPTY_ERROR);
       }
@@ -1783,13 +1806,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // `fix-m2-persist-always-allow-to-profile` feature.
       unlockedPayloadRef.current = normalizedCreatePayload;
       unlockedPasswordRef.current = draft.password;
-      const onboardingPackages = await buildRemoteOnboardingPackages({
-        remoteShares,
-        localShare,
-        group,
-        relays: validatedRelays,
-        password: distributionPassword,
-      });
+      // fix-followup-distribute-2a — createProfile no longer encrypts
+      // onboarding packages. Each remote share is represented by a
+      // "Package not created" placeholder whose packageCreated flag
+      // is false; the per-share `encodeDistributionPackage(idx, password)`
+      // mutator is the sole call-site that produces a populated
+      // bfonboard package (invoked by the DistributeSharesScreen when
+      // the user sets the per-share password).
+      const onboardingPackages: OnboardingPackageView[] = remoteShares.map(
+        (remoteShare) =>
+          buildPendingOnboardingPackageView({
+            remoteShare,
+            group,
+          }),
+      );
 
       // fix-followup-create-bootstrap-live-relay-pump — the createProfile
       // boundary now bootstraps the real `RuntimeRelayPump` via
@@ -1838,25 +1868,28 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // Share seckeys are only consumed above this point (the
       // unadoptedSharesPool + runtime bootstrap complete before we
       // get here), so zero behaviour downstream of `createProfile`
-      // depends on the real seckey / password / packageText values
-      // surviving on the React state.
-      const packageSecretsStash = new Map<
-        number,
-        { packageText: string; password: string }
-      >();
-      for (const pkg of onboardingPackages) {
-        packageSecretsStash.set(pkg.idx, {
-          packageText: pkg.packageText,
-          password: pkg.password,
-        });
-      }
-      createSessionPackageSecretsRef.current = packageSecretsStash;
-      const redactedOnboardingPackages: OnboardingPackageView[] =
-        onboardingPackages.map((pkg) => ({
-          ...pkg,
-          packageText: "[redacted-bfprofile]",
-          password: "[redacted]",
-        }));
+      // depends on the real seckey values surviving on the React
+      // state — EXCEPT that `encodeDistributionPackage(idx, password)`
+      // still needs the plaintext share secrets to drive
+      // `encodeOnboardPackage` per share. We therefore stash the
+      // plaintext share context on `createSessionShareContextRef`
+      // (an out-of-band provider-local ref) BEFORE redacting the
+      // React state.
+      createSessionShareContextRef.current = {
+        remoteShares: remoteShares.map((share) => ({
+          idx: share.idx,
+          seckey: share.seckey,
+        })),
+        localShare: { idx: localShare.idx, seckey: localShare.seckey },
+        group,
+        relays: validatedRelays,
+      };
+      // fix-followup-distribute-2a — the per-share secret ref is
+      // populated lazily by `encodeDistributionPackage` as the user
+      // sets per-share passwords on the Distribute Shares screen.
+      // Start with an empty map so no stale stash from a prior
+      // create flow leaks through.
+      createSessionPackageSecretsRef.current = new Map();
       const redactedLocalShare: SharePackageWire = {
         ...localShare,
         seckey: "[redacted]",
@@ -1873,7 +1906,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         keyset: redactedKeyset,
         localShare: redactedLocalShare,
         createdProfileId: profileId,
-        onboardingPackages: redactedOnboardingPackages,
+        onboardingPackages,
       });
       await reloadProfiles();
 
@@ -1899,6 +1932,87 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  // fix-followup-distribute-2a — per-share encoder. Produces a
+  // populated bfonboard1… package for remote share `idx` using a
+  // user-supplied `password`. See {@link AppStateValue.encodeDistributionPackage}
+  // for the full contract.
+  const encodeDistributionPackage = useCallback(
+    async (idx: number, password: string) => {
+      if (typeof password !== "string" || password.length < 8) {
+        throw new Error(
+          "Package password must be at least 8 characters.",
+        );
+      }
+      const context = createSessionShareContextRef.current;
+      if (!context) {
+        throw new Error(
+          "No active create session; cannot encode distribution package.",
+        );
+      }
+      const remoteShare = context.remoteShares.find(
+        (share) => share.idx === idx,
+      );
+      if (!remoteShare) {
+        throw new Error(
+          `No remote share with idx=${idx} in the active create session.`,
+        );
+      }
+      const payload = onboardPayloadForRemoteShare({
+        remoteShare,
+        localShare: context.localShare,
+        group: context.group,
+        relays: context.relays,
+      });
+      const packageText = await encodeOnboardPackage(payload, password);
+      // Stash the plaintext package text + password on the per-share
+      // secret ref so the DistributeSharesScreen Copy / QR affordances
+      // can read the real values through `getCreateSessionPackageSecret`
+      // without ever surfacing them on the React state.
+      const nextStash = new Map(createSessionPackageSecretsRef.current);
+      nextStash.set(idx, { packageText, password });
+      createSessionPackageSecretsRef.current = nextStash;
+      // Populate the redacted preview (first 24 chars of bfonboard1…)
+      // and flip packageCreated on the session view.
+      const preview = packageText.slice(0, 24);
+      setCreateSession((session) => {
+        if (!session) return session;
+        return {
+          ...session,
+          onboardingPackages: session.onboardingPackages.map((entry) =>
+            entry.idx === idx
+              ? {
+                  ...entry,
+                  packageText: preview,
+                  password: "[redacted]",
+                  packageCreated: true,
+                }
+              : entry,
+          ),
+        };
+      });
+    },
+    [],
+  );
+
+  // fix-followup-distribute-2a — offline fallback / manual confirm.
+  // Flips `manuallyMarkedDistributed` to true for the remote share
+  // at `idx`, regardless of relay state. No-op when there is no
+  // active create session or when `idx` does not match any entry.
+  // (VAL-FOLLOWUP-005)
+  const markPackageDistributed = useCallback((idx: number) => {
+    setCreateSession((session) => {
+      if (!session) return session;
+      return {
+        ...session,
+        onboardingPackages: session.onboardingPackages.map((entry) =>
+          entry.idx === idx
+            ? { ...entry, manuallyMarkedDistributed: true }
+            : entry,
+        ),
+      };
+    });
+  }, []);
 
   const finishDistribution = useCallback(async () => {
     if (!createSession?.createdProfileId) {
@@ -2862,7 +2976,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         const onboardingPackages = session.onboardingPackages.map((entry) =>
           entry.idx === idx ? { ...entry, ...normalizedPatch } : entry,
         );
-        const distributed = allPackagesDistributed(onboardingPackages);
+        // fix-followup-distribute-2a — the new `packageDistributed`
+        // predicate (peerOnline || manuallyMarkedDistributed) governs
+        // the Create flow (VAL-FOLLOWUP-006). The rotate-keyset flow
+        // still uses the legacy "package+password copied / QR shown"
+        // heuristic until it is refactored to the per-share flow in
+        // a follow-up. Compute distribution inline here to preserve
+        // rotate semantics without regressing the Create predicate.
+        const distributed =
+          onboardingPackages.length > 0 &&
+          onboardingPackages.every(
+            (pkg) =>
+              (pkg.packageCopied || pkg.copied || pkg.qrShown) &&
+              pkg.passwordCopied,
+          );
         return {
           ...session,
           phase:
@@ -4954,6 +5081,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       createKeyset,
       createProfile,
       updatePackageState,
+      encodeDistributionPackage,
+      markPackageDistributed,
       finishDistribution,
       clearCreateSession,
       getCreateSessionPackageSecret,
@@ -5029,6 +5158,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       createKeyset,
       createProfile,
       updatePackageState,
+      encodeDistributionPackage,
+      markPackageDistributed,
       finishDistribution,
       clearCreateSession,
       getCreateSessionPackageSecret,

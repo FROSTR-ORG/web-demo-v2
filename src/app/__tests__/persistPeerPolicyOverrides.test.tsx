@@ -169,8 +169,6 @@ async function bootWithPersistentAllow(groupName: string): Promise<{
       password: profilePassword,
       confirmPassword: profilePassword,
       relays: ["wss://relay.local"],
-      distributionPassword: "distro-password",
-      confirmDistributionPassword: "distro-password",
     });
   });
   await waitFor(() => expect(latestRef.runtimeStatus).toBeTruthy());
@@ -388,8 +386,6 @@ describe("persistPeerPolicyOverrides — peer-policy override persistence matrix
           password: "fresh-password",
           confirmPassword: "fresh-password",
           relays: ["wss://relay.local"],
-          distributionPassword: "distro-password-2",
-          confirmDistributionPassword: "distro-password-2",
         });
       });
       await waitFor(() => expect(latest().runtimeStatus).toBeTruthy());

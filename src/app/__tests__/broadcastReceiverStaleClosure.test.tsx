@@ -167,8 +167,6 @@ describe("fix-m2-broadcast-receiver-stale-closure — receiver persists through 
           password: profilePassword,
           confirmPassword: profilePassword,
           relays: ["wss://relay.local"],
-          distributionPassword: "distro-password",
-          confirmDistributionPassword: "distro-password",
         });
       });
       await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());
@@ -286,8 +284,6 @@ describe("fix-m2-broadcast-receiver-stale-closure — receiver persists through 
           password: profilePassword,
           confirmPassword: profilePassword,
           relays: ["wss://relay.local"],
-          distributionPassword: "distro-password",
-          confirmDistributionPassword: "distro-password",
         });
       });
       await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());

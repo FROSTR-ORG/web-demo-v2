@@ -618,12 +618,12 @@ function OnboardingCompleteContent({
               threshold: 2,
               count: 3,
             });
+            // fix-followup-distribute-2a — distributionPassword /
+            // confirmDistributionPassword removed from CreateProfileDraft.
             return createProfile({
               deviceName: "Igloo Web",
               password: profilePassword,
               confirmPassword,
-              distributionPassword: profilePassword,
-              confirmDistributionPassword: profilePassword,
               relays: MOCK_REVIEW_DATA.relays,
             });
           })();

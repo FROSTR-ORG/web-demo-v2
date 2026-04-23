@@ -159,6 +159,16 @@ export function createDemoSession(
       memberPubkey: demoKeyset.group.members[index + 1].pubkey,
       packageText: `${DEMO_BFONBOARD}${share.idx}`,
       password: DEMO_PASSWORD,
+      // fix-followup-distribute-2a — the demo scenario presumes the
+      // package has already been encoded (the gallery fixtures don't
+      // exercise the pre-encode state), so `packageCreated` defaults
+      // to true here. The distributed state is driven by
+      // `manuallyMarkedDistributed` to match the new
+      // `packageDistributed(pkg)` predicate (peerOnline ||
+      // manuallyMarkedDistributed).
+      packageCreated: true,
+      peerOnline: false,
+      manuallyMarkedDistributed: Boolean(options.distributed),
       packageCopied: Boolean(options.distributed && share.idx === 1),
       passwordCopied: Boolean(options.distributed),
       copied: Boolean(options.distributed && share.idx === 1),
@@ -291,6 +301,13 @@ export function createDemoAppState(
     createKeyset: async () => undefined,
     createProfile: async () => DEMO_PROFILE_ID,
     updatePackageState: () => undefined,
+    // fix-followup-distribute-2a — new per-share mutators. The demo
+    // fixture is pure metadata, so both are async no-ops that satisfy
+    // the AppStateValue interface without side effects. Tests that
+    // want to observe the dispatch can pass an override in
+    // `createDemoAppState({encodeDistributionPackage: spy, ...})`.
+    encodeDistributionPackage: async () => undefined,
+    markPackageDistributed: () => undefined,
     finishDistribution: async () => DEMO_PROFILE_ID,
     clearCreateSession: () => undefined,
     getCreateSessionPackageSecret: () => null,

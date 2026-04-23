@@ -134,8 +134,6 @@ async function bootProvider(options: {
       password: "profile-password",
       confirmPassword: "profile-password",
       relays: ["wss://relay.local"],
-      distributionPassword: "distro-password",
-      confirmDistributionPassword: "distro-password",
     });
   });
   await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());
@@ -432,8 +430,6 @@ describe("fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — VAL-ONBOARD-013",
         password: "profile-password",
         confirmPassword: "profile-password",
         relays: ["wss://relay.local"],
-        distributionPassword: "distro-password",
-        confirmDistributionPassword: "distro-password",
       });
     });
     await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());

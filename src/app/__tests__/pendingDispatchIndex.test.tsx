@@ -148,8 +148,6 @@ describe("AppStateProvider — pendingDispatchIndex", () => {
         password: "profile-password",
         confirmPassword: "profile-password",
         relays: ["wss://relay.local"],
-        distributionPassword: "distro-password",
-        confirmDistributionPassword: "distro-password",
       });
     });
     await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());
@@ -240,8 +238,6 @@ describe("AppStateProvider — pendingDispatchIndex", () => {
         password: "profile-password",
         confirmPassword: "profile-password",
         relays: ["wss://relay.local"],
-        distributionPassword: "distro-password",
-        confirmDistributionPassword: "distro-password",
       });
     });
     await waitFor(() => expect(latest.runtimeStatus).toBeTruthy());

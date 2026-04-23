@@ -210,8 +210,6 @@ describe("clearPolicyOverrides — VAL-POLICIES-009: empties the full manual_ove
           password: profilePassword,
           confirmPassword: profilePassword,
           relays: ["wss://relay.local"],
-          distributionPassword: "distro-password",
-          confirmDistributionPassword: "distro-password",
         });
       });
       await waitFor(() => expect(latestRef.runtimeStatus).toBeTruthy());
@@ -399,8 +397,6 @@ describe("clearPolicyOverrides — VAL-POLICIES-009: empties the full manual_ove
           password: "profile-password",
           confirmPassword: "profile-password",
           relays: ["wss://relay.local"],
-          distributionPassword: "distro-password",
-          confirmDistributionPassword: "distro-password",
         });
       });
       await waitFor(() => expect(latestRef.runtimeStatus).toBeTruthy());

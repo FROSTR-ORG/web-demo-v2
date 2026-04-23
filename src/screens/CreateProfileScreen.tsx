@@ -14,13 +14,15 @@ export function CreateProfileScreen() {
   const { createSession, createProfile } = useAppState();
   const demoUi = useDemoUi();
   const presetPassword = demoUi.shared?.passwordPreset ?? "";
+  // fix-followup-distribute-2a — distributionPassword /
+  // confirmDistributionPassword are no longer part of CreateProfileDraft.
+  // Distribution passwords are now collected per-share on the
+  // DistributeSharesScreen via encodeDistributionPackage.
   const [draft, setDraft] = useState(() => ({
     ...defaultCreateProfileDraft(),
     deviceName: demoUi.shared?.profileNamePreset ?? defaultCreateProfileDraft().deviceName,
     password: presetPassword,
     confirmPassword: presetPassword,
-    distributionPassword: presetPassword,
-    confirmDistributionPassword: presetPassword,
     relays: demoUi.shared?.relayPreset ? ["wss://relay.primal.net", demoUi.shared.relayPreset] : defaultCreateProfileDraft().relays
   }));
   const [relayInput, setRelayInput] = useState("wss://");
@@ -48,8 +50,6 @@ export function CreateProfileScreen() {
   const localShare = createSession.localShare;
   const members = createSession.keyset.group.members;
   const confirmMatches = draft.password.length > 0 && draft.password === draft.confirmPassword;
-  const distributionPasswordMatches =
-    draft.distributionPassword.length > 0 && draft.distributionPassword === draft.confirmDistributionPassword;
 
   function getPeerPermission(idx: number, key: "sign" | "ecdh" | "ping" | "onboard"): boolean {
     return draft.peerPermissions?.[idx]?.[key] ?? true;
@@ -105,26 +105,12 @@ export function CreateProfileScreen() {
           </div>
         </div>
 
-        <div className="password-group">
-          <SectionHeader
-            title="Remote Package Password"
-            copy="This password decrypts every remote bfonboard package you distribute from this setup."
-            infoIcon
-          />
-          <div className="profile-password-row">
-            <PasswordField
-              label="Remote Package Password"
-              value={draft.distributionPassword}
-              onChange={(event) => setDraft((current) => ({ ...current, distributionPassword: event.target.value }))}
-            />
-            <PasswordField
-              label="Confirm Remote Package Password"
-              value={draft.confirmDistributionPassword}
-              checked={distributionPasswordMatches}
-              onChange={(event) => setDraft((current) => ({ ...current, confirmDistributionPassword: event.target.value }))}
-            />
-          </div>
-        </div>
+        {/* fix-followup-distribute-2a — the "Remote Package Password" + confirm
+            inputs have been removed. Distribution passwords are now collected
+            per-share on the DistributeSharesScreen via the
+            encodeDistributionPackage(idx, password) mutator. See feature
+            fix-followup-distribute-2b-screen-rewrites for the full paper-parity
+            rewrite of this screen (Paper 60R-0). */}
 
         <div className="password-group">
           <SectionHeader title="Profile Password" copy="This password encrypts your profile on this device. You'll need it each time you unlock it." infoIcon />
@@ -223,7 +209,7 @@ export function CreateProfileScreen() {
         </div>
 
         {error ? <div className="error">{error}</div> : null}
-        <Button type="submit" size="full" disabled={busy || !confirmMatches || !distributionPasswordMatches}>
+        <Button type="submit" size="full" disabled={busy || !confirmMatches}>
           {busy ? "Creating Profile..." : "Continue to Distribute Shares"}
         </Button>
       </form>
