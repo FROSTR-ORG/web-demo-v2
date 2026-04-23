@@ -10,12 +10,12 @@ test.beforeEach(async ({ page }) => {
   await clearIdb(page);
 });
 
-test.fixme("generate nsec, create keyset, reload to returning welcome, and unlock", async ({ page }) => {
+test("generate nsec, create keyset, reload to returning welcome, and unlock", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Create New Keyset" }).click();
   await page.getByLabel("Keyset Name").fill("Returning Flow Key");
-  await page.getByRole("button", { name: "Generate NSEC" }).click();
-  const nsecInput = page.getByPlaceholder("Paste existing nsec or generate one");
+  await page.getByRole("button", { name: "Generate", exact: true }).click();
+  const nsecInput = page.getByPlaceholder("Paste your existing nsec or generate a new one");
   await expect(nsecInput).toHaveValue(/nsec1/);
   await page.getByRole("button", { name: "Reveal nsec" }).click();
   await expect(nsecInput).toHaveAttribute("type", "text");
@@ -23,25 +23,34 @@ test.fixme("generate nsec, create keyset, reload to returning welcome, and unloc
 
   await expect(page.getByRole("heading", { name: "Create Profile" })).toBeVisible();
   await page.getByLabel("Profile Name").fill("Returning Browser");
-  await page.getByRole("textbox", { name: "Remote Package Password", exact: true }).fill("remote-test-password");
-  await page.getByRole("textbox", { name: "Confirm Remote Package Password", exact: true }).fill("remote-test-password");
+  // fix-followup-distribute-2a/2c — the former shared "Remote Package
+  // Password" field on /create/profile was removed in 2A; remote
+  // passwords are now collected per share on /create/distribute via
+  // the per-share Password input + Create package CTA (Paper 8GU-0).
   await page.getByRole("textbox", { name: "Password", exact: true }).fill("test-password");
   await page.getByRole("textbox", { name: "Confirm Password", exact: true }).fill("test-password");
   await page.getByRole("button", { name: "Continue to Distribute Shares" }).click();
 
   await expect(page.getByRole("heading", { name: "Distribute Shares" })).toBeVisible({ timeout: 30_000 });
-  const qrButtons = page.getByRole("button", { name: "QR" });
-  const qrCount = await qrButtons.count();
-  for (let index = 0; index < qrCount; index += 1) {
-    await qrButtons.nth(index).click();
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await page.getByRole("button", { name: "Done" }).click();
+
+  const packagePasswordInputs = page.getByLabel(/^Package password for share \d+$/);
+  const remoteCount = await packagePasswordInputs.count();
+  expect(remoteCount).toBeGreaterThan(0);
+  const createPackageButtons = page.getByRole("button", { name: "Create package" });
+  for (let index = 0; index < remoteCount; index += 1) {
+    await packagePasswordInputs.first().fill(`remote-package-password-${index + 1}`);
+    await createPackageButtons.first().click();
+    await expect(createPackageButtons).toHaveCount(remoteCount - index - 1, {
+      timeout: 10_000,
+    });
   }
-  const copyPasswordButtons = page.getByRole("button", { name: "Copy Password" });
-  const copyPasswordCount = await copyPasswordButtons.count();
-  for (let index = 0; index < copyPasswordCount; index += 1) {
-    await copyPasswordButtons.nth(index).click();
+
+  const markDistributedButtons = page.getByRole("button", { name: /^Mark distributed$/ });
+  await expect(markDistributedButtons).toHaveCount(remoteCount);
+  for (let index = 0; index < remoteCount; index += 1) {
+    await markDistributedButtons.nth(index).click();
   }
+
   await page.getByRole("button", { name: "Continue to Completion" }).click();
   await page.getByRole("button", { name: "Finish Distribution" }).click();
   await expect(page.getByText(/Peers:/i).first()).toBeVisible({ timeout: 30_000 });
@@ -57,7 +66,7 @@ test.fixme("generate nsec, create keyset, reload to returning welcome, and unloc
 test("manual pasted nsec remains unsupported", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Create New Keyset" }).click();
-  await page.getByPlaceholder("Paste existing nsec or generate one").fill("invalid-key");
+  await page.getByPlaceholder("Paste your existing nsec or generate a new one").fill("invalid-key");
   await page.getByRole("button", { name: "Create Keyset" }).click();
   await expect(page.getByText("Invalid nsec format — must start with nsec1.")).toBeVisible();
 });
@@ -103,19 +112,21 @@ test.fixme("rotates a returning profile from a generated bfshare source", async 
   await page.getByRole("textbox", { name: "Confirm Password", exact: true }).fill("rotated-local-password");
   await page.getByRole("button", { name: "Continue to Distribute Shares" }).click();
 
+  // The rotate-keyset flow still uses the legacy Copy-Package /
+  // Copy-Password distribute screen (distinct from the 2B Paper 8GU-0
+  // rewrite which only applied to /create/distribute). Per-share
+  // encoding is driven by the preceding Review & Generate screen's
+  // single distribution password, not per share.
   await expect(page.getByRole("heading", { name: "Distribute Shares" })).toBeVisible();
-  const qrButtons = page.getByRole("button", { name: "QR" });
-  const qrCount = await qrButtons.count();
-  for (let index = 0; index < qrCount; index += 1) {
-    await qrButtons.nth(index).click();
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await page.getByRole("button", { name: "Done" }).click();
-  }
-  const copyPasswordButtons = page.getByRole("button", { name: "Copy Password" });
-  const copyPasswordCount = await copyPasswordButtons.count();
-  for (let index = 0; index < copyPasswordCount; index += 1) {
+  const copyPackageButtons = page.getByRole("button", { name: /Copy Package/i });
+  const copyPasswordButtons = page.getByRole("button", { name: /Copy Password/i });
+  const remotePackageCount = await copyPackageButtons.count();
+  expect(remotePackageCount).toBeGreaterThan(0);
+  for (let index = 0; index < remotePackageCount; index += 1) {
+    await copyPackageButtons.nth(index).click();
     await copyPasswordButtons.nth(index).click();
   }
+
   await page.getByRole("button", { name: "Continue to Completion" }).click();
   await page.getByRole("button", { name: "Finish Distribution" }).click();
 
