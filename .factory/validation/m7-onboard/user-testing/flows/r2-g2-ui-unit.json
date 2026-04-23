@@ -1,0 +1,114 @@
+{
+  "groupId": "r2-g2-ui-unit",
+  "testedAt": "2026-04-23T06:27:33Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "evidenceDir": "m7-onboard/r2-g2-ui-unit"
+  },
+  "toolsUsed": ["shell-cli", "playwright-cli", "vitest", "playwright"],
+  "commandRuns": [
+    {
+      "id": "cmd-1",
+      "command": "npx vitest run src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.onboardSponsor.test.tsx --config vitest.config.ts",
+      "exitCode": 0,
+      "transcript": "m7-onboard/r2-g2-ui-unit/01-SettingsSidebar.onboardSponsor.test.txt",
+      "result": "1 file passed; 6 tests passed"
+    },
+    {
+      "id": "cmd-2",
+      "command": "npx vitest run src/screens/DashboardScreen/sidebar/__tests__/SettingsSidebar.groupProfileMetadata.test.tsx --config vitest.config.ts",
+      "exitCode": 0,
+      "transcript": "m7-onboard/r2-g2-ui-unit/02-SettingsSidebar.groupProfileMetadata.test.txt",
+      "result": "1 file passed; 7 tests passed"
+    },
+    {
+      "id": "cmd-3",
+      "command": "npx vitest run src/screens/__tests__/OnboardSponsorScreens.test.tsx --config vitest.config.ts",
+      "exitCode": 0,
+      "transcript": "m7-onboard/r2-g2-ui-unit/03-OnboardSponsorScreens.test.txt",
+      "result": "1 file passed; 21 tests passed"
+    },
+    {
+      "id": "cmd-4",
+      "command": "npx vitest run src/app/__tests__/onboardSponsorFlow.exhaustion.test.tsx --config vitest.config.ts",
+      "exitCode": 0,
+      "transcript": "m7-onboard/r2-g2-ui-unit/04-onboardSponsorFlow.exhaustion.test.txt",
+      "result": "1 file passed; 1 test passed"
+    },
+    {
+      "id": "cmd-5",
+      "command": "npx vitest run src/screens/__tests__/RecoverScreens.test.tsx --config vitest.config.ts",
+      "exitCode": 0,
+      "transcript": "m7-onboard/r2-g2-ui-unit/05-RecoverScreens.test.txt",
+      "result": "1 file passed; 10 tests passed"
+    },
+    {
+      "id": "cmd-6",
+      "command": "npx playwright test src/e2e/recover-regression.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "transcript": "m7-onboard/r2-g2-ui-unit/06-recover-regression.playwright.txt",
+      "result": "2 tests passed"
+    }
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-CROSS-019",
+      "status": "pass",
+      "reason": "Recover regression/unit suites passed for collect-shares rendering, masked↔revealed NSEC toggle behavior, and recover-screen flow coverage with no Playwright console errors.",
+      "commandEvidence": ["cmd-5", "cmd-6"]
+    },
+    {
+      "id": "VAL-ONBOARD-002",
+      "status": "pass",
+      "reason": "Settings sidebar onboard-entry suite passed, including keyboard activation/focus and no duplicate affordance checks.",
+      "commandEvidence": ["cmd-1"]
+    },
+    {
+      "id": "VAL-ONBOARD-005",
+      "status": "pass",
+      "reason": "Onboard sponsor screen suite passed QR/copy/handoff assertions, including QR round-trip checks.",
+      "commandEvidence": ["cmd-3"]
+    },
+    {
+      "id": "VAL-ONBOARD-010",
+      "status": "pass",
+      "reason": "Group profile metadata suite passed threshold/member and created/updated rendering checks used as direct UI evidence.",
+      "commandEvidence": ["cmd-2"]
+    },
+    {
+      "id": "VAL-ONBOARD-020",
+      "status": "pass",
+      "reason": "Exhaustion flow suite passed slot-limit enforcement and invariant checks for member count + pending operations.",
+      "commandEvidence": ["cmd-4"]
+    },
+    {
+      "id": "VAL-ONBOARD-022",
+      "status": "pass",
+      "reason": "Onboard sponsor screen suite passed keyboard cancellation with focus restoration evidence.",
+      "commandEvidence": ["cmd-3"]
+    },
+    {
+      "id": "VAL-ONBOARD-023",
+      "status": "pass",
+      "reason": "Onboard sponsor screen suite passed textarea Tab/Shift+Tab focus traversal behavior checks.",
+      "commandEvidence": ["cmd-3"]
+    },
+    {
+      "id": "VAL-ONBOARD-025",
+      "status": "pass",
+      "reason": "Onboard sponsor screen suite passed clipboard write + transient copied state/reset behavior.",
+      "commandEvidence": ["cmd-3"]
+    }
+  ],
+  "frictions": [
+    {
+      "description": "The OnboardSponsorScreens Vitest run logs repeated jsdom 'HTMLCanvasElement.prototype.getContext not implemented' stack traces while still completing successfully.",
+      "resolved": true,
+      "resolution": "Captured full transcript as evidence; run remained green (exitCode 0, 21/21 tests passed).",
+      "affectedAssertions": ["VAL-ONBOARD-005", "VAL-ONBOARD-022", "VAL-ONBOARD-023", "VAL-ONBOARD-025"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Executed all six required commands exactly as assigned; all returned exit code 0. Assigned round-2 assertions in this group scored pass based on the mapped test evidence."
+}

@@ -1,0 +1,108 @@
+{
+  "groupId": "r2-g3-deviations-console",
+  "testedAt": "2026-04-23T06:32:24Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "guidanceSections": [
+      "Flow Validator Guidance: shell-cli",
+      "Flow Validator Guidance: playwright-cli"
+    ]
+  },
+  "toolsUsed": [
+    "playwright-cli",
+    "shell-cli",
+    "rg"
+  ],
+  "commandRuns": [
+    {
+      "id": "cmd-01-playwright-demo-gallery",
+      "command": "npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "transcriptPath": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/evidence/m7-onboard/r2-g3-deviations-console/01-playwright-demo-gallery.txt"
+    },
+    {
+      "id": "cmd-02-rg-runtime-deviations",
+      "command": "rg -n \"VAL-CROSS-001|VAL-CROSS-002|VAL-CROSS-016|VAL-CROSS-020|VAL-ONBOARD-015|VAL-ONBOARD-017\" docs/runtime-deviations-from-paper.md",
+      "exitCode": 0,
+      "transcriptPath": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/evidence/m7-onboard/r2-g3-deviations-console/02-rg-runtime-deviations.txt"
+    },
+    {
+      "id": "cmd-03-rg-allowed-console-warnings",
+      "command": "rg -n \"Current allowlist|_None\\.|zero-warning\" docs/allowed-console-warnings.md",
+      "exitCode": 0,
+      "transcriptPath": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4/evidence/m7-onboard/r2-g3-deviations-console/03-rg-allowed-console-warnings.txt"
+    }
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-CROSS-001",
+      "status": "pass",
+      "reason": "Deviation doc explicitly cites VAL-CROSS-001 in the environment-blocked public-relay section with rationale and substitute evidence (rg lines 139-140, 153-159).",
+      "commandEvidence": [
+        "cmd-02-rg-runtime-deviations"
+      ]
+    },
+    {
+      "id": "VAL-CROSS-002",
+      "status": "pass",
+      "reason": "Deviation doc has a dedicated VAL-CROSS-002 section explaining protocol-level observability limits and reconciled evidence strategy (rg lines 601, 603, 643).",
+      "commandEvidence": [
+        "cmd-02-rg-runtime-deviations"
+      ]
+    },
+    {
+      "id": "VAL-CROSS-016",
+      "status": "pass",
+      "reason": "Deviation doc explicitly cites VAL-CROSS-016 under the same public-relay constraint block with rationale and mapped substitute evidence (rg lines 139-140, 153-154, 167).",
+      "commandEvidence": [
+        "cmd-02-rg-runtime-deviations"
+      ]
+    },
+    {
+      "id": "VAL-CROSS-020",
+      "status": "pass",
+      "reason": "Deviation doc explicitly cites VAL-CROSS-020 in the public-relay constraint section and provides substitute evidence rationale (rg lines 139-140, 153-154, 174).",
+      "commandEvidence": [
+        "cmd-02-rg-runtime-deviations"
+      ]
+    },
+    {
+      "id": "VAL-CROSS-031",
+      "status": "pass",
+      "reason": "Demo-gallery Playwright run passed (desktop project) and allowed-console-warnings policy shows an empty warn allowlist with strict zero-warning baseline (_None_, zero-warning policy).",
+      "commandEvidence": [
+        "cmd-01-playwright-demo-gallery",
+        "cmd-03-rg-allowed-console-warnings"
+      ]
+    },
+    {
+      "id": "VAL-ONBOARD-015",
+      "status": "pass",
+      "reason": "Deviation doc explicitly cites VAL-ONBOARD-015 in the public-relay constraint block and in the dedicated camera-QR coverage extension with rationale/evidence mapping (rg lines 139-140, 153-154, 179, 857-858, 880).",
+      "commandEvidence": [
+        "cmd-02-rg-runtime-deviations"
+      ]
+    },
+    {
+      "id": "VAL-ONBOARD-017",
+      "status": "pass",
+      "reason": "Deviation doc has a dedicated section for VAL-ONBOARD-017 detailing no-source-artboard rationale and design-system parity strategy with explicit assertion coverage (rg lines 1259, 1265, 1338).",
+      "commandEvidence": [
+        "cmd-02-rg-runtime-deviations"
+      ]
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Desktop demo-gallery run includes one mobile-focused test skipped by project guard; this did not affect assigned deviation/console-baseline evidence collection.",
+      "resolved": true,
+      "resolution": "Used the required desktop command exactly and scored only the assigned assertions per task intent.",
+      "affectedAssertions": [
+        "VAL-CROSS-031"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Executed all three required commands with exit code 0, captured transcripts under mission evidence, and validated all 7 assigned assertions as pass based on explicit deviation citations/rationales and the console-baseline evidence."
+}
