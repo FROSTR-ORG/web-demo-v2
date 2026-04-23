@@ -532,12 +532,33 @@ export interface OnboardingPackageView {
   packageCreated: boolean;
   /**
    * fix-followup-distribute-2a — runtime-assigned `request_id` of
-   * the outbound Onboard command dispatched for this share. Populated
-   * by a future mutator (feature 3 / 2C) once the sponsor flow
-   * dispatches the onboarding runtime command. Present here so the
-   * type surfaces the lifecycle field; populated in 2C.
+   * the outbound Onboard command dispatched for this share.
+   *
+   * fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire
+   * (feature 3) — populated inside `encodeDistributionPackage(idx,
+   * password)` immediately after the per-share bfonboard package is
+   * encoded: the same atomic mutator call also dispatches
+   * `handleRuntimeCommand({type: "onboard", peer_pubkey32_hex})` for
+   * the share's target member and stashes the returned requestId
+   * here. `AppStateProvider.absorbDrains` then correlates this id
+   * against drained `CompletedOperation::Onboard` (flip
+   * `peerOnline = true`) and `OperationFailure { op_type: "onboard" }`
+   * (surface `adoptionError` inline) envelopes.
    */
   pendingDispatchRequestId?: string;
+  /**
+   * fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire
+   * — non-fatal inline error surfaced on this share's Distribute
+   * card when the sponsor-side runtime yields an
+   * `OperationFailure { op_type: "onboard" }` matching
+   * {@link pendingDispatchRequestId}. The copy is
+   * "Peer adoption failed — retry or mark distributed manually" —
+   * the user can still proceed via the manual fallback (the
+   * "Mark distributed" button remains enabled). Defaults to
+   * `undefined` (never surfaces until a real onboard failure is
+   * drained).
+   */
+  adoptionError?: string;
   /**
    * fix-followup-distribute-2a — `true` when the paired peer has
    * come online (handshake echo observed from the runtime). Feeds

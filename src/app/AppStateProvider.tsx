@@ -803,6 +803,75 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         });
       }
     }
+    // fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire
+    // — correlate drained `CompletedOperation::Onboard` and
+    // `OperationFailure { op_type: "onboard" }` envelopes back to the
+    // active create session's onboarding packages via each share's
+    // `pendingDispatchRequestId`. Mirrors the `createOnboardSponsorPackage`
+    // correlation pattern higher up in this drain handler:
+    //   - Completion match ⇒ flip `peerOnline = true`, which (via
+    //     the `packageDistributed(pkg)` predicate) auto-advances the
+    //     Distribute-screen status chip to "Distributed" with NO
+    //     manual Mark-distributed click required.
+    //   - Failure match    ⇒ surface a non-fatal inline error
+    //     `"Peer adoption failed — retry or mark distributed
+    //     manually"` on the share's card. `Mark distributed`
+    //     remains enabled so the user can still proceed through
+    //     the manual fallback.
+    // The correlation runs only when there is an active create
+    // session; later sessions / other screens never read these
+    // fields, so we gate the setter on presence and short-circuit
+    // when no onboarding package matches.
+    if (drains.completions.length > 0 || drains.failures.length > 0) {
+      const onboardCompletionIds = new Set<string>();
+      for (const completion of drains.completions) {
+        const onboardCompletion =
+          (completion as { Onboard?: { request_id: string } }).Onboard;
+        if (onboardCompletion?.request_id) {
+          onboardCompletionIds.add(onboardCompletion.request_id);
+        }
+      }
+      const onboardFailureEntries = new Map<string, string>();
+      for (const failure of drains.failures) {
+        if (failure.op_type !== "onboard") continue;
+        onboardFailureEntries.set(
+          failure.request_id,
+          "Peer adoption failed — retry or mark distributed manually",
+        );
+      }
+      if (onboardCompletionIds.size > 0 || onboardFailureEntries.size > 0) {
+        setCreateSession((session) => {
+          if (!session) return session;
+          let changed = false;
+          const nextPackages = session.onboardingPackages.map((entry) => {
+            const requestId = entry.pendingDispatchRequestId;
+            if (!requestId) return entry;
+            if (onboardCompletionIds.has(requestId) && !entry.peerOnline) {
+              changed = true;
+              return {
+                ...entry,
+                peerOnline: true,
+                // Completion wins over a stale failure from a prior
+                // attempt — clear the inline error so the chip
+                // transitions cleanly to Distributed.
+                adoptionError: undefined,
+              };
+            }
+            const failureMessage = onboardFailureEntries.get(requestId);
+            if (failureMessage && entry.adoptionError !== failureMessage) {
+              changed = true;
+              return {
+                ...entry,
+                adoptionError: failureMessage,
+              };
+            }
+            return entry;
+          });
+          if (!changed) return session;
+          return { ...session, onboardingPackages: nextPackages };
+        });
+      }
+    }
     // Populate the dashboard RuntimeEventLog ring buffer from every drain
     // channel. Preserves drain order: events first (they precede the
     // completions/failures they describe in the runtime's own ordering),
@@ -1972,8 +2041,47 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const nextStash = new Map(createSessionPackageSecretsRef.current);
       nextStash.set(idx, { packageText, password });
       createSessionPackageSecretsRef.current = nextStash;
+      // fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire
+      // — mirror the `createOnboardSponsorPackage` pattern at
+      // AppStateProvider.tsx (onboard sponsor flow): after encoding
+      // the bfonboard package, dispatch `handleRuntimeCommand({type:
+      // "onboard", peer_pubkey32_hex})` for the share's target
+      // member. The returned `requestId` is stashed on
+      // `onboardingPackages[idx].pendingDispatchRequestId` so
+      // `absorbDrains` can correlate drained
+      // `CompletedOperation::Onboard` envelopes back to the share
+      // (echo-driven peerOnline flip) and `OperationFailure {
+      // op_type: "onboard" }` envelopes (adoptionError inline
+      // surface).
+      //
+      // Compute the target peer's x-only pubkey from the group
+      // member matching this share. `memberPubkeyXOnly` lowercases
+      // and strips the 02/03 prefix to produce the 64-hex x-only
+      // form the runtime expects as `peer_pubkey32_hex`.
+      const targetMember = memberForShare(context.group, remoteShare);
+      const onboardCommand = {
+        type: "onboard" as const,
+        peer_pubkey32_hex: memberPubkeyXOnly(targetMember),
+      };
+      let onboardRequestId: string | null = null;
+      try {
+        const result = await dispatchRuntimeCommandRef.current?.(onboardCommand);
+        onboardRequestId = result?.requestId ?? null;
+      } catch {
+        // Runtime dispatch failures are non-fatal — the package text
+        // itself has been encoded and stashed, so the user can still
+        // hand off the package manually and use "Mark distributed".
+        // The `adoptionError` surface is reserved for drained
+        // OperationFailure envelopes that correlate back to a
+        // specific request_id; we leave pendingDispatchRequestId
+        // unset here so subsequent completions cannot falsely match.
+        onboardRequestId = null;
+      }
       // Populate the redacted preview (first 24 chars of bfonboard1…)
-      // and flip packageCreated on the session view.
+      // and flip packageCreated on the session view. Also stash the
+      // onboard command's requestId (if captured) so absorbDrains
+      // can correlate later completions / failures. Clear any stale
+      // `adoptionError` left over from a prior attempt.
       const preview = packageText.slice(0, 24);
       setCreateSession((session) => {
         if (!session) return session;
@@ -1986,6 +2094,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                   packageText: preview,
                   password: "[redacted]",
                   packageCreated: true,
+                  pendingDispatchRequestId:
+                    onboardRequestId ?? entry.pendingDispatchRequestId,
+                  adoptionError: undefined,
                 }
               : entry,
           ),
@@ -5373,6 +5484,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         localShare: SharePackageWire;
         remoteShares: SharePackageWire[];
       }) => Promise<void>;
+      /**
+       * fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire
+       * — directly feed a drain batch through `absorbDrains` so unit
+       * tests can exercise the `CompletedOperation::Onboard` /
+       * `OperationFailure { op_type: "onboard" }` correlation against
+       * active create-session onboarding packages without spinning up
+       * the full RuntimeRelayPump. Tree-shaken from production bundles
+       * via `import.meta.env.DEV`.
+       */
+      __iglooTestAbsorbDrains?: (drains: RuntimeDrainBatch) => void;
     };
     globalWindow.__appState = value;
     // Initialise the dev-only `__debug` surface once per provider mount.
@@ -5827,6 +5948,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       simulator.setOnDrains(absorbDrains);
       simulatorRef.current = simulator;
       applyRuntimeStatus(simulator.pump(4));
+    };
+    // fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire
+    // — expose absorbDrains so unit tests can simulate runtime drain
+    // batches arriving at the provider without spinning up a full
+    // RuntimeRelayPump. Used by
+    // `src/app/__tests__/encodeDistributionPackage.onboard-dispatch.test.tsx`
+    // to verify the onboarding-package correlation against both
+    // `CompletedOperation::Onboard` (peerOnline flip) and
+    // `OperationFailure { op_type: "onboard" }` (adoptionError surface).
+    globalWindow.__iglooTestAbsorbDrains = (drains) => {
+      absorbDrains(drains);
     };
     return () => {
       if (globalWindow.__appState === value) {

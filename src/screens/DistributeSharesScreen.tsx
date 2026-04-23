@@ -303,6 +303,12 @@ function RemoteShareCard({
         )}
       </div>
 
+      {pkg.adoptionError ? (
+        <span className="error" role="alert" data-testid={`adoption-error-${pkg.idx}`}>
+          {pkg.adoptionError}
+        </span>
+      ) : null}
+
       <div
         className={`package-actions${actionsDisabled ? " locked" : ""}`}
       >
