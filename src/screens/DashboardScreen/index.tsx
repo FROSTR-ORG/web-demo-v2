@@ -20,12 +20,14 @@ import {
   type PublishBackupResult,
 } from "./modals/PublishBackupModal";
 import { SigningFailedModal } from "./modals/SigningFailedModal";
+import { DashboardStateAnnouncer } from "./panels/DashboardStateAnnouncer";
 import { DashboardSummaryBar } from "./panels/DashboardSummaryBar";
 import { MockStateToggle } from "./panels/MockStateToggle";
 import {
   NonSignFailureBannerStack,
   type NonSignFailureBannerEntry,
 } from "./panels/NonSignFailureBanner";
+import { OfflineBanner } from "./panels/OfflineBanner";
 import { SignActivityPanel } from "./panels/SignActivityPanel";
 import { TestEcdhPanel } from "./panels/TestEcdhPanel";
 import { TestPingPanel } from "./panels/TestPingPanel";
@@ -803,6 +805,20 @@ export function DashboardScreen() {
       }
     >
       <section className="dashboard-column">
+        {/* m7-a11y-offline-banner / VAL-CROSS-025 — polite aria-live
+         * state-transition announcer. Visually hidden sr-only region
+         * whose text is rewritten exactly once per dashboard-state
+         * transition so screen reader users receive a concise cue when
+         * the runtime moves between running/connecting/stopped/
+         * relays-offline/signing-blocked without needing to open a
+         * modal or re-scan the UI. */}
+        <DashboardStateAnnouncer dashboardState={dashboardState} />
+        {/* m7-a11y-offline-banner / VAL-CROSS-026 — network-offline
+         * banner driven by `navigator.onLine`. Surfaces a persistent
+         * "Offline — relays unreachable" notice when the browser
+         * reports the network as offline; clears the banner and auto-
+         * reconnects relay WS on the return-to-online transition. */}
+        <OfflineBanner onReconnect={restartRuntimeConnections} />
         {/* MockStateToggle exposes "Open Policy Prompt" and
          * "Open Signing Failed" demo buttons that call `setActiveModal`
          * directly. These are proactive open paths used only by Paper
