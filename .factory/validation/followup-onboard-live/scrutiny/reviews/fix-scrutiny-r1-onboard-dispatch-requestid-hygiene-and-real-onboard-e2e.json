@@ -1,0 +1,15 @@
+{
+  "featureId": "fix-scrutiny-r1-onboard-dispatch-requestid-hygiene-and-real-onboard-e2e",
+  "reviewedAt": "2026-04-23T18:26:30Z",
+  "commitId": "fa463d8",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix closes both follow-up scrutiny blockers on per-share onboard dispatch. `encodeDistributionPackage` now clears stale `pendingDispatchRequestId` before dispatch, stores a new request id only from a successful onboard dispatch, and surfaces dispatch throws via `adoptionError`. The multi-device regression spec also now drives the real requester `/onboard` UI in the happy path while retaining the documented DEV-hook failure-path deviation.",
+    "issues": []
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": ".factory/validation/followup-onboard-live/scrutiny/reviews/fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire.json",
+  "summary": "Pass. The stale request-id correlation bug and the requester-side UI bypass identified in round 1 are both resolved at current HEAD."
+}

@@ -1,0 +1,88 @@
+{
+  "groupId": "r2-g2-ui-parity",
+  "testedAt": "2026-04-23T18:26:45Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "guidanceSections": [
+      "Flow Validator Guidance: vitest",
+      "Flow Validator Guidance: playwright-cli"
+    ],
+    "project": "desktop",
+    "workers": 1,
+    "assignedAssertions": [
+      "VAL-FOLLOWUP-004",
+      "VAL-FOLLOWUP-005",
+      "VAL-FOLLOWUP-008",
+      "VAL-FOLLOWUP-011",
+      "VAL-FOLLOWUP-012"
+    ]
+  },
+  "toolsUsed": [
+    "playwright-cli",
+    "vitest"
+  ],
+  "commandRuns": [
+    {
+      "id": "cmd-01-screen-suites",
+      "command": "npx vitest run src/screens/__tests__/CreateProfileScreen.test.tsx src/screens/__tests__/DistributeSharesScreen.test.tsx src/screens/__tests__/DistributionCompleteScreen.test.tsx --config vitest.config.ts",
+      "exitCode": 0,
+      "result": "3 files passed; 39 tests passed"
+    },
+    {
+      "id": "cmd-02-followup-paper-parity",
+      "command": "npx playwright test src/e2e/visual/followup-paper-parity.spec.ts --project=desktop --workers 1",
+      "exitCode": 0,
+      "result": "3 passed; live /create/profile, /create/distribute, /create/complete parity checks green"
+    }
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-FOLLOWUP-004",
+      "status": "pass",
+      "reason": "The DistributeShares screen suite includes explicit PRE / POST / DISTRIBUTED-state coverage, and the live paper-parity run confirms those stateful create-flow surfaces render correctly on the real `/create/*` routes.",
+      "commandEvidence": [
+        "cmd-01-screen-suites",
+        "cmd-02-followup-paper-parity"
+      ]
+    },
+    {
+      "id": "VAL-FOLLOWUP-005",
+      "status": "pass",
+      "reason": "Screen tests directly assert `markPackageDistributed(idx)` wiring on `/create/distribute` and the fallback `Mark distributed` affordance on `/create/complete`, covering both manual fallback surfaces required by the follow-up contract.",
+      "commandEvidence": [
+        "cmd-01-screen-suites"
+      ]
+    },
+    {
+      "id": "VAL-FOLLOWUP-008",
+      "status": "pass",
+      "reason": "The DistributeShares screen suite covers the local-share badge, pre-state password/create controls, post-state masked password + package preview, and action-row enablement; the live parity run confirms the same structure on `/create/distribute`.",
+      "commandEvidence": [
+        "cmd-01-screen-suites",
+        "cmd-02-followup-paper-parity"
+      ]
+    },
+    {
+      "id": "VAL-FOLLOWUP-011",
+      "status": "pass",
+      "reason": "The DistributeShares suite includes exact-text assertions for the page header plus the three numbered 'How this step works' steps, and the live parity spec passed against the Paper baseline on `/create/distribute`.",
+      "commandEvidence": [
+        "cmd-01-screen-suites",
+        "cmd-02-followup-paper-parity"
+      ]
+    },
+    {
+      "id": "VAL-FOLLOWUP-012",
+      "status": "pass",
+      "reason": "The DistributionComplete suite covers the exact header/subhead/callout text, CTA enabled/disabled gating, and the pending-row fallback affordance, while the live parity suite passed on `/create/complete` against the LN7-0 Paper baseline.",
+      "commandEvidence": [
+        "cmd-01-screen-suites",
+        "cmd-02-followup-paper-parity"
+      ]
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "UI/parity proof set passed cleanly: 2 commands run, 5 assigned assertions passed, 0 failed, 0 blocked."
+}

@@ -1,0 +1,50 @@
+{
+  "milestone": "followup-onboard-live",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 12,
+    "passed": 12,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-FOLLOWUP-001",
+    "VAL-FOLLOWUP-002",
+    "VAL-FOLLOWUP-003",
+    "VAL-FOLLOWUP-004",
+    "VAL-FOLLOWUP-005",
+    "VAL-FOLLOWUP-006",
+    "VAL-FOLLOWUP-007",
+    "VAL-FOLLOWUP-008",
+    "VAL-FOLLOWUP-009",
+    "VAL-FOLLOWUP-010",
+    "VAL-FOLLOWUP-011",
+    "VAL-FOLLOWUP-012"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "flowReports": [
+    {
+      "groupId": "r2-g1-runtime-e2e",
+      "file": ".factory/validation/followup-onboard-live/user-testing/flows/r2-g1-runtime-e2e.json"
+    },
+    {
+      "groupId": "r2-g2-ui-parity",
+      "file": ".factory/validation/followup-onboard-live/user-testing/flows/r2-g2-ui-parity.json"
+    },
+    {
+      "groupId": "r2-g3-create-flow-audit",
+      "file": ".factory/validation/followup-onboard-live/user-testing/flows/r2-g3-create-flow-audit.json"
+    }
+  ],
+  "toolsUsed": [
+    "playwright-cli",
+    "rg",
+    "shell-cli",
+    "vitest"
+  ],
+  "dedupedBlockers": [],
+  "generatedAt": "2026-04-23T18:27:00Z"
+}

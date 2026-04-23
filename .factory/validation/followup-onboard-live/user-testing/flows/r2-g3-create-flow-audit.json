@@ -1,0 +1,72 @@
+{
+  "groupId": "r2-g3-create-flow-audit",
+  "testedAt": "2026-04-23T18:27:00Z",
+  "isolation": {
+    "repoRoot": "/Users/plebdev/Desktop/igloo-web-v2-prototype/web-demo-v2",
+    "missionDir": "/Users/plebdev/.factory/missions/b48100dd-0e6c-4a7c-90a3-f12e61d1c3c4",
+    "guidanceSections": [
+      "Flow Validator Guidance: vitest",
+      "Flow Validator Guidance: shell-cli"
+    ],
+    "assignedAssertions": [
+      "VAL-FOLLOWUP-006",
+      "VAL-FOLLOWUP-007",
+      "VAL-FOLLOWUP-009"
+    ]
+  },
+  "toolsUsed": [
+    "rg",
+    "shell-cli",
+    "vitest"
+  ],
+  "commandRuns": [
+    {
+      "id": "cmd-01-setup-flows",
+      "command": "npx vitest run src/app/__tests__/setupFlows.test.tsx --config vitest.config.ts",
+      "exitCode": 0,
+      "result": "1 file passed; 10 tests passed"
+    },
+    {
+      "id": "cmd-02-create-flow-removal-audit",
+      "command": "rg -n \"does not render any 'Remote Package Password' text|packageCreated === false|preEncodePkg|CreateProfileDraft|distributionPassword|confirmDistributionPassword\" src/screens/__tests__/CreateProfileScreen.test.tsx src/app/__tests__/setupFlows.test.tsx src/app/AppStateTypes.ts src/app/profileDrafts.ts",
+      "exitCode": 0,
+      "result": "Create-flow audit lines confirm the CreateProfile DOM removal test, CreateProfileDraft removal comments, and the pre-encode `packageCreated === false` assertions."
+    },
+    {
+      "id": "cmd-03-distribution-predicate-audit",
+      "command": "rg -n \"VAL-FOLLOWUP-006|packageDistributed\\(|Copy package / Copy password wiring|renders the 'Distributed' success-tone chip when manuallyMarkedDistributed is true|exposes a Mark distributed fallback|Paper LN7-0 parity|How this step works info panel|POST-state rendering|DISTRIBUTED state\" src/app/distributionPackages.ts src/screens/__tests__/DistributeSharesScreen.test.tsx src/screens/__tests__/DistributionCompleteScreen.test.tsx",
+      "exitCode": 0,
+      "result": "Predicate and screen-audit lines confirm `packageDistributed(entry)` depends only on `peerOnline || manuallyMarkedDistributed`, with copy/password/QR wiring covered separately from the distributed-state tests."
+    }
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-FOLLOWUP-006",
+      "status": "pass",
+      "reason": "The create-flow audit confirms the `packageDistributed(entry)` predicate is explicitly defined as `peerOnline || manuallyMarkedDistributed`, while the DistributeShares test file keeps copy/password wiring in a separate contract block from the distributed-state assertions. That preserves copy/password/QR as informational sub-state only.",
+      "commandEvidence": [
+        "cmd-03-distribution-predicate-audit"
+      ]
+    },
+    {
+      "id": "VAL-FOLLOWUP-007",
+      "status": "pass",
+      "reason": "The CreateProfile screen suite contains the explicit no-'Remote Package Password' DOM test, and the type audit shows `CreateProfileDraft` removed those fields while `profileDrafts` retains only migration comments for legacy cleanup. Remaining `distributionPassword` symbols are isolated to the deferred rotate-keyset path, not the create-flow draft.",
+      "commandEvidence": [
+        "cmd-02-create-flow-removal-audit"
+      ]
+    },
+    {
+      "id": "VAL-FOLLOWUP-009",
+      "status": "pass",
+      "reason": "The setup-flows suite explicitly checks the post-`createProfile` pre-encode state (`packageCreated === false`, empty `packageText`, empty `password`) before the per-share encode step, proving eager package encryption no longer occurs at `createProfile` time.",
+      "commandEvidence": [
+        "cmd-01-setup-flows",
+        "cmd-02-create-flow-removal-audit"
+      ]
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Create-flow contract audit passed: 3 commands run, 3 assigned assertions passed, 0 failed, 0 blocked."
+}
