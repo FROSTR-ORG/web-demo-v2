@@ -161,6 +161,19 @@ describe("CreateProfileScreen", () => {
     expect(screen.getAllByText("ONBOARD").length).toBe(2);
   });
 
+  it("does not render any 'Remote Package Password' text (VAL-FOLLOWUP-007)", () => {
+    renderScreen();
+    expect(
+      screen.queryAllByText(/Remote Package Password/i),
+    ).toHaveLength(0);
+    expect(
+      screen.queryAllByText(/Confirm Remote Package Password/i),
+    ).toHaveLength(0);
+    expect(
+      screen.queryByLabelText(/Remote Package Password/i),
+    ).toBeNull();
+  });
+
   it("navigates to /create/distribute on successful submit (VAL-SHR-005)", async () => {
     mocks.demoUi = { shared: { passwordPreset: "paperpass", relayPreset: "wss://relay.example.com" } };
     renderScreen();

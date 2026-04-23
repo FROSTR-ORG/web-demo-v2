@@ -108,7 +108,14 @@ describe("demo scenarios", () => {
       { id: "recover-collect-shares", text: ["Incompatible Shares", "03b7e1f9d2c8...4j8w"] },
       { id: "import-error-corrupted", text: ["Backup Corrupted"] },
       { id: "onboard-failed-rejected", text: ["Onboarding Rejected"] },
-      { id: "shared-distribute-shares", text: ["Enter password to unlock"] },
+      // fix-followup-distribute-2b-screen-rewrites — the Distribute
+      // Shares screen was rewritten per Paper 8GU-0. The old
+      // `lockedPackageIndexes` → "Enter password to unlock" affordance
+      // no longer exists; the demo scenario now exercises the POST-
+      // state (every remote share has `packageCreated === true`, so
+      // each card renders the "Ready to distribute" chip + the new
+      // "How this step works" info panel).
+      { id: "shared-distribute-shares", text: ["How this step works", "Ready to distribute"] },
       { id: "replace-share-applying", text: ["Onboarding package: bfonboard1••••"] },
       { id: "create-generation-progress", text: ["1 of 3 phases"] },
       { id: "rotate-keyset-generation-progress", text: ["2 of 4 phases"] },

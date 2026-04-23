@@ -105,12 +105,12 @@ export function CreateProfileScreen() {
           </div>
         </div>
 
-        {/* fix-followup-distribute-2a — the "Remote Package Password" + confirm
-            inputs have been removed. Distribution passwords are now collected
-            per-share on the DistributeSharesScreen via the
-            encodeDistributionPackage(idx, password) mutator. See feature
-            fix-followup-distribute-2b-screen-rewrites for the full paper-parity
-            rewrite of this screen (Paper 60R-0). */}
+        {/* fix-followup-distribute-2b — the former shared remote-package
+            password input was removed in 2A; the paper-parity rewrite (Paper
+            60R-0) renders only Profile Name, Assigned Local Share info,
+            Profile Password + Confirm, Relays, and Peer Permissions before the
+            Continue CTA. Per-share distribution passwords are now collected on
+            the DistributeSharesScreen via encodeDistributionPackage. */}
 
         <div className="password-group">
           <SectionHeader title="Profile Password" copy="This password encrypts your profile on this device. You'll need it each time you unlock it." infoIcon />
