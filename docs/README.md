@@ -33,7 +33,7 @@ the runtime, Paper parity, or local relay constraints.
 | Change setup-flow behavior | `outside-runtime-flow-invariants.md` | `web-demo-architecture.md` |
 | Work on runtime status, policies, approvals, or relay behavior | `web-demo-architecture.md` | `agent-runbook.md`, relevant deviation entries |
 | Update docs only | `agent-runbook.md` | `allowed-console-warnings.md` for validation command choices |
-| Validate Paper parity | `followup-paper-parity-report.md` | `runtime-deviations-from-paper.md`, `src/demo/scenarios.ts` |
+| Validate Paper parity | `demo-scenario-guide.md` | `agent-runbook.md`, `runtime-deviations-from-paper.md`, `src/demo/scenarios.ts` |
 | Investigate multi-device e2e | `agent-runbook.md` | `.factory/library/user-testing.md` for detailed validator notes |
 
 ## Validation By Change Type
@@ -41,9 +41,11 @@ the runtime, Paper parity, or local relay constraints.
 | Change type | Focused validation |
 | --- | --- |
 | Docs-only | `rg -n 'T[O]DO\|T[B]D\|F[I]XME' README.md docs/*.md`; `git diff --stat`; targeted link/source checks from `agent-runbook.md`. |
-| Demo fixture or Paper-reference change | `npm run paper:sync`; `npx vitest run src/demo/__tests__/scenarios.test.tsx src/demo/__tests__/crossAreaFinalGate.test.tsx --config vitest.config.ts`; `npx playwright test src/e2e/demo-gallery.spec.ts --project=desktop`. |
+| Demo fixture or Paper-reference change | `npm run paper:sync`; `npm run paper:drift -- --threshold=0.02`; `npx vitest run src/demo/__tests__/scenarios.test.tsx src/demo/__tests__/crossAreaFinalGate.test.tsx --config vitest.config.ts`. |
+| Paper parity UI split | Focused screen tests for the product/demo boundary; `npm run paper:drift -- --mode=live --threshold=0.02` for a ranked live-DOM queue; raw `npm run paper:drift -- --threshold=0.02` after any Paper sync. |
 | TypeScript UI/refactor change | `npx tsc --noEmit -p tsconfig.json --pretty false`; `npx vitest run --config vitest.config.ts` or narrower related tests. |
 | Multi-device/runtime change | Relevant `src/e2e/multi-device/*.spec.ts` with `--project=desktop --workers 1`, plus the local relay notes in `agent-runbook.md`. |
+| Dashboard real-peer workability | `npm run test:e2e:dashboard-real-peers`; this starts `bifrost-devtools` on `ws://127.0.0.1:8194` and verifies dashboard states, event logs, policies, sign/ECDH/ping, and permission feedback against real peers. |
 
 ## Canonical Sources
 
@@ -54,7 +56,8 @@ the runtime, Paper parity, or local relay constraints.
 - **Public app-state API**: import from `src/app/AppState.tsx` at app edges;
   type definitions live in `src/app/AppStateTypes.ts`.
 - **Design reference**: sibling `../igloo-paper/` is the source of truth for
-  Paper screens and screenshots. Treat it as read-only from this workspace.
+  Paper screens and screenshots. Read it by default; modify and export it only
+  when the active task explicitly names Paper as the fix source.
 - **Protocol reference**: sibling `../bifrost-rs/` is the source of truth for
   Rust/WASM runtime behavior. Treat it as read-only unless the task explicitly
   asks for protocol work.

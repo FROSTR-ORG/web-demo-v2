@@ -9,8 +9,8 @@
  *      artboard PNG exported from the sibling `igloo-paper` repo
  *      (`igloo-paper/screens/dashboard/<flow>/screenshot.png`) and
  *      committed under `src/e2e/visual/paper-fixtures/`. These are the
- *      true source of truth for Paper parity — they catch app-vs-paper
- *      drift, not just app-vs-self regression. The comparison uses a
+ *      true source of truth for live demo-vs-Paper parity — they catch
+ *      app-vs-paper drift, not just app-vs-self regression. The comparison uses a
  *      custom pixelmatch run (sizes may differ — Paper is 1440 × 1284,
  *      app captures a viewport-sized `.app-shell`), cropping both
  *      images to their common top-aligned bounding box before diffing.
@@ -37,8 +37,11 @@
  *      default.
  *
  * Notes:
- *   - `?chrome=0` hides the demo toolbar so captures exclude demo
- *     affordances.
+ *   - These cases intentionally use `/demo/<scenario>` WITHOUT
+ *     `?chrome=0`. Raw mode is reserved for the broad Paper-reference
+ *     raster audit; this focused spec must exercise the live React DOM.
+ *     Screenshots target `.app-shell`, so the demo toolbar is outside
+ *     the captured region.
  *   - We wait for scenario-specific copy before screenshotting so
  *     async pumps have settled; `paperPanels=true` renders use static
  *     fixture content so no timers are driving the DOM at capture
@@ -186,7 +189,7 @@ for (const state of STATES) {
       "Visual parity suite runs on desktop only (1440x1080 viewport)."
     );
 
-    await page.goto(`/demo/${state.scenarioId}?chrome=0`);
+    await page.goto(`/demo/${state.scenarioId}`);
     await expect(page.locator(".app-header")).toBeVisible();
     await expect(
       page.locator(".app-shell").getByText(state.expectedCopy).first()
@@ -257,7 +260,7 @@ test("design-system primitives (.settings-section / .settings-card / .settings-b
   // Load any of the dashboard scenarios so the full CSS bundle is in the
   // page; the specific state does not matter here — we're asserting
   // against the loaded stylesheet's rule table.
-  await page.goto(`/demo/dashboard-running?chrome=0`);
+  await page.goto(`/demo/dashboard-running`);
   await expect(page.locator(".app-header")).toBeVisible();
 
   const missing = await page.evaluate((selectors: readonly string[]) => {
@@ -301,7 +304,7 @@ test("design-system primitives render in the Settings sidebar on the dashboard",
   // settings scenario ensures at least one live consumer of each
   // primitive is mounted in the DOM — proving reuse, not just
   // definition.
-  await page.goto(`/demo/dashboard-settings-lock-profile?chrome=0`);
+  await page.goto(`/demo/dashboard-settings-lock-profile`);
   await expect(page.locator(".app-header")).toBeVisible();
 
   // `.settings-section` and `.settings-card` are used by every section

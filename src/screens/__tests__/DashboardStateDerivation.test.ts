@@ -144,6 +144,116 @@ describe("deriveDashboardState", () => {
     ).toBe("running");
   });
 
+  it("shows signing-blocked when outbound policy denies the only online remote signer", () => {
+    expect(
+      deriveDashboardState({
+        signerPaused: false,
+        runtimeStatus: runtimeStatus({
+          readiness: {
+            ...runtimeStatus().readiness,
+            threshold: 1,
+            signing_peer_count: 1,
+            sign_ready: true,
+          },
+          metadata: {
+            ...runtimeStatus().metadata,
+            peers: ["peer-a", "peer-b"],
+          },
+          peers: [
+            {
+              ...runtimeStatus().peers[0],
+              pubkey: "peer-a",
+              online: true,
+            },
+            {
+              ...runtimeStatus().peers[0],
+              idx: 2,
+              pubkey: "peer-b",
+              online: false,
+              can_sign: false,
+            },
+          ],
+          peer_permission_states: [
+            {
+              pubkey: "peer-a",
+              manual_override: { request: { sign: "deny" } },
+              remote_observation: null,
+              effective_policy: {
+                request: { sign: "deny" },
+                respond: { sign: "allow" },
+              },
+            },
+            {
+              pubkey: "peer-b",
+              manual_override: null,
+              remote_observation: null,
+              effective_policy: {
+                request: { sign: "allow" },
+                respond: { sign: "allow" },
+              },
+            },
+          ],
+        }),
+        runtimeRelays: [{ url: "wss://relay.test", state: "online" }],
+      }),
+    ).toBe("signing-blocked");
+  });
+
+  it("keeps running when the runtime readiness threshold is policy-allowed", () => {
+    expect(
+      deriveDashboardState({
+        signerPaused: false,
+        runtimeStatus: runtimeStatus({
+          readiness: {
+            ...runtimeStatus().readiness,
+            threshold: 1,
+            signing_peer_count: 1,
+            sign_ready: true,
+          },
+          metadata: {
+            ...runtimeStatus().metadata,
+            peers: ["peer-a", "peer-b"],
+          },
+          peers: [
+            {
+              ...runtimeStatus().peers[0],
+              pubkey: "peer-a",
+              online: true,
+            },
+            {
+              ...runtimeStatus().peers[0],
+              idx: 2,
+              pubkey: "peer-b",
+              online: false,
+              can_sign: false,
+            },
+          ],
+          peer_permission_states: [
+            {
+              pubkey: "peer-a",
+              manual_override: null,
+              remote_observation: null,
+              effective_policy: {
+                request: { sign: "allow" },
+                respond: { sign: "allow" },
+              },
+            },
+            {
+              pubkey: "peer-b",
+              manual_override: null,
+              remote_observation: null,
+              effective_policy: {
+                request: { sign: "deny" },
+                respond: { sign: "allow" },
+              },
+            },
+          ],
+        }),
+        runtimeRelays: [{ url: "wss://relay.test", state: "online" }],
+      }),
+    ).toBe("running");
+  });
+
   // m1-signing-blocked-and-nonce-overlay: the dashboard must transition into
   // `signing-blocked` the moment readiness surfaces `!sign_ready` — even if
   // no sign is currently queued. Without this, the UI would only react after

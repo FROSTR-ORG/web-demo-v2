@@ -8,10 +8,10 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /**
- * TestRefreshAllPanel enablement — fulfils feature
+ * TestPeerRefreshPanel enablement — fulfils feature
  * `fix-m1-test-ping-and-refresh-all-enablement` + VAL-OPS-025.
  *
- * Verifies the Refresh All submit button:
+ * Verifies the Refresh peers submit button:
  *   - is ENABLED when refreshBlocked=false (no per-input gate — the
  *     broadcast refresh takes no arguments).
  *   - is DISABLED when refreshBlocked=true, and surfaces the caller-
@@ -36,7 +36,7 @@ vi.mock("../../../../app/AppState", () => ({
 }));
 
 // Import AFTER the mock so the panel binds to the mocked context.
-import { TestRefreshAllPanel } from "../TestRefreshAllPanel";
+import { TestPeerRefreshPanel } from "../TestPeerRefreshPanel";
 
 afterEach(() => {
   cleanup();
@@ -45,20 +45,20 @@ afterEach(() => {
 });
 
 function getSubmit(): HTMLButtonElement {
-  const panel = screen.getByTestId("test-refresh-all-panel");
+  const panel = screen.getByTestId("test-peer-refresh-panel");
   return panel.querySelector("button[type='submit']") as HTMLButtonElement;
 }
 
-describe("TestRefreshAllPanel enablement — running runtime", () => {
-  it("renders Refresh All ENABLED when refreshBlocked=false (no input required)", () => {
-    render(<TestRefreshAllPanel refreshBlocked={false} />);
+describe("TestPeerRefreshPanel enablement — running runtime", () => {
+  it("renders Refresh peers ENABLED when refreshBlocked=false (no input required)", () => {
+    render(<TestPeerRefreshPanel refreshBlocked={false} />);
     const submit = getSubmit();
     expect(submit.disabled).toBe(false);
     expect(submit.getAttribute("aria-disabled")).toBe("false");
   });
 
   it("dispatches refresh_all_peers on click", async () => {
-    render(<TestRefreshAllPanel refreshBlocked={false} />);
+    render(<TestPeerRefreshPanel refreshBlocked={false} />);
     fireEvent.click(getSubmit());
 
     await waitFor(() => {
@@ -70,17 +70,17 @@ describe("TestRefreshAllPanel enablement — running runtime", () => {
   });
 });
 
-describe("TestRefreshAllPanel enablement — refreshBlocked=true disables the control", () => {
+describe("TestPeerRefreshPanel enablement — refreshBlocked=true disables the control", () => {
   it("disables submit when refreshBlocked=true", () => {
-    render(<TestRefreshAllPanel refreshBlocked={true} />);
+    render(<TestPeerRefreshPanel refreshBlocked={true} />);
     const submit = getSubmit();
     expect(submit.disabled).toBe(true);
     expect(submit.getAttribute("aria-disabled")).toBe("true");
   });
 
   it("does NOT dispatch handleRuntimeCommand when disabled (click + submit guarded)", () => {
-    render(<TestRefreshAllPanel refreshBlocked={true} />);
-    const panel = screen.getByTestId("test-refresh-all-panel");
+    render(<TestPeerRefreshPanel refreshBlocked={true} />);
+    const panel = screen.getByTestId("test-peer-refresh-panel");
     const submit = getSubmit();
     const form = panel.querySelector("form") as HTMLFormElement;
 
@@ -92,30 +92,30 @@ describe("TestRefreshAllPanel enablement — refreshBlocked=true disables the co
 
   it("renders the caller-provided accessible reason (signerPaused copy)", () => {
     render(
-      <TestRefreshAllPanel
+      <TestPeerRefreshPanel
         refreshBlocked={true}
         refreshBlockedReason="Signer paused — resume to ping peers."
       />,
     );
-    const reason = screen.getByTestId("test-refresh-all-blocked-reason");
+    const reason = screen.getByTestId("test-peer-refresh-blocked-reason");
     expect(reason.textContent).toContain("Signer paused");
     expect(reason.getAttribute("role")).toBe("status");
   });
 
   it("renders the caller-provided accessible reason (stopped copy)", () => {
     render(
-      <TestRefreshAllPanel
+      <TestPeerRefreshPanel
         refreshBlocked={true}
         refreshBlockedReason="Runtime stopped — start the signer to ping peers."
       />,
     );
-    const reason = screen.getByTestId("test-refresh-all-blocked-reason");
+    const reason = screen.getByTestId("test-peer-refresh-blocked-reason");
     expect(reason.textContent).toContain("Runtime stopped");
   });
 
   it("falls back to neutral copy when refreshBlockedReason is null/undefined", () => {
-    render(<TestRefreshAllPanel refreshBlocked={true} />);
-    const reason = screen.getByTestId("test-refresh-all-blocked-reason");
-    expect(reason.textContent).toContain("Refresh All unavailable");
+    render(<TestPeerRefreshPanel refreshBlocked={true} />);
+    const reason = screen.getByTestId("test-peer-refresh-blocked-reason");
+    expect(reason.textContent).toContain("Refresh peers unavailable");
   });
 });

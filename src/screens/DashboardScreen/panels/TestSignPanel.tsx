@@ -4,13 +4,11 @@ import { useAppState } from "../../../app/AppState";
 const HEX_RE = /^[0-9a-fA-F]{64}$/;
 
 /**
- * Dev-only affordance for smoke-testing the `sign` runtime command from the
- * Dashboard without needing a second device. Rendered only when
- * `import.meta.env.DEV` is true so Vite's dead-code elimination strips this
- * panel (and its mock-style helpers) from production builds.
+ * Web-demo affordance for smoke-testing the `sign` runtime command from the
+ * profile-scoped Test page without needing a second device.
  *
  * Fulfils:
- *   - VAL-OPS-001 — "Test-sign surface exists on the dashboard"
+ *   - VAL-OPS-001 — "Test-sign surface exists on the Test page"
  *   - VAL-OPS-003 — "Sign input is validated before dispatch"
  *   - VAL-OPS-025 — "All OPS surfaces are keyboard reachable"
  *
@@ -90,11 +88,11 @@ export function TestSignPanel({
       aria-labelledby={`${inputId}-heading`}
     >
       <div className="value" id={`${inputId}-heading`}>
-        Test Sign (dev)
+        Test Sign
       </div>
       <p className="help">
         Dispatches a <code>sign</code> command to the runtime using the
-        32-byte hex message below. Dev-only; absent from production builds.
+        32-byte hex message below.
       </p>
       <form onSubmit={onSubmit} className="test-sign-form">
         <div className="field">

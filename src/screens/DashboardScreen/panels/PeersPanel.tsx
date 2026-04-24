@@ -5,8 +5,13 @@ import type {
   PeerPermissionState,
   PeerStatus,
 } from "../../../lib/bifrost/types";
+import type { PeerLatencySample } from "../../../app/AppStateTypes";
 import { paperLatencyMs } from "../mocks";
-import { PeerRow, type PeerRefreshErrorInfo } from "./PeerRow";
+import {
+  freshPeerLatencyMs,
+  PeerRow,
+  type PeerRefreshErrorInfo,
+} from "./PeerRow";
 
 export function PeersPanel({
   peers,
@@ -17,13 +22,15 @@ export function PeersPanel({
   onRefresh,
   peerRefreshErrors,
   peerPermissionStates,
+  peerLatencyByPubkey,
+  nowMs = Date.now(),
 }: {
   peers: PeerStatus[];
   onlineCount: number;
   signReadyLabel: string;
   paperPanels: boolean;
   sidebarOpen?: boolean;
-  onRefresh: () => void | Promise<void>;
+  onRefresh?: () => void | Promise<void>;
   /**
    * Map of `peer.pubkey` → latest refresh failure for peers that were
    * offline at the last `refresh_all_peers` dispatch and whose
@@ -42,6 +49,8 @@ export function PeersPanel({
    * / VAL-POLICIES-020).
    */
   peerPermissionStates?: PeerPermissionState[];
+  peerLatencyByPubkey?: Record<string, PeerLatencySample>;
+  nowMs?: number;
 }) {
   // Index permission states by pubkey once per render so each PeerRow
   // lookup is O(1) rather than O(n) across the peer list.
@@ -57,24 +66,38 @@ export function PeersPanel({
   }, [peerPermissionStates]);
 
   // Inline collapsible state. PeersPanel owns its expand/collapse rather
-  // than delegating to `<Collapsible>` because the Peers header needs to
-  // host a "Refresh peers" icon button. Wrapping the whole header in a
-  // single `<button>` (as `<Collapsible>` does) would nest that icon
-  // button inside another `<button>`, which React flags as invalid DOM
-  // ("<button> cannot be a descendant of <button>") and breaks
+  // than delegating to `<Collapsible>` because callers can optionally host
+  // sibling header actions beside the toggle. Wrapping the whole header in a
+  // single `<button>` (as `<Collapsible>` does) would nest those actions
+  // inside another `<button>`, which React flags as invalid DOM and breaks
   // keyboard/screen-reader focus semantics. Tracked by
   // `misc-peers-panel-nested-button`.
   const [open, setOpen] = useState(true);
   const toggle = () => setOpen((prev) => !prev);
   const averageLatencyLabel = useMemo(() => {
     const onlinePeers = peers.filter((peer) => peer.online);
-    if (onlinePeers.length === 0) return "Avg: --";
-    const total = onlinePeers.reduce(
-      (sum, peer) => sum + paperLatencyMs(peer.idx),
-      0,
-    );
-    return `Avg: ${Math.round(total / onlinePeers.length)}ms`;
-  }, [peers]);
+    if (paperPanels) {
+      if (onlinePeers.length === 0) return "Avg: --";
+      const total = onlinePeers.reduce(
+        (sum, peer) => sum + paperLatencyMs(peer.idx),
+        0,
+      );
+      return `Avg: ${Math.round(total / onlinePeers.length)}ms`;
+    }
+    const freshLatencies = onlinePeers
+      .map((peer) =>
+        freshPeerLatencyMs(peerLatencyByPubkey?.[peer.pubkey], nowMs),
+      )
+      .filter((latency): latency is number => latency !== null);
+    if (freshLatencies.length === 0) return "Peer avg: --";
+    return `Peer avg: ${Math.round(
+      freshLatencies.reduce((sum, latency) => sum + latency, 0) /
+        freshLatencies.length,
+    )}ms`;
+  }, [nowMs, paperPanels, peerLatencyByPubkey, peers]);
+
+  const helpTitle =
+    "Peer RTT is measured from Ping dispatch to completion. Relay RTT is browser-to-relay REQ/EOSE.";
 
   return (
     <div className="collapsible peers-panel-collapsible">
@@ -93,7 +116,9 @@ export function PeersPanel({
           />
           <span className="peers-title-group">
             <span className="peers-title">Peers</span>
-            <HelpCircle size={15} color="#93c5fd" />
+            <span title={helpTitle} aria-label={helpTitle}>
+              <HelpCircle size={15} color="#93c5fd" aria-hidden="true" />
+            </span>
             <span
               className={`health-dot ${onlineCount > 0 ? "online" : "offline"}`}
             />
@@ -108,17 +133,19 @@ export function PeersPanel({
             {paperPanels ? "~186 ready" : signReadyLabel}
           </StatusPill>
           <StatusPill>{averageLatencyLabel}</StatusPill>
-          <Button
-            type="button"
-            variant="header"
-            size="icon"
-            onClick={() => {
-              void onRefresh();
-            }}
-            aria-label="Refresh peers"
-          >
-            <RotateCw size={16} />
-          </Button>
+          {onRefresh ? (
+            <Button
+              type="button"
+              variant="header"
+              size="icon"
+              onClick={() => {
+                void onRefresh();
+              }}
+              aria-label="Refresh peers"
+            >
+              <RotateCw size={16} />
+            </Button>
+          ) : null}
         </div>
       </div>
       {open && (
@@ -131,6 +158,12 @@ export function PeersPanel({
                 paper={paperPanels}
                 sidebarOpen={sidebarOpen}
                 refreshError={peerRefreshErrors?.[peer.pubkey] ?? null}
+                latencySample={
+                  paperPanels
+                    ? null
+                    : peerLatencyByPubkey?.[peer.pubkey] ?? null
+                }
+                nowMs={nowMs}
                 permissionState={
                   permissionStateByPubkey?.get(peer.pubkey) ?? null
                 }

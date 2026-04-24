@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "../../../components/ui";
 import type {
   PendingDispatchEntry,
+  PeerLatencySample,
 } from "../../../app/AppStateTypes";
 import type {
   PeerPermissionState,
@@ -49,6 +50,7 @@ export function RunningState({
   peerPermissionStates,
   runtimeRelays,
   pendingDispatchIndex,
+  peerLatencyByPubkey,
 }: {
   relays: string[];
   onlineCount: number;
@@ -56,10 +58,11 @@ export function RunningState({
   peers: PeerStatus[];
   pendingOperations: PendingOperation[];
   pendingDispatchIndex?: Record<string, PendingDispatchEntry>;
+  peerLatencyByPubkey?: Record<string, PeerLatencySample>;
   paperPanels: boolean;
   sidebarOpen?: boolean;
   onStop: () => void;
-  onRefresh: () => void | Promise<void>;
+  onRefresh?: () => void | Promise<void>;
   onOpenPolicyPrompt?: (request: PolicyPromptRequest) => void;
   peerRefreshErrors?: Record<string, PeerRefreshErrorInfo>;
   /**
@@ -73,7 +76,7 @@ export function RunningState({
    * m5-relay-telemetry — per-relay telemetry snapshot sourced from
    * {@link RuntimeRelayPump}. Rendered by {@link RelayHealthPanel} in
    * runtime mode (paperPanels=false) so validators and users can
-   * observe live Latency / Events / Last-Seen columns
+   * observe live Relay RTT / Events / Last-Seen columns
    * (VAL-SETTINGS-010 through VAL-SETTINGS-014). Omitted in Paper/demo
    * mode to preserve pixel-parity.
    */
@@ -163,6 +166,8 @@ export function RunningState({
         onRefresh={onRefresh}
         peerRefreshErrors={peerRefreshErrors}
         peerPermissionStates={peerPermissionStates}
+        peerLatencyByPubkey={peerLatencyByPubkey}
+        nowMs={nowMs}
       />
 
       {/*

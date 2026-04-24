@@ -53,7 +53,7 @@ test.describe("Recover NSEC regression gate", () => {
     });
     page.on("pageerror", (error) => errors.push(error.message));
 
-    await page.goto("/demo/recover-collect-shares?chrome=0");
+    await page.goto("/demo/recover-collect-shares");
 
     // Paper copy: heading, threshold line, share slot labels.
     await expect(page.getByRole("heading", { name: "Recover NSEC" })).toBeVisible();
@@ -63,7 +63,7 @@ test.describe("Recover NSEC regression gate", () => {
     await expect(page.getByText(/Share #0 — This Browser/).first()).toBeVisible();
     await expect(page.getByText(/Share #1 — Pasted/).first()).toBeVisible();
 
-    expect(errors, "recover-collect-shares raw render").toEqual([]);
+    expect(errors, "recover-collect-shares render").toEqual([]);
   });
 
   test("success screen toggles masked↔revealed with zero console errors", async ({ page }, testInfo) => {
@@ -77,7 +77,7 @@ test.describe("Recover NSEC regression gate", () => {
     });
     page.on("pageerror", (error) => errors.push(error.message));
 
-    await page.goto("/demo/recover-success?chrome=0");
+    await page.goto("/demo/recover-success");
 
     // Paper copy on success screen.
     await expect(page.getByRole("heading", { name: "Recover NSEC" })).toBeVisible();
@@ -116,6 +116,6 @@ test.describe("Recover NSEC regression gate", () => {
     await expect(toggle).toHaveText(/Reveal/);
     await expect(copyButton).toBeDisabled();
 
-    expect(errors, "recover-success raw render + toggle").toEqual([]);
+    expect(errors, "recover-success render + toggle").toEqual([]);
   });
 });

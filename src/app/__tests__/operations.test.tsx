@@ -812,6 +812,15 @@ describe("MockAppStateProvider — runtime command API shape", () => {
     const sawLifecycle = latest.lifecycleEvents.length >= 0; // events slice at least exists
     expect(sawCompletion || sawFailure).toBe(true);
     expect(sawLifecycle).toBe(true);
+    if (sawCompletion) {
+      const sample = latest.peerLatencyByPubkey[remotePeerPubkey!];
+      expect(sample).toBeTruthy();
+      expect(sample.requestId).toBe(result.requestId);
+      expect(sample.source).toBe("user");
+      expect(sample.latencyMs).toBeGreaterThanOrEqual(0);
+    } else {
+      expect(latest.peerLatencyByPubkey[remotePeerPubkey!]).toBeUndefined();
+    }
 
     // Ensure the unused fixture binding isn't flagged.
     expect(payload).toBeTruthy();

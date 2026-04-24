@@ -37,7 +37,9 @@ export function RelayHealthPanel({
       <div className="relay-health-head">
         <span>Relay</span>
         <span>Status</span>
-        <span>Latency</span>
+        <span title="Browser-to-relay REQ/EOSE round-trip time.">
+          Relay RTT
+        </span>
         <span>Events</span>
         <span>Last Seen</span>
       </div>

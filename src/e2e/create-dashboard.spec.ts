@@ -75,5 +75,7 @@ test("creates a keyset and reaches the Paper-skinned runtime dashboard", async (
 
   await expect(page.locator(".app-header")).toHaveCount(1);
   await expect(page.getByText(/Peers:/i).first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("main").getByText("E2E Signing Key").first()).toBeVisible();
+  await expect(
+    page.getByRole("main").getByText(/Signer (Running|Connecting)/i).first(),
+  ).toBeVisible();
 });

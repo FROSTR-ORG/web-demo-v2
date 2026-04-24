@@ -127,6 +127,7 @@ import type {
   OnboardingPackageStatePatch,
   OnboardSession,
   PeerDeniedEvent,
+  PeerLatencySample,
   PendingDispatchEntry,
   PolicyOverrideEntry,
   PolicyPromptDecision,
@@ -145,6 +146,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [runtimeStatus, setRuntimeStatus] =
     useState<RuntimeStatusSummary | null>(null);
   const [runtimeRelays, setRuntimeRelays] = useState<RuntimeRelayStatus[]>([]);
+  const [peerLatencyByPubkey, setPeerLatencyByPubkey] = useState<
+    Record<string, PeerLatencySample>
+  >({});
   const [signerPaused, setSignerPausedState] = useState(false);
   const [createSession, setCreateSession] = useState<CreateSession | null>(
     null,
@@ -579,6 +583,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setActiveProfile(snapshot.activeProfile ?? null);
       setRuntimeStatus(snapshot.runtimeStatus ?? null);
       setRuntimeRelays(snapshot.runtimeRelays ?? []);
+      setPeerLatencyByPubkey(snapshot.peerLatencyByPubkey ?? {});
       setSignerPausedState(Boolean(snapshot.signerPaused));
       setCreateSession(null);
       setImportSession(null);
@@ -630,6 +635,30 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     const eventLogCompletions = drains.completions.filter(
       (completion) => !isUncorrelatedPingCompletion(completion, indexSnapshot),
     );
+    if (drains.completions.length > 0) {
+      const measuredAt = Date.now();
+      const samples: Record<string, PeerLatencySample> = {};
+      for (const completion of drains.completions) {
+        const ping = (completion as { Ping?: { request_id: string; peer: string } }).Ping;
+        if (!ping?.request_id) continue;
+        const entry = indexSnapshot[ping.request_id];
+        if (!entry || entry.type !== "ping") continue;
+        const peer = entry.peer_pubkey ?? ping.peer;
+        if (!peer) continue;
+        samples[peer] = {
+          latencyMs: Math.max(0, measuredAt - entry.dispatchedAt),
+          measuredAt,
+          requestId: ping.request_id,
+          source: entry.probeSource === "refresh" ? "refresh" : "user",
+        };
+      }
+      if (Object.keys(samples).length > 0) {
+        setPeerLatencyByPubkey((previous) => ({
+          ...previous,
+          ...samples,
+        }));
+      }
+    }
     if (drains.completions.length > 0) {
       // m7-onboard-sponsor-flow — VAL-ONBOARD-009 / VAL-ONBOARD-011.
       // Detect an Onboard completion matching the active sponsor
@@ -903,11 +932,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         });
       }
     }
-    // Populate the dashboard RuntimeEventLog ring buffer from every drain
-    // channel. Preserves drain order: events first (they precede the
-    // completions/failures they describe in the runtime's own ordering),
-    // then completions, then failures. Each entry is tagged with a typed
-    // badge used by the Event Log panel for colour/label rendering
+    // Populate the dashboard RuntimeEventLog ring buffer from user-facing
+    // drain channels. Runtime `InboundAccepted` stays in lifecycleEvents
+    // for diagnostics/participation checks, but it is transport plumbing:
+    // Paper's `ECHO` badge is reserved for meaningful semantic confirmation
+    // rows, not every accepted relay envelope. Preserves drain order for the
+    // visible rows: events first, then completions, then failures. Each
+    // entry is tagged with a typed badge used by the Event Log panel for
+    // colour/label rendering
     // (VAL-EVENTLOG-005 / VAL-EVENTLOG-014 / VAL-EVENTLOG-024).
     if (
       drains.events.length > 0 ||
@@ -917,6 +949,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const now = Date.now();
       const newEntries: RuntimeEventLogEntry[] = [];
       for (const event of drains.events) {
+        if (isInboundAcceptedRuntimeEvent(event)) continue;
         runtimeEventLogSeqRef.current += 1;
         newEntries.push({
           seq: runtimeEventLogSeqRef.current,
@@ -1005,6 +1038,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setPeerDenialQueue([]);
     setPolicyOverrides([]);
     setRuntimeEventLog([]);
+    setPeerLatencyByPubkey({});
     pendingDispatchIndexRef.current = {};
     pendingUnmatchedDispatchesRef.current = [];
     lastDispatchRef.current = null;
@@ -1579,6 +1613,36 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const markRefreshPingProbeIds = useCallback((requestIds: string[]) => {
+    const unique = Array.from(new Set(requestIds.filter(Boolean)));
+    if (unique.length === 0) return;
+    const dispatchedAt = Date.now();
+    const additions: Record<string, PendingDispatchEntry> = {};
+    for (const requestId of unique) {
+      if (pendingDispatchIndexRef.current[requestId]) continue;
+      additions[requestId] = {
+        type: "ping",
+        probeSource: "refresh",
+        dispatchedAt,
+      };
+    }
+    if (Object.keys(additions).length === 0) return;
+    pendingDispatchIndexRef.current = {
+      ...pendingDispatchIndexRef.current,
+      ...additions,
+    };
+    setPendingDispatchIndex((previous) => {
+      let changed = false;
+      const next: Record<string, PendingDispatchEntry> = { ...previous };
+      for (const [requestId, entry] of Object.entries(additions)) {
+        if (next[requestId]) continue;
+        next[requestId] = entry;
+        changed = true;
+      }
+      return changed ? next : previous;
+    });
+  }, []);
+
   const applyRuntimeStatus = useCallback(
     (status: RuntimeStatusSummary | null) => {
       setRuntimeStatus(augmentStatus(status));
@@ -1602,13 +1666,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const startLiveRelayPump = useCallback(
-    async (runtime: RuntimeClient, relayUrls: string[]) => {
+    async (
+      runtime: RuntimeClient,
+      relayUrls: string[],
+      options: { resetDrains?: boolean } = {},
+    ) => {
       const relays = Array.from(
         new Set(relayUrls.map((relay) => relay.trim()).filter(Boolean)),
       );
+      const resetDrains = options.resetDrains ?? true;
       liveRelayUrlsRef.current = relays;
       stopRelayPump(false);
-      resetDrainSlices();
+      if (resetDrains) {
+        resetDrainSlices();
+      }
       if (relays.length === 0) {
         setRuntimeRelays([]);
         return runtime.runtimeStatus();
@@ -1619,6 +1690,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         relays,
         onRelayStatusChange: setRuntimeRelays,
         onDrains: absorbDrains,
+        onRefreshPingRequestIds: markRefreshPingProbeIds,
         onSocketEvent: recordRelaySocketEvent,
       });
       relayPumpRef.current = pump;
@@ -1633,7 +1705,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       return status;
     },
-    [absorbDrains, augmentStatus, resetDrainSlices, stopRelayPump],
+    [
+      absorbDrains,
+      augmentStatus,
+      markRefreshPingProbeIds,
+      resetDrainSlices,
+      stopRelayPump,
+    ],
   );
 
   const setRuntime = useCallback(
@@ -1645,6 +1723,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (simulatorRef.current && simulatorRef.current !== simulator) {
         simulatorRef.current.stop();
         simulatorRef.current.setOnDrains(undefined);
+        simulatorRef.current.setOnRefreshPingRequestIds(undefined);
       }
       if (!relayUrls?.length) {
         liveRelayUrlsRef.current = [];
@@ -1654,6 +1733,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       simulatorRef.current = simulator ?? null;
       if (simulator) {
         simulator.setOnDrains(absorbDrains);
+        simulator.setOnRefreshPingRequestIds(markRefreshPingProbeIds);
       }
       resetDrainSlices();
       // Route through `augmentStatus` so any active dev-only nonce-depletion
@@ -1680,7 +1760,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // runtime is now backing `runtimeRef`.
       setBridgeHydrated(false);
     },
-    [absorbDrains, augmentStatus, resetDrainSlices, startLiveRelayPump, stopRelayPump],
+    [
+      absorbDrains,
+      augmentStatus,
+      markRefreshPingProbeIds,
+      resetDrainSlices,
+      startLiveRelayPump,
+      stopRelayPump,
+    ],
   );
 
   const startRuntimeFromPayload = useCallback(
@@ -1905,7 +1992,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           createdAt,
           updatedAt: createdAt,
           lastUsedAt: createdAt,
-          label: createSession.draft.groupName,
+          label: deviceName,
           unadoptedSharesCiphertext,
           shareAllocations: [],
         });
@@ -2094,7 +2181,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             entry.idx === idx
               ? {
                   ...entry,
-                  pendingDispatchRequestId: undefined,
                   adoptionError: undefined,
                 }
               : entry,
@@ -2220,7 +2306,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             ),
           };
         });
-        return;
+        return undefined;
       }
 
       const dispatchResult = await dispatchCreateSessionOnboard(
@@ -2248,6 +2334,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           ),
         };
       });
+      return dispatchResult.requestId;
     },
     [dispatchCreateSessionOnboard],
   );
@@ -2560,7 +2647,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           createdAt,
           updatedAt: createdAt,
           lastUsedAt: createdAt,
-          label: group.group_name,
+          label: payload.device.name,
         });
       await saveProfile(record);
       await startRuntimeFromSnapshot(
@@ -3194,7 +3281,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const summary = await savePayloadAsProfile(payload, draft.password, {
         replaceProfileId: rotateKeysetSession.sourceProfile.id,
         createdAt: rotateKeysetSession.sourceProfile.createdAt,
-        label: rotateKeysetSession.sourceProfile.label,
+        label: deviceName,
       });
 
       const remoteShares = nextBundle.shares.filter(
@@ -3922,7 +4009,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         {
           createdAt: activeProfile.createdAt,
           lastUsedAt: Date.now(),
-          label: activeProfile.label,
+          label: trimmed,
           unadoptedSharesCiphertext: existingRecord?.unadoptedSharesCiphertext,
           shareAllocations: existingRecord?.shareAllocations,
         },
@@ -4187,7 +4274,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     const relays = liveRelayUrlsRef.current.length
       ? liveRelayUrlsRef.current
       : activeProfile?.relays ?? [];
-    await startLiveRelayPump(runtime, relays);
+    await startLiveRelayPump(runtime, relays, { resetDrains: false });
     if (relayPumpRef.current) {
       const status = await relayPumpRef.current.refreshAll();
       if (runtimeRef.current === runtime) {
@@ -4679,8 +4766,28 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       runtime.handleCommand(cmd);
 
       if (expectedType === null) {
-        // refresh_all_peers fans out to pings internally; no single pending
-        // op represents the command's request_id.
+        // refresh_all_peers fans out to background Ping probes; tag the
+        // produced request_ids explicitly before any later drains arrive so
+        // user/dev pings are not inferred from correlation misses.
+        if (cmd.type === "refresh_all_peers") {
+          try {
+            runtime.tick(now);
+            const statusAfter = runtime.runtimeStatus();
+            markRefreshPingProbeIds(
+              statusAfter.pending_operations
+                .filter(
+                  (op) => op.op_type === "Ping" && !before.has(op.request_id),
+                )
+                .map((op) => op.request_id),
+            );
+            setRuntimeStatus(augmentStatus(statusAfter));
+            correlatePendingOperations(statusAfter.pending_operations);
+          } catch {
+            // Preserve the historical best-effort dispatch contract: callers
+            // still get requestId:null for refresh-all even if status capture
+            // is temporarily unavailable.
+          }
+        }
         return { requestId: null, debounced: false };
       }
 
@@ -4742,6 +4849,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         }
         if (dispatchMetadata.peer_pubkey !== undefined) {
           indexEntry.peer_pubkey = dispatchMetadata.peer_pubkey;
+        }
+        if (dispatchMetadata.probeSource !== undefined) {
+          indexEntry.probeSource = dispatchMetadata.probeSource;
         }
         const capturedRequestId = requestId;
         pendingDispatchIndexRef.current = {
@@ -4806,7 +4916,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       return { requestId, debounced: false };
     },
-    [augmentStatus, correlatePendingOperations],
+    [augmentStatus, correlatePendingOperations, markRefreshPingProbeIds],
   );
 
   // m7-onboard-sponsor-flow — install the latest `handleRuntimeCommand`
@@ -4960,6 +5070,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       activeProfile,
       runtimeStatus,
       runtimeRelays,
+      peerLatencyByPubkey,
       signerPaused,
       createSession,
       importSession,
@@ -5040,6 +5151,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       activeProfile,
       runtimeStatus,
       runtimeRelays,
+      peerLatencyByPubkey,
       signerPaused,
       createSession,
       importSession,
@@ -5739,6 +5851,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (simulatorRef.current) {
         simulatorRef.current.stop();
         simulatorRef.current.setOnDrains(undefined);
+        simulatorRef.current.setOnRefreshPingRequestIds(undefined);
       }
       const simulator = new LocalRuntimeSimulator(runtime);
       await simulator.attachVirtualPeers({
@@ -5749,6 +5862,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       simulator.start();
       simulator.refreshAll();
       simulator.setOnDrains(absorbDrains);
+      simulator.setOnRefreshPingRequestIds(markRefreshPingProbeIds);
       simulatorRef.current = simulator;
       applyRuntimeStatus(simulator.pump(4));
     };
@@ -5776,6 +5890,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     savePayloadAsProfile,
     stopRelayPump,
     absorbDrains,
+    markRefreshPingProbeIds,
   ]);
 
   return (
@@ -5947,7 +6062,7 @@ function isUncorrelatedPingCompletion(
 ): boolean {
   const ping = (completion as { Ping?: { request_id: string } }).Ping;
   if (!ping?.request_id) return false;
-  return index[ping.request_id]?.type !== "ping";
+  return index[ping.request_id]?.probeSource === "refresh";
 }
 
 function isUncorrelatedPingFailure(
@@ -5955,7 +6070,7 @@ function isUncorrelatedPingFailure(
   index: Record<string, PendingDispatchEntry>,
 ): boolean {
   if (failure.op_type !== "ping") return false;
-  return index[failure.request_id]?.type !== "ping";
+  return index[failure.request_id]?.probeSource === "refresh";
 }
 
 /**
@@ -5982,11 +6097,22 @@ function badgeForCompletion(
 }
 
 /**
- * Map a {@link RuntimeEvent.kind} to the typed event-log badge. Accepts
- * both the PascalCase and snake_case spellings that bifrost-rs may emit
- * (the type definition includes both) by lower-casing before matching.
- * Unknown kinds fall through to `INFO` so a forward-compatible runtime
- * never throws on a newly-introduced event.
+ * Runtime `InboundAccepted` is lifecycle-only plumbing. It remains in
+ * `lifecycleEvents` for diagnostics, but the dashboard Event Log filters it
+ * out before badge mapping so transport envelopes do not render as Paper's
+ * semantic `ECHO` rows.
+ */
+function isInboundAcceptedRuntimeEvent(event: RuntimeEvent): boolean {
+  const kind = String(event.kind).toLowerCase();
+  return kind === "inboundaccepted" || kind === "inbound_accepted";
+}
+
+/**
+ * Map a {@link RuntimeEvent.kind} to the typed event-log badge for visible
+ * runtime rows. Accepts both the PascalCase and snake_case spellings that
+ * bifrost-rs may emit (the type definition includes both) by lower-casing
+ * before matching. Unknown kinds fall through to `INFO` so a
+ * forward-compatible runtime never throws on a newly-introduced event.
  */
 function badgeForRuntimeEvent(event: RuntimeEvent): RuntimeEventLogBadge {
   switch (String(event.kind).toLowerCase()) {
@@ -6001,9 +6127,6 @@ function badgeForRuntimeEvent(event: RuntimeEvent): RuntimeEventLogBadge {
     case "commandqueued":
     case "command_queued":
       return "INFO";
-    case "inboundaccepted":
-    case "inbound_accepted":
-      return "ECHO";
     case "configupdated":
     case "config_updated":
       return "INFO";
@@ -6083,7 +6206,7 @@ interface RuntimeCommandDescriptor {
   pendingOpType: "Sign" | "Ecdh" | "Ping" | "Onboard" | null;
   dispatchMetadata: Pick<
     PendingDispatchEntry,
-    "type" | "message_hex_32" | "peer_pubkey"
+    "type" | "message_hex_32" | "peer_pubkey" | "probeSource"
   > | null;
   lifecycleOpType: "sign" | "ecdh" | "ping" | null;
   lifecyclePreview: string | null;
@@ -6121,12 +6244,23 @@ function runtimeCommandDescriptor(
         lifecyclePreview: cmd.pubkey32_hex.slice(0, 10).toLowerCase(),
       };
     case "ping":
+      return {
+        pendingOpType: "Ping",
+        dispatchMetadata: {
+          type: "ping",
+          peer_pubkey: cmd.peer_pubkey32_hex,
+          probeSource: "user",
+        },
+        lifecycleOpType: "ping",
+        lifecyclePreview: cmd.peer_pubkey32_hex.slice(0, 10).toLowerCase(),
+      };
     case "refresh_peer":
       return {
         pendingOpType: "Ping",
         dispatchMetadata: {
           type: "ping",
           peer_pubkey: cmd.peer_pubkey32_hex,
+          probeSource: "refresh",
         },
         lifecycleOpType: "ping",
         lifecyclePreview: cmd.peer_pubkey32_hex.slice(0, 10).toLowerCase(),

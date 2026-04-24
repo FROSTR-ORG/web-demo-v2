@@ -21,6 +21,7 @@ export function RotateCreateProfileScreen() {
   const { rotateKeysetSession, createRotatedProfile } = useAppState();
   const demoUi = useDemoUi();
   const demoProfile = Boolean(demoUi.rotateKeyset || demoUi.progress);
+  const presetPassword = demoUi.rotateKeyset?.passwordPreset ?? "";
   const rotatedGroup = rotateKeysetSession?.rotated?.next.group;
   const previousLocalIdx = rotateKeysetSession?.sourceShares[0]?.idx;
   const rotatedLocalShare =
@@ -30,8 +31,8 @@ export function RotateCreateProfileScreen() {
   const [deviceName, setDeviceName] = useState(
     rotateKeysetSession?.sourcePayload?.device.name ?? "Igloo Web",
   );
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [password, setPassword] = useState(presetPassword);
+  const [confirmPassword, setConfirmPassword] = useState(presetPassword);
   const [relays, setRelays] = useState(
     rotateKeysetSession?.sourcePayload?.device.relays ?? [
       "wss://relay.primal.net",
@@ -233,7 +234,7 @@ export function RotateCreateProfileScreen() {
 
         <SectionHeader
           title="Peer Permissions"
-          copy="Default permissions will be assigned to each peer. You can change these later in Settings."
+          copy="Set default permissions for each peer. You can change these later in Settings."
         />
         <div className="permission-list">
           {members.map((member) => (

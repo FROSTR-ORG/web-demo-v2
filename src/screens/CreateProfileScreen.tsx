@@ -5,7 +5,10 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { defaultCreateProfileDraft, useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField, SectionHeader, Stepper, TextField } from "../components/ui";
-import { ToggleSwitch } from "../components/ToggleSwitch";
+import {
+  PeerPermissionTagGroup,
+  type PeerPermissionMethod,
+} from "../components/PeerPermissionTags";
 import { useDemoUi } from "../demo/demoUi";
 import { shortHex } from "../lib/bifrost/format";
 
@@ -51,11 +54,11 @@ export function CreateProfileScreen() {
   const members = createSession.keyset.group.members;
   const confirmMatches = draft.password.length > 0 && draft.password === draft.confirmPassword;
 
-  function getPeerPermission(idx: number, key: "sign" | "ecdh" | "ping" | "onboard"): boolean {
+  function getPeerPermission(idx: number, key: PeerPermissionMethod): boolean {
     return draft.peerPermissions?.[idx]?.[key] ?? true;
   }
 
-  function setPeerPermission(idx: number, key: "sign" | "ecdh" | "ping" | "onboard", value: boolean) {
+  function setPeerPermission(idx: number, key: PeerPermissionMethod, value: boolean) {
     setDraft((current) => ({
       ...current,
       peerPermissions: {
@@ -174,34 +177,23 @@ export function CreateProfileScreen() {
               </div>
               <div className="inline-actions permission-toggles">
                 {member.idx === localShare.idx ? (
-                  <span className="help">Local profile</span>
+                  <PeerPermissionTagGroup />
                 ) : (
-                  <>
-                    <ToggleSwitch
-                      size="compact"
-                      checked={getPeerPermission(member.idx, "sign")}
-                      onChange={(e) => setPeerPermission(member.idx, "sign", e.target.checked)}
-                      onLabel="SIGN"
-                    />
-                    <ToggleSwitch
-                      size="compact"
-                      checked={getPeerPermission(member.idx, "ecdh")}
-                      onChange={(e) => setPeerPermission(member.idx, "ecdh", e.target.checked)}
-                      onLabel="ECDH"
-                    />
-                    <ToggleSwitch
-                      size="compact"
-                      checked={getPeerPermission(member.idx, "ping")}
-                      onChange={(e) => setPeerPermission(member.idx, "ping", e.target.checked)}
-                      onLabel="PING"
-                    />
-                    <ToggleSwitch
-                      size="compact"
-                      checked={getPeerPermission(member.idx, "onboard")}
-                      onChange={(e) => setPeerPermission(member.idx, "onboard", e.target.checked)}
-                      onLabel="ONBOARD"
-                    />
-                  </>
+                  <PeerPermissionTagGroup
+                    interactive
+                    values={{
+                      sign: getPeerPermission(member.idx, "sign"),
+                      ecdh: getPeerPermission(member.idx, "ecdh"),
+                      ping: getPeerPermission(member.idx, "ping"),
+                      onboard: getPeerPermission(member.idx, "onboard"),
+                    }}
+                    onToggle={(method, nextValue) =>
+                      setPeerPermission(member.idx, method, nextValue)
+                    }
+                    ariaLabel={(method, active) =>
+                      `${active ? "Disable" : "Enable"} ${method} permission for Peer #${member.idx}`
+                    }
+                  />
                 )}
               </div>
             </div>

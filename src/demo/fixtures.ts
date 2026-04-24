@@ -287,6 +287,7 @@ export function createDemoAppState(
     activeProfile: null,
     runtimeStatus: null,
     runtimeRelays: [],
+    peerLatencyByPubkey: {},
     signerPaused: false,
     createSession: null,
     importSession: null,

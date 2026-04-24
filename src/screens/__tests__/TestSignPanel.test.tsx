@@ -3,11 +3,11 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /**
- * TestSignPanel — Dev-only dashboard affordance that dispatches a `sign`
+ * TestSignPanel — Test page affordance that dispatches a `sign`
  * command via `handleRuntimeCommand`. Covers feature m1-test-sign-affordance
  * and validation assertions:
  *
- *   - VAL-OPS-001 — Test-sign surface exists on the dashboard
+ *   - VAL-OPS-001 — Test-sign surface exists on the Test page
  *   - VAL-OPS-003 — Sign input is validated before dispatch
  *   - VAL-OPS-025 — All OPS surfaces are keyboard reachable
  */
@@ -127,8 +127,9 @@ afterEach(() => {
 
 function renderDashboard() {
   return render(
-    <MemoryRouter initialEntries={["/dashboard/test-profile-id"]}>
+    <MemoryRouter initialEntries={["/dashboard/test-profile-id/test"]}>
       <Routes>
+        <Route path="/dashboard/:profileId/test" element={<DashboardScreen mode="test" />} />
         <Route path="/dashboard/:profileId" element={<DashboardScreen />} />
         <Route
           path="/"
@@ -139,14 +140,14 @@ function renderDashboard() {
   );
 }
 
-// Convenience: scope queries to the TestSign panel so they ignore the Stop
-// Signer and Refresh controls elsewhere on the dashboard.
+// Convenience: scope queries to the TestSign panel so they ignore sibling
+// command controls on the Test page.
 function getPanel(): HTMLElement {
   return screen.getByTestId("test-sign-panel");
 }
 
 describe("VAL-OPS-001 — TestSignPanel presence + accessible name", () => {
-  it("renders the dev-only TestSign panel on the dashboard (DEV build)", () => {
+  it("renders the TestSign panel on the Test page", () => {
     renderDashboard();
     expect(screen.getByTestId("test-sign-panel")).toBeInTheDocument();
   });
@@ -160,7 +161,7 @@ describe("VAL-OPS-001 — TestSignPanel presence + accessible name", () => {
     expect(accessibleName).toMatch(/^(test\s*sign|sign)(\s|$)/i);
   });
 
-  it("is reachable from the first focusable element on the dashboard within <=10 tab stops", () => {
+  it("is reachable from the first focusable element on the Test page within <=10 tab stops", () => {
     renderDashboard();
     const panel = getPanel();
     const input = panel.querySelector("input") as HTMLInputElement;
@@ -188,14 +189,7 @@ describe("VAL-OPS-001 — TestSignPanel presence + accessible name", () => {
 
     const index = candidates.indexOf(submit);
     expect(index).toBeGreaterThanOrEqual(0);
-    // Headline VAL-OPS-025 requirement is "keyboard reachable"; the
-    // concrete tab-stop budget allows for the 5 OPS surfaces
-    // (Refresh peers, Ping, Test Sign, Test ECDH, Refresh All) plus
-    // the collapsible-panel headers and Event Log filter/Clear that
-    // sit between them in the DOM tree (m4-event-log-panel adds
-    // two more focusable controls in runtime mode). 13 keeps the
-    // budget tight while accommodating the live runtime layout.
-    expect(index).toBeLessThanOrEqual(13);
+    expect(index).toBeLessThanOrEqual(10);
   });
 });
 
@@ -294,29 +288,17 @@ describe("Test-sign button disabled when signing is blocked", () => {
   });
 });
 
-describe("Production build guard — panel source is gated on import.meta.env.DEV", () => {
-  it("TestSignPanel import and render site are wrapped in an `import.meta.env.DEV` guard", async () => {
+describe("Build availability — TestSignPanel is available in every web-demo build", () => {
+  it("TestSignPanel source is free of build-gating markers", async () => {
     const fs = await import("node:fs/promises");
     const path = await import("node:path");
-    // vitest runs from the repo root; resolve source files relative to cwd.
     const repoRoot = process.cwd();
-    const dashboardSrc = await fs.readFile(
-      path.join(repoRoot, "src/screens/DashboardScreen/index.tsx"),
-      "utf8",
-    );
-    // The render site must be conditional on `import.meta.env.DEV` so Vite's
-    // dead-code elimination drops the TestSignPanel branch from production
-    // bundles.
-    expect(dashboardSrc).toMatch(/import\.meta\.env\.DEV[\s\S]*?TestSignPanel/);
-    // No stray `__DEV__` branching in the dashboard (pre-existing invariant
-    // stated in feature description).
-    expect(dashboardSrc).not.toMatch(/__DEV__/);
-    // The panel itself must not export a `mockOpenPolicyPrompt` helper that
-    // could leak into production via tree-shaking escape.
     const panelSrc = await fs.readFile(
       path.join(repoRoot, "src/screens/DashboardScreen/panels/TestSignPanel.tsx"),
       "utf8",
     );
+    expect(panelSrc).not.toMatch(/import\.meta\.env\.DEV/);
+    expect(panelSrc).not.toMatch(/Dev-only|dev-only|production builds/);
     expect(panelSrc).not.toMatch(/mockOpenPolicyPrompt/);
     expect(panelSrc).not.toMatch(/__DEV__/);
   });

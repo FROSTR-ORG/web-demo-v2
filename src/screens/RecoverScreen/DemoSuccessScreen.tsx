@@ -30,7 +30,7 @@ export function DemoRecoverSuccessContent({
 }: DemoRecoverSuccessContentProps) {
   const { activeProfile } = useAppState();
   const [copied, setCopied] = useState(Boolean(copiedInitial));
-  const [revealed, setRevealed] = useState(false);
+  const [revealed, setRevealed] = useState(Boolean(copiedInitial));
 
   if (!profileId || !activeProfile || activeProfile.id !== profileId) {
     return null;

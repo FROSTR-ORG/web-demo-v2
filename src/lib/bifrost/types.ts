@@ -371,6 +371,8 @@ export type RuntimeEventKind =
   | "Initialized"
   | "StatusChanged"
   | "CommandQueued"
+  // Runtime plumbing: kept in AppState.lifecycleEvents for diagnostics,
+  // but filtered out of the user-facing dashboard Event Log.
   | "InboundAccepted"
   | "ConfigUpdated"
   | "PolicyUpdated"
@@ -378,6 +380,8 @@ export type RuntimeEventKind =
   | "initialized"
   | "status_changed"
   | "command_queued"
+  // Runtime plumbing: kept in AppState.lifecycleEvents for diagnostics,
+  // but filtered out of the user-facing dashboard Event Log.
   | "inbound_accepted"
   | "config_updated"
   | "policy_updated"
@@ -411,6 +415,7 @@ export interface OperationFailure {
 
 export interface StoredProfileSummary {
   id: string;
+  /** Human-readable Device Profile name used by local profile selectors. */
   label: string;
   deviceName: string;
   groupName: string;
@@ -550,7 +555,7 @@ export interface OnboardingPackageView {
   adoptionError?: string;
   /**
    * fix-followup-distribute-2a — `true` when the paired peer has
-   * come online (handshake echo observed from the runtime). Feeds
+   * come online (matching Onboard completion observed from the runtime). Feeds
    * into {@link import("../../app/distributionPackages").packageDistributed}
    * alongside {@link manuallyMarkedDistributed}. Defaults to `false`.
    */

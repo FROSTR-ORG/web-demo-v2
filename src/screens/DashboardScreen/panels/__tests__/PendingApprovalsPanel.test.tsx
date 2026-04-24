@@ -156,7 +156,7 @@ describe("deriveApprovalRowsFromRuntime", () => {
     expect(rows[0].ttl).toBe("0s");
   });
 
-  it("hides background refresh-all Ping operations unless they have explicit ping dispatch metadata", () => {
+  it("hides tagged background refresh-all Ping operations while keeping user ping dispatches", () => {
     const pending: PendingOperation[] = [
       makePending({
         op_type: "Ping",
@@ -179,9 +179,16 @@ describe("deriveApprovalRowsFromRuntime", () => {
     ];
 
     const filtered = filterPendingApprovalOperations(pending, {
+      "req-background-ping": {
+        type: "ping",
+        peer_pubkey: peerAPubkey,
+        probeSource: "refresh",
+        dispatchedAt: nowMs,
+      },
       "req-explicit-ping": {
         type: "ping",
         peer_pubkey: peerAPubkey,
+        probeSource: "user",
         dispatchedAt: nowMs,
       },
     });
@@ -192,9 +199,16 @@ describe("deriveApprovalRowsFromRuntime", () => {
 
     const rows = deriveApprovalRowsFromRuntime(pending, [], nowMs, {
       pendingDispatchIndex: {
+        "req-background-ping": {
+          type: "ping",
+          peer_pubkey: peerAPubkey,
+          probeSource: "refresh",
+          dispatchedAt: nowMs,
+        },
         "req-explicit-ping": {
           type: "ping",
           peer_pubkey: peerAPubkey,
+          probeSource: "user",
           dispatchedAt: nowMs,
         },
       },

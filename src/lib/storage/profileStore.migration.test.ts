@@ -62,6 +62,7 @@ describe("profileStore + migrateProfileRecord — legacy records load cleanly", 
 
       const record = await getProfile(id);
       expect(record).not.toBeNull();
+      expect(record!.summary.label).toBe("Alice Laptop");
       expect(record!.summary.deviceName).toBe("Alice Laptop");
       expect(record!.summary.relays).toEqual([
         "wss://relay.primal.net",
@@ -78,6 +79,7 @@ describe("profileStore + migrateProfileRecord — legacy records load cleanly", 
       const summaries = await listProfiles();
       expect(summaries).toHaveLength(1);
       expect(summaries[0]!.id).toBe(id);
+      expect(summaries[0]!.label).toBe("Alice Laptop");
       expect(summaries[0]!.deviceName).toBe("Alice Laptop");
       expect(summaries[0]!.updatedAt).toBe(1_680_000_000_000);
     },

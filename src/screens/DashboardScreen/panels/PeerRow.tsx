@@ -6,7 +6,19 @@ import type {
   PeerPermissionState,
   PeerStatus,
 } from "../../../lib/bifrost/types";
+import type { PeerLatencySample } from "../../../app/AppStateTypes";
 import { paperLatency, paperPeerKey } from "../mocks";
+
+export const PEER_LATENCY_FRESH_MS = 60_000;
+
+export function freshPeerLatencyMs(
+  sample: PeerLatencySample | null | undefined,
+  nowMs: number,
+): number | null {
+  if (!sample) return null;
+  const ageMs = Math.max(0, nowMs - sample.measuredAt);
+  return ageMs <= PEER_LATENCY_FRESH_MS ? sample.latencyMs : null;
+}
 
 /**
  * Inline refresh/ping error surface for peers whose most recent
@@ -39,6 +51,8 @@ export function PeerRow({
   sidebarOpen,
   refreshError,
   permissionState,
+  latencySample,
+  nowMs = Date.now(),
 }: {
   peer: PeerStatus;
   paper?: boolean;
@@ -56,17 +70,25 @@ export function PeerRow({
    * regress.
    */
   permissionState?: PeerPermissionState | null;
+  latencySample?: PeerLatencySample | null;
+  nowMs?: number;
 }) {
   const incomingPct = Math.min(100, peer.incoming_available);
   const outgoingPct = Math.min(100, peer.outgoing_available);
   const lowPool = peer.online && Math.min(peer.incoming_available, peer.outgoing_available) < 25;
   const rowState = peer.online ? (lowPool ? "warning" : "") : "offline";
 
-  // Keep the trailing slot compact and Paper-like in both runtime and
-  // Paper-reference modes. The runtime status does not currently expose
-  // a measured per-peer RTT, so use the existing fixture mapping and fall
-  // back to a compact placeholder rather than prose that can wrap.
-  const onlineLatencyLabel = paperLatency(peer.idx);
+  const measuredLatencyMs = freshPeerLatencyMs(latencySample, nowMs);
+  const onlineLatencyLabel = paper
+    ? paperLatency(peer.idx)
+    : measuredLatencyMs === null
+      ? "--"
+      : `${measuredLatencyMs}ms`;
+  const latencyTitle = paper
+    ? undefined
+    : measuredLatencyMs === null
+      ? "No fresh peer RTT sample yet."
+      : "Peer RTT measured from Ping dispatch to completion.";
 
   // When an effective_policy-backed permissionState is provided, badges
   // are driven directly by the runtime grant matrix. Otherwise fall back
@@ -167,6 +189,7 @@ export function PeerRow({
           <span
             className="peer-latency"
             data-testid={`peer-latency-${peer.idx}`}
+            title={latencyTitle}
           >
             {onlineLatencyLabel}
           </span>

@@ -20,11 +20,12 @@ not as the main architecture guide.
   share intentionally left offline for later onboarding.
 - **web-demo-v2 implementation**: `RuntimeRelayPump.refreshAll()` still
   dispatches `refresh_all_peers` so known peers update `last_seen`,
-  readiness, and nonce availability. The dashboard now treats uncorrelated
-  fan-out Ping operations from that loop as background liveness probes:
-  they are filtered out of Pending Approvals, `runtimeFailures`, and
-  Event Log completion/failure rows unless the Ping has a
-  `pendingDispatchIndex` entry from an explicit user/dev `ping` dispatch.
+  readiness, and nonce availability. The provider tags fan-out Ping
+  operations from that loop as background liveness probes in
+  `pendingDispatchIndex`, and the dashboard filters those tagged probes
+  out of Pending Approvals, `runtimeFailures`, and Event Log
+  completion/failure rows. Explicit user/dev `ping` dispatches are tagged
+  separately and remain visible.
 - **Protocol / UX constraint**: a not-yet-onboarded or intentionally
   offline optional share can still be present in the group package. Probing
   it is useful for runtime freshness, but surfacing those timeouts as
@@ -893,6 +894,39 @@ not as the main architecture guide.
   hysteresis for VAL-SETTINGS-013.
 - **Assertion IDs covered**: VAL-SETTINGS-010, VAL-SETTINGS-011,
   VAL-SETTINGS-012, VAL-SETTINGS-013, VAL-SETTINGS-014.
+
+### Paper/demo fixture splits for parity-only visual states
+
+- **Paper / task source**: the Paper canvas sometimes shows an already-seeded
+  visual state: decoded import metadata, empty validation fields, copied
+  recovery output, or a simplified dashboard panel. Those states are useful for
+  visual review but are not always a safe product default.
+- **web-demo-v2 implementation**:
+  - `src/screens/ImportScreens.tsx` uses `demoUi.import.backupPreset` to seed
+    the Paper Load Backup artboard with decoded group/share copy and hides the
+    Scan QR affordance in that preset state. Product routes without the preset
+    keep prefix-only validation copy and the real QR scanner button.
+  - `src/screens/CreateKeysetScreen.tsx` allows
+    `demoUi.create.keysetNamePreset` to seed the Paper validation artboard with
+    an empty keyset-name field. Product routes still default to
+    "My Signing Key".
+  - `src/screens/DashboardScreen/index.tsx` renders the top dashboard context
+    strip from public profile/runtime metadata. `SigningBlockedState` hides the
+    runtime-only "Signing Capacity" alert when `paperPanels=true`, but keeps it
+    in runtime-shaped dashboard rendering.
+  - `src/screens/RecoverScreen/DemoSuccessScreen.tsx` uses
+    `demoUi.recover.copied` to seed the Paper demo success state as copied and
+    revealed. Product recovery still reads the recovered key from the in-memory
+    `recoverSession` and requires explicit reveal before copy.
+- **Deviation**: these are visual fixtures, not protocol shortcuts. Do not move
+  decoded package data, passwords, raw shares, or recovered `nsec` values into
+  router state to match Paper.
+- **Regression coverage**:
+  `src/screens/__tests__/ImportScreens.test.tsx`,
+  `src/screens/__tests__/CreateFlow.test.tsx`,
+  `src/screens/__tests__/DashboardRuntimeStatesFidelity.test.tsx`, and
+  `src/screens/__tests__/RecoverScreens.test.tsx`.
+
 ### Camera QR scanning — Playwright mobile project behaviour (VAL-BACKUP-019)
 
 - **Paper / task source**: `m6-camera-qr-scan` feature description — "Mobile

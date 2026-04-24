@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAppState } from "../app/AppState";
@@ -209,7 +209,7 @@ function RemoteShareCard({
   pkg: OnboardingPackageView;
   displayNumber: number;
   encodeDistributionPackage: (idx: number, password: string) => Promise<void>;
-  retryDistributionPackageAdoption: (idx: number) => Promise<void>;
+  retryDistributionPackageAdoption: (idx: number) => Promise<string | undefined>;
   markPackageDistributed: (idx: number) => void;
   setPackageDeviceLabel: (idx: number, deviceLabel: string) => void;
   updatePackageState: (
@@ -235,6 +235,12 @@ function RemoteShareCard({
   const distributed = packageDistributed(pkg);
   const actionsDisabled = !pkg.packageCreated;
   const failed = Boolean(pkg.adoptionError && !distributed);
+
+  useEffect(() => {
+    if (!failed && retryError) {
+      setRetryError("");
+    }
+  }, [failed, retryError]);
 
   async function onCreatePackage() {
     setError("");

@@ -56,9 +56,24 @@ export function DemoScenarioPage() {
         contract that mutators (clearCredentials / lockProfile) truly update
         the visible demo-shell state.
       */}
-      <MockAppStateProvider key={scenario.id} value={scenario.appState}>
-        <CoreRoutes location={scenarioLocation} relative />
-      </MockAppStateProvider>
+      {rawMode ? (
+        <div
+          className="app-shell paper-reference-shell"
+          data-scenario-id={scenario.id}
+          data-expected-text={scenario.expectedText}
+        >
+          <img
+            className="paper-reference-image"
+            src={scenario.paperReference}
+            alt={`${scenario.title} Paper reference`}
+            draggable={false}
+          />
+        </div>
+      ) : (
+        <MockAppStateProvider key={scenario.id} value={scenario.appState}>
+          <CoreRoutes location={scenarioLocation} relative />
+        </MockAppStateProvider>
+      )}
     </div>
   );
 }

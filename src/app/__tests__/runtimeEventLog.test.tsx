@@ -5,7 +5,8 @@
  * Covers:
  *  - entries are appended for drained runtime events, completions and failures
  *  - each entry is tagged with the correct typed badge
- *    (SYNC / SIGN / ECDH / ECHO / PING / SIGNER_POLICY / READY / INFO / ERROR)
+ *    (SYNC / SIGN / ECDH / semantic ECHO fixtures / PING /
+ *    SIGNER_POLICY / READY / INFO / ERROR)
  *  - ring buffer is bounded to 500 entries; oldest are evicted FIFO
  *  - buffer resets on Lock and Clear Credentials (no bleed between profiles)
  *  - `window.__debug.runtimeEventLog` is exposed (DEV only) as a live array
@@ -322,7 +323,52 @@ describe("AppStateProvider — runtimeEventLog", () => {
     }
   });
 
-  it("does not surface uncorrelated background Ping drains in user-facing failure or event-log buffers", async () => {
+  it("keeps InboundAccepted drains in lifecycleEvents without surfacing ECHO log rows", async () => {
+    const statusEvent: RuntimeEvent = {
+      kind: "status_changed",
+      status: BASE_STATUS,
+    };
+    const inboundEvent: RuntimeEvent = {
+      kind: "inbound_accepted",
+      status: BASE_STATUS,
+    };
+
+    let latest!: AppStateValue;
+    render(
+      <AppStateProvider>
+        <Capture onState={(state) => (latest = state)} />
+      </AppStateProvider>,
+    );
+    await waitFor(() => expect(latest).toBeTruthy());
+
+    const testWindow = window as TestWindow;
+    expect(typeof testWindow.__iglooTestAbsorbDrains).toBe("function");
+
+    await act(async () => {
+      testWindow.__iglooTestAbsorbDrains?.({
+        completions: [],
+        failures: [],
+        events: [inboundEvent, statusEvent],
+      });
+    });
+
+    await waitFor(() => {
+      expect(latest.lifecycleEvents).toHaveLength(2);
+      expect(latest.runtimeEventLog).toHaveLength(1);
+    });
+    expect(latest.lifecycleEvents.map((event) => event.kind)).toEqual([
+      "inbound_accepted",
+      "status_changed",
+    ]);
+    expect(latest.runtimeEventLog.map((entry) => entry.badge)).toEqual([
+      "SYNC",
+    ]);
+    expect(latest.runtimeEventLog.some((entry) => entry.badge === "ECHO")).toBe(
+      false,
+    );
+  });
+
+  it("surfaces uncorrelated Ping drains instead of assuming they are background refresh probes", async () => {
     let latest!: AppStateValue;
     render(
       <AppStateProvider>
@@ -355,11 +401,15 @@ describe("AppStateProvider — runtimeEventLog", () => {
     await waitFor(() =>
       expect(latest.runtimeCompletions).toHaveLength(1),
     );
-    expect(latest.runtimeFailures).toEqual([]);
-    expect(latest.runtimeEventLog).toEqual([]);
+    expect(latest.runtimeFailures).toHaveLength(1);
+    expect(latest.runtimeEventLog.map((entry) => entry.badge)).toEqual([
+      "PING",
+      "ERROR",
+    ]);
     expect(latest.runtimeCompletions[0]).toEqual({
       Ping: { request_id: "req-background-ping-ok", peer: "peer-a" },
     });
+    expect(latest.peerLatencyByPubkey).toEqual({});
   });
 
   it("ring buffer is bounded to 500 entries; oldest are evicted FIFO (VAL-EVENTLOG-014 / VAL-EVENTLOG-024)", async () => {

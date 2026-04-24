@@ -243,9 +243,10 @@ export function deriveApprovalRowsFromRuntime(
 }
 
 /**
- * Background `refresh_all_peers` probes fan out into per-peer Ping ops,
- * but those are liveness checks, not approval requests. Keep explicit
- * user/dev pings (they carry pendingDispatchIndex metadata) visible.
+ * Background refresh probes fan out into per-peer Ping ops, but those are
+ * liveness checks, not approval requests. Keep explicit user/dev pings
+ * visible; legacy ping entries without a probeSource are treated as user
+ * initiated so older fixtures remain useful.
  */
 export function filterPendingApprovalOperations(
   pendingOps: PendingOperation[],
@@ -254,7 +255,8 @@ export function filterPendingApprovalOperations(
   if (!pendingDispatchIndex) return pendingOps;
   return pendingOps.filter((op) => {
     if (op.op_type !== "Ping") return true;
-    return pendingDispatchIndex[op.request_id]?.type === "ping";
+    const entry = pendingDispatchIndex[op.request_id];
+    return entry?.type === "ping" && entry.probeSource !== "refresh";
   });
 }
 

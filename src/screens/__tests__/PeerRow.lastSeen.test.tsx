@@ -6,9 +6,8 @@ import type { PeerStatus } from "../../lib/bifrost/types";
 
 /**
  * PeerRow latency slot — keeps the Peers panel trailing column compact.
- * The runtime status does not expose real per-peer RTT yet, so online
- * rows intentionally use the Paper-style millisecond token instead of
- * wrapping relative "Last seen ..." prose.
+ * Runtime mode renders only fresh measured peer RTT samples. Paper mode
+ * keeps the static reference tokens for visual parity.
  */
 
 const PEER_PUBKEY = ["peer-latency-", "abcdef0123"].join("");
@@ -34,21 +33,45 @@ afterEach(() => {
 });
 
 describe("PeerRow latency slot — runtime mode", () => {
-  it("renders compact Paper latency tokens instead of relative last-seen prose", () => {
-    const { rerender } = render(<PeerRow peer={makePeer({ idx: 0 })} />);
+  it("renders a compact placeholder until a fresh sample exists", () => {
+    render(<PeerRow peer={makePeer({ idx: 0 })} nowMs={10_000} />);
 
-    expect(screen.getByTestId("peer-latency-0").textContent).toBe("24ms");
-    expect(screen.queryByText(/Last seen/i)).not.toBeInTheDocument();
-
-    rerender(<PeerRow peer={makePeer({ idx: 1 })} />);
-    expect(screen.getByTestId("peer-latency-1").textContent).toBe("38ms");
+    expect(screen.getByTestId("peer-latency-0").textContent).toBe("--");
     expect(screen.queryByText(/Last seen/i)).not.toBeInTheDocument();
   });
 
-  it("renders a compact numeric fallback for peers outside the Paper fixture rows", () => {
-    render(<PeerRow peer={makePeer({ idx: 7 })} />);
+  it("renders fresh measured peer RTT samples", () => {
+    render(
+      <PeerRow
+        peer={makePeer({ idx: 1 })}
+        latencySample={{
+          latencyMs: 47,
+          measuredAt: 10_000,
+          requestId: "req-ping-1",
+          source: "user",
+        }}
+        nowMs={10_500}
+      />,
+    );
 
-    expect(screen.getByTestId("peer-latency-7").textContent).toBe("31ms");
+    expect(screen.getByTestId("peer-latency-1").textContent).toBe("47ms");
+  });
+
+  it("ignores stale measured samples", () => {
+    render(
+      <PeerRow
+        peer={makePeer({ idx: 7 })}
+        latencySample={{
+          latencyMs: 47,
+          measuredAt: 10_000,
+          requestId: "req-ping-1",
+          source: "refresh",
+        }}
+        nowMs={70_001}
+      />,
+    );
+
+    expect(screen.getByTestId("peer-latency-7").textContent).toBe("--");
     expect(screen.queryByText("Ready")).not.toBeInTheDocument();
   });
 });

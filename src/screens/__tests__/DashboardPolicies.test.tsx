@@ -242,10 +242,11 @@ describe("DashboardScreen — Policies view", () => {
     });
   });
 
-  it("summary bar persists in Policies view", () => {
+  it("opens Policies view without restoring the removed dashboard summary strip", () => {
     renderDashboard();
     fireEvent.click(screen.getByText("Policies"));
-    expect(screen.getByText("My Signing Key")).toBeInTheDocument();
+    expect(document.querySelector(".dashboard-summary")).toBeNull();
+    expect(screen.getByText("Signer Policies")).toBeInTheDocument();
   });
 
   it("clicking Back to dashboard returns to main dashboard view", () => {

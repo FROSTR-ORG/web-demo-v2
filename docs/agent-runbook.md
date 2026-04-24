@@ -45,8 +45,9 @@ Then read the smallest set of docs for the task:
    in `src/components/` only when another flow already needs the same behavior.
 4. Update `docs/runtime-deviations-from-paper.md` only when the live app must
    intentionally differ from Paper or a validation-contract phrase.
-5. Run focused component tests first, then `src/e2e/demo-gallery.spec.ts` when
-   the visual surface changed.
+5. Run focused component tests first. Use `npm run paper:drift` for
+   synced-reference integrity and `npm run paper:drift -- --mode=live` when
+   you need a ranked live DOM versus Paper work queue.
 
 ### Demo scenario or Paper-reference asset
 
@@ -75,7 +76,8 @@ Then read the smallest set of docs for the task:
 - `web-demo-v2/` is its own git repo. Check status from this directory, not the
   parent prototype folder.
 - The sibling `../igloo-paper/` repo is the design reference. Read it for copy,
-  layout, and screenshots; do not modify it during web-demo work.
+  layout, and screenshots. Modify/export it only when the user explicitly asks
+  for Paper work or the active plan names Paper as the fix source.
 - The sibling `../bifrost-rs/` repo is the protocol/runtime reference. Read it
   to confirm bridge behavior; do not modify it unless the user explicitly asks
   for protocol changes.
@@ -105,7 +107,34 @@ Real product routes are mounted by `src/app/CoreRoutes.tsx` under the real
 The `/demo` and `/demo/:scenarioId` routes are deterministic Paper-review
 surfaces. They use `MockAppStateProvider`, scenario fixtures, and a one-shot
 `sessionStorage` bridge when a demo interaction deep-links into a real route.
-Append `?chrome=0` to a demo scenario URL for clean visual capture.
+Append `?chrome=0` to a demo scenario URL only for Paper-reference raster
+capture; raw mode renders the synced Paper PNG rather than the live mock DOM.
+Use `/demo/:scenarioId` without that query for live mock UI review, and use
+the real product routes for runtime/protocol behavior.
+
+## Paper Parity Workflow
+
+There are two parity modes, and they answer different questions:
+
+- `npm run paper:drift -- --threshold=0.02` captures
+  `/demo/:scenarioId?chrome=0`. This is the synced-reference integrity check:
+  Paper PNG versus the same Paper PNG in the app shell. It should pass after
+  `npm run paper:sync` unless a reference path, image dimension, or capture
+  pipeline is broken.
+- `npm run paper:drift -- --mode=live --threshold=0.02` captures the live mock
+  React DOM at `/demo/:scenarioId`. Treat failures here as a ranked design
+  work queue, not as proof that runtime behavior is wrong.
+
+For web-demo parity work, patch the live mock DOM to match Paper by default.
+Patch Paper only when the web demo reflects real protocol/runtime behavior or
+when Paper is visibly stale. After any Paper mutation, run the Paper export and
+verify commands in `../igloo-paper`, then return here for `npm run paper:sync`
+and the raw drift audit.
+
+When Paper and bifrost reality disagree, keep the real route truthful and put
+visual-only matching behind existing demo controls such as `demoUi` presets or
+`dashboard.paperPanels`. Add a focused test for both sides of the split so the
+next agent can see which behavior is intentional.
 
 ## Runtime And Relay Notes
 
@@ -119,6 +148,32 @@ Append `?chrome=0` to a demo scenario URL for clean visual capture.
   `docs/runtime-deviations-from-paper.md`.
 - DEV-only hooks such as `window.__debug.*` and `window.__iglooTest*` are for
   validation evidence. They must not become production behavior.
+
+## Real-Peer Dashboard Workability
+
+Use the focused real-peer dashboard suite when a change touches dashboard
+state derivation, runtime event logs, signer operations, peer policies, relay
+telemetry, or permission chips:
+
+```bash
+npm run test:e2e:dashboard-real-peers
+```
+
+The suite lives in `src/e2e/multi-device/dashboard-real-peers.spec.ts` and
+uses `src/e2e/support/realPeers.ts`. It starts the local
+`bifrost-devtools` relay on `ws://127.0.0.1:8194`, creates a real 2-of-3
+keyset through the WASM bridge, seeds two browser contexts as real peers, and
+then drives the Dashboard UI from page A. It covers Running, Stopped,
+Relays Offline, and Signing Blocked dashboard states plus Event Log,
+Sign Activity, Policies, request-sign permission deny/recovery, and dev
+sign/ECDH/ping dispatches.
+
+Keep this suite as the workability proof, not the visual parity gate. It may
+use DEV-only `__iglooTest*` hooks to set up a real runtime quickly, but the
+assertions should stay focused on user-visible dashboard behavior and
+`AppState` observability sourced from real bifrost peers. Run it alone with
+`--workers=1`; the local relay port is fixed at `8194`, so parallel specs or
+a manually started relay will contend with it.
 
 ## Security And Persistence Rules
 

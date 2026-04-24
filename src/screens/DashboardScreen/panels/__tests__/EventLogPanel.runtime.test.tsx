@@ -31,7 +31,10 @@ vi.mock("../../../../app/AppState", () => ({
   useAppState: () => currentState.value,
 }));
 
-import { EventLogPanel } from "../EventLogPanel";
+import {
+  EventLogPanel,
+  __resetEventLogFilterPersistenceForTest,
+} from "../EventLogPanel";
 
 function entry(
   overrides: Partial<RuntimeEventLogEntry> & {
@@ -48,7 +51,13 @@ function entry(
   };
 }
 
+function selectAllRuntimeBadges(): void {
+  fireEvent.click(screen.getByText("Filter"));
+  fireEvent.click(screen.getByText("Select all"));
+}
+
 beforeEach(() => {
+  __resetEventLogFilterPersistenceForTest();
   currentState.value = {
     runtimeEventLog: [],
     clearRuntimeEventLog: vi.fn(),
@@ -73,8 +82,8 @@ describe("EventLogPanel — runtime wiring", () => {
     const t3 = new Date("2026-04-22T09:03:04Z").getTime();
     currentState.value.runtimeEventLog = [
       entry({ seq: 1, badge: "SIGN", at: t1, payload: { request_id: "req-alpha" } }),
-      entry({ seq: 2, badge: "ECDH", at: t2, payload: { request_id: "req-beta" } }),
-      entry({ seq: 3, badge: "PING", at: t3, payload: { request_id: "req-gamma" } }),
+      entry({ seq: 2, badge: "ERROR", at: t2, payload: { request_id: "req-beta" } }),
+      entry({ seq: 3, badge: "SIGN", at: t3, payload: { request_id: "req-gamma" } }),
     ];
     const { container } = render(<EventLogPanel />);
     // Count pill reflects total.
@@ -82,11 +91,11 @@ describe("EventLogPanel — runtime wiring", () => {
 
     const items = container.querySelectorAll(".event-log-item");
     expect(items.length).toBe(3);
-    // Newest-first: seq 3 (PING) first, seq 1 (SIGN) last.
+    // Newest-first: seq 3 (SIGN) first, seq 1 (SIGN) last.
     const badges = Array.from(items).map(
       (row) => row.querySelector(".event-log-type")?.textContent,
     );
-    expect(badges).toEqual(["PING", "ECDH", "SIGN"]);
+    expect(badges).toEqual(["SIGN", "ERROR", "SIGN"]);
 
     // Every timestamp matches HH:MM:SS.
     const times = Array.from(items).map(
@@ -111,6 +120,7 @@ describe("EventLogPanel — runtime wiring", () => {
       entry({ seq: 10, badge: "ERROR" }),
     ];
     const { container } = render(<EventLogPanel />);
+    selectAllRuntimeBadges();
     const badgeClasses = Array.from(
       container.querySelectorAll(".event-log-type"),
     ).map((node) => node.className);
@@ -216,8 +226,8 @@ describe("EventLogPanel — runtime wiring", () => {
     // (a) Seed 3 entries (seqs 1..3) and render.
     currentState.value.runtimeEventLog = [
       entry({ seq: 1, badge: "SIGN", payload: { request_id: "req-pre-1" } }),
-      entry({ seq: 2, badge: "ECDH", payload: { request_id: "req-pre-2" } }),
-      entry({ seq: 3, badge: "PING", payload: { request_id: "req-pre-3" } }),
+      entry({ seq: 2, badge: "ERROR", payload: { request_id: "req-pre-2" } }),
+      entry({ seq: 3, badge: "SIGN", payload: { request_id: "req-pre-3" } }),
     ];
     currentState.value.clearRuntimeEventLog = clearRuntimeEventLog;
     const { container, rerender } = render(<EventLogPanel />);
@@ -231,8 +241,8 @@ describe("EventLogPanel — runtime wiring", () => {
     // (c) Seed 2 new entries AFTER clear with seq restarting at 1 — the
     // realistic post-clear state (runtimeEventLogSeqRef was reset to 0).
     currentState.value.runtimeEventLog = [
-      entry({ seq: 1, badge: "INFO", payload: { request_id: "req-post-1" } }),
-      entry({ seq: 2, badge: "SYNC", payload: { request_id: "req-post-2" } }),
+      entry({ seq: 1, badge: "ERROR", payload: { request_id: "req-post-1" } }),
+      entry({ seq: 2, badge: "SIGN", payload: { request_id: "req-post-2" } }),
     ];
     rerender(<EventLogPanel />);
 
@@ -244,7 +254,7 @@ describe("EventLogPanel — runtime wiring", () => {
       (row) => row.querySelector(".event-log-type")?.textContent,
     );
     // Newest-first ordering preserved.
-    expect(badges).toEqual(["SYNC", "INFO"]);
+    expect(badges).toEqual(["SIGN", "ERROR"]);
     expect(screen.getByText("2 events")).toBeTruthy();
     // No residual "No events yet" empty state.
     expect(screen.queryByText("No events yet")).toBeNull();
@@ -271,6 +281,7 @@ describe("EventLogPanel — runtime wiring", () => {
       }),
     ];
     const { container } = render(<EventLogPanel />);
+    selectAllRuntimeBadges();
     const rows = container.querySelectorAll(".event-log-row");
     for (const row of rows) {
       fireEvent.click(row);

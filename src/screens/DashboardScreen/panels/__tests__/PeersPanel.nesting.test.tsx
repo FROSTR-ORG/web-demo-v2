@@ -1,13 +1,15 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PeersPanel } from "../PeersPanel";
+import type { PeerLatencySample } from "../../../../app/AppStateTypes";
 import type { PeerStatus } from "../../../../lib/bifrost/types";
 
 /**
  * Regression coverage for feature `misc-peers-panel-nested-button`.
  *
- * PeersPanel previously wrapped its whole header row (including the
- * "Refresh peers" icon button) inside the `<Collapsible>` toggle
+ * PeersPanel previously wrapped its whole header row (including optional
+ * sibling header actions such as the old refresh icon button) inside the
+ * `<Collapsible>` toggle
  * `<button>`. That produced two problems:
  *
  *   1. React's `validateDOMNesting` emits
@@ -20,8 +22,7 @@ import type { PeerStatus } from "../../../../lib/bifrost/types";
  *
  * These tests lock in the fix: no nested `<button>` in the rendered
  * markup, the collapsible toggle still works via click + keyboard,
- * and the refresh button still dispatches the handler with an
- * accessible name.
+ * and optional header actions remain independent when provided.
  */
 
 function makePeer(idx: number, online: boolean): PeerStatus {
@@ -50,7 +51,7 @@ afterEach(() => {
   cleanup();
 });
 
-function renderPeersPanel(onRefresh = vi.fn()) {
+function renderPeersPanel(onRefresh?: () => void) {
   const peers = [makePeer(1, true), makePeer(2, false)];
   return {
     onRefresh,
@@ -66,7 +67,15 @@ function renderPeersPanel(onRefresh = vi.fn()) {
   };
 }
 
-function renderPeersPanelWithPeers(peers: PeerStatus[], onRefresh = vi.fn()) {
+function renderPeersPanelWithPeers(
+  peers: PeerStatus[],
+  onRefresh?: () => void,
+  options: {
+    paperPanels?: boolean;
+    peerLatencyByPubkey?: Record<string, PeerLatencySample>;
+    nowMs?: number;
+  } = {},
+) {
   return {
     onRefresh,
     ...render(
@@ -74,8 +83,10 @@ function renderPeersPanelWithPeers(peers: PeerStatus[], onRefresh = vi.fn()) {
         peers={peers}
         onlineCount={peers.filter((peer) => peer.online).length}
         signReadyLabel="sign ready"
-        paperPanels={false}
+        paperPanels={options.paperPanels ?? false}
         onRefresh={onRefresh}
+        peerLatencyByPubkey={options.peerLatencyByPubkey}
+        nowMs={options.nowMs}
       />,
     ),
   };
@@ -107,23 +118,89 @@ describe("PeersPanel — nested-button regression", () => {
     expect(nestingWarnings).toEqual([]);
   });
 
-  it("refresh button has an accessible name and dispatches onRefresh", () => {
-    const { onRefresh } = renderPeersPanel();
+  it("omits the refresh button when no onRefresh handler is provided", () => {
+    renderPeersPanel();
+    expect(
+      screen.queryByRole("button", { name: "Refresh peers" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("refresh button has an accessible name and dispatches onRefresh when provided", () => {
+    const onRefresh = vi.fn();
+    renderPeersPanel(onRefresh);
     const refreshBtn = screen.getByRole("button", { name: "Refresh peers" });
     fireEvent.click(refreshBtn);
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
-  it("renders numeric latency for higher-index online peers and mirrors it in the average badge", () => {
+  it("renders placeholders in runtime mode before measured samples arrive", () => {
     renderPeersPanelWithPeers([makePeer(2, true), makePeer(3, false)]);
+
+    expect(screen.getByTestId("peer-latency-2").textContent).toBe("--");
+    expect(screen.getByText("Peer avg: --")).toBeInTheDocument();
+    expect(screen.queryByText("Avg: 31ms")).not.toBeInTheDocument();
+  });
+
+  it("renders fresh runtime latency samples and mirrors them in the average badge", () => {
+    const peers = [makePeer(2, true), makePeer(3, true), makePeer(4, false)];
+    renderPeersPanelWithPeers(peers, undefined, {
+      nowMs: 20_000,
+      peerLatencyByPubkey: {
+        peer2pub: {
+          latencyMs: 20,
+          measuredAt: 19_000,
+          requestId: "req-ping-2",
+          source: "user",
+        },
+        peer3pub: {
+          latencyMs: 40,
+          measuredAt: 19_500,
+          requestId: "req-ping-3",
+          source: "refresh",
+        },
+        peer4pub: {
+          latencyMs: 100,
+          measuredAt: 19_500,
+          requestId: "req-ping-4",
+          source: "refresh",
+        },
+      },
+    });
+
+    expect(screen.getByTestId("peer-latency-2").textContent).toBe("20ms");
+    expect(screen.getByTestId("peer-latency-3").textContent).toBe("40ms");
+    expect(screen.getByText("Peer avg: 30ms")).toBeInTheDocument();
+  });
+
+  it("ignores stale runtime samples", () => {
+    renderPeersPanelWithPeers([makePeer(2, true)], undefined, {
+      nowMs: 80_001,
+      peerLatencyByPubkey: {
+        peer2pub: {
+          latencyMs: 20,
+          measuredAt: 20_000,
+          requestId: "req-ping-2",
+          source: "user",
+        },
+      },
+    });
+
+    expect(screen.getByTestId("peer-latency-2").textContent).toBe("--");
+    expect(screen.getByText("Peer avg: --")).toBeInTheDocument();
+  });
+
+  it("keeps Paper fixture latency values in Paper mode", () => {
+    renderPeersPanelWithPeers([makePeer(2, true), makePeer(3, false)], undefined, {
+      paperPanels: true,
+    });
 
     expect(screen.getByTestId("peer-latency-2").textContent).toBe("31ms");
     expect(screen.getByText("Avg: 31ms")).toBeInTheDocument();
-    expect(screen.queryByText("Avg: --")).not.toBeInTheDocument();
   });
 
   it("clicking the refresh button does not collapse the peers panel", () => {
-    const { onRefresh, container } = renderPeersPanel();
+    const onRefresh = vi.fn();
+    const { container } = renderPeersPanel(onRefresh);
     // Panel opens by default.
     expect(container.querySelector(".peer-list")).not.toBeNull();
     const refreshBtn = screen.getByRole("button", { name: "Refresh peers" });

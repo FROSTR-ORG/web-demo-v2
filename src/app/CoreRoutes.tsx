@@ -70,6 +70,7 @@ export function CoreRoutes({ location, extraRoutes, relative = false }: { locati
       <Route path={pathFor("/replace-share/replaced", relative)} element={<ShareReplacedScreen />} />
       <Route path={pathFor("/recover/:profileId", relative)} element={<CollectSharesScreen />} />
       <Route path={pathFor("/recover/:profileId/success", relative)} element={<RecoverSuccessScreen />} />
+      <Route path={pathFor("/dashboard/:profileId/test", relative)} element={<DashboardScreen mode="test" />} />
       <Route path={pathFor("/dashboard/:profileId", relative)} element={<DashboardScreen />} />
       <Route path="*" element={<Navigate to={relative ? "." : "/"} replace />} />
     </Routes>

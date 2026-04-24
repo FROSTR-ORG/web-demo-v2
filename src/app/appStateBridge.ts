@@ -4,6 +4,7 @@ import type {
 } from "../lib/bifrost/types";
 import type { RuntimeRelayStatus } from "../lib/relay/runtimeRelayPump";
 import type { AppStateValue } from "./AppState";
+import type { PeerLatencySample } from "./AppStateTypes";
 
 /**
  * sessionStorage key used by the demo-to-real-app-state bridge.
@@ -34,6 +35,7 @@ export interface AppStateBridgeSnapshot {
   activeProfile: StoredProfileSummary | null;
   runtimeStatus: RuntimeStatusSummary | null;
   runtimeRelays: RuntimeRelayStatus[];
+  peerLatencyByPubkey: Record<string, PeerLatencySample>;
   signerPaused: boolean;
   createSession: null;
   importSession: null;
@@ -53,6 +55,7 @@ export function snapshotFromAppState(
     | "activeProfile"
     | "runtimeStatus"
     | "runtimeRelays"
+    | "peerLatencyByPubkey"
     | "signerPaused"
     | "createSession"
     | "importSession"
@@ -69,6 +72,7 @@ export function snapshotFromAppState(
     runtimeRelays: Array.isArray(value.runtimeRelays)
       ? value.runtimeRelays
       : [],
+    peerLatencyByPubkey: value.peerLatencyByPubkey ?? {},
     signerPaused: value.signerPaused,
     // Setup sessions contain decoded shares, package passwords, or recovered
     // keys. The demo bridge is only a visual hand-off convenience, so never
@@ -93,6 +97,7 @@ function normalizeAppStateBridgeSnapshot(
     runtimeRelays: Array.isArray(snapshot.runtimeRelays)
       ? snapshot.runtimeRelays
       : [],
+    peerLatencyByPubkey: snapshot.peerLatencyByPubkey ?? {},
     signerPaused: Boolean(snapshot.signerPaused),
     // Harden reads too: older snapshots or manually injected sessionStorage
     // must not rehydrate setup-session secrets.

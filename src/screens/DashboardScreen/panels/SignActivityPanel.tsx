@@ -23,7 +23,7 @@ const TOAST_LIFETIME_MS = 4_000;
 const CLOCK_TICK_MS = 1_000;
 
 /**
- * Dev-only dashboard affordance that surfaces per-request sign / ECDH /
+ * Test page affordance that surfaces per-request sign / ECDH /
  * ping lifecycle transitions in the DOM. Subscribes to the real
  * `signLifecycleLog` slice so each dispatch produces a row that flips
  * from `pending` to `completed` / `failed` as the runtime drains
@@ -38,9 +38,7 @@ const CLOCK_TICK_MS = 1_000;
  *   - VAL-OPS-004 / VAL-OPS-013 — sign completions render in AppState
  *     and the dashboard within <=3 s; accompanied by an
  *     `aria-live="polite"` toast for assistive tech users.
- *   - The surface is dev-gated (`import.meta.env.DEV`) by the caller
- *     (DashboardScreen), so production builds strip it via Vite's
- *     dead-code elimination.
+ *   - The surface is available in the web demo's profile-scoped Test page.
  *
  * Keyboard accessible: rows are `<li>` elements reachable in the normal
  * document order, and every row's status is exposed via plain text so
@@ -119,7 +117,7 @@ export function SignActivityPanel() {
       aria-labelledby="sign-activity-heading"
     >
       <div className="value" id="sign-activity-heading">
-        Recent Sign Activity (dev)
+        Recent Sign Activity
       </div>
       <p className="help">
         Per-request runtime lifecycle for sign / ECDH / ping dispatches.

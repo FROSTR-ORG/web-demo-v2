@@ -1,35 +1,28 @@
 import { useCallback, useState } from "react";
+import { RotateCw } from "lucide-react";
 import { useAppState } from "../../../app/AppState";
 
 /**
- * Dev-only affordance for smoke-testing the `refresh_all_peers` runtime
- * command from the Dashboard. Complements the PeersPanel header "Refresh
- * peers" icon button with a second, keyboard-first "Refresh All" surface
- * whose accessible name is explicit so keyboard users (and the Tab-order
- * validator driving VAL-OPS-025) can reach a broadcast-refresh dispatch
- * without aiming at the icon-sized button in the peers header.
+ * Web-demo affordance for smoke-testing the `refresh_all_peers` runtime
+ * command from the profile-scoped Test page. This is the only manual
+ * peer-refresh command surface; the Dashboard Peers header is display-only.
  *
  * Fulfils:
  *   - Feature `fix-m1-keyboard-ping-trigger-and-enter-activation` — ensures
- *     the five OPS surfaces (Refresh peers, Ping, Test Sign, Test ECDH,
- *     Refresh All) are all reachable in tab order.
- *   - VAL-OPS-025 — "All OPS surfaces are keyboard reachable" (Refresh All
+ *     the OPS surfaces are all reachable in tab order.
+ *   - VAL-OPS-025 — "All OPS surfaces are keyboard reachable" (peer refresh
  *     side).
- *
- * Rendered only when `import.meta.env.DEV` is true so Vite's dead-code
- * elimination strips it (and its help copy) from production builds.
  */
-export function TestRefreshAllPanel({
+export function TestPeerRefreshPanel({
   refreshBlocked,
   refreshBlockedReason = null,
 }: {
   /**
-   * When true, the Refresh All button is force-disabled and a status hint
-   * is rendered. Mirrors the PeersPanel "Refresh peers" icon contract:
-   * disabled only when the runtime is truly unavailable (paused or
-   * stopped) — `connecting`, `relays-offline`, and `signing-blocked`
-   * states all keep it live because a broadcast ping is exactly what the
-   * user reaches for to kick the pump in those states.
+   * When true, the Refresh peers button is force-disabled and a status hint
+   * is rendered. Disabled only when the runtime is truly unavailable
+   * (paused or stopped) — `connecting`, `relays-offline`, and
+   * `signing-blocked` states all keep it live because a broadcast ping is
+   * exactly what the user reaches for to kick the pump in those states.
    */
   refreshBlocked: boolean;
   /**
@@ -75,37 +68,37 @@ export function TestRefreshAllPanel({
 
   return (
     <section
-      className="panel panel-pad test-refresh-all-panel"
-      data-testid="test-refresh-all-panel"
-      aria-labelledby="test-refresh-all-heading"
+      className="panel panel-pad test-peer-refresh-panel"
+      data-testid="test-peer-refresh-panel"
+      aria-labelledby="test-peer-refresh-heading"
     >
-      <div className="value" id="test-refresh-all-heading">
-        Test Refresh All (dev)
+      <div className="value" id="test-peer-refresh-heading">
+        Refresh peers
       </div>
       <p className="help">
         Dispatches <code>refresh_all_peers</code>, fanning out pings to every
-        known peer. Keyboard-first sibling of the Peers header icon button.
-        Dev-only; absent from production builds.
+        known peer.
       </p>
-      <form onSubmit={onSubmit} className="test-refresh-all-form">
+      <form onSubmit={onSubmit} className="test-peer-refresh-form">
         <div className="inline-actions">
           <button
             type="submit"
             className="button button-primary button-md"
             disabled={submitDisabled}
             aria-disabled={submitDisabled}
-            aria-label="Refresh All"
+            aria-label="Refresh peers"
           >
-            {dispatching ? "Refreshing…" : "Refresh All"}
+            <RotateCw size={16} aria-hidden="true" />
+            {dispatching ? "Refreshing…" : "Refresh peers"}
           </button>
           {refreshBlocked ? (
             <span
               className="help"
               role="status"
-              data-testid="test-refresh-all-blocked-reason"
+              data-testid="test-peer-refresh-blocked-reason"
             >
               {refreshBlockedReason ??
-                "Refresh All unavailable — runtime not ready."}
+                "Refresh peers unavailable — runtime not ready."}
             </span>
           ) : null}
         </div>
@@ -117,7 +110,7 @@ export function TestRefreshAllPanel({
         {lastDispatchAt ? (
           <p
             className="help"
-            data-testid="test-refresh-all-last-dispatch-at"
+            data-testid="test-peer-refresh-last-dispatch-at"
           >
             Last broadcast:{" "}
             <code>{new Date(lastDispatchAt).toISOString()}</code>

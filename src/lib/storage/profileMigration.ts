@@ -74,6 +74,15 @@ function migrateSummary(
   const lastUsedAt = Number.isFinite(explicitLastUsedAt)
     ? explicitLastUsedAt
     : createdAt;
+  const deviceName = asString(raw.deviceName, "");
+  const groupName = asString(raw.groupName, "");
+  const rawLabel = asString(raw.label, "");
+  const label =
+    rawLabel.length > 0 && rawLabel !== groupName
+      ? rawLabel
+      : deviceName.length > 0
+        ? deviceName
+        : rawLabel;
 
   // Spread the raw summary FIRST so any forward-compat unknown fields
   // (written by a newer build) survive the migration. Canonical fields
@@ -84,9 +93,9 @@ function migrateSummary(
   return {
     ...raw,
     id,
-    label: asString(raw.label, ""),
-    deviceName: asString(raw.deviceName, ""),
-    groupName: asString(raw.groupName, ""),
+    label,
+    deviceName,
+    groupName,
     threshold: asNumber(raw.threshold, 0),
     memberCount: asNumber(raw.memberCount, 0),
     localShareIdx: asNumber(raw.localShareIdx, 0),

@@ -230,7 +230,16 @@ export const demoScenarios: DemoScenario[] = [
   // to render at /create/progress without bouncing back to /create (VAL-CRT-007,
   // VAL-CRT-012). The Create Keyset form itself does not read createSession,
   // so all existing content-parity assertions continue to hold.
-  scenario("create-keyset", "create", "Create - 1. Create Keyset", "screens/create/1-create-keyset", "/create", createKeysetState, "Create New Keyset"),
+  scenario(
+    "create-keyset",
+    "create",
+    "Create - 1. Create Keyset",
+    "screens/create/1-create-keyset",
+    "/create",
+    createKeysetState,
+    "Create New Keyset",
+    { demoUi: { create: { keysetNamePreset: "" } } }
+  ),
   scenario(
     "create-validation-error",
     "create",
@@ -239,7 +248,7 @@ export const demoScenarios: DemoScenario[] = [
     "/create",
     noProfiles,
     "Existing nsec splitting is not supported yet.",
-    { demoUi: { create: { validationError: true, nsecPreset: "not-a-valid-key" } } }
+    { demoUi: { create: { validationError: true, nsecPreset: "not-a-valid-key", keysetNamePreset: "" } } }
   ),
   scenario(
     "create-generation-progress",

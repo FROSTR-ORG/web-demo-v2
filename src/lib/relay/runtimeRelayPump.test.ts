@@ -188,6 +188,66 @@ describe("RuntimeRelayPump", () => {
     expect(relay.closed).toBe(true);
   });
 
+  it("tags refresh_all fan-out Ping request ids before drain callbacks run", async () => {
+    class RefreshRuntime extends FakeRuntime {
+      private refreshQueued = false;
+      private pending: RuntimeStatusSummary["pending_operations"] = [];
+
+      override handleCommand(command: unknown) {
+        super.handleCommand(command);
+        if (
+          typeof command === "object" &&
+          command !== null &&
+          (command as { type?: string }).type === "refresh_all_peers"
+        ) {
+          this.refreshQueued = true;
+        }
+      }
+
+      override tick(now: number) {
+        super.tick(now);
+        if (this.refreshQueued && this.pending.length === 0) {
+          this.pending = [
+            {
+              op_type: "Ping",
+              request_id: "req-refresh-ping",
+              started_at: now,
+              timeout_at: now + 10_000,
+              target_peers: ["peer-a"],
+              threshold: 1,
+              collected_responses: [],
+              context: null,
+            },
+          ];
+        }
+      }
+
+      override runtimeStatus(): RuntimeStatusSummary {
+        return {
+          ...super.runtimeStatus(),
+          pending_operations: this.pending,
+        };
+      }
+    }
+
+    const runtime = new RefreshRuntime();
+    const relay = new FakeRelayConnection("wss://relay.test");
+    const tagged: string[][] = [];
+    const pump = new RuntimeRelayPump({
+      runtime: runtime as never,
+      relays: ["wss://relay.test"],
+      relayClient: new FakeRelayClient([relay]),
+      eventKind: 27000,
+      now: () => 1,
+      onRefreshPingRequestIds: (requestIds) => tagged.push(requestIds),
+    });
+
+    await pump.start();
+    await pump.refreshAll();
+
+    expect(tagged).toEqual([["req-refresh-ping"]]);
+  });
+
   it("marks failed connects and failed publishes offline", async () => {
     const runtime = new FakeRuntime();
     const offline = new FakeRelayConnection("wss://offline.test", {

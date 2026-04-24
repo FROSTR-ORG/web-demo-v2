@@ -31,16 +31,26 @@ test("renders every demo scenario in raw mode without demo chrome", async ({ pag
   for (const scenario of demoScenarios) {
     await page.goto(`/demo/${scenario.id}?chrome=0`);
     await expect(page.locator(".demo-scenario-toolbar")).toHaveCount(0);
-    await expect(page.locator(".app-header")).toBeVisible();
-    await expect(page.locator(".app-shell").getByText(new RegExp(escapeRegExp(scenario.expectedText), "i")).first()).toBeVisible();
+    const shell = page.locator(".app-shell.paper-reference-shell");
+    await expect(shell).toBeVisible();
+    await expect(shell).toHaveAttribute("data-scenario-id", scenario.id);
+    await expect(shell).toHaveAttribute("data-expected-text", scenario.expectedText);
+
+    const image = shell.locator(".paper-reference-image");
+    await expect(image).toBeVisible();
+    await expect(image).toHaveAttribute("src", scenario.paperReference);
+    await expect(
+      image.evaluate((element) => element instanceof HTMLImageElement && element.complete && element.naturalWidth > 0),
+      scenario.id
+    ).resolves.toBe(true);
   }
 });
 
-test("enabled interactive controls use pointer cursors in every raw demo scenario", async ({ page }, testInfo) => {
+test("enabled interactive controls use pointer cursors in every live demo scenario", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "Cursor affordance pass runs on desktop only.");
 
   for (const scenario of demoScenarios) {
-    await page.goto(`/demo/${scenario.id}?chrome=0`);
+    await page.goto(`/demo/${scenario.id}`);
     await expect(page.locator(".app-header")).toBeVisible();
 
     const cursorMismatches = await page.evaluate(() =>

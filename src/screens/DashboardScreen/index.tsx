@@ -1,5 +1,6 @@
 import {
   FileText,
+  FlaskConical,
   LayoutDashboard,
   Settings,
   SlidersHorizontal,
@@ -23,7 +24,6 @@ import { PolicyPromptModal } from "./modals/PolicyPromptModal";
 import { SigningFailedModal } from "./modals/SigningFailedModal";
 import { DashboardRecoverPanel } from "./panels/DashboardRecoverPanel";
 import { DashboardStateAnnouncer } from "./panels/DashboardStateAnnouncer";
-import { DashboardSummaryBar } from "./panels/DashboardSummaryBar";
 import { MockStateToggle } from "./panels/MockStateToggle";
 import {
   NonSignFailureBannerStack,
@@ -33,7 +33,7 @@ import { OfflineBanner } from "./panels/OfflineBanner";
 import { SignActivityPanel } from "./panels/SignActivityPanel";
 import { TestEcdhPanel } from "./panels/TestEcdhPanel";
 import { TestPingPanel } from "./panels/TestPingPanel";
-import { TestRefreshAllPanel } from "./panels/TestRefreshAllPanel";
+import { TestPeerRefreshPanel } from "./panels/TestPeerRefreshPanel";
 import { TestSignPanel } from "./panels/TestSignPanel";
 import { SettingsSidebar } from "./sidebar/SettingsSidebar";
 import { deriveDashboardState, isNoncePoolDepleted } from "./dashboardState";
@@ -47,6 +47,8 @@ import {
   DEFAULT_POLICY_PROMPT_REQUEST,
   MOCK_BACKUP_STRING,
   MOCK_SHARE_PACKAGE_STRING,
+  paperGroupKey,
+  paperShareKey,
   type PolicyPromptRequest,
 } from "./mocks";
 import type {
@@ -64,6 +66,12 @@ import {
 } from "../../lib/relay/relayTelemetry";
 
 export type { DashboardState, ModalState } from "./types";
+
+type DashboardScreenMode = "dashboard" | "test";
+
+interface DashboardScreenProps {
+  mode?: DashboardScreenMode;
+}
 
 function mockPackageForMode(mode: ExportMode): string {
   return mode === "profile" ? MOCK_BACKUP_STRING : MOCK_SHARE_PACKAGE_STRING;
@@ -150,13 +158,14 @@ export function relayHealthRowsFromRuntime(
   });
 }
 
-export function DashboardScreen() {
+export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {}) {
   const { profileId } = useParams();
   const navigate = useNavigate();
   const {
     activeProfile,
     runtimeStatus,
     runtimeRelays = [],
+    peerLatencyByPubkey = {},
     signerPaused = false,
     lockProfile,
     clearCredentials,
@@ -454,37 +463,6 @@ export function DashboardScreen() {
     });
   }, [runtimeStatus]);
 
-  const handleRefreshPeers = useCallback(async () => {
-    if (hasDemoDashboardState) {
-      // Demo/fixture scenarios rely on the visual-only refresh animation
-      // and don't have a real runtime to dispatch against.
-      refreshRuntime?.();
-      return;
-    }
-    if (!handleRuntimeCommand) {
-      refreshRuntime?.();
-      return;
-    }
-    try {
-      await handleRuntimeCommand({ type: "refresh_all_peers" });
-    } catch (error) {
-      // Dispatch failed (e.g. no runtime). Surface via console so the
-      // outer error observer doesn't silently drop it, but don't throw —
-      // the refresh button is a user-visible affordance and must remain
-      // clickable for subsequent retries.
-      // eslint-disable-next-line no-console
-      console.error(
-        `refresh_all_peers dispatch failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
-    // Kick the relay pump so outbound ping events are flushed to the wire
-    // immediately; without this the next poll tick would delay user-visible
-    // last_seen updates by up to 2.5 s.
-    refreshRuntime?.();
-  }, [handleRuntimeCommand, hasDemoDashboardState, refreshRuntime]);
-
   // Dispatches a runtime nonce-pool refresh/rebalance by fanning out
   // `refresh_all_peers` (which triggers per-peer pings + nonce replenish
   // exchanges). Surfaced as the "Trigger Sync" affordance inside the
@@ -644,13 +622,13 @@ export function DashboardScreen() {
   if (!activeProfile || activeProfile.id !== profileId || !runtimeStatus) {
     return <Navigate to="/" replace />;
   }
-
+  const testPageActive = mode === "test";
   const onlineCount = runtimeStatus.peers.filter((peer) => peer.online).length;
   const signReadyLabel = `${runtimeStatus.readiness.signing_peer_count}/${runtimeStatus.readiness.threshold} sign ready`;
   const dashboardState = hasDemoDashboardState
     ? mockState
     : deriveDashboardState({ signerPaused, runtimeStatus, runtimeRelays });
-  // Derive the "signing blocked" gate used by the dev-only TestSign panel.
+  // Derive the "signing blocked" gate used by the TestSign panel.
   // Per the validation contract this is whatever the runtime surfaces as
   // `signing_state === 'SIGNING_BLOCKED'` — we compute it from the exposed
   // readiness fields plus paused/blocked dashboard states.
@@ -674,10 +652,9 @@ export function DashboardScreen() {
   // relay in `connecting` is enough to carry the ping once the socket
   // upgrades, and refresh_all_peers is exactly what users reach for in
   // `relays-offline` / `connecting` / `signing-blocked` to force the
-  // pump. The PeersPanel header "Refresh peers" icon has always been
-  // unconditionally clickable — the keyboard-first Test Ping / Test
-  // Refresh All siblings mirror that contract, blocked ONLY when the
-  // runtime is truly unavailable (paused or stopped). A future
+  // pump. The keyboard-first Test Ping / Refresh peers controls on the
+  // test page keep that contract, blocked ONLY when the runtime is truly
+  // unavailable (paused or stopped). A future
   // `readiness.ping_ready` field (currently absent from
   // `RuntimeReadiness`) would plug in here via `=== false`, but the
   // bridge does not expose such a flag today, so we only react to
@@ -777,6 +754,10 @@ export function DashboardScreen() {
   }
 
   function handleReturnToDashboard() {
+    if (testPageActive) {
+      navigate(`/dashboard/${profileId}`);
+      return;
+    }
     if (recoverActive) {
       resetRecoverState();
     }
@@ -790,47 +771,74 @@ export function DashboardScreen() {
     setDashboardView("policies");
   }
 
+  function handleOpenTestPage() {
+    if (recoverActive) {
+      resetRecoverState();
+    }
+    navigate(`/dashboard/${profileId}/test`);
+  }
+
   const recoverHeaderLabel = recoverActive ? "Dashboard" : "Recover";
   const recoverHeaderAriaLabel = recoverActive ? "Back to dashboard" : undefined;
   const policiesHeaderLabel = policiesActive ? "Dashboard" : "Policies";
   const policiesHeaderAriaLabel = policiesActive ? "Back to dashboard" : undefined;
+  const showTestHeaderButton = !testPageActive;
 
   return (
     <AppShell
       mainVariant="dashboard"
       headerActions={
-        <>
+        testPageActive ? (
           <Button
             type="button"
             variant="header"
-            className={recoverActive ? "button-header-active" : undefined}
-            aria-label={recoverHeaderAriaLabel}
-            aria-pressed={recoverActive}
-            onClick={recoverActive ? handleReturnToDashboard : handleOpenRecover}
+            className="button-header-active"
+            aria-label="Back to dashboard"
+            onClick={handleReturnToDashboard}
           >
-            {recoverActive ? (
-              <LayoutDashboard size={14} color="#93C5FD" />
-            ) : (
-              <FileText size={14} />
-            )}
-            {recoverHeaderLabel}
+            <LayoutDashboard size={14} color="#93C5FD" />
+            Dashboard
           </Button>
-          <Button
-            type="button"
-            variant="header"
-            className={policiesActive ? "button-header-active" : undefined}
-            aria-label={policiesHeaderAriaLabel}
-            aria-pressed={policiesActive}
-            onClick={policiesActive ? handleReturnToDashboard : handleOpenPolicies}
-          >
-            {policiesActive ? (
-              <LayoutDashboard size={14} color="#93C5FD" />
-            ) : (
-              <SlidersHorizontal size={14} />
-            )}
-            {policiesHeaderLabel}
-          </Button>
-        </>
+        ) : (
+          <>
+            <Button
+              type="button"
+              variant="header"
+              className={recoverActive ? "button-header-active" : undefined}
+              aria-label={recoverHeaderAriaLabel}
+              aria-pressed={recoverActive}
+              onClick={recoverActive ? handleReturnToDashboard : handleOpenRecover}
+            >
+              {recoverActive ? (
+                <LayoutDashboard size={14} color="#93C5FD" />
+              ) : (
+                <FileText size={14} />
+              )}
+              {recoverHeaderLabel}
+            </Button>
+            <Button
+              type="button"
+              variant="header"
+              className={policiesActive ? "button-header-active" : undefined}
+              aria-label={policiesHeaderAriaLabel}
+              aria-pressed={policiesActive}
+              onClick={policiesActive ? handleReturnToDashboard : handleOpenPolicies}
+            >
+              {policiesActive ? (
+                <LayoutDashboard size={14} color="#93C5FD" />
+              ) : (
+                <SlidersHorizontal size={14} />
+              )}
+              {policiesHeaderLabel}
+            </Button>
+            {showTestHeaderButton ? (
+              <Button type="button" variant="header" onClick={handleOpenTestPage}>
+                <FlaskConical size={14} />
+                Test
+              </Button>
+            ) : null}
+          </>
+        )
       }
       headerSettingsAction={
         <Button type="button" variant="header" size="icon" aria-label="Settings" onClick={() => setSettingsOpen(true)}>
@@ -847,6 +855,19 @@ export function DashboardScreen() {
          * relays-offline/signing-blocked without needing to open a
          * modal or re-scan the UI. */}
         <DashboardStateAnnouncer dashboardState={dashboardState} />
+        <div className="dashboard-context-strip" aria-label="Active keyset context">
+          <span className="dashboard-context-primary">{activeProfile.groupName}</span>
+          <span className="dashboard-context-separator">·</span>
+          <span>
+            {activeProfile.threshold}/{activeProfile.memberCount}
+          </span>
+          <span className="dashboard-context-separator">·</span>
+          <span>{paperGroupKey(runtimeStatus.metadata.group_public_key || activeProfile.groupPublicKey)}</span>
+          <span className="dashboard-context-divider" aria-hidden="true" />
+          <span>Share #{runtimeStatus.metadata.member_idx}</span>
+          <span className="dashboard-context-separator">·</span>
+          <span>{paperShareKey(runtimeStatus.metadata.share_public_key)}</span>
+        </div>
         {/* m7-a11y-offline-banner / VAL-CROSS-026 — network-offline
          * banner driven by `navigator.onLine`. Surfaces a persistent
          * "Offline — relays unreachable" notice when the browser
@@ -870,16 +891,20 @@ export function DashboardScreen() {
           />
         ) : null}
 
-        <DashboardSummaryBar
-          groupName={activeProfile.groupName}
-          threshold={activeProfile.threshold}
-          memberCount={activeProfile.memberCount}
-          groupPublicKey={activeProfile.groupPublicKey}
-          shareIdx={runtimeStatus.metadata.member_idx}
-          sharePublicKey={runtimeStatus.metadata.share_public_key}
-        />
-
-        {dashboardView === "recover" ? (
+        {testPageActive ? (
+          <>
+            <TestSignPanel signingBlocked={signingBlocked} />
+            <TestEcdhPanel ecdhBlocked={ecdhBlocked} />
+            <TestPingPanel
+              pingBlocked={pingBlocked}
+              pingBlockedReason={pingBlockedReason}
+            />
+            <TestPeerRefreshPanel
+              refreshBlocked={pingBlocked}
+              refreshBlockedReason={pingBlockedReason}
+            />
+          </>
+        ) : dashboardView === "recover" ? (
           <DashboardRecoverPanel
             profileId={profileId}
             paperPanels={paperPanels}
@@ -911,11 +936,13 @@ export function DashboardScreen() {
                 pendingDispatchIndex={
                   paperPanels ? undefined : pendingDispatchIndex
                 }
+                peerLatencyByPubkey={
+                  paperPanels ? undefined : peerLatencyByPubkey
+                }
                 paperPanels={paperPanels}
                 sidebarOpen={settingsOpen}
                 runtimeRelays={paperPanels ? undefined : runtimeRelays}
                 onStop={handleStopSigner}
-                onRefresh={handleRefreshPeers}
                 onOpenPolicyPrompt={
                   // VAL-APPROVALS-018 / fix-m2-policy-prompt-never-proactive-open:
                   // The runtime PolicyPromptModal must ONLY open in
@@ -981,6 +1008,7 @@ export function DashboardScreen() {
                   isNoncePoolDepleted(runtimeStatus)
                 }
                 onTriggerSync={handleTriggerSync}
+                paperPanels={paperPanels}
               />
             )}
           </>
@@ -989,49 +1017,18 @@ export function DashboardScreen() {
         {/* Non-sign failure banner stack — aria-live region that surfaces
          * ECDH/ping/onboard OperationFailures that couldn't be attributed
          * to a visible PeerRow (VAL-OPS-015). Rendered unconditionally so
-         * the banner is available in production, sitting immediately
-         * adjacent to the Activity surface below. When empty the container
+         * the banner is available in production, sitting near the command
+         * and activity surfaces on the Test page. When empty the container
          * stays mounted so SR announcements on newly-added banners fire
          * without the whole region remounting. */}
-        {dashboardView === "dashboard" && !paperPanels ? (
+        {(testPageActive || dashboardView === "dashboard") && !paperPanels ? (
           <NonSignFailureBannerStack
             banners={nonSignFailureBanners}
             onDismiss={handleDismissNonSignFailureBanner}
           />
         ) : null}
 
-        {/* Dev-only TestSign + TestEcdh affordances. Gated on
-         * `import.meta.env.DEV` so `vite build` dead-code-eliminates them
-         * from the production bundle. Also hidden when Paper reference
-         * panels are active so pixel-parity demo scenarios are unaffected. */}
-        {dashboardView === "dashboard" && import.meta.env.DEV && !paperPanels ? (
-          <>
-            <TestSignPanel signingBlocked={signingBlocked} />
-            <TestEcdhPanel ecdhBlocked={ecdhBlocked} />
-            {/* Test Ping + Test Refresh All — keyboard-first dev surfaces
-             * that close the VAL-OPS-025 Tab-order gap. A dedicated
-             * "Ping" button (accessible name /^ping(\s|$)/i) plus a
-             * "Refresh All" button give the Tab validator all five OPS
-             * surfaces (Refresh peers, Ping, Test Sign, Test ECDH,
-             * Refresh All) within <=10 tab-stops. Wired through
-             * `handleRuntimeCommand` so Enter/Space/click dispatch go
-             * through the same code path as a pointer click. */}
-            <TestPingPanel
-              pingBlocked={pingBlocked}
-              pingBlockedReason={pingBlockedReason}
-            />
-            <TestRefreshAllPanel
-              refreshBlocked={pingBlocked}
-              refreshBlockedReason={pingBlockedReason}
-            />
-            {/* Recent Sign Activity — surfaces the runtime lifecycle of
-             * every dispatched sign / ECDH / ping so validators and users
-             * observe the dispatched -> pending -> completed|failed
-             * transition even when the runtime completes faster than the
-             * poll tick (VAL-OPS-002 / VAL-OPS-004 / VAL-OPS-013). */}
-            <SignActivityPanel />
-          </>
-        ) : null}
+        {testPageActive ? <SignActivityPanel /> : null}
       </section>
 
       {/*

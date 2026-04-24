@@ -407,7 +407,7 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
     });
   });
 
-  describe("Dashboard summary bar is stable across all states", () => {
+  describe("Dashboard summary strip stays removed across all states", () => {
     it.each([
       ["running"],
       ["connecting"],
@@ -415,11 +415,10 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
       ["relays-offline"],
       ["signing-blocked"],
     ] as const)(
-      "renders the group/share summary bar for %s",
+      "does not render the standalone group/share strip for %s",
       (state) => {
         renderAt({ dashboard: { state } });
-        expect(screen.getByText("My Signing Key")).toBeInTheDocument();
-        expect(screen.getByText("Share #0")).toBeInTheDocument();
+        expect(document.querySelector(".dashboard-summary")).toBeNull();
       }
     );
   });

@@ -22,7 +22,7 @@ import { demoFlows, demoScenarios } from "../scenarios";
  *  - VAL-CROSS-001  DemoGallery lists every canonical scenario grouped by flow
  *  - VAL-CROSS-002  Gallery links navigate to /demo/{id} and the scenario's expectedText renders
  *  - VAL-CROSS-003  Scenario chrome toolbar renders All screens / Prev / Next / Raw / Reference
- *  - VAL-CROSS-004  Raw mode (?chrome=0) hides the scenario chrome toolbar
+ *  - VAL-CROSS-004  Raw mode (?chrome=0) hides chrome and renders the Paper reference
  *  - VAL-CROSS-014  Unknown routes fall back to "/" (welcome)
  *  - VAL-CROSS-022  paper-reference assets resolve for at least one representative scenario per flow
  */
@@ -169,7 +169,7 @@ describe("Cross-area final gate — every canonical scenario", () => {
     expect(next.getAttribute("href")).toBe("/demo/import-load-backup");
   });
 
-  it("Raw mode (?chrome=0) hides the demo chrome toolbar (VAL-CROSS-004)", () => {
+  it("Raw mode (?chrome=0) hides chrome and renders the Paper reference (VAL-CROSS-004)", () => {
     render(
       <MemoryRouter initialEntries={["/demo/welcome-first-time?chrome=0"]}>
         <Routes>
@@ -181,11 +181,15 @@ describe("Cross-area final gate — every canonical scenario", () => {
     const toolbar = document.querySelector(".demo-scenario-toolbar");
     expect(toolbar).toBeNull();
 
-    // The scenario content itself still renders.
+    // Raw mode is the Paper-reference raster capture surface. The
+    // interactive mock scenario still renders at `/demo/:id` without
+    // `?chrome=0`.
     const welcome = demoScenarios.find((entry) => entry.id === "welcome-first-time")!;
-    expect(
-      screen.getAllByText(new RegExp(escapeRegExp(welcome.expectedText), "i")).length
-    ).toBeGreaterThan(0);
+    const shell = document.querySelector(".app-shell.paper-reference-shell");
+    expect(shell).not.toBeNull();
+    expect(shell?.getAttribute("data-scenario-id")).toBe(welcome.id);
+    expect(shell?.getAttribute("data-expected-text")).toBe(welcome.expectedText);
+    expect(document.querySelector(".paper-reference-image")).not.toBeNull();
   });
 
   it("removing ?chrome=0 restores the toolbar (VAL-CROSS-004)", () => {

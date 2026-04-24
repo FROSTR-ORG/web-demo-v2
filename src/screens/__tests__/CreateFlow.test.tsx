@@ -86,6 +86,40 @@ describe("CreateKeysetScreen", () => {
     expect(screen.getByRole("button", { name: "Create Keyset" })).toBeInTheDocument();
   });
 
+  it("uses the normal product keyset name by default but allows an empty Paper demo preset", async () => {
+    const { unmount } = render(
+      <MemoryRouter>
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByPlaceholderText("e.g. My Signing Key, Work Key..."),
+    ).toHaveValue("My Signing Key");
+    unmount();
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: "/create",
+            state: { demoUi: { create: { keysetNamePreset: "" } } },
+          },
+        ]}
+      >
+        <CreateKeysetScreen />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByPlaceholderText("e.g. My Signing Key, Work Key..."),
+    ).toHaveValue("");
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Keyset" }));
+    await waitFor(() => {
+      expect(screen.getByText("Keyset name is required.")).toBeInTheDocument();
+    });
+    expect(mocks.createKeyset).not.toHaveBeenCalled();
+  });
+
   it("blocks non-nsec prefix input with the 'must start with nsec1' error", async () => {
     render(
       <MemoryRouter>
@@ -584,7 +618,7 @@ describe("CreateKeysetScreen", () => {
     expect(nsecInput).toHaveValue(pasted);
     expect(nsecInput).toHaveAttribute("type", "text");
 
-    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back to Welcome" }));
 
     const nsecInputAfter = screen.getByPlaceholderText(
       "Paste your existing nsec or generate a new one",

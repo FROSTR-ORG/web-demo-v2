@@ -9,12 +9,16 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "npm run wasm:build && vitest run --config vitest.config.ts",
     "test:e2e": "playwright test",
+    "test:e2e:dashboard-real-peers": "playwright test src/e2e/multi-device/dashboard-real-peers.spec.ts --project=desktop --workers=1",
     "wasm:build": "node scripts/build-wasm.mjs",
     "paper:sync": "node scripts/sync-paper.mjs",
+    "paper:drift": "node scripts/audit-paper-drift.mjs --threshold=0.02",
     "lint": "echo 'lint via tsc+vitest (see docs/allowed-console-warnings.md)'",
     "format:check": "echo 'format:check via tsc+vitest (see docs/allowed-console-warnings.md)'"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/share-tech-mono": "^5.2.7",
     "idb-keyval": "^6.2.2",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.468.0",

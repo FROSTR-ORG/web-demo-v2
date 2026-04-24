@@ -50,7 +50,7 @@ const MOCK_REVIEW_DATA = {
 
 /* ---------- Validation helpers ---------- */
 
-function validateBackupString(value: string): {
+function validateBackupString(value: string, paperDemo = false): {
   valid: boolean;
   message: string;
 } {
@@ -60,7 +60,9 @@ function validateBackupString(value: string): {
   if (value.trim().startsWith("bfprofile1")) {
     return {
       valid: true,
-      message: "Valid backup format — decrypt to review profile details",
+      message: paperDemo
+        ? "Valid backup — Group: My Signing Key (2/3) · Share #1"
+        : "Valid backup format — decrypt to review profile details",
     };
   }
   return {
@@ -82,7 +84,8 @@ export function LoadBackupScreen() {
     demoUi.import?.backupPreset ?? "",
   );
   const [showQrScanner, setShowQrScanner] = useState(false);
-  const validation = validateBackupString(backupString);
+  const paperLoadBackup = Boolean(demoUi.import?.backupPreset);
+  const validation = validateBackupString(backupString, paperLoadBackup);
 
   function handleContinue() {
     if (!validation.valid) return;
@@ -91,7 +94,11 @@ export function LoadBackupScreen() {
   }
 
   return (
-    <AppShell mainVariant="flow">
+    <AppShell
+      mainVariant="flow"
+      brandSubtitle="Threshold Signing for Nostr"
+      headerMeta="Import"
+    >
       <div className="screen-column">
         <BackLink
           onClick={() => {
@@ -139,14 +146,16 @@ export function LoadBackupScreen() {
           >
             Upload Backup File
           </button>
-          <button
-            type="button"
-            className="button button-chip button-sm onboard-scan-btn"
-            onClick={() => setShowQrScanner(true)}
-          >
-            <QrCode size={14} />
-            Scan QR
-          </button>
+          {paperLoadBackup ? null : (
+            <button
+              type="button"
+              className="button button-chip button-sm onboard-scan-btn"
+              onClick={() => setShowQrScanner(true)}
+            >
+              <QrCode size={14} />
+              Scan QR
+            </button>
+          )}
           {validation.message && (
             <span
               className={
@@ -231,7 +240,11 @@ export function DecryptBackupScreen() {
   }
 
   return (
-    <AppShell mainVariant="flow">
+    <AppShell
+      mainVariant="flow"
+      brandSubtitle="Threshold Signing for Nostr"
+      headerMeta="Import"
+    >
       <div className="screen-column">
         <BackLink
           onClick={() => {
@@ -341,7 +354,11 @@ export function ReviewSaveScreen() {
   }
 
   return (
-    <AppShell mainVariant="flow">
+    <AppShell
+      mainVariant="flow"
+      brandSubtitle="Threshold Signing for Nostr"
+      headerMeta="Import"
+    >
       <div className="screen-column">
         <BackLink
           onClick={() => {
@@ -498,7 +515,11 @@ export function ImportErrorScreen() {
     : "import-error-alert bg-[#EAB3081A] border-[#EAB30840]";
 
   return (
-    <AppShell mainVariant="flow">
+    <AppShell
+      mainVariant="flow"
+      brandSubtitle="Threshold Signing for Nostr"
+      headerMeta="Import"
+    >
       <div className="screen-column">
         <BackLink
           onClick={() => {

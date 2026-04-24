@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /**
- * TestEcdhPanel — Dev-only dashboard affordance that dispatches an `ecdh`
+ * TestEcdhPanel — Test page affordance that dispatches an `ecdh`
  * runtime command via `handleRuntimeCommand`. Covers feature m1-ecdh-dispatch
  * and the following validation assertions:
  *
@@ -129,8 +129,9 @@ afterEach(() => {
 
 function renderDashboard() {
   return render(
-    <MemoryRouter initialEntries={["/dashboard/test-profile-id"]}>
+    <MemoryRouter initialEntries={["/dashboard/test-profile-id/test"]}>
       <Routes>
+        <Route path="/dashboard/:profileId/test" element={<DashboardScreen mode="test" />} />
         <Route path="/dashboard/:profileId" element={<DashboardScreen />} />
         <Route
           path="/"
@@ -146,7 +147,7 @@ function getPanel(): HTMLElement {
 }
 
 describe("TestEcdhPanel presence + accessible name", () => {
-  it("renders the dev-only TestEcdh panel on the dashboard (DEV build)", () => {
+  it("renders the TestEcdh panel on the Test page", () => {
     renderDashboard();
     expect(screen.getByTestId("test-ecdh-panel")).toBeInTheDocument();
   });
@@ -313,25 +314,17 @@ describe("ECDH button disabled when runtime is not ready", () => {
   });
 });
 
-describe("Production build guard — panel source is gated on import.meta.env.DEV", () => {
-  it("TestEcdhPanel import and render site are wrapped in an `import.meta.env.DEV` guard", async () => {
+describe("Build availability — TestEcdhPanel is available in every web-demo build", () => {
+  it("TestEcdhPanel source is free of build-gating markers", async () => {
     const fs = await import("node:fs/promises");
     const path = await import("node:path");
     const repoRoot = process.cwd();
-    const dashboardSrc = await fs.readFile(
-      path.join(repoRoot, "src/screens/DashboardScreen/index.tsx"),
-      "utf8",
-    );
-    // The render site must be conditional on `import.meta.env.DEV` so Vite's
-    // dead-code elimination drops the TestEcdhPanel branch from production
-    // bundles (matching TestSignPanel).
-    expect(dashboardSrc).toMatch(/import\.meta\.env\.DEV[\s\S]*?TestEcdhPanel/);
-    // The panel itself must not leak any dev-only helper names / __DEV__ into
-    // production.
     const panelSrc = await fs.readFile(
       path.join(repoRoot, "src/screens/DashboardScreen/panels/TestEcdhPanel.tsx"),
       "utf8",
     );
+    expect(panelSrc).not.toMatch(/import\.meta\.env\.DEV/);
+    expect(panelSrc).not.toMatch(/Dev-only|dev-only|production builds/);
     expect(panelSrc).not.toMatch(/mockOpenPolicyPrompt/);
     expect(panelSrc).not.toMatch(/__DEV__/);
   });

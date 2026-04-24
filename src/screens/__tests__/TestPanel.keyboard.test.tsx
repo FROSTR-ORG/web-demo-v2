@@ -16,9 +16,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * Covers:
  *   - A dedicated Ping trigger exists whose accessible name matches
  *     /^ping(\s|$)/i.
- *   - All five OPS surfaces (Refresh peers, Ping, Test Sign, Test ECDH,
- *     Refresh All) are reachable within <=10 tab-stops from the first
- *     focusable element on the dashboard.
+ *   - Dashboard exposes a Test header button and does not render command
+ *     panels inline.
+ *   - All OPS surfaces (Refresh peers, Ping, Test Sign, Test ECDH) are
+ *     reachable within <=10 tab-stops on the Test page.
  *   - Enter on a focused Test Sign submit button (with a valid 64-hex
  *     message) dispatches identically to a pointer click — same code
  *     path, single `handleRuntimeCommand({type:'sign',...})` call.
@@ -27,7 +28,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *   - Enter inside the Test Sign message input triggers form submission.
  *   - The Test Ping button dispatches `handleRuntimeCommand({type:'ping',
  *     peer_pubkey32_hex})` on Enter in its input.
- *   - The Test Refresh All button dispatches
+ *   - The Test Refresh peers button dispatches
  *     `handleRuntimeCommand({type:'refresh_all_peers'})` on Space.
  */
 
@@ -135,10 +136,11 @@ afterEach(() => {
   fakeRuntimeStatus.pending_operations = [];
 });
 
-function renderDashboard() {
+function renderDashboard(initialEntries = ["/dashboard/test-profile-id/test"]) {
   return render(
-    <MemoryRouter initialEntries={["/dashboard/test-profile-id"]}>
+    <MemoryRouter initialEntries={initialEntries}>
       <Routes>
+        <Route path="/dashboard/:profileId/test" element={<DashboardScreen mode="test" />} />
         <Route path="/dashboard/:profileId" element={<DashboardScreen />} />
         <Route
           path="/"
@@ -163,6 +165,24 @@ function collectFocusable(): HTMLElement[] {
 }
 
 describe("VAL-OPS-025 — Test panel keyboard reachability (Ping + all OPS surfaces)", () => {
+  it("moves command panels off Dashboard and opens them from the Test header button", () => {
+    renderDashboard(["/dashboard/test-profile-id"]);
+
+    expect(screen.queryByTestId("test-sign-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("test-ecdh-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("test-ping-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("test-peer-refresh-panel")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Refresh peers")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Test" }));
+    expect(screen.getByTestId("test-sign-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("test-peer-refresh-panel")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /back to dashboard/i }));
+    expect(screen.queryByTestId("test-sign-panel")).not.toBeInTheDocument();
+    expect(screen.getByText("Signer Running")).toBeInTheDocument();
+  });
+
   it("renders a dedicated TestPing panel whose submit accessible name matches /^ping(\\s|$)/i", () => {
     renderDashboard();
     const panel = screen.getByTestId("test-ping-panel");
@@ -175,19 +195,19 @@ describe("VAL-OPS-025 — Test panel keyboard reachability (Ping + all OPS surfa
     expect(accessibleName).toMatch(/^ping(\s|$)/i);
   });
 
-  it("renders a dedicated Refresh All button (dev panel)", () => {
+  it("renders a dedicated Refresh peers button on the Test page", () => {
     renderDashboard();
-    const panel = screen.getByTestId("test-refresh-all-panel");
+    const panel = screen.getByTestId("test-peer-refresh-panel");
     const submit = panel.querySelector(
       "button[type='submit']",
     ) as HTMLButtonElement;
     expect(submit).not.toBeNull();
     const accessibleName =
       submit.getAttribute("aria-label") ?? submit.textContent ?? "";
-    expect(accessibleName).toMatch(/^refresh\s*all(\s|$)/i);
+    expect(accessibleName).toMatch(/^refresh\s*peers(\s|$)/i);
   });
 
-  it("reaches all five OPS surfaces (Refresh peers, Ping, Test Sign, Test ECDH, Refresh All) within <=10 tab-stops", () => {
+  it("reaches all OPS surfaces (Refresh peers, Ping, Test Sign, Test ECDH) within <=10 tab-stops", () => {
     renderDashboard();
     // Enable the three validated-input test buttons so they participate in
     // the tab order.
@@ -214,15 +234,14 @@ describe("VAL-OPS-025 — Test panel keyboard reachability (Ping + all OPS surfa
     const pingBtn = pingPanel.querySelector(
       "button[type='submit']",
     ) as HTMLButtonElement;
-    const refreshAllBtn = screen
-      .getByTestId("test-refresh-all-panel")
+    const refreshPeersBtn = screen
+      .getByTestId("test-peer-refresh-panel")
       .querySelector("button[type='submit']") as HTMLButtonElement;
-    const refreshPeersBtn = screen.getByLabelText("Refresh peers");
 
     expect(signBtn.disabled).toBe(false);
     expect(ecdhBtn.disabled).toBe(false);
     expect(pingBtn.disabled).toBe(false);
-    expect(refreshAllBtn.disabled).toBe(false);
+    expect(refreshPeersBtn.disabled).toBe(false);
 
     const focusable = collectFocusable();
     const surfaces = [
@@ -230,7 +249,6 @@ describe("VAL-OPS-025 — Test panel keyboard reachability (Ping + all OPS surfa
       { name: "Ping", el: pingBtn },
       { name: "Test Sign", el: signBtn },
       { name: "Test ECDH", el: ecdhBtn },
-      { name: "Refresh All", el: refreshAllBtn },
     ];
     for (const s of surfaces) {
       const idx = focusable.indexOf(s.el);
@@ -241,8 +259,8 @@ describe("VAL-OPS-025 — Test panel keyboard reachability (Ping + all OPS surfa
     const indices = surfaces.map((s) => focusable.indexOf(s.el));
     const firstSurfaceIdx = Math.min(...indices);
     const lastSurfaceIdx = Math.max(...indices);
-    // Feature contract: "Tab from dashboard first focusable reaches all
-    // five OPS surfaces within <=10 tab-stops". We interpret this as:
+    // Feature contract: "Tab from the Test page's first focusable reaches
+    // all OPS surfaces within <=10 tab-stops". We interpret this as:
     // once you've Tabbed to the first OPS surface, the remaining four
     // must be within 10 additional Tab presses — i.e. the span from the
     // first OPS surface to the last is <=10 focusable steps.
@@ -375,7 +393,7 @@ describe("VAL-OPS-025 — Enter/Space on Test Sign dispatch identically to click
   });
 });
 
-describe("VAL-OPS-025 — Ping / Refresh All activation via keyboard", () => {
+describe("VAL-OPS-025 — Ping / Refresh peers activation via keyboard", () => {
   const pk = "0123456789abcdef".repeat(4);
 
   it("Enter inside Test Ping input dispatches ping with the typed pubkey", async () => {
@@ -396,9 +414,9 @@ describe("VAL-OPS-025 — Ping / Refresh All activation via keyboard", () => {
     });
   });
 
-  it("Space on focused Refresh All dispatches refresh_all_peers", async () => {
+  it("Space on focused Refresh peers dispatches refresh_all_peers", async () => {
     renderDashboard();
-    const panel = screen.getByTestId("test-refresh-all-panel");
+    const panel = screen.getByTestId("test-peer-refresh-panel");
     const submit = panel.querySelector(
       "button[type='submit']",
     ) as HTMLButtonElement;
@@ -420,8 +438,8 @@ describe("VAL-OPS-025 — Ping / Refresh All activation via keyboard", () => {
   });
 });
 
-describe("Production build guard — new dev panels are gated on import.meta.env.DEV", () => {
-  it("TestPing and TestRefreshAll imports are wrapped in an `import.meta.env.DEV` guard", async () => {
+describe("Build availability — Test page is available in every web-demo build", () => {
+  it("Test route is declared directly and command panel sources have no build-gating markers", async () => {
     const fs = await import("node:fs/promises");
     const path = await import("node:path");
     const repoRoot = process.cwd();
@@ -429,10 +447,16 @@ describe("Production build guard — new dev panels are gated on import.meta.env
       path.join(repoRoot, "src/screens/DashboardScreen/index.tsx"),
       "utf8",
     );
-    expect(dashboardSrc).toMatch(/import\.meta\.env\.DEV[\s\S]*?TestPingPanel/);
-    expect(dashboardSrc).toMatch(
-      /import\.meta\.env\.DEV[\s\S]*?TestRefreshAllPanel/,
+    const coreRoutesSrc = await fs.readFile(
+      path.join(repoRoot, "src/app/CoreRoutes.tsx"),
+      "utf8",
     );
+    expect(coreRoutesSrc).toMatch(/\/dashboard\/:profileId\/test/);
+    expect(coreRoutesSrc).not.toMatch(
+      /import\.meta\.env\.DEV[\s\S]{0,160}\/dashboard\/:profileId\/test/,
+    );
+    expect(dashboardSrc).toMatch(/mode === "test"[\s\S]*?TestPingPanel/);
+    expect(dashboardSrc).toMatch(/mode === "test"[\s\S]*?TestPeerRefreshPanel/);
     const pingSrc = await fs.readFile(
       path.join(
         repoRoot,
@@ -440,15 +464,19 @@ describe("Production build guard — new dev panels are gated on import.meta.env
       ),
       "utf8",
     );
+    expect(pingSrc).not.toMatch(/import\.meta\.env\.DEV/);
+    expect(pingSrc).not.toMatch(/Dev-only|dev-only|production builds/);
     expect(pingSrc).not.toMatch(/mockOpenPolicyPrompt/);
     expect(pingSrc).not.toMatch(/__DEV__/);
     const refreshSrc = await fs.readFile(
       path.join(
         repoRoot,
-        "src/screens/DashboardScreen/panels/TestRefreshAllPanel.tsx",
+        "src/screens/DashboardScreen/panels/TestPeerRefreshPanel.tsx",
       ),
       "utf8",
     );
+    expect(refreshSrc).not.toMatch(/import\.meta\.env\.DEV/);
+    expect(refreshSrc).not.toMatch(/Dev-only|dev-only|production builds/);
     expect(refreshSrc).not.toMatch(/mockOpenPolicyPrompt/);
     expect(refreshSrc).not.toMatch(/__DEV__/);
   });
@@ -473,10 +501,8 @@ describe(":focus-visible outline is declared for all four test triggers", () => 
       /\.test-ping-panel button\[type="submit"\]:focus-visible/,
     );
     expect(css).toMatch(
-      /\.test-refresh-all-panel button\[type="submit"\]:focus-visible/,
+      /\.test-peer-refresh-panel button\[type="submit"\]:focus-visible/,
     );
-    // The shared `.button:focus-visible` rule covers the Refresh peers
-    // icon button (it uses the `.button` class via the UI helper).
     expect(css).toMatch(/\.button:focus-visible/);
   });
 });

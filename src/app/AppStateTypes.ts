@@ -392,13 +392,30 @@ export type EnrichedOperationFailure = OperationFailure & {
  * `settledAt` is set when the corresponding completion or failure has
  * been drained; entries whose `settledAt` is older than 60s are pruned
  * by a provider-side GC sweep so the index never grows without bound.
+ *
+ * `probeSource` distinguishes user/dev Ping dispatches from background
+ * refresh probes. Drain filtering must use this explicit tag rather than
+ * treating a missing correlation as proof of background traffic.
  */
 export interface PendingDispatchEntry {
   type: "sign" | "ecdh" | "ping" | "onboard";
   message_hex_32?: string;
   peer_pubkey?: string;
+  probeSource?: "refresh" | "user";
   dispatchedAt: number;
   settledAt?: number;
+}
+
+/**
+ * Most recent app-observed peer Ping RTT sample. This is UI telemetry,
+ * not a persisted runtime contract: `latencyMs` measures elapsed time
+ * from local dispatch/correlation to drained `CompletedOperation::Ping`.
+ */
+export interface PeerLatencySample {
+  latencyMs: number;
+  measuredAt: number;
+  requestId: string;
+  source: "refresh" | "user";
 }
 
 /**
@@ -539,8 +556,9 @@ export interface NoncePoolSnapshot {
  *   - `SIGN`         — sign completion (successful partial signature or
  *                       full aggregation)
  *   - `ECDH`         — ecdh completion (shared secret derived)
- *   - `ECHO`         — inbound peer event accepted by the local signer
- *                       (`inbound_accepted` runtime event)
+ *   - `ECHO`         — semantic peer confirmation rows from Paper/demo
+ *                       fixtures; raw runtime `inbound_accepted` plumbing
+ *                       remains lifecycle telemetry, not a visible log row
  *   - `PING`         — ping completion (peer round-trip measured)
  *   - `SIGNER_POLICY` — a change to the local signer's policy state
  *                       (`policy_updated` runtime event)
@@ -650,6 +668,11 @@ export interface AppStateValue {
   activeProfile: StoredProfileSummary | null;
   runtimeStatus: RuntimeStatusSummary | null;
   runtimeRelays: RuntimeRelayStatus[];
+  /**
+   * Runtime-only peer ping RTT samples keyed by peer pubkey. Cleared on
+   * profile/runtime boundaries and ignored by Paper/demo fixture panels.
+   */
+  peerLatencyByPubkey: Record<string, PeerLatencySample>;
   signerPaused: boolean;
   createSession: CreateSession | null;
   importSession: ImportSession | null;
@@ -956,7 +979,7 @@ export interface AppStateValue {
    *     `onboardingPackages[idx].packageText`.
    *
    * Also dispatches the matching runtime Onboard command so the
-   * provider can correlate later echo/failure drains back to the row.
+   * provider can correlate later completion/failure drains back to the row.
    */
   encodeDistributionPackage: (idx: number, password: string) => Promise<void>;
   /**
@@ -966,13 +989,13 @@ export interface AppStateValue {
    * `pendingDispatchRequestId` / `adoptionError` retry state is
    * refreshed.
    */
-  retryDistributionPackageAdoption: (idx: number) => Promise<void>;
+  retryDistributionPackageAdoption: (idx: number) => Promise<string | undefined>;
   /**
    * fix-followup-distribute-2a — unconditionally mark the remote
    * share at {@link idx} as "Distributed" by flipping
    * `onboardingPackages[idx].manuallyMarkedDistributed = true` on
    * the current create session. Offline fallback for QR / manual
-   * handoff; independent of relay state or echo observation
+   * handoff; independent of relay state or onboard completion
    * (VAL-FOLLOWUP-005).
    */
   markPackageDistributed: (idx: number) => void;

@@ -116,6 +116,13 @@ interface RuntimeRelayPumpOptions {
    */
   onDrains?: (drains: RuntimeDrainBatch) => void;
   /**
+   * Called after `refresh_all_peers` has materialised its fan-out Ping
+   * operations and before the resulting drains are emitted. App state uses
+   * this to tag background liveness probes so they do not masquerade as
+   * user/dev pings when completions or failures arrive later.
+   */
+  onRefreshPingRequestIds?: (requestIds: string[]) => void;
+  /**
    * Optional observer called on every underlying socket event (open/close/
    * error) for diagnostic consumers. The pump itself already uses socket
    * events to drive per-relay telemetry; this hook is for additional
@@ -164,6 +171,7 @@ export class RuntimeRelayPump {
   private readonly now: () => number;
   private readonly onRelayStatusChange?: (statuses: RuntimeRelayStatus[]) => void;
   private readonly onDrains?: (drains: RuntimeDrainBatch) => void;
+  private readonly onRefreshPingRequestIds?: (requestIds: string[]) => void;
   private readonly connections: RuntimeRelayConnectionState[];
   private relayStatusesValue: RuntimeRelayStatus[];
   private stopped = true;
@@ -196,6 +204,7 @@ export class RuntimeRelayPump {
     this.now = options.now ?? (() => Date.now());
     this.onRelayStatusChange = options.onRelayStatusChange;
     this.onDrains = options.onDrains;
+    this.onRefreshPingRequestIds = options.onRefreshPingRequestIds;
     this.connections = relays.map((url) => ({
       url,
       connection: null,
@@ -330,10 +339,44 @@ export class RuntimeRelayPump {
   }
 
   async refreshAll(): Promise<RuntimeStatusSummary> {
+    let baselineIds: Set<string> | null = null;
     if (!this.stopped) {
+      baselineIds = new Set(
+        this.runtime.runtimeStatus().pending_operations.map(
+          (op) => op.request_id,
+        ),
+      );
       this.runtime.handleCommand({ type: "refresh_all_peers" });
     }
-    return this.pump();
+    this.runtime.tick(this.now());
+    if (baselineIds) {
+      const requestIds = this.runtime
+        .runtimeStatus()
+        .pending_operations.filter(
+          (op) => op.op_type === "Ping" && !baselineIds.has(op.request_id),
+        )
+        .map((op) => op.request_id);
+      if (requestIds.length > 0) {
+        this.onRefreshPingRequestIds?.(requestIds);
+      }
+    }
+    if (!this.stopped) {
+      await this.publishOutboundEvents();
+    }
+    const completions = this.runtime.drainCompletions();
+    const failures = this.runtime.drainFailures();
+    const events = this.runtime.drainRuntimeEvents();
+    if (
+      this.onDrains &&
+      (completions.length > 0 || failures.length > 0 || events.length > 0)
+    ) {
+      try {
+        this.onDrains({ completions, failures, events });
+      } catch {
+        // Callback must not break pumping. Swallow and continue.
+      }
+    }
+    return this.runtime.runtimeStatus();
   }
 
   async pump(): Promise<RuntimeStatusSummary> {

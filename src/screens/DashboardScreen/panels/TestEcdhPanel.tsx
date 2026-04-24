@@ -4,15 +4,13 @@ import { useAppState } from "../../../app/AppState";
 const HEX_RE = /^[0-9a-fA-F]{64}$/;
 
 /**
- * Dev-only affordance for smoke-testing the `ecdh` runtime command from the
- * Dashboard without needing a second device. Sibling of {@link TestSignPanel}.
- * Rendered only when `import.meta.env.DEV` is true so Vite's dead-code
- * elimination strips this panel (and its mock-style helpers) from production
- * builds.
+ * Web-demo affordance for smoke-testing the `ecdh` runtime command from the
+ * profile-scoped Test page without needing a second device. Sibling of
+ * {@link TestSignPanel}.
  *
  * Fulfils:
  *   - Feature m1-ecdh-dispatch — "Add an ECDH dispatch path in AppStateValue /
- *     Dashboard (dev-gated affordance)"
+ *     Dashboard"
  *   - VAL-OPS-009 — "ECDH happy path surfaces a completion" (UI dispatch side)
  *   - VAL-OPS-020 — "Concurrent sign + ECDH do not interfere" — the
  *     dispatch path is independent of TestSignPanel so a user can fire both
@@ -94,11 +92,11 @@ export function TestEcdhPanel({
       aria-labelledby={`${inputId}-heading`}
     >
       <div className="value" id={`${inputId}-heading`}>
-        Test ECDH (dev)
+        Test ECDH
       </div>
       <p className="help">
         Dispatches an <code>ecdh</code> command to the runtime using the
-        32-byte hex pubkey below. Dev-only; absent from production builds.
+        32-byte hex pubkey below.
       </p>
       <form onSubmit={onSubmit} className="test-ecdh-form">
         <div className="field">
