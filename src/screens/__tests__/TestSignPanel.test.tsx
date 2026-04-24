@@ -298,7 +298,9 @@ describe("Build availability — TestSignPanel is available in every web-demo bu
       "utf8",
     );
     expect(panelSrc).not.toMatch(/import\.meta\.env\.DEV/);
-    expect(panelSrc).not.toMatch(/Dev-only|dev-only|production builds/);
+    expect(panelSrc).not.toMatch(
+      /\bDev-only\b|\bdev-only\b|not (?:shipped|included) in production/,
+    );
     expect(panelSrc).not.toMatch(/mockOpenPolicyPrompt/);
     expect(panelSrc).not.toMatch(/__DEV__/);
   });

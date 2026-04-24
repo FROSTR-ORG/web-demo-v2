@@ -21,7 +21,9 @@ export function RotateCreateProfileScreen() {
   const { rotateKeysetSession, createRotatedProfile } = useAppState();
   const demoUi = useDemoUi();
   const demoProfile = Boolean(demoUi.rotateKeyset || demoUi.progress);
-  const presetPassword = demoUi.rotateKeyset?.passwordPreset ?? "";
+  const presetPassword = rotateKeysetSession
+    ? ""
+    : demoUi.rotateKeyset?.passwordPreset ?? "";
   const rotatedGroup = rotateKeysetSession?.rotated?.next.group;
   const previousLocalIdx = rotateKeysetSession?.sourceShares[0]?.idx;
   const rotatedLocalShare =

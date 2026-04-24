@@ -478,8 +478,8 @@ describe("OnboardSponsorHandoffScreen — VAL-ONBOARD-005 / 023 / 025", () => {
   // fix-m7-ut-r1-direct-evidence-and-deviations — VAL-ONBOARD-022
   // widening: focus restoration after Escape → Enter (Discard) must
   // return document.activeElement to the element that launched the
-  // sponsor flow (the Settings sidebar entry), OR — if no trigger was
-  // recorded on router state — to a well-defined landing control
+  // sponsor flow, OR — if no trigger was recorded on router state —
+  // to a well-defined landing control
   // (the <body> / root AppShell) so focus is never left on a deleted
   // node. We render with a synthetic trigger element wired through
   // route state so the restore path is exercised end-to-end.

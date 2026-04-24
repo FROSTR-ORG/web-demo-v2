@@ -716,7 +716,6 @@ function RuntimeEventLog() {
           {displayRows.map((row) => {
             const entry = row.kind === "single" ? row.entry : row.entries[0];
             const expanded = expandedRowIds.has(row.id);
-            const scrubbed = scrubEventLogPayload(entry.payload);
             return (
               <div className="event-log-item" key={row.id}>
                 <button
@@ -747,7 +746,11 @@ function RuntimeEventLog() {
                 </button>
                 {expanded && row.kind === "single" ? (
                   <pre className="event-log-expanded">
-                    {JSON.stringify(scrubbed, null, 2)}
+                    {JSON.stringify(
+                      scrubEventLogPayload(entry.payload),
+                      null,
+                      2,
+                    )}
                   </pre>
                 ) : null}
                 {expanded && row.kind === "group" ? (

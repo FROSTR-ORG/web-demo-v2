@@ -323,9 +323,13 @@ describe("AppStateProvider — runtimeEventLog", () => {
     }
   });
 
-  it("keeps InboundAccepted drains in lifecycleEvents without surfacing ECHO log rows", async () => {
+  it("keeps routine lifecycle drains in lifecycleEvents without surfacing visible log rows", async () => {
     const statusEvent: RuntimeEvent = {
       kind: "status_changed",
+      status: BASE_STATUS,
+    };
+    const commandQueuedEvent: RuntimeEvent = {
+      kind: "command_queued",
       status: BASE_STATUS,
     };
     const inboundEvent: RuntimeEvent = {
@@ -348,24 +352,81 @@ describe("AppStateProvider — runtimeEventLog", () => {
       testWindow.__iglooTestAbsorbDrains?.({
         completions: [],
         failures: [],
-        events: [inboundEvent, statusEvent],
+        events: [inboundEvent, commandQueuedEvent, statusEvent],
       });
     });
 
     await waitFor(() => {
-      expect(latest.lifecycleEvents).toHaveLength(2);
-      expect(latest.runtimeEventLog).toHaveLength(1);
+      expect(latest.lifecycleEvents).toHaveLength(3);
+      expect(latest.runtimeEventLog).toHaveLength(0);
     });
     expect(latest.lifecycleEvents.map((event) => event.kind)).toEqual([
       "inbound_accepted",
+      "command_queued",
       "status_changed",
     ]);
-    expect(latest.runtimeEventLog.map((entry) => entry.badge)).toEqual([
-      "SYNC",
-    ]);
-    expect(latest.runtimeEventLog.some((entry) => entry.badge === "ECHO")).toBe(
-      false,
+    expect(latest.runtimeEventLog.some((entry) => entry.badge === "ECHO")).toBe(false);
+    expect(latest.runtimeEventLog.some((entry) => entry.badge === "INFO")).toBe(false);
+    expect(latest.runtimeEventLog.some((entry) => entry.badge === "SYNC")).toBe(false);
+  });
+
+  it("surfaces meaningful runtime drains while hiding command_queued/status_changed noise", async () => {
+    const signCompletion: CompletedOperation = {
+      Sign: { request_id: "req-sign-quiet", signatures_hex64: ["sig"] },
+    };
+    const ecdhCompletion: CompletedOperation = {
+      Ecdh: {
+        request_id: "req-ecdh-quiet",
+        shared_secret_hex32: "ab".repeat(32),
+      },
+    };
+    const onboardCompletion = {
+      Onboard: { request_id: "req-onboard-quiet", group_member_count: 2 },
+    } as unknown as CompletedOperation;
+    const failure: OperationFailure = {
+      request_id: "req-fail-quiet",
+      op_type: "sign",
+      code: "timeout",
+      message: "peer offline",
+      failed_peer: null,
+    };
+
+    let latest!: AppStateValue;
+    render(
+      <AppStateProvider>
+        <Capture onState={(state) => (latest = state)} />
+      </AppStateProvider>,
     );
+    await waitFor(() => expect(latest).toBeTruthy());
+
+    const testWindow = window as TestWindow;
+    await act(async () => {
+      testWindow.__iglooTestAbsorbDrains?.({
+        completions: [signCompletion, ecdhCompletion, onboardCompletion],
+        failures: [failure],
+        events: [
+          { kind: "command_queued", status: BASE_STATUS },
+          { kind: "status_changed", status: BASE_STATUS },
+          { kind: "policy_updated", status: BASE_STATUS },
+        ],
+      });
+    });
+
+    await waitFor(() =>
+      expect(latest.runtimeEventLog.map((entry) => entry.badge)).toEqual([
+        "SIGNER_POLICY",
+        "SIGN",
+        "ECDH",
+        "ONBOARD",
+        "ERROR",
+        "ONBOARD",
+      ]),
+    );
+    expect(latest.lifecycleEvents.map((event) => event.kind)).toEqual([
+      "command_queued",
+      "status_changed",
+      "policy_updated",
+    ]);
   });
 
   it("surfaces uncorrelated Ping drains instead of assuming they are background refresh probes", async () => {

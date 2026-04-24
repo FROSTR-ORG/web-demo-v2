@@ -246,7 +246,8 @@ export function deriveApprovalRowsFromRuntime(
  * Background refresh probes fan out into per-peer Ping ops, but those are
  * liveness checks, not approval requests. Keep explicit user/dev pings
  * visible; legacy ping entries without a probeSource are treated as user
- * initiated so older fixtures remain useful.
+ * initiated so older fixtures remain useful. If a Ping op has no dispatch
+ * index entry, keep it visible as the safer fallback.
  */
 export function filterPendingApprovalOperations(
   pendingOps: PendingOperation[],
@@ -256,7 +257,7 @@ export function filterPendingApprovalOperations(
   return pendingOps.filter((op) => {
     if (op.op_type !== "Ping") return true;
     const entry = pendingDispatchIndex[op.request_id];
-    return entry?.type === "ping" && entry.probeSource !== "refresh";
+    return !entry || (entry.type === "ping" && entry.probeSource !== "refresh");
   });
 }
 

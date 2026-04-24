@@ -189,6 +189,7 @@ describe("RuntimeRelayPump", () => {
   });
 
   it("tags refresh_all fan-out Ping request ids before drain callbacks run", async () => {
+    const calls: string[] = [];
     class RefreshRuntime extends FakeRuntime {
       private refreshQueued = false;
       private pending: RuntimeStatusSummary["pending_operations"] = [];
@@ -228,6 +229,11 @@ describe("RuntimeRelayPump", () => {
           pending_operations: this.pending,
         };
       }
+
+      override drainCompletions() {
+        calls.push("drain");
+        return super.drainCompletions();
+      }
     }
 
     const runtime = new RefreshRuntime();
@@ -239,13 +245,18 @@ describe("RuntimeRelayPump", () => {
       relayClient: new FakeRelayClient([relay]),
       eventKind: 27000,
       now: () => 1,
-      onRefreshPingRequestIds: (requestIds) => tagged.push(requestIds),
+      onRefreshPingRequestIds: (requestIds) => {
+        calls.push("refresh");
+        tagged.push(requestIds);
+      },
     });
 
     await pump.start();
     await pump.refreshAll();
 
     expect(tagged).toEqual([["req-refresh-ping"]]);
+    expect(calls.indexOf("refresh")).toBeGreaterThanOrEqual(0);
+    expect(calls.indexOf("refresh")).toBeLessThan(calls.lastIndexOf("drain"));
   });
 
   it("marks failed connects and failed publishes offline", async () => {

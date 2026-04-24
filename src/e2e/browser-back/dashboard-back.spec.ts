@@ -12,13 +12,10 @@ import { test, expect, type Page } from "@playwright/test";
  *
  * The production app does not expose a `/dashboard/:id/settings`
  * sub-route — Settings is a sidebar overlay over `/dashboard/:id`.
- * The closest "deep route" the user can reach from the dashboard is
- * `/onboard-sponsor`, which the Settings sidebar navigates to via
- * `navigate("/onboard-sponsor")`. This spec exercises the contract
- * on that deep route: observe dashboard state snapshot → navigate to
- * `/onboard-sponsor` → `page.goBack()` → assert the dashboard route
- * is restored AND the pending_operations / runtimeEventLog
- * observables did not regress.
+ * This spec exercises the back-button contract on `/onboard-sponsor`:
+ * observe dashboard state snapshot → navigate to `/onboard-sponsor`
+ * → `page.goBack()` → assert the dashboard route is restored AND the
+ * pending_operations / runtimeEventLog observables did not regress.
  *
  * To run manually:
  *   npx playwright test \
@@ -200,9 +197,7 @@ test.describe("VAL-CROSS-023 — browser Back from a deep dashboard route", () =
 
         // Navigate to the deep route via client-side history (again:
         // hard `page.goto` would discard the in-memory AppState and
-        // break the return-Back assertion). `/onboard-sponsor` is
-        // reachable from the Dashboard Settings sidebar in the
-        // production app.
+        // break the return-Back assertion).
         await page.evaluate(() => {
           window.history.pushState({}, "", "/onboard-sponsor");
           window.dispatchEvent(new PopStateEvent("popstate"));

@@ -5,14 +5,14 @@
  * flow (the Paper export only covers the requester side); this screen
  * is therefore built on the existing design-system primitives
  * (`.settings-section`, `.field`, `.button-*`, `.settings-btn-*`) so
- * the layout, typography and color tokens match the Settings sidebar
- * the user just came from. See
+ * the layout, typography and color tokens remain aligned with the
+ * dashboard settings surface. See
  * `docs/runtime-deviations-from-paper.md` for the dedicated deviation
  * entry.
  *
  * Surface contracts covered here (VAL-ONBOARD-*):
- *   - 001 / 002: entry point lives in SettingsSidebar (this file only
- *     implements the post-click screens).
+ *   - 001 / 002: this file implements the source-side configure and
+ *     handoff screens.
  *   - 003: form fields + CTA gating (label / password / relay overrides).
  *   - 004 / 025: Copy button writes the exact bfonboard1… string.
  *   - 005: monospace textarea + Copy + QR (rendered on `<canvas>` via
@@ -480,9 +480,8 @@ export function OnboardSponsorHandoffScreen() {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const triggerActiveElementRef = useRef<HTMLElement | null>(null);
 
-  // Capture the previously-focused element on mount (typically the
-  // "Onboard a Device" button in the Settings sidebar) so Cancel /
-  // Escape can restore focus per VAL-ONBOARD-022.
+  // Capture the previously-focused element on mount so Cancel / Escape can
+  // restore focus per VAL-ONBOARD-022.
   useEffect(() => {
     triggerActiveElementRef.current =
       (location.state as { triggerActiveElement?: HTMLElement } | null)

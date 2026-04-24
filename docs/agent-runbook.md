@@ -143,9 +143,8 @@ next agent can see which behavior is intentional.
   `ws://127.0.0.1:8194`.
 - Most multi-device specs spawn and tear down their own relay. Starting a relay
   manually can cause port `8194` contention.
-- The user-facing restore form accepts `wss://` relays. Local
-  `ws://127.0.0.1:8194` restore tests rely on a DEV-only opt-in documented in
-  `docs/runtime-deviations-from-paper.md`.
+- Relay backup publish/restore is not surfaced in the web demo. Onboarding and
+  profile transfer use `bfonboard` / `bfprofile` import-export flows instead.
 - DEV-only hooks such as `window.__debug.*` and `window.__iglooTest*` are for
   validation evidence. They must not become production behavior.
 

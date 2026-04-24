@@ -377,6 +377,25 @@ export function createDemoAppState(
       },
       event: { id: "mock", pubkey: "mock", created_at: 0, kind: 30078, tags: [], content: "mock", sig: "mock" },
     }),
+    publishTestNote: async ({ content }) => {
+      const eventId = "0".repeat(64);
+      return {
+        requestId: "mock-request-note",
+        eventId,
+        nevent: "nevent1mock",
+        event: {
+          id: eventId,
+          pubkey: DEMO_GROUP_PK_HEX,
+          created_at: Math.floor(now / 1000),
+          kind: 1,
+          tags: [],
+          content,
+          sig: "a".repeat(128),
+        },
+        reached: ["wss://relay.primal.net"],
+        failed: [],
+      };
+    },
     setSignerPaused: () => undefined,
     refreshRuntime: () => undefined,
     restartRuntimeConnections: async () => undefined,

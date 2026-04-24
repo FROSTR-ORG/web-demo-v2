@@ -307,15 +307,15 @@ test("design-system primitives render in the Settings sidebar on the dashboard",
   await page.goto(`/demo/dashboard-settings-lock-profile`);
   await expect(page.locator(".app-header")).toBeVisible();
 
-  // `.settings-section` and `.settings-card` are used by every section
-  // (Device Profile / Group Profile / Replace Share / Onboard a Device /
-  // etc.), so we expect multiple instances.
+  // `.settings-section` and `.settings-card` are used by the Paper-aligned
+  // settings sections (Device Profile / Group Profile / Replace Share / etc.),
+  // so we expect multiple instances.
   await expect(page.locator(".settings-section").first()).toBeVisible();
   expect(await page.locator(".settings-section").count()).toBeGreaterThanOrEqual(2);
   await expect(page.locator(".settings-card").first()).toBeVisible();
   expect(await page.locator(".settings-card").count()).toBeGreaterThanOrEqual(2);
 
-  // The blue CTA is used by Replace Share / Onboard a Device; at least
-  // one must exist in the rendered sidebar.
+  // The blue CTA is used by Replace Share; at least one must exist in the
+  // rendered sidebar.
   expect(await page.locator(".settings-btn-blue").count()).toBeGreaterThanOrEqual(1);
 });

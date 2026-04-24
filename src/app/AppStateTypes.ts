@@ -16,6 +16,7 @@ import type {
   StoredProfileSummary,
 } from "../lib/bifrost/types";
 import type { RuntimeCommand } from "../lib/bifrost/runtimeClient";
+import type { NostrTextNoteEvent } from "../lib/nostr/testNote";
 import type { RuntimeRelayStatus } from "../lib/relay/runtimeRelayPump";
 import type { RuntimeExportPackages } from "./runtimeExports";
 
@@ -663,6 +664,15 @@ export const RUNTIME_EVENT_LOG_MAX = 500;
  */
 export const PROFILE_NAME_MAX_LENGTH = 64;
 
+export interface TestNotePublishResult {
+  requestId: string;
+  eventId: string;
+  nevent: string;
+  event: NostrTextNoteEvent;
+  reached: string[];
+  failed: string[];
+}
+
 export interface AppStateValue {
   profiles: StoredProfileSummary[];
   activeProfile: StoredProfileSummary | null;
@@ -671,6 +681,9 @@ export interface AppStateValue {
   /**
    * Runtime-only peer ping RTT samples keyed by peer pubkey. Cleared on
    * profile/runtime boundaries and ignored by Paper/demo fixture panels.
+   * The provider prunes/flushed samples at runtime/profile boundaries, not
+   * on every active-peer-set change, so consumers must tolerate stale keys
+   * that are not present in the current peer list.
    */
   peerLatencyByPubkey: Record<string, PeerLatencySample>;
   signerPaused: boolean;
@@ -987,7 +1000,12 @@ export interface AppStateValue {
    * package. Reuses the existing in-memory package stash and preserves
    * package text, password, and device-label metadata; only the
    * `pendingDispatchRequestId` / `adoptionError` retry state is
-   * refreshed.
+   * refreshed. Resolves to the new runtime request id when a dispatch
+   * registers a correlatable pending operation, matching
+   * {@link HandleRuntimeCommandResult}; resolves to `undefined` when no
+   * dispatch is registered (signer paused, debounced, or failed before a
+   * pending operation exists). Unlike {@link encodeDistributionPackage},
+   * callers can use this id to correlate a successful retry registration.
    */
   retryDistributionPackageAdoption: (idx: number) => Promise<string | undefined>;
   /**
@@ -1166,6 +1184,7 @@ export interface AppStateValue {
       sig: string;
     };
   }>;
+  publishTestNote: (input: { content: string }) => Promise<TestNotePublishResult>;
   setSignerPaused: (paused: boolean) => void;
   refreshRuntime: () => void;
   restartRuntimeConnections: () => Promise<void>;

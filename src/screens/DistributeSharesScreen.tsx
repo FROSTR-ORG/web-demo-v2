@@ -231,6 +231,7 @@ function RemoteShareCard({
   const [busy, setBusy] = useState(false);
   const [retryBusy, setRetryBusy] = useState(false);
   const [retryError, setRetryError] = useState("");
+  const [lastRetryRequestId, setLastRetryRequestId] = useState<string | null>(null);
 
   const distributed = packageDistributed(pkg);
   const actionsDisabled = !pkg.packageCreated;
@@ -267,7 +268,8 @@ function RemoteShareCard({
     setRetryError("");
     setRetryBusy(true);
     try {
-      await retryDistributionPackageAdoption(pkg.idx);
+      const requestId = await retryDistributionPackageAdoption(pkg.idx);
+      setLastRetryRequestId(requestId ?? null);
     } catch (err) {
       setRetryError(
         err instanceof Error
@@ -418,6 +420,11 @@ function RemoteShareCard({
             variant="chip"
             size="sm"
             disabled={retryBusy}
+            title={
+              lastRetryRequestId
+                ? `Last retry request: ${lastRetryRequestId}`
+                : undefined
+            }
             aria-label={`Retry adoption for share ${displayNumber}`}
             onClick={() => void onRetryAdoption()}
           >

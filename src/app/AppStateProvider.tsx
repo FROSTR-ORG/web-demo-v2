@@ -56,6 +56,11 @@ import {
   type RuntimeDrainBatch,
   type RuntimeRelayStatus,
 } from "../lib/relay/runtimeRelayPump";
+import {
+  buildTextNoteForSigning,
+  encodeMinimalNevent,
+  finalizeTextNoteEvent,
+} from "../lib/nostr/testNote";
 import type { RelaySocketEvent } from "../lib/relay/browserRelayClient";
 import {
   OnboardingRelayError,
@@ -194,6 +199,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [runtimeFailures, setRuntimeFailures] = useState<
     EnrichedOperationFailure[]
   >([]);
+  const runtimeCompletionsRef = useRef<CompletedOperation[]>([]);
+  const runtimeFailuresRef = useRef<EnrichedOperationFailure[]>([]);
   const [pendingDispatchIndex, setPendingDispatchIndex] = useState<
     Record<string, PendingDispatchEntry>
   >({});
@@ -705,6 +712,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         merged.sort((a, b) =>
           completionRequestId(a).localeCompare(completionRequestId(b)),
         );
+        runtimeCompletionsRef.current = merged;
         return merged;
       });
       // Advance any tracked lifecycle entries to `completed`. Keyed by the
@@ -799,6 +807,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setRuntimeFailures((previous) => {
           const merged = [...previous, ...enriched];
           merged.sort((a, b) => a.request_id.localeCompare(b.request_id));
+          runtimeFailuresRef.current = merged;
           return merged;
         });
       }
@@ -933,13 +942,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
     }
     // Populate the dashboard RuntimeEventLog ring buffer from user-facing
-    // drain channels. Runtime `InboundAccepted` stays in lifecycleEvents
-    // for diagnostics/participation checks, but it is transport plumbing:
-    // Paper's `ECHO` badge is reserved for meaningful semantic confirmation
-    // rows, not every accepted relay envelope. Preserves drain order for the
-    // visible rows: events first, then completions, then failures. Each
-    // entry is tagged with a typed badge used by the Event Log panel for
-    // colour/label rendering
+    // drain channels. bifrost-rs exposes three relevant drains here:
+    // lifecycle `RuntimeEvent`s, semantic `CompletedOperation`s, and
+    // user-facing `OperationFailure`s. Keep raw lifecycle events in
+    // `lifecycleEvents` for diagnostics, but only promote meaningful
+    // runtime events into the visible Event Log; routine queue/tick/relay
+    // plumbing such as `command_queued`, `status_changed`, and
+    // `inbound_accepted` would otherwise drown out sign/onboard/error rows.
+    // Preserves drain order for the visible rows: events first, then
+    // completions, then failures. Each entry is tagged with a typed badge
+    // used by the Event Log panel for colour/label rendering
     // (VAL-EVENTLOG-005 / VAL-EVENTLOG-014 / VAL-EVENTLOG-024).
     if (
       drains.events.length > 0 ||
@@ -949,7 +961,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const now = Date.now();
       const newEntries: RuntimeEventLogEntry[] = [];
       for (const event of drains.events) {
-        if (isInboundAcceptedRuntimeEvent(event)) continue;
+        if (!isVisibleRuntimeEventLogEvent(event)) continue;
         runtimeEventLogSeqRef.current += 1;
         newEntries.push({
           seq: runtimeEventLogSeqRef.current,
@@ -1031,6 +1043,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const resetDrainSlices = useCallback(() => {
     setRuntimeCompletions([]);
     setRuntimeFailures([]);
+    runtimeCompletionsRef.current = [];
+    runtimeFailuresRef.current = [];
     setLifecycleEvents([]);
     setSignDispatchLog({});
     setSignLifecycleLog([]);
@@ -2152,7 +2166,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     async (
       idx: number,
       failurePrefix: string,
-    ): Promise<{ requestId?: string; adoptionError?: string }> => {
+    ): Promise<{
+      requestId?: string;
+      adoptionError?: string;
+      debounced?: boolean;
+    }> => {
       const context = createSessionShareContextRef.current;
       if (!context) {
         throw new Error(
@@ -2190,6 +2208,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
       try {
         const result = await dispatchRuntimeCommandRef.current?.(onboardCommand);
+        if (result?.debounced) {
+          return { debounced: true };
+        }
         return { requestId: result?.requestId ?? undefined };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -2245,22 +2266,25 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         idx,
         "Onboard dispatch failed",
       );
+      const dispatchDebounced = dispatchResult.debounced === true;
       // Populate the redacted preview (first 24 chars of bfonboard1…)
       // and flip packageCreated on the session view. Also stash the
       // onboard command's requestId so absorbDrains can correlate later
       // completions / failures. A missing requestId means the dispatch never
       // produced a trackable start, so surface that inline instead of leaving
-      // the row looking pending forever.
-      // `pendingDispatchRequestId` is ALWAYS set from this dispatch
-      // result (no fallback to `entry.pendingDispatchRequestId`) so
-      // a retry click whose dispatch throws produces `undefined`, not
-      // a stale id. `adoptionError` mirrors the same: cleared on
-      // successful dispatch, populated with inline copy on throw or
-      // missing requestId.
+      // the row looking pending forever. Debounced dispatches preserve the
+      // existing correlation/error fields because the original request remains
+      // in flight.
+      // Outside the debounced path, `pendingDispatchRequestId` is set from
+      // this dispatch result (no fallback to `entry.pendingDispatchRequestId`)
+      // so a retry click whose dispatch throws produces `undefined`, not a
+      // stale id. `adoptionError` mirrors the same: cleared on successful
+      // dispatch, populated with inline copy on throw or missing requestId.
       const preview = packageText.slice(0, 24);
-      const dispatchStartError =
-        dispatchResult.adoptionError ??
-        "onboard failed to start: missing requestId";
+      const dispatchStartError = dispatchDebounced
+        ? undefined
+        : dispatchResult.adoptionError ??
+          "onboard failed to start: missing requestId";
       setCreateSession((session) => {
         if (!session) return session;
         return {
@@ -2272,12 +2296,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                   packageText: preview,
                   password: "[redacted]",
                   packageCreated: true,
-                  pendingDispatchRequestId: dispatchResult.requestId
-                    ? dispatchResult.requestId
-                    : undefined,
-                  adoptionError: dispatchResult.requestId
-                    ? undefined
-                    : dispatchStartError,
+                  pendingDispatchRequestId: dispatchDebounced
+                    ? entry.pendingDispatchRequestId
+                    : dispatchResult.requestId
+                      ? dispatchResult.requestId
+                      : undefined,
+                  adoptionError: dispatchDebounced
+                    ? entry.adoptionError
+                    : dispatchResult.requestId
+                      ? undefined
+                      : dispatchStartError,
                 }
               : entry,
           ),
@@ -2313,6 +2341,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         idx,
         "Retry could not start",
       );
+      if (dispatchResult.debounced) {
+        return undefined;
+      }
       const retryError =
         dispatchResult.adoptionError ??
         (dispatchResult.requestId
@@ -4291,6 +4322,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     pendingDispatchIndexRef.current = pendingDispatchIndex;
   }, [pendingDispatchIndex]);
 
+  useEffect(() => {
+    runtimeCompletionsRef.current = runtimeCompletions;
+  }, [runtimeCompletions]);
+
+  useEffect(() => {
+    runtimeFailuresRef.current = runtimeFailures;
+  }, [runtimeFailures]);
+
   // Keep peerDenialQueueRef in lock-step with state so resolvePeerDenial
   // can look up the resolving entry without re-creating its identity on
   // every queue mutation.
@@ -4964,6 +5003,82 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     applyRuntimeStatus(runtime.runtimeStatus());
   }, [absorbDrains, applyRuntimeStatus, signerPaused]);
 
+  const publishTestNote: AppStateValue["publishTestNote"] = useCallback(
+    async ({ content }) => {
+      const profile = activeProfile;
+      const status = runtimeStatus;
+      if (!profile || !status) {
+        throw new Error("Cannot publish note: no unlocked profile is active.");
+      }
+      if (signerPausedRef.current || !status.readiness.sign_ready) {
+        throw new Error("Cannot publish note: signing is not ready.");
+      }
+      const groupPublicKey =
+        status.metadata.group_public_key || profile.groupPublicKey;
+      const eventForSigning = await buildTextNoteForSigning({
+        pubkey: groupPublicKey,
+        content,
+      });
+      const dispatch = await handleRuntimeCommand({
+        type: "sign",
+        message_hex_32: eventForSigning.id,
+      });
+      if (!dispatch.requestId) {
+        throw new Error(
+          dispatch.debounced
+            ? "Cannot publish note: sign request was debounced."
+            : "Cannot publish note: sign request did not register.",
+        );
+      }
+
+      const deadline = Date.now() + TEST_NOTE_SIGN_TIMEOUT_MS;
+      let signature: string | null = null;
+      while (Date.now() < deadline) {
+        const completion = runtimeCompletionsRef.current.find(
+          (entry) =>
+            "Sign" in entry && entry.Sign.request_id === dispatch.requestId,
+        );
+        if (completion && "Sign" in completion) {
+          signature = completion.Sign.signatures_hex64[0] ?? null;
+          break;
+        }
+        const failure = runtimeFailuresRef.current.find(
+          (entry) => entry.request_id === dispatch.requestId,
+        );
+        if (failure) {
+          throw new Error(
+            `Cannot publish note: signing failed (${failure.code}: ${failure.message}).`,
+          );
+        }
+        try {
+          if (relayPumpRef.current) {
+            applyRuntimeStatus(await relayPumpRef.current.pump());
+          } else {
+            refreshRuntime();
+          }
+        } catch {
+          refreshRuntime();
+        }
+        await sleep(TEST_NOTE_SIGN_POLL_MS);
+      }
+      if (!signature) {
+        throw new Error("Cannot publish note: signing timed out.");
+      }
+
+      const event = finalizeTextNoteEvent(eventForSigning, signature);
+      const publish = await relayPumpRef.current?.publishEvent(event);
+      return {
+        requestId: dispatch.requestId,
+        eventId: event.id,
+        nevent: encodeMinimalNevent(event.id),
+        event,
+        reached: publish?.reached ?? [],
+        failed: publish?.failed ?? [],
+      };
+    },
+    [activeProfile, applyRuntimeStatus, handleRuntimeCommand, refreshRuntime, runtimeStatus],
+  );
+
   useEffect(() => {
     // When the provider was hydrated from the demo bridge there is no real
     // RuntimeClient backing the visible runtimeStatus — running the tick loop
@@ -5142,6 +5257,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       clearCredentials,
       exportRuntimePackages,
       createProfileBackup,
+      publishTestNote,
       setSignerPaused,
       refreshRuntime,
       restartRuntimeConnections,
@@ -5223,6 +5339,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       clearCredentials,
       exportRuntimePackages,
       createProfileBackup,
+      publishTestNote,
       setSignerPaused,
       refreshRuntime,
       restartRuntimeConnections,
@@ -6097,14 +6214,26 @@ function badgeForCompletion(
 }
 
 /**
- * Runtime `InboundAccepted` is lifecycle-only plumbing. It remains in
- * `lifecycleEvents` for diagnostics, but the dashboard Event Log filters it
- * out before badge mapping so transport envelopes do not render as Paper's
- * semantic `ECHO` rows.
+ * bifrost-rs lifecycle events are diagnostic by default. The dashboard
+ * Event Log should surface stateful/user-meaningful runtime edges, while
+ * suppressing high-volume plumbing rows:
+ *  - `inbound_accepted`: relay envelope accepted for processing
+ *  - `command_queued`: local command was enqueued after `handle_command`
+ *  - `status_changed`: emitted after `tick` when runtime status JSON changes
+ *
+ * All raw lifecycle events remain available in `lifecycleEvents` and DEV
+ * debug surfaces; this predicate only controls the visible log.
  */
-function isInboundAcceptedRuntimeEvent(event: RuntimeEvent): boolean {
+function isVisibleRuntimeEventLogEvent(event: RuntimeEvent): boolean {
   const kind = String(event.kind).toLowerCase();
-  return kind === "inboundaccepted" || kind === "inbound_accepted";
+  return !(
+    kind === "inboundaccepted" ||
+    kind === "inbound_accepted" ||
+    kind === "commandqueued" ||
+    kind === "command_queued" ||
+    kind === "statuschanged" ||
+    kind === "status_changed"
+  );
 }
 
 /**
@@ -6286,6 +6415,12 @@ function runtimeCommandDescriptor(
 }
 
 const HANDLE_COMMAND_DEBOUNCE_MS = 300;
+const TEST_NOTE_SIGN_TIMEOUT_MS = 30_000;
+const TEST_NOTE_SIGN_POLL_MS = 250;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
 
 /**
  * Retention window for {@link PendingDispatchEntry} after settlement

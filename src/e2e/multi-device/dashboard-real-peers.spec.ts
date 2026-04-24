@@ -105,6 +105,15 @@ test.describe("dashboard real-peer workability", () => {
           pageA.getByTestId(`sign-activity-row-${signRequestId}`),
         ).toHaveAttribute("data-status", "completed");
 
+        const publishRequestId = await publishTestNoteUntilReached(
+          pageA,
+          pageB,
+          network,
+        );
+        await expect(
+          pageA.getByTestId(`sign-activity-row-${publishRequestId}`),
+        ).toHaveAttribute("data-status", "completed");
+
         const ecdhRequestId = await dispatchFromDevPanel(pageA, {
           panelTestId: "test-ecdh-panel",
           inputLabel: "Peer pubkey (64 hex chars)",
@@ -213,6 +222,99 @@ async function dispatchSignUntilCompleted(
   throw new Error(
     `Sign never completed after retries: ${JSON.stringify(attempts)}`,
   );
+}
+
+async function publishTestNoteUntilReached(
+  page: Page,
+  responderPage: Page,
+  network: RealPeerNetwork,
+): Promise<string> {
+  const attempts: Array<{ requestId: string; outcome: string }> = [];
+  await refreshResponderAdvertisement(page, responderPage, network.peerBPubkey32);
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const baselineIds = await signLifecycleIds(page);
+    const panel = page.getByTestId("test-publish-note-panel");
+    await panel.getByLabel("Note content").fill(
+      attempt === 1 ? "hello world" : `hello world ${attempt}`,
+    );
+    await panel.getByRole("button", { name: "Publish Note" }).click();
+    const requestId = await waitForNewSignLifecycleId(page, baselineIds);
+    const outcome = await waitForActivityOutcome(page, requestId);
+    attempts.push({ requestId, outcome });
+    if (outcome === "completed") {
+      await expect(panel.getByTestId("test-publish-note-event-id")).toContainText(
+        /[0-9a-f]{64}/,
+        { timeout: 45_000 },
+      );
+      await expect(panel.getByTestId("test-publish-note-relays")).toContainText(
+        /Published to [1-9]/,
+        { timeout: 45_000 },
+      );
+      return requestId;
+    }
+    await dismissRuntimeModalIfPresent(page);
+    await restoreRelayAndReadiness(page);
+    await refreshResponderAdvertisement(page, responderPage, network.peerBPubkey32);
+  }
+  throw new Error(
+    `Publish note never completed after retries: ${JSON.stringify(attempts)}`,
+  );
+}
+
+async function signLifecycleIds(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const w = window as unknown as {
+      __appState?: {
+        signLifecycleLog?: Array<{
+          request_id: string;
+          op_type: string;
+        }>;
+      };
+    };
+    return (w.__appState?.signLifecycleLog ?? [])
+      .filter((entry) => entry.op_type === "sign")
+      .map((entry) => entry.request_id);
+  });
+}
+
+async function waitForNewSignLifecycleId(
+  page: Page,
+  baselineIds: string[],
+): Promise<string> {
+  const handle = await page.waitForFunction(
+    (baselineIds: string[]) => {
+      const baseline = new Set(baselineIds);
+      const w = window as unknown as {
+        __appState?: {
+          signLifecycleLog?: Array<{
+            request_id: string;
+            op_type: string;
+            status: string;
+          }>;
+        };
+      };
+      const match = (w.__appState?.signLifecycleLog ?? [])
+        .slice()
+        .reverse()
+        .find(
+          (entry) =>
+            entry.op_type === "sign" &&
+            !baseline.has(entry.request_id) &&
+            (entry.status === "pending" ||
+              entry.status === "completed" ||
+              entry.status === "failed"),
+        );
+      return match?.request_id ?? null;
+    },
+    baselineIds,
+    { timeout: 15_000, polling: 100 },
+  );
+  const requestId = (await handle.jsonValue()) as string | null;
+  expect(requestId).toBeTruthy();
+  if (!requestId) {
+    throw new Error("No lifecycle request_id surfaced for publish note.");
+  }
+  return requestId;
 }
 
 async function dismissRuntimeModalIfPresent(page: Page): Promise<void> {
@@ -335,7 +437,9 @@ async function dispatchFromDevPanel(
           (entry) =>
             entry.op_type === opType &&
             entry.message_preview === preview &&
-            (entry.status === "pending" || entry.status === "completed"),
+            (entry.status === "pending" ||
+              entry.status === "completed" ||
+              entry.status === "failed"),
         );
       return match?.request_id ?? null;
     },
@@ -499,12 +603,14 @@ async function drivePermissionDenyAndRecovery(
 
   await page.getByRole("button", { name: /back to dashboard/i }).click();
   await expectStateTitle(page, "Signing Blocked", 45_000);
+  await openTestPage(page);
   await expect(
     page.getByTestId("test-sign-panel").getByRole("button", {
       name: "Test Sign",
     }),
   ).toBeDisabled();
 
+  await page.getByRole("button", { name: /back to dashboard/i }).click();
   await page.getByRole("button", { name: "Policies", exact: true }).click();
   await signChip.click();
   await expect(signChip).toHaveAttribute("data-state", "unset", {

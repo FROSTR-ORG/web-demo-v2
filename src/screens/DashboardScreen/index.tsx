@@ -34,6 +34,7 @@ import { SignActivityPanel } from "./panels/SignActivityPanel";
 import { TestEcdhPanel } from "./panels/TestEcdhPanel";
 import { TestPingPanel } from "./panels/TestPingPanel";
 import { TestPeerRefreshPanel } from "./panels/TestPeerRefreshPanel";
+import { TestPublishNotePanel } from "./panels/TestPublishNotePanel";
 import { TestSignPanel } from "./panels/TestSignPanel";
 import { SettingsSidebar } from "./sidebar/SettingsSidebar";
 import { deriveDashboardState, isNoncePoolDepleted } from "./dashboardState";
@@ -783,6 +784,9 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
   const policiesHeaderLabel = policiesActive ? "Dashboard" : "Policies";
   const policiesHeaderAriaLabel = policiesActive ? "Back to dashboard" : undefined;
   const showTestHeaderButton = !testPageActive;
+  const sharePublicKeyLabel =
+    runtimeStatus.metadata.share_public_key ||
+    `share-${activeProfile.localShareIdx}`;
 
   return (
     <AppShell
@@ -866,7 +870,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
           <span className="dashboard-context-divider" aria-hidden="true" />
           <span>Share #{runtimeStatus.metadata.member_idx}</span>
           <span className="dashboard-context-separator">·</span>
-          <span>{paperShareKey(runtimeStatus.metadata.share_public_key)}</span>
+          <span>{paperShareKey(sharePublicKeyLabel)}</span>
         </div>
         {/* m7-a11y-offline-banner / VAL-CROSS-026 — network-offline
          * banner driven by `navigator.onLine`. Surfaces a persistent
@@ -893,6 +897,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
 
         {testPageActive ? (
           <>
+            <TestPublishNotePanel signingBlocked={signingBlocked} />
             <TestSignPanel signingBlocked={signingBlocked} />
             <TestEcdhPanel ecdhBlocked={ecdhBlocked} />
             <TestPingPanel
@@ -911,6 +916,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
             recoverStep={recoverStep}
             onRecovered={() => setRecoverStep("success")}
             onExit={handleReturnToDashboard}
+            onExpired={handleReturnToDashboard}
           />
         ) : policiesActive ? (
           <PoliciesState
@@ -1132,7 +1138,6 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
             handleOpenExport("profile");
           }}
           onExportShare={() => handleOpenExport("share")}
-          signerPaused={signerPaused}
         />
       )}
     </AppShell>

@@ -299,13 +299,14 @@ describe("Dashboard runtime-state fidelity", () => {
       expect(screen.getByText("Review Approvals")).toBeInTheDocument();
     });
 
-    it("keeps the runtime-only Signing Capacity alert out of Paper-panel scenarios", () => {
-      const { unmount } = renderAt({
+    it("shows Signing Capacity when paperPanels is false", () => {
+      renderAt({
         dashboard: { state: "signing-blocked", paperPanels: false },
       });
       expect(screen.getByText("Signing Capacity")).toBeInTheDocument();
-      unmount();
+    });
 
+    it("hides Signing Capacity and shows Common Causes/Operator Action when paperPanels is true", () => {
       renderAt({ dashboard: { state: "signing-blocked", paperPanels: true } });
       expect(screen.queryByText("Signing Capacity")).not.toBeInTheDocument();
       expect(screen.getByText("Common Causes")).toBeInTheDocument();

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import { RotateCw } from "lucide-react";
 import { useAppState } from "../../../app/AppState";
 
@@ -40,7 +40,7 @@ export function TestPeerRefreshPanel({
   const [lastDispatchAt, setLastDispatchAt] = useState<number | null>(null);
 
   const onSubmit = useCallback(
-    async (event: React.FormEvent<HTMLFormElement>) => {
+    async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       if (refreshBlocked || dispatching) return;
       setDispatching(true);

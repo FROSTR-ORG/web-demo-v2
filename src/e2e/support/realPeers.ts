@@ -4,6 +4,8 @@ import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { expect, type Page } from "@playwright/test";
 
 export const RELAY_HOST = "127.0.0.1";
+// Fixed-port relay used by the real-peer specs. These specs must run
+// serially; startBifrostDevtoolsRelay guards against parallel workers.
 export const RELAY_PORT = 8194;
 export const RELAY_URL = `ws://${RELAY_HOST}:${RELAY_PORT}`;
 
@@ -14,9 +16,8 @@ export const RUNTIME_READY_TIMEOUT_MS = 120_000;
 
 const BIFROST_RS_CANDIDATES = [
   process.env.BIFROST_RS_DIR,
-  "/Users/plebdev/Desktop/igloo-web-v2-prototype/bifrost-rs",
-  "/Users/plebdev/Desktop/code/bifrost-rs",
-  "/Users/plebdev/Desktop/code/frostr-infra/repos/bifrost-rs",
+  "./bifrost-rs",
+  "../bifrost-rs",
 ].filter((value): value is string => Boolean(value));
 
 export interface SpecGroup {
@@ -124,11 +125,20 @@ async function killChild(child: ChildProcess): Promise<void> {
 export async function startBifrostDevtoolsRelay(): Promise<{
   stop: () => Promise<void>;
 }> {
+  const workerIndex = process.env.TEST_WORKER_INDEX;
+  if (workerIndex && workerIndex !== "0" && workerIndex !== "1") {
+    throw new Error(
+      `Real-peer relay uses fixed ${RELAY_URL} and requires serial test execution. ` +
+        "Run with --workers=1 or avoid startBifrostDevtoolsRelay() from parallel workers.",
+    );
+  }
+
   const binary = resolveDevtoolsBinary();
   if (!existsSync(binary)) {
     throw new Error(
-      `bifrost-devtools binary missing at ${binary}. Run ` +
-        "`bash .factory/init.sh` or build `bifrost-devtools` before this suite.",
+      `bifrost-devtools binary missing at ${binary}. Set BIFROST_RS_DIR, ` +
+        "place a bifrost-rs checkout at ./bifrost-rs or ../bifrost-rs, " +
+        "then build `bifrost-devtools` before this suite.",
     );
   }
 

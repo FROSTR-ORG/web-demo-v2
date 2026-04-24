@@ -73,15 +73,17 @@ export class LocalRuntimeSimulator {
       this.local.tick(now);
       if (this.refreshAllBaselineIds) {
         const baseline = this.refreshAllBaselineIds;
-        this.refreshAllBaselineIds = null;
-        const requestIds = this.local
+        const pingOps = this.local
           .runtimeStatus()
           .pending_operations.filter(
             (op) => op.op_type === "Ping" && !baseline.has(op.request_id),
-          )
-          .map((op) => op.request_id);
+          );
+        const requestIds = pingOps.map((op) => op.request_id);
         if (requestIds.length > 0) {
           this.onRefreshPingRequestIds?.(requestIds);
+          this.refreshAllBaselineIds = null;
+        } else if (this.local.runtimeStatus().pending_operations.length === 0) {
+          this.refreshAllBaselineIds = null;
         }
       }
       const localOutbound = this.local.drainOutboundEvents();

@@ -11,9 +11,14 @@ import { ShareBlock } from "./ShareBlock";
 import { MOCK_LOCAL_SHARE } from "./mocks";
 import { maskShare } from "./recoverUtils";
 
+export type RecoverVariant =
+  | "incompatible-shares"
+  | "timeout"
+  | "network-failure";
+
 interface DemoCollectSharesContentProps {
   profileId: string;
-  variant?: "incompatible-shares";
+  variant?: RecoverVariant;
   showBackLink?: boolean;
   onBack?: () => void;
   onRecovered: () => void;

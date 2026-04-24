@@ -11,12 +11,21 @@ const defaultBaseUrl = "http://127.0.0.1:5173";
 const outputDir = resolve(repoRoot, "test-results", "paper-drift");
 
 const options = parseArgs(process.argv.slice(2));
+if (typeof options.threshold === "boolean") {
+  throw new Error("Invalid --threshold value: expected a number between 0 and 1.");
+}
+if (typeof options.baseUrl === "boolean") {
+  throw new Error("Invalid --base-url value: expected a URL.");
+}
+if (typeof options.mode === "boolean") {
+  throw new Error('Invalid --mode value: expected "raw" or "live".');
+}
 const threshold = Number(options.threshold ?? "0.02");
 const baseURL = String(options.baseUrl ?? defaultBaseUrl).replace(/\/$/, "");
 const keepPassingArtifacts = Boolean(options.keepPassingArtifacts);
 const mode = String(options.mode ?? "raw");
 
-if (!Number.isFinite(threshold) || threshold < 0) {
+if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
   throw new Error(`Invalid --threshold value: ${options.threshold}`);
 }
 if (!["raw", "live"].includes(mode)) {
@@ -132,6 +141,18 @@ function serverPortFromBaseURL(url) {
   return parsed.protocol === "https:" ? "443" : "80";
 }
 
+async function stopServer(child) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  await new Promise((resolve) => {
+    const timeout = setTimeout(resolve, 2_000);
+    child.once("exit", () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+    child.kill();
+  });
+}
+
 let server;
 const healthURL = `${baseURL}/demo/welcome-first-time?chrome=0`;
 if (!(await waitForServer(healthURL, 1_000))) {
@@ -143,7 +164,7 @@ if (!(await waitForServer(healthURL, 1_000))) {
   server.stdout.on("data", (chunk) => process.stderr.write(chunk));
   server.stderr.on("data", (chunk) => process.stderr.write(chunk));
   if (!(await waitForServer(healthURL))) {
-    server.kill();
+    await stopServer(server);
     throw new Error("Vite server did not become ready");
   }
 }
@@ -217,7 +238,7 @@ try {
   }
 } finally {
   await browser.close();
-  server?.kill();
+  await stopServer(server);
 }
 
 results.sort((a, b) => b.ratio - a.ratio);

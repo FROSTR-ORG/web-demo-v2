@@ -52,8 +52,8 @@ function entry(
 }
 
 function selectAllRuntimeBadges(): void {
-  fireEvent.click(screen.getByText("Filter"));
-  fireEvent.click(screen.getByText("Select all"));
+  fireEvent.click(screen.getByRole("button", { name: /filter event log/i }));
+  fireEvent.click(screen.getByRole("button", { name: "Select all" }));
 }
 
 beforeEach(() => {

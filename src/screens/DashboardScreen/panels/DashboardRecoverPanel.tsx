@@ -1,5 +1,8 @@
 import { useDemoUi } from "../../../demo/demoUi";
-import { DemoCollectSharesContent } from "../../RecoverScreen/DemoCollectSharesScreen";
+import {
+  DemoCollectSharesContent,
+  type RecoverVariant,
+} from "../../RecoverScreen/DemoCollectSharesScreen";
 import { DemoRecoverSuccessContent } from "../../RecoverScreen/DemoSuccessScreen";
 import { ProductCollectSharesContent } from "../../RecoverScreen/ProductCollectSharesScreen";
 import { ProductRecoverSuccessContent } from "../../RecoverScreen/ProductSuccessScreen";
@@ -11,7 +14,12 @@ interface DashboardRecoverPanelProps {
   recoverStep: DashboardRecoverStep;
   onRecovered: () => void;
   onExit: () => void;
+  onExpired: () => void;
 }
+
+const allowedRecoverVariants = new Set<RecoverVariant>([
+  "incompatible-shares",
+]);
 
 export function DashboardRecoverPanel({
   profileId,
@@ -19,12 +27,25 @@ export function DashboardRecoverPanel({
   recoverStep,
   onRecovered,
   onExit,
+  onExpired,
 }: DashboardRecoverPanelProps) {
   const demoUi = useDemoUi();
+  const requestedRecoverVariant = demoUi.dashboard?.recoverVariant;
   const dashboardRecoverVariant =
-    demoUi.dashboard?.recoverVariant === "incompatible-shares"
-      ? "incompatible-shares"
+    requestedRecoverVariant &&
+    allowedRecoverVariants.has(requestedRecoverVariant)
+      ? requestedRecoverVariant
       : undefined;
+
+  if (
+    import.meta.env.DEV &&
+    requestedRecoverVariant &&
+    !allowedRecoverVariants.has(requestedRecoverVariant)
+  ) {
+    console.warn(
+      `Unknown dashboard recover variant: ${requestedRecoverVariant}`,
+    );
+  }
 
   return (
     <div className="dashboard-recover-panel" data-testid="dashboard-recover-panel">
@@ -46,7 +67,7 @@ export function DashboardRecoverPanel({
         <ProductRecoverSuccessContent
           profileId={profileId}
           onExit={onExit}
-          onExpired={onExit}
+          onExpired={onExpired}
         />
       ) : (
         <ProductCollectSharesContent

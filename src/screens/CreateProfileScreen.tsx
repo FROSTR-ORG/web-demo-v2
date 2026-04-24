@@ -59,19 +59,22 @@ export function CreateProfileScreen() {
   }
 
   function setPeerPermission(idx: number, key: PeerPermissionMethod, value: boolean) {
-    setDraft((current) => ({
-      ...current,
-      peerPermissions: {
-        ...current.peerPermissions,
-        [idx]: {
-          sign: getPeerPermission(idx, "sign"),
-          ecdh: getPeerPermission(idx, "ecdh"),
-          ping: getPeerPermission(idx, "ping"),
-          onboard: getPeerPermission(idx, "onboard"),
-          [key]: value,
+    setDraft((current) => {
+      const currentRow = current.peerPermissions?.[idx];
+      return {
+        ...current,
+        peerPermissions: {
+          ...current.peerPermissions,
+          [idx]: {
+            sign: currentRow?.sign ?? true,
+            ecdh: currentRow?.ecdh ?? true,
+            ping: currentRow?.ping ?? true,
+            onboard: currentRow?.onboard ?? true,
+            [key]: value,
+          },
         },
-      },
-    }));
+      };
+    });
   }
 
   return (

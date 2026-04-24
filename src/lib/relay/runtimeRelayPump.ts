@@ -357,7 +357,11 @@ export class RuntimeRelayPump {
         )
         .map((op) => op.request_id);
       if (requestIds.length > 0) {
-        this.onRefreshPingRequestIds?.(requestIds);
+        try {
+          this.onRefreshPingRequestIds?.(requestIds);
+        } catch (err) {
+          console.error("[RuntimeRelayPump] onRefreshPingRequestIds failed", err);
+        }
       }
     }
     if (!this.stopped) {

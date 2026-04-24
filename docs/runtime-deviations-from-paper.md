@@ -1390,15 +1390,12 @@ end-to-end.
   mission proposal (`mission.md > M7`) defines this flow as a
   new surface added on top of the sponsor dashboard.
 - **web-demo-v2 implementation**: `src/screens/OnboardSponsorScreens.tsx`
-  (`OnboardSponsorConfigScreen`, `OnboardSponsorHandoffScreen`)
-  and `src/screens/DashboardScreen/sidebar/SettingsSidebar.tsx`
-  (the Onboard a Device entry row between Replace Share and
-  Export & Backup).
+  (`OnboardSponsorConfigScreen`, `OnboardSponsorHandoffScreen`).
 - **Deviation**: because there is no source-side sponsor
-  artboard in Paper, the two new screens (Configure + Hand-off)
-  and the sidebar entry are built DIRECTLY on the project's
-  existing design-system primitives — the same primitives the
-  Settings sidebar and Replace Share flow use:
+  artboard in Paper, the two screens (Configure + Hand-off) are
+  built DIRECTLY on the project's existing design-system
+  primitives — the same primitives the Settings sidebar and
+  Replace Share flow use:
   `.settings-section`, `.settings-card`, `.settings-action-row`,
   `.settings-btn-blue`, `.settings-btn-red`, `.field`,
   `Share Tech Mono` titles, `AppShell`, `PageHeading`,
@@ -1438,12 +1435,11 @@ end-to-end.
   state machine. Verification against VAL-ONBOARD-017's
   "demo gallery entry" clause is reconciled here: the
   assertion's intent (a deterministic, replayable surface for
-  Paper-parity review) is satisfied by the two DOM-level
-  fidelity tests `OnboardSponsorScreens.test.tsx` and
-  `SettingsSidebar.onboardSponsor.test.tsx`, which assert the
-  same design-system primitives are present, plus the live e2e
-  at `src/e2e/multi-device/onboard-sponsorship.spec.ts` for
-  runtime behaviour. If a stable demo fixture is later
+  Paper-parity review) is satisfied by the DOM-level fidelity test
+  `OnboardSponsorScreens.test.tsx`, which asserts the same
+  design-system primitives are present, plus the live e2e at
+  `src/e2e/multi-device/onboard-sponsorship.spec.ts` for runtime
+  behaviour. If a stable demo fixture is later
   required, a mock-only scenario can be added at
   `/demo/onboard-sponsor-configure` + `/demo/onboard-sponsor-handoff`
   without changing the screens themselves.
@@ -1462,8 +1458,7 @@ end-to-end.
   VAL-ONBOARD-002 (entry point and keyboard reachability),
   VAL-ONBOARD-003 (form fields), VAL-ONBOARD-005 (Copy + QR
   hand-off affordances), VAL-ONBOARD-016 ("Replace Share"
-  terminology — the sidebar entry sits between Replace Share
-  and Export & Backup with no "Rotate Share" residue).
+  terminology — no "Rotate Share" residue).
 
 ### 2026-04-23 — Peer Permissions row uses `ToggleSwitch` instead of Paper pill badges (60R-0 / VAL-FOLLOWUP-007)
 

@@ -23,7 +23,7 @@ export function PeersPanel({
   peerRefreshErrors,
   peerPermissionStates,
   peerLatencyByPubkey,
-  nowMs = Date.now(),
+  nowMs,
 }: {
   peers: PeerStatus[];
   onlineCount: number;
@@ -74,6 +74,10 @@ export function PeersPanel({
   // `misc-peers-panel-nested-button`.
   const [open, setOpen] = useState(true);
   const toggle = () => setOpen((prev) => !prev);
+  const resolvedNowMs = useMemo(
+    () => nowMs ?? Date.now(),
+    [nowMs, peerLatencyByPubkey, peers],
+  );
   const averageLatencyLabel = useMemo(() => {
     const onlinePeers = peers.filter((peer) => peer.online);
     if (paperPanels) {
@@ -86,7 +90,10 @@ export function PeersPanel({
     }
     const freshLatencies = onlinePeers
       .map((peer) =>
-        freshPeerLatencyMs(peerLatencyByPubkey?.[peer.pubkey], nowMs),
+        freshPeerLatencyMs(
+          peerLatencyByPubkey?.[peer.pubkey],
+          resolvedNowMs,
+        ),
       )
       .filter((latency): latency is number => latency !== null);
     if (freshLatencies.length === 0) return "Peer avg: --";
@@ -94,7 +101,7 @@ export function PeersPanel({
       freshLatencies.reduce((sum, latency) => sum + latency, 0) /
         freshLatencies.length,
     )}ms`;
-  }, [nowMs, paperPanels, peerLatencyByPubkey, peers]);
+  }, [resolvedNowMs, paperPanels, peerLatencyByPubkey, peers]);
 
   const helpTitle =
     "Peer RTT is measured from Ping dispatch to completion. Relay RTT is browser-to-relay REQ/EOSE.";
@@ -163,7 +170,7 @@ export function PeersPanel({
                     ? null
                     : peerLatencyByPubkey?.[peer.pubkey] ?? null
                 }
-                nowMs={nowMs}
+                nowMs={resolvedNowMs}
                 permissionState={
                   permissionStateByPubkey?.get(peer.pubkey) ?? null
                 }

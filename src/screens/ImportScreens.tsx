@@ -216,7 +216,10 @@ export function DecryptBackupScreen() {
     return <Navigate to="/import" replace />;
   }
 
-  const validation = validateBackupString(backupString);
+  const validation = validateBackupString(
+    backupString,
+    demoUi.import?.isPaperDemo ?? false,
+  );
   const canDecrypt = password.trim().length > 0;
 
   async function handleDecrypt() {

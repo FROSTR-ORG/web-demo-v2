@@ -187,6 +187,7 @@ import { DashboardScreen } from "../DashboardScreen";
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   mockRecoverSession = null;
   mockLockProfile.mockClear();
   mockClearCredentials.mockClear();
@@ -573,7 +574,8 @@ describe("VAL-CROSS-010 — Header Recover opens inline dashboard recovery", () 
   });
 
   it("runs product recovery through inline success, reveal, copy, and clear", async () => {
-    Object.assign(navigator, {
+    vi.stubGlobal("navigator", {
+      ...navigator,
       clipboard: { writeText: vi.fn(() => Promise.resolve()) },
     });
     renderAt({ dashboard: { state: "running", paperPanels: false } });
