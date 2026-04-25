@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAppState } from "../app/AppState";
@@ -74,11 +74,16 @@ function previewPackageText(packageText: string): string {
   return `${base}…`;
 }
 
+function shareDisplayNumber(position: number): number {
+  return position + 1;
+}
+
 export function DistributeSharesScreen() {
   const navigate = useNavigate();
   const {
     createSession,
     encodeDistributionPackage,
+    retryDistributionPackageAdoption,
     markPackageDistributed,
     setPackageDeviceLabel,
     updatePackageState,
@@ -108,7 +113,6 @@ export function DistributeSharesScreen() {
     return { packageText: pkg.packageText, password: pkg.password };
   }
 
-  const localShare = createSession.localShare;
   const remoteCreatedAll = createSession.onboardingPackages.every(
     (pkg) => pkg.packageCreated,
   );
@@ -133,7 +137,7 @@ export function DistributeSharesScreen() {
             {HOW_THIS_STEP_WORKS_STEPS.map((step, idx) => (
               <li key={step.title} className="how-this-step-works-item">
                 <span className="how-this-step-works-number" aria-hidden="true">
-                  {idx + 1}
+                  {idx + 1}.
                 </span>
                 <span className="how-this-step-works-body">
                   <strong className="how-this-step-works-title">
@@ -153,10 +157,7 @@ export function DistributeSharesScreen() {
           <div className="package-head">
             <div className="package-title-row">
               <div className="package-title">
-                Share {localShare.idx + 1}
-              </div>
-              <div className="package-index">
-                Index {localShare.idx}
+                Share {shareDisplayNumber(0)}
               </div>
             </div>
             <StatusPill tone="success" marker="check">
@@ -167,11 +168,13 @@ export function DistributeSharesScreen() {
         </div>
 
         <div className="package-stack">
-          {createSession.onboardingPackages.map((pkg) => (
+          {createSession.onboardingPackages.map((pkg, index) => (
             <RemoteShareCard
               key={pkg.idx}
               pkg={pkg}
+              displayNumber={shareDisplayNumber(index + 1)}
               encodeDistributionPackage={encodeDistributionPackage}
+              retryDistributionPackageAdoption={retryDistributionPackageAdoption}
               markPackageDistributed={markPackageDistributed}
               setPackageDeviceLabel={setPackageDeviceLabel}
               updatePackageState={updatePackageState}
@@ -195,14 +198,18 @@ export function DistributeSharesScreen() {
 
 function RemoteShareCard({
   pkg,
+  displayNumber,
   encodeDistributionPackage,
+  retryDistributionPackageAdoption,
   markPackageDistributed,
   setPackageDeviceLabel,
   updatePackageState,
   resolveSecret,
 }: {
   pkg: OnboardingPackageView;
+  displayNumber: number;
   encodeDistributionPackage: (idx: number, password: string) => Promise<void>;
+  retryDistributionPackageAdoption: (idx: number) => Promise<string | undefined>;
   markPackageDistributed: (idx: number) => void;
   setPackageDeviceLabel: (idx: number, deviceLabel: string) => void;
   updatePackageState: (
@@ -222,12 +229,23 @@ function RemoteShareCard({
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [retryBusy, setRetryBusy] = useState(false);
+  const [retryError, setRetryError] = useState("");
+  const [lastRetryRequestId, setLastRetryRequestId] = useState<string | null>(null);
 
   const distributed = packageDistributed(pkg);
   const actionsDisabled = !pkg.packageCreated;
+  const failed = Boolean(pkg.adoptionError && !distributed);
+
+  useEffect(() => {
+    if (!failed && retryError) {
+      setRetryError("");
+    }
+  }, [failed, retryError]);
 
   async function onCreatePackage() {
     setError("");
+    setRetryError("");
     if (password.length < 8) {
       setError("Package password must be at least 8 characters.");
       return;
@@ -246,9 +264,28 @@ function RemoteShareCard({
     }
   }
 
-  let chip: { tone: "warning" | "info" | "success"; label: string };
+  async function onRetryAdoption() {
+    setRetryError("");
+    setRetryBusy(true);
+    try {
+      const requestId = await retryDistributionPackageAdoption(pkg.idx);
+      setLastRetryRequestId(requestId ?? null);
+    } catch (err) {
+      setRetryError(
+        err instanceof Error
+          ? err.message
+          : "Retry could not start.",
+      );
+    } finally {
+      setRetryBusy(false);
+    }
+  }
+
+  let chip: { tone: "warning" | "info" | "success" | "error"; label: string };
   if (distributed) {
     chip = { tone: "success", label: "Distributed" };
+  } else if (failed) {
+    chip = { tone: "error", label: "Adoption failed" };
   } else if (pkg.packageCreated) {
     chip = { tone: "info", label: "Ready to distribute" };
   } else {
@@ -259,8 +296,7 @@ function RemoteShareCard({
     <div className={`package-card${pkg.packageCreated ? "" : " pending"}`}>
       <div className="package-head">
         <div className="package-title-row">
-          <div className="package-title">Share {pkg.idx + 1}</div>
-          <div className="package-index">Index {pkg.idx}</div>
+          <div className="package-title">Share {displayNumber}</div>
         </div>
         <StatusPill
           tone={chip.tone}
@@ -282,7 +318,7 @@ function RemoteShareCard({
           <input
             className="input"
             type="text"
-            aria-label={`Device label for share ${pkg.idx + 1}`}
+            aria-label={`Device label for share ${displayNumber}`}
             placeholder="Optional device label"
             value={pkg.deviceLabel ?? ""}
             onChange={(event) =>
@@ -304,7 +340,7 @@ function RemoteShareCard({
               <input
                 className="input password-input"
                 type="password"
-                aria-label={`Package password for share ${pkg.idx + 1}`}
+                aria-label={`Package password for share ${displayNumber}`}
                 required
                 value={password}
                 onChange={(event) => {
@@ -326,9 +362,14 @@ function RemoteShareCard({
         )}
       </div>
 
-      {pkg.adoptionError ? (
+      {failed ? (
         <span className="error" role="alert" data-testid={`adoption-error-${pkg.idx}`}>
           {pkg.adoptionError}
+        </span>
+      ) : null}
+      {retryError ? (
+        <span className="error" role="alert">
+          {retryError}
         </span>
       ) : null}
 
@@ -373,6 +414,23 @@ function RemoteShareCard({
           disabled={actionsDisabled}
           onShown={() => updatePackageState(pkg.idx, { qrShown: true })}
         />
+        {failed ? (
+          <Button
+            type="button"
+            variant="chip"
+            size="sm"
+            disabled={retryBusy}
+            title={
+              lastRetryRequestId
+                ? `Last retry request: ${lastRetryRequestId}`
+                : undefined
+            }
+            aria-label={`Retry adoption for share ${displayNumber}`}
+            onClick={() => void onRetryAdoption()}
+          >
+            {retryBusy ? "Retrying..." : "Retry"}
+          </Button>
+        ) : null}
         <Button
           type="button"
           variant="chip"

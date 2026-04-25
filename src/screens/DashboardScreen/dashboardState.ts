@@ -25,6 +25,25 @@ function hasCompletedPeerRefresh(status: RuntimeStatusSummary): boolean {
   );
 }
 
+function policyBlocksOutboundSigning(status: RuntimeStatusSummary): boolean {
+  const peerPermissionStates = status.peer_permission_states ?? [];
+  if (peerPermissionStates.length === 0) return false;
+
+  // `readiness.threshold` is the runtime's already-normalised signing-peer
+  // floor for the peers listed in `runtime_status.peers`. Compare policy
+  // against that same surface so the dashboard follows bifrost-rs rather
+  // than re-deriving quorum math from group metadata.
+  const requiredRemoteSigners = Math.max(0, status.readiness.threshold);
+  if (requiredRemoteSigners === 0) return false;
+
+  const policyAllowedOnlinePeers = status.peers.filter(
+    (peer) =>
+      peer.online &&
+      peerPolicyAllowsRequestSign(peer, peerPermissionStates),
+  );
+  return policyAllowedOnlinePeers.length < requiredRemoteSigners;
+}
+
 /**
  * Returns true iff `effective_policy.request.sign` for `peer` resolves to
  * `allow` (either the literal string `"allow"` or boolean `true`). Any
@@ -149,6 +168,7 @@ export function isNoncePoolDepleted(status: RuntimeStatusSummary): boolean {
  * even while another non-signing state might otherwise win).
  */
 export function isSigningBlocked(status: RuntimeStatusSummary): boolean {
+  if (policyBlocksOutboundSigning(status)) return true;
   if (!status.readiness.sign_ready) return true;
   return pendingRuntimeWorkIsBlocked(status);
 }

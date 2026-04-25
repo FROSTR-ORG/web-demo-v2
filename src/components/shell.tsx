@@ -4,13 +4,14 @@ import logoUrl from "../assets/igloo-logo.png";
 
 interface AppShellProps {
   children: ReactNode;
+  brandSubtitle?: ReactNode;
   headerMeta?: ReactNode;
   headerActions?: ReactNode;
   headerSettingsAction?: ReactNode;
   mainVariant?: "center" | "flow" | "dashboard";
 }
 
-export function AppShell({ children, headerMeta, headerActions, headerSettingsAction, mainVariant = "center" }: AppShellProps) {
+export function AppShell({ children, brandSubtitle, headerMeta, headerActions, headerSettingsAction, mainVariant = "center" }: AppShellProps) {
   const hasHeaderRight = Boolean(headerMeta || headerActions || headerSettingsAction);
 
   return (
@@ -18,7 +19,10 @@ export function AppShell({ children, headerMeta, headerActions, headerSettingsAc
       <header className="app-header">
         <div className="brand">
           <img className="brand-logo" src={logoUrl} alt="" />
-          <div className="brand-name">Igloo</div>
+          <div className="brand-title-stack">
+            <div className="brand-name">Igloo</div>
+            {brandSubtitle ? <div className="brand-subtitle">{brandSubtitle}</div> : null}
+          </div>
         </div>
         {hasHeaderRight ? (
           <div className="header-right">

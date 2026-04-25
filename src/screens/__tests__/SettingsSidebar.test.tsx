@@ -1,4 +1,4 @@
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -166,14 +166,14 @@ describe("Settings Sidebar", () => {
   it("displays Group Profile section with keyset info", () => {
     renderDashboard();
     fireEvent.click(screen.getByLabelText("Settings"));
-    expect(screen.getByText("Keyset Name")).toBeInTheDocument();
-    // "My Signing Key" appears both in dashboard summary and settings
-    expect(screen.getAllByText("My Signing Key").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("Keyset npub")).toBeInTheDocument();
-    expect(screen.getByText("Threshold")).toBeInTheDocument();
-    expect(screen.getByText("2 of 3")).toBeInTheDocument();
-    expect(screen.getByText("Created")).toBeInTheDocument();
-    expect(screen.getByText("Updated")).toBeInTheDocument();
+    const sidebar = within(screen.getByTestId("settings-sidebar"));
+    expect(sidebar.getByText("Keyset Name")).toBeInTheDocument();
+    expect(sidebar.getByText("My Signing Key")).toBeInTheDocument();
+    expect(sidebar.getByText("Keyset npub")).toBeInTheDocument();
+    expect(sidebar.getByText("Threshold")).toBeInTheDocument();
+    expect(sidebar.getByText("2 of 3")).toBeInTheDocument();
+    expect(sidebar.getByText("Created")).toBeInTheDocument();
+    expect(sidebar.getByText("Updated")).toBeInTheDocument();
   });
 
   it("displays relay management with remove buttons and add input", () => {

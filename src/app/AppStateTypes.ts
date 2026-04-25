@@ -16,6 +16,7 @@ import type {
   StoredProfileSummary,
 } from "../lib/bifrost/types";
 import type { RuntimeCommand } from "../lib/bifrost/runtimeClient";
+import type { NostrTextNoteEvent } from "../lib/nostr/testNote";
 import type { RuntimeRelayStatus } from "../lib/relay/runtimeRelayPump";
 import type { RuntimeExportPackages } from "./runtimeExports";
 
@@ -239,8 +240,7 @@ export const ONBOARD_SPONSOR_PASSWORD_MISMATCH_ERROR =
  * relay list is empty after trim. Shared across: Settings sidebar
  * relay-list editor, AppStateProvider.updateRelays, createProfile,
  * createOnboardSponsorPackage, createRotatedProfile,
- * restoreProfileFromRelay, fetchProfileBackupEvent, profileRuntime,
- * RestoreFromRelayScreen, and MockAppStateProvider.
+ * profileRuntime, and MockAppStateProvider.
  *
  * Any UI surface that renders this copy should import this constant
  * rather than re-hardcoding the string literal so copy changes remain
@@ -393,13 +393,30 @@ export type EnrichedOperationFailure = OperationFailure & {
  * `settledAt` is set when the corresponding completion or failure has
  * been drained; entries whose `settledAt` is older than 60s are pruned
  * by a provider-side GC sweep so the index never grows without bound.
+ *
+ * `probeSource` distinguishes user/dev Ping dispatches from background
+ * refresh probes. Drain filtering must use this explicit tag rather than
+ * treating a missing correlation as proof of background traffic.
  */
 export interface PendingDispatchEntry {
   type: "sign" | "ecdh" | "ping" | "onboard";
   message_hex_32?: string;
   peer_pubkey?: string;
+  probeSource?: "refresh" | "user";
   dispatchedAt: number;
   settledAt?: number;
+}
+
+/**
+ * Most recent app-observed peer Ping RTT sample. This is UI telemetry,
+ * not a persisted runtime contract: `latencyMs` measures elapsed time
+ * from local dispatch/correlation to drained `CompletedOperation::Ping`.
+ */
+export interface PeerLatencySample {
+  latencyMs: number;
+  measuredAt: number;
+  requestId: string;
+  source: "refresh" | "user";
 }
 
 /**
@@ -540,8 +557,9 @@ export interface NoncePoolSnapshot {
  *   - `SIGN`         — sign completion (successful partial signature or
  *                       full aggregation)
  *   - `ECDH`         — ecdh completion (shared secret derived)
- *   - `ECHO`         — inbound peer event accepted by the local signer
- *                       (`inbound_accepted` runtime event)
+ *   - `ECHO`         — semantic peer confirmation rows from Paper/demo
+ *                       fixtures; raw runtime `inbound_accepted` plumbing
+ *                       remains lifecycle telemetry, not a visible log row
  *   - `PING`         — ping completion (peer round-trip measured)
  *   - `SIGNER_POLICY` — a change to the local signer's policy state
  *                       (`policy_updated` runtime event)
@@ -552,13 +570,10 @@ export interface NoncePoolSnapshot {
  *   - `INFO`         — any other lifecycle edge that doesn't merit a
  *                       dedicated colour (command_queued, config_updated,
  *                       state_wiped, Onboard completion)
- *   - `ERROR`        — any drained `OperationFailure`
- *   - `BACKUP_PUBLISH` — local-mutation marker emitted by
- *                       {@link AppStateValue.publishProfileBackup} when a
- *                       publish attempt fails pre-flight (no relays
- *                       configured) or post-fan-out (all relays offline).
- *                       Surfaced so operators can correlate the inline
- *                       error with the event stream (VAL-BACKUP-007).
+ *   - `ERROR`        — drained user-facing `OperationFailure`s
+ *                       (background refresh Ping probes are quiet)
+ *   - `ONBOARD`      — onboarding lifecycle entries emitted by local
+ *                       sponsor/requester handoff flows.
  */
 export type RuntimeEventLogBadge =
   | "SYNC"
@@ -571,7 +586,6 @@ export type RuntimeEventLogBadge =
   | "READY"
   | "INFO"
   | "ERROR"
-  | "BACKUP_PUBLISH"
   | "ONBOARD";
 
 /**
@@ -583,12 +597,8 @@ export type RuntimeEventLogBadge =
  *  - `failure`       — drained from `RuntimeClient.drainFailures()`
  *  - `local_mutation` — synthesised by an AppStateProvider mutator to
  *                       record a notable local action that has no
- *                       direct WASM drain correlate. Currently used by
- *                       {@link AppStateValue.publishProfileBackup} to
- *                       record backup-publish pre-flight/post-fan-out
- *                       failures so operators can correlate the inline
- *                       error surface with the event stream
- *                       (VAL-BACKUP-007).
+ *                       direct WASM drain correlate, such as onboarding
+ *                       lifecycle markers.
  */
 export type RuntimeEventLogSource =
   | "runtime_event"
@@ -625,47 +635,14 @@ export interface RuntimeEventLogEntry {
    *  - `completion`      → {@link CompletedOperation}
    *  - `failure`         → {@link EnrichedOperationFailure}
    *  - `local_mutation`  → a minimal, scrub-safe record describing the
-   *                        local action. For BACKUP_PUBLISH entries
-   *                        see {@link BackupPublishLocalMutationPayload}.
-   *                        By construction this path NEVER includes
-   *                        ciphertext, password, or share material
-   *                        (VAL-BACKUP-007 security invariant).
+   *                        local action. By construction this path NEVER
+   *                        includes passwords, share secrets, or other
+   *                        credential-bearing material.
    *
    * Kept as `unknown` at this layer to avoid coupling consumers to the
    * discriminated shape — `EventLogPanel` narrows by `source`.
    */
   payload: unknown;
-}
-
-/**
- * Payload shape for the `local_mutation` / `BACKUP_PUBLISH` runtime
- * event-log entry emitted by
- * {@link AppStateValue.publishProfileBackup} when a publish attempt
- * fails. Contract:
- *
- *  - `kind`: always `"backup_publish_failed"` so the entry is easily
- *    filterable/searchable in the JSON body even though the typed
- *    `badge`/`source` are the primary narrowing channels.
- *  - `reason`: why the publish could not succeed.
- *      - `"no-relays"`  — relays.length === 0 OR the relay pump is
- *                         not attached (pre-flight guard).
- *      - `"all-offline"` — relay fan-out completed but no relay
- *                          accepted the event (all attempts failed).
- *  - `attemptedRelayCount`: how many configured relays were attempted
- *    at the point of failure. Zero for `no-relays`; matches the
- *    profile's `relays.length` for `all-offline`.
- *
- * SECURITY INVARIANT: this payload MUST NOT include the encrypted
- * backup ciphertext, the user's password, the share secret, or any
- * other credential-bearing field. The publish mutator enforces this
- * by construction — the payload is built from literal, typed fields
- * only. See VAL-BACKUP-007 contract clause "no ciphertext/password
- * leak in event-log payload".
- */
-export interface BackupPublishLocalMutationPayload {
-  readonly kind: "backup_publish_failed";
-  readonly reason: "no-relays" | "all-offline";
-  readonly attemptedRelayCount: number;
 }
 
 /**
@@ -687,11 +664,28 @@ export const RUNTIME_EVENT_LOG_MAX = 500;
  */
 export const PROFILE_NAME_MAX_LENGTH = 64;
 
+export interface TestNotePublishResult {
+  requestId: string;
+  eventId: string;
+  nevent: string;
+  event: NostrTextNoteEvent;
+  reached: string[];
+  failed: string[];
+}
+
 export interface AppStateValue {
   profiles: StoredProfileSummary[];
   activeProfile: StoredProfileSummary | null;
   runtimeStatus: RuntimeStatusSummary | null;
   runtimeRelays: RuntimeRelayStatus[];
+  /**
+   * Runtime-only peer ping RTT samples keyed by peer pubkey. Cleared on
+   * profile/runtime boundaries and ignored by Paper/demo fixture panels.
+   * The provider prunes/flushed samples at runtime/profile boundaries, not
+   * on every active-peer-set change, so consumers must tolerate stale keys
+   * that are not present in the current peer list.
+   */
+  peerLatencyByPubkey: Record<string, PeerLatencySample>;
   signerPaused: boolean;
   createSession: CreateSession | null;
   importSession: ImportSession | null;
@@ -743,9 +737,12 @@ export interface AppStateValue {
    */
   runtimeCompletions: CompletedOperation[];
   /**
-   * Operation failures drained from the runtime, ordered by ascending
-   * `request_id`. Populated each refresh tick by AppStateProvider reading
-   * `RuntimeClient.drainFailures()`.
+   * User-facing operation failures drained from the runtime, ordered by
+   * ascending `request_id`. Populated each refresh tick by
+   * AppStateProvider reading `RuntimeClient.drainFailures()`. Background
+   * refresh-all Ping probe failures are intentionally filtered before they
+   * reach this slice so an optional offline future share does not look like
+   * an actionable dashboard error.
    *
    * Each entry is enriched via {@link AppStateValue.pendingDispatchIndex}
    * before landing here — sign-type failures carry their originating
@@ -757,7 +754,9 @@ export interface AppStateValue {
   /**
    * Bounded ring buffer of dashboard-oriented event log entries derived from
    * all three runtime drain channels (`drainRuntimeEvents`,
-   * `drainCompletions`, `drainFailures`). Each entry is tagged with a
+   * `drainCompletions`, `drainFailures`). Background refresh-all Ping
+   * probe completions/failures are treated as quiet liveness telemetry and
+   * filtered out before display. Each retained entry is tagged with a
    * {@link RuntimeEventLogBadge} and retained in insertion order up to
    * {@link RUNTIME_EVENT_LOG_MAX} (500) entries — once exceeded, the
    * oldest is FIFO-evicted. Survives tick cycles and relay reconnects;
@@ -993,15 +992,28 @@ export interface AppStateValue {
    *     `onboardingPackages[idx].packageText`.
    *
    * Also dispatches the matching runtime Onboard command so the
-   * provider can correlate later echo/failure drains back to the row.
+   * provider can correlate later completion/failure drains back to the row.
    */
   encodeDistributionPackage: (idx: number, password: string) => Promise<void>;
+  /**
+   * Retry the runtime Onboard dispatch for an already-created remote
+   * package. Reuses the existing in-memory package stash and preserves
+   * package text, password, and device-label metadata; only the
+   * `pendingDispatchRequestId` / `adoptionError` retry state is
+   * refreshed. Resolves to the new runtime request id when a dispatch
+   * registers a correlatable pending operation, matching
+   * {@link HandleRuntimeCommandResult}; resolves to `undefined` when no
+   * dispatch is registered (signer paused, debounced, or failed before a
+   * pending operation exists). Unlike {@link encodeDistributionPackage},
+   * callers can use this id to correlate a successful retry registration.
+   */
+  retryDistributionPackageAdoption: (idx: number) => Promise<string | undefined>;
   /**
    * fix-followup-distribute-2a — unconditionally mark the remote
    * share at {@link idx} as "Distributed" by flipping
    * `onboardingPackages[idx].manuallyMarkedDistributed = true` on
    * the current create session. Offline fallback for QR / manual
-   * handoff; independent of relay state or echo observation
+   * handoff; independent of relay state or onboard completion
    * (VAL-FOLLOWUP-005).
    */
   markPackageDistributed: (idx: number) => void;
@@ -1172,91 +1184,7 @@ export interface AppStateValue {
       sig: string;
     };
   }>;
-  /**
-   * m6-backup-publish — build an encrypted profile-backup event and
-   * publish it to every configured relay.
-   *
-   * The event is built via `create_encrypted_profile_backup` +
-   * `build_profile_backup_event` using the active share's secret key so
-   * the author `pubkey` is deterministic per share
-   * (VAL-BACKUP-004). Kind is `profile_backup_event_kind()` (10000),
-   * a NIP-16/33 replaceable event: duplicate publishes from the same
-   * share replace the prior backup on each relay (VAL-BACKUP-006 /
-   * VAL-BACKUP-031).
-   *
-   * The `password` argument is a UI-level gate enforced upstream (the
-   * modal requires `password.length >= 8` with a matching confirm —
-   * VAL-BACKUP-002 / VAL-BACKUP-024 / VAL-BACKUP-025). The password
-   * itself is NOT sent to relays, persisted, or logged
-   * (VAL-BACKUP-003 forbids plaintext in `content`). The mutator
-   * mirrors the modal's policy for defense-in-depth and throws
-   * synchronously when the invariant is violated.
-   *
-   * Throws when:
-   *   - `password.length < 8` (policy threshold mirrored from the modal)
-   *   - No active runtime / profile (locked or wiped)
-   *   - No relays are configured or reachable (VAL-BACKUP-007)
-   *
-   * Returns `{ event, reached }` — the signed event and the list of
-   * relay URLs that accepted the publish. `reached.length === 0` is
-   * treated as an error state inside the mutator.
-   */
-  publishProfileBackup: (password: string) => Promise<{
-    event: {
-      id: string;
-      pubkey: string;
-      created_at: number;
-      kind: number;
-      tags: string[][];
-      content: string;
-      sig: string;
-    };
-    reached: string[];
-  }>;
-  /**
-   * m6-backup-restore — fetch an encrypted profile-backup event from
-   * one or more relays and persist the decrypted backup as a new
-   * `SavedProfile` in IndexedDB (without starting the runtime).
-   *
-   * The caller supplies the shareholding bfshare package text + its
-   * package password — this is the "equivalent derivation flow" from
-   * VAL-BACKUP-009 because `parse_profile_backup_event` needs the
-   * share secret (not just the pubkey) to decrypt the ciphertext.
-   * The share secret is derived from the decoded bfshare locally; it
-   * is NEVER transmitted. The author pubkey of the replaceable
-   * kind-10000 event is derived from the share secret and used as
-   * the `authors` filter so relays return only this share's backup.
-   *
-   * Relay URLs must all pass `validateRelayUrl` — the restore screen
-   * disables submit on any invalid entry (VAL-BACKUP-032) but the
-   * mutator also rejects defensively.
-   *
-   * Behaviour:
-   *   - Opens a REQ subscription `{ kinds: [profile_backup_event_kind()],
-   *     authors: [<derivedAuthor>] }` on each relay in parallel.
-   *   - Resolves on the first matching EVENT (wins race across relays).
-   *   - If no EVENT arrives within `NO_BACKUP_FOUND_TIMEOUT_MS` (≥3 s
-   *     per VAL-BACKUP-012), rejects with `"No backup found"` so the
-   *     screen can surface the dedicated empty state.
-   *   - Decrypts via `parseProfileBackupEvent`. If the wrong share
-   *     secret / password is supplied, the WASM bridge surfaces an
-   *     error that this mutator remaps to the canonical
-   *     `"Invalid password"` copy (VAL-BACKUP-011).
-   *   - Persists via `saveProfile` — profile id is derived from the
-   *     share secret so repeat restores of the same backup idempotently
-   *     update the single existing record (VAL-BACKUP-030). Runtime is
-   *     NOT started; the user unlocks the profile from Welcome
-   *     (VAL-BACKUP-013).
-   */
-  restoreProfileFromRelay: (input: {
-    bfshare: string;
-    bfsharePassword: string;
-    backupPassword: string;
-    relays: string[];
-  }) => Promise<{
-    profile: StoredProfileSummary;
-    alreadyExisted: boolean;
-  }>;
+  publishTestNote: (input: { content: string }) => Promise<TestNotePublishResult>;
   setSignerPaused: (paused: boolean) => void;
   refreshRuntime: () => void;
   restartRuntimeConnections: () => Promise<void>;

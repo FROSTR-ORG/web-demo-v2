@@ -46,8 +46,8 @@ import { test, expect, type Page } from "@playwright/test";
  *      distributed" click required.
  *
  * OperationFailure path (VAL-FOLLOWUP — Device B aborts
- * mid-handshake → Device A surfaces inline retry copy + Mark
- * distributed stays enabled):
+ * mid-handshake → Device A surfaces inline retry copy + Retry +
+ * Mark distributed stays enabled):
  *   The live-abort path is slow to converge deterministically
  *   (TTL-driven timeout ≥ 60s). To keep the spec stable on
  *   `--repeat-each=3 --workers=1`, we use the DEV-only
@@ -55,9 +55,10 @@ import { test, expect, type Page } from "@playwright/test";
  *   { op_type: "onboard", request_id }` that matches the share's
  *   `pendingDispatchRequestId`. `absorbDrains` then surfaces the
  *   canonical inline copy ("Peer adoption failed — retry or mark
- *   distributed manually") on that share's card, and the
- *   Mark-distributed button remains enabled so the user can still
- *   proceed via the manual fallback. This deliberate DEV-hook
+ *   distributed manually") on that share's card. The Retry button
+ *   re-dispatches a fresh sponsor-side Onboard request for the
+ *   already-created package, and Mark distributed remains enabled so
+ *   the user can still proceed via the manual fallback. This deliberate DEV-hook
  *   carve-out is documented in `docs/runtime-deviations-from-paper.md`
  *   (see the 2026-04-23 entry
  *   "create-distribute-live-bootstrap OperationFailure path uses
@@ -398,9 +399,9 @@ test.describe(
           await waitForAppStateHooks(pageA, "A");
 
           // === Type the per-share password + click Create package ===
-          const passwordInput = pageA.getByLabel(
-            `Package password for share ${remoteIdx + 1}`,
-          );
+          const passwordInput = pageA
+            .getByLabel(/^Package password for share \d+$/)
+            .first();
           await passwordInput.fill(PACKAGE_PASSWORD);
           await pageA
             .getByRole("button", { name: /Create package/i })
@@ -586,7 +587,7 @@ test.describe(
     );
 
     test(
-      "Device B aborts mid-handshake → Device A surfaces 'Peer adoption failed — retry or mark distributed manually' inline + Mark distributed remains enabled (VAL-FOLLOWUP OperationFailure path)",
+      "Device B aborts mid-handshake → Device A can retry adoption or mark distributed manually (VAL-FOLLOWUP OperationFailure path)",
       async ({ browser }) => {
         const ctxA = await browser.newContext();
         try {
@@ -602,7 +603,8 @@ test.describe(
           await waitForAppStateHooks(pageA, "A");
 
           await pageA
-            .getByLabel(`Package password for share ${remoteIdx + 1}`)
+            .getByLabel(/^Package password for share \d+$/)
+            .first()
             .fill(PACKAGE_PASSWORD);
           await pageA
             .getByRole("button", { name: /Create package/i })
@@ -638,7 +640,7 @@ test.describe(
           // OperationFailure envelope with op_type:"onboard" matching
           // the share's pendingDispatchRequestId directly into the
           // provider's drain handler. The user-visible behaviour
-          // (inline retry copy + Mark distributed still enabled) is
+          // (inline retry copy + Retry + Mark distributed enabled) is
           // identical to what the runtime would surface when the
           // requester's in-flight OnboardRequest is abandoned and the
           // sponsor-side request times out / rejects.
@@ -676,26 +678,70 @@ test.describe(
               "Peer adoption failed — retry or mark distributed manually",
             ),
           ).toBeVisible({ timeout: 5_000 });
-          // Mark distributed remains enabled — the manual fallback
-          // is still reachable.
+          await expect(
+            pageA.locator(".status-pill.error", { hasText: "Adoption failed" }),
+          ).toHaveCount(1);
+          const retryButton = pageA
+            .getByRole("button", { name: /^Retry adoption for share \d+$/ })
+            .first();
+          await expect(retryButton).toBeEnabled();
+          // Mark distributed remains enabled — the manual fallback is
+          // still reachable while the retry affordance is visible.
           const markButton = pageA
             .getByRole("button", { name: /^Mark distributed$/ })
             .first();
           await expect(markButton).toBeEnabled();
-          // The chip has NOT flipped to "Distributed" (peerOnline is
-          // still false); the pre-fallback chip remains "Ready to
-          // distribute".
+
+          // Retry dispatches a fresh onboard request for the same
+          // already-created package. Wait beyond the command debounce
+          // window so this click cannot be coalesced with the initial
+          // package-create dispatch.
+          await pageA.waitForTimeout(350);
+          await retryButton.click();
+          await expect(
+            pageA.getByRole("button", {
+              name: /^Retry adoption for share \d+$/,
+            }),
+          ).toHaveCount(0, { timeout: 5_000 });
           await expect(
             pageA.locator(".status-pill.info", { hasText: "Ready to distribute" }),
-          ).toHaveCount(1);
+          ).toHaveCount(1, { timeout: 5_000 });
+          await expect
+            .poll(
+              async () =>
+                pageA.evaluate((idx) => {
+                  const w = window as unknown as {
+                    __appState: {
+                      createSession: {
+                        onboardingPackages: Array<{
+                          idx: number;
+                          pendingDispatchRequestId?: string;
+                        }>;
+                      };
+                    };
+                  };
+                  const entry =
+                    w.__appState.createSession.onboardingPackages.find(
+                      (p) => p.idx === idx,
+                    );
+                  return entry?.pendingDispatchRequestId ?? null;
+                }, remoteIdx),
+              { timeout: 5_000 },
+            )
+            .not.toBe(requestIdStr);
 
           // Manual fallback still works end-to-end — manual
-          // markPackageDistributed flips the chip to success even
-          // while adoptionError is still surfaced.
+          // markPackageDistributed flips the chip to success and clears
+          // retry/error state for this package.
           await markButton.click();
           await expect(
             pageA.locator(".status-pill.success", { hasText: "Distributed" }),
           ).toHaveCount(1, { timeout: 5_000 });
+          await expect(
+            pageA.getByText(
+              "Peer adoption failed — retry or mark distributed manually",
+            ),
+          ).toHaveCount(0);
         } finally {
           await ctxA.close().catch(() => undefined);
         }

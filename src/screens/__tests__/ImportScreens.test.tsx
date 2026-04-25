@@ -214,6 +214,26 @@ describe("LoadBackupScreen", () => {
     fireEvent.click(scanBtn);
     expect(screen.getByRole("dialog", { name: /QR Scanner/i })).toBeInTheDocument();
   });
+
+  it("keeps the Paper preset state display-only: decoded copy, no QR scanner affordance", () => {
+    mocks.locationState = {
+      demoUi: { import: { backupPreset: "bfprofile1paperpreset" } },
+    };
+    render(
+      <MemoryRouter>
+        <LoadBackupScreen />
+      </MemoryRouter>,
+    );
+    expect(screen.getByPlaceholderText("bfprofile1...")).toHaveValue(
+      "bfprofile1paperpreset",
+    );
+    expect(
+      screen.getByText("Valid backup — Group: My Signing Key (2/3) · Share #1"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Scan QR/i }),
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe("DecryptBackupScreen", () => {

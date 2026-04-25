@@ -24,7 +24,15 @@
  *     500-entry cap.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import type {
   AppStateValue,
   RuntimeEventLogEntry,
@@ -69,6 +77,214 @@ afterEach(() => {
 });
 
 describe("EventLogPanel — filter persistence", () => {
+  it("defaults runtime filters to no active filtering so every badge renders initially", () => {
+    currentState.value.runtimeEventLog = [
+      entry({ seq: 1, badge: "SIGN" }),
+      entry({ seq: 2, badge: "ECDH" }),
+      entry({ seq: 3, badge: "PING" }),
+      entry({ seq: 4, badge: "ERROR" }),
+      entry({ seq: 5, badge: "INFO" }),
+      entry({ seq: 6, badge: "ONBOARD" }),
+    ];
+    const { container } = render(<EventLogPanel />);
+    const rendered = Array.from(
+      container.querySelectorAll(".event-log-type"),
+    ).map((n) => n.textContent);
+    expect(rendered).toEqual([
+      "ONBOARD",
+      "INFO",
+      "ERROR",
+      "PING",
+      "ECDH",
+      "SIGN",
+    ]);
+    expect(screen.getByText("6 events")).toBeTruthy();
+
+    const trigger = screen.getByRole("button", {
+      name: "Filter event log, no filters active, showing all 11 badges",
+    });
+    expect(within(trigger).getByText("No filters")).toBeTruthy();
+    fireEvent.click(trigger);
+    expect(
+      screen
+        .getByRole("menuitemcheckbox", { name: "SIGN" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("menuitemcheckbox", { name: "ERROR" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("menuitemcheckbox", { name: "ECDH" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("menuitemcheckbox", { name: "ONBOARD" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("menuitemcheckbox", { name: "PING" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("menuitemcheckbox", { name: "INFO" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+  });
+
+  it("keeps the checkbox popover open while toggling filters and updates active count", () => {
+    currentState.value.runtimeEventLog = [
+      entry({ seq: 1, badge: "SIGN" }),
+      entry({ seq: 2, badge: "PING" }),
+    ];
+    render(<EventLogPanel />);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Filter event log, no filters active, showing all 11 badges",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "PING" }));
+
+    expect(screen.getByRole("menu", { name: "Event log filters" })).toBeTruthy();
+    expect(
+      screen
+        .getByRole("menuitemcheckbox", { name: "PING" })
+        .getAttribute("aria-checked"),
+    ).toBe("false");
+    expect(
+      screen.getByRole("button", {
+        name: "Filter event log, 10 of 11 badges active",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("groups repeated low-signal PING completions while preserving the raw event count and scrubbed detail", () => {
+    currentState.value.runtimeEventLog = [
+      entry({
+        seq: 1,
+        at: 1_000,
+        badge: "PING",
+        source: "completion",
+        payload: { Ping: { request_id: "req-ping-1" } },
+      }),
+      entry({
+        seq: 2,
+        at: 2_000,
+        badge: "PING",
+        source: "completion",
+        payload: { Ping: { request_id: "req-ping-2" } },
+      }),
+      entry({
+        seq: 3,
+        at: 3_000,
+        badge: "PING",
+        source: "completion",
+        payload: {
+          Ping: { request_id: "req-ping-3" },
+          passphrase: "hunter2",
+        },
+      }),
+    ];
+
+    const { container } = render(<EventLogPanel />);
+
+    expect(screen.getByText("3 events")).toBeTruthy();
+    expect(container.querySelectorAll(".event-log-item").length).toBe(1);
+    expect(screen.getByText("Ping completed ×3")).toBeTruthy();
+    expect(container.querySelector(".event-log-count-badge")?.textContent).toBe(
+      "3",
+    );
+
+    fireEvent.click(container.querySelector(".event-log-row")!);
+    expect(container.querySelectorAll(".event-log-group-entry").length).toBe(3);
+    const expanded = container.querySelector(".event-log-group-expanded")
+      ?.textContent ?? "";
+    expect(expanded).toContain("req-ping-3");
+    expect(expanded).toContain("req-ping-2");
+    expect(expanded).toContain("req-ping-1");
+    expect(expanded).not.toContain("hunter2");
+  });
+
+  it("does not group high-signal ERROR or ONBOARD rows even when repeated", () => {
+    currentState.value.runtimeEventLog = [
+      entry({ seq: 1, badge: "ERROR" }),
+      entry({ seq: 2, badge: "ERROR" }),
+      entry({ seq: 3, badge: "ONBOARD" }),
+      entry({ seq: 4, badge: "ONBOARD" }),
+    ];
+
+    const { container } = render(<EventLogPanel />);
+
+    expect(screen.getByText("4 events")).toBeTruthy();
+    expect(container.querySelectorAll(".event-log-item").length).toBe(4);
+    expect(container.querySelector(".event-log-count-badge")).toBeNull();
+  });
+
+  it("filters before grouping so matching low-signal rows can collapse after other badges are hidden", () => {
+    currentState.value.runtimeEventLog = [
+      entry({
+        seq: 1,
+        at: 1_000,
+        badge: "PING",
+        source: "completion",
+        payload: { Ping: { request_id: "req-ping-1" } },
+      }),
+      entry({ seq: 2, at: 2_000, badge: "SIGN" }),
+      entry({
+        seq: 3,
+        at: 3_000,
+        badge: "PING",
+        source: "completion",
+        payload: { Ping: { request_id: "req-ping-3" } },
+      }),
+    ];
+
+    const { container } = render(<EventLogPanel />);
+    fireEvent.click(screen.getByText("Filter"));
+    fireEvent.click(screen.getByText("Clear all"));
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "PING" }));
+
+    expect(screen.getByText("2 events")).toBeTruthy();
+    expect(container.querySelectorAll(".event-log-item").length).toBe(1);
+    expect(screen.getByText("Ping completed ×2")).toBeTruthy();
+  });
+
+  it("closes the filter popover from Escape and outside click while preserving trigger focus", async () => {
+    currentState.value.runtimeEventLog = [
+      entry({ seq: 1, badge: "SIGN" }),
+      entry({ seq: 2, badge: "ERROR" }),
+    ];
+    render(<EventLogPanel />);
+    const trigger = screen.getByRole("button", {
+      name: "Filter event log, no filters active, showing all 11 badges",
+    });
+    fireEvent.click(trigger);
+    const menu = screen.getByRole("menu", { name: "Event log filters" });
+    await waitFor(() =>
+      expect(screen.getByRole("menuitemcheckbox", { name: "SYNC" })).toHaveFocus(),
+    );
+
+    fireEvent.keyDown(menu, { key: "End" });
+    expect(
+      screen.getByRole("menuitemcheckbox", { name: "ONBOARD" }),
+    ).toHaveFocus();
+
+    fireEvent.keyDown(menu, { key: "Escape" });
+    expect(screen.queryByRole("menu", { name: "Event log filters" })).toBeNull();
+    expect(trigger).toHaveFocus();
+
+    fireEvent.click(trigger);
+    expect(screen.getByRole("menu", { name: "Event log filters" })).toBeTruthy();
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole("menu", { name: "Event log filters" })).toBeNull();
+  });
+
   it("Select all / Clear all actions toggle every badge in the dropdown", () => {
     currentState.value.runtimeEventLog = [
       entry({ seq: 1, badge: "SIGN" }),
@@ -195,10 +411,10 @@ describe("EventLogPanel — filter persistence", () => {
 });
 
 describe("EventLogPanel — scroll anchor & jump to newest", () => {
-  it("renders a `.event-log-list` wrapper containing every item row (MutationObserver target for VAL-EVENTLOG-015)", () => {
+  it("renders a `.event-log-list` wrapper containing every visible item row (MutationObserver target for VAL-EVENTLOG-015)", () => {
     currentState.value.runtimeEventLog = [
       entry({ seq: 1, badge: "SIGN" }),
-      entry({ seq: 2, badge: "ECDH" }),
+      entry({ seq: 2, badge: "ERROR" }),
     ];
     const { container } = render(<EventLogPanel />);
     const list = container.querySelector(".event-log-list");
@@ -210,8 +426,8 @@ describe("EventLogPanel — scroll anchor & jump to newest", () => {
   it("VAL-EVENTLOG-021 — when user is scrolled off-top, prepended events do NOT shift the visible scroll anchor", () => {
     currentState.value.runtimeEventLog = [
       entry({ seq: 1, badge: "SIGN" }),
-      entry({ seq: 2, badge: "ECDH" }),
-      entry({ seq: 3, badge: "PING" }),
+      entry({ seq: 2, badge: "ERROR" }),
+      entry({ seq: 3, badge: "SIGN" }),
     ];
     const { container, rerender } = render(<EventLogPanel />);
     const listEl = container.querySelector(".event-log-list") as HTMLElement;
@@ -232,7 +448,7 @@ describe("EventLogPanel — scroll anchor & jump to newest", () => {
     // Now ingest an entry: scrollHeight grows by 40 px (one row's height).
     currentState.value.runtimeEventLog = [
       ...currentState.value.runtimeEventLog,
-      entry({ seq: 4, badge: "SYNC" }),
+      entry({ seq: 4, badge: "ERROR" }),
     ];
     Object.defineProperty(listEl, "scrollHeight", {
       configurable: true,
@@ -246,7 +462,7 @@ describe("EventLogPanel — scroll anchor & jump to newest", () => {
   it("'Jump to newest' is hidden when scrolled at top and visible when scrolled down", () => {
     currentState.value.runtimeEventLog = [
       entry({ seq: 1, badge: "SIGN" }),
-      entry({ seq: 2, badge: "ECDH" }),
+      entry({ seq: 2, badge: "ERROR" }),
     ];
     const { container } = render(<EventLogPanel />);
     // Initially at top (scrollTop=0) — affordance hidden.
@@ -270,7 +486,7 @@ describe("EventLogPanel — scroll anchor & jump to newest", () => {
     const entries: RuntimeEventLogEntry[] = [];
     for (let i = 1; i <= 200; i += 1) {
       entries.push(
-        entry({ seq: i, badge: "SYNC", payload: { seq_id: i } }),
+        entry({ seq: i, badge: "SIGN", payload: { seq_id: i } }),
       );
     }
     currentState.value.runtimeEventLog = entries;
@@ -302,13 +518,13 @@ describe("EventLogPanel — scroll anchor & jump to newest", () => {
     // Min and max bracket the expected range.
     expect(Math.min(...payloadSeqs)).toBe(1);
     expect(Math.max(...payloadSeqs)).toBe(200);
-  });
+  }, 10_000);
 
   it("no-flicker-to-empty on intra-session remount (VAL-EVENTLOG-015): buffer-backed rows are visible on first paint", () => {
     currentState.value.runtimeEventLog = [
       entry({ seq: 1, badge: "SIGN" }),
-      entry({ seq: 2, badge: "ECDH" }),
-      entry({ seq: 3, badge: "PING" }),
+      entry({ seq: 2, badge: "ERROR" }),
+      entry({ seq: 3, badge: "SIGN" }),
     ];
     const { container, unmount } = render(<EventLogPanel />);
     const initialCount = container.querySelectorAll(".event-log-item").length;

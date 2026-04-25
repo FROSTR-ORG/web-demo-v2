@@ -343,4 +343,27 @@ describe("RecoverSuccessScreen", () => {
       screen.getByText(/nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0/),
     ).toBeInTheDocument();
   });
+
+  it("can seed the Paper demo success state as copied and already revealed", async () => {
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn(() => Promise.resolve()) },
+    });
+    renderSuccess({
+      demoUi: { recover: { variant: "success", copied: true } },
+    });
+
+    const paperNsec =
+      "nsec1abcpaperrecoveredprivatekeymock7k4m9x2p5s8q3v6w0";
+    expect(screen.getByText(paperNsec)).toBeInTheDocument();
+    expect(screen.getByText("Copied!")).toBeInTheDocument();
+
+    const copyButton = screen.getByRole("button", {
+      name: /Copy to Clipboard/,
+    });
+    expect(copyButton).not.toBeDisabled();
+    fireEvent.click(copyButton);
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(paperNsec),
+    );
+  });
 });

@@ -7,7 +7,7 @@ import type {
 import type { RuntimeStatusSummary } from "../../../../lib/bifrost/types";
 
 /**
- * SignActivityPanel — dev-only dashboard affordance that surfaces the
+ * SignActivityPanel — Test page affordance that surfaces the
  * per-request_id runtime lifecycle (dispatched -> pending -> completed |
  * failed) as DOM rows + an aria-live "sign succeeded" toast. Fulfils the
  * `fix-m1-sign-completion-ui-feedback-and-pending-trace` feature and

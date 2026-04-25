@@ -1,6 +1,9 @@
 import { ChevronDown } from "lucide-react";
+import type { KeyboardEvent } from "react";
 import {
   useCallback,
+  useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -21,9 +24,9 @@ import {
 } from "../mocks";
 
 /**
- * The ten canonical Paper badges rendered by the runtime-wired Event
- * Log panel. Order here is the order shown in the Filter dropdown and
- * the order in which colour-class hints are matched in CSS
+ * The canonical badges rendered by the runtime-wired Event Log panel.
+ * Order here is the order shown in the Filter dropdown and the order
+ * in which colour-class hints are matched in CSS
  * (`.event-log-type.sync`, `.event-log-type.sign`, …).
  */
 const RUNTIME_BADGES: RuntimeEventLogBadge[] = [
@@ -37,7 +40,6 @@ const RUNTIME_BADGES: RuntimeEventLogBadge[] = [
   "READY",
   "INFO",
   "ERROR",
-  "BACKUP_PUBLISH",
   // fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — the
   // VAL-ONBOARD-011 contract requires onboarding lifecycle entries
   // (completion + failure) to carry a distinct ONBOARD badge so
@@ -45,6 +47,31 @@ const RUNTIME_BADGES: RuntimeEventLogBadge[] = [
   // ERROR buckets.
   "ONBOARD",
 ];
+
+const LOW_SIGNAL_GROUP_BADGES = new Set<RuntimeEventLogBadge>([
+  "SYNC",
+  "PING",
+  "INFO",
+  "READY",
+]);
+const EVENT_LOG_GROUP_WINDOW_MS = 15_000;
+
+type EventLogDisplayRow =
+  | {
+      kind: "single";
+      id: string;
+      entry: RuntimeEventLogEntry;
+    }
+  | {
+      kind: "group";
+      id: string;
+      entries: RuntimeEventLogEntry[];
+      summary: string;
+    };
+
+function defaultRuntimeFilterBadges(): Set<RuntimeEventLogBadge> {
+  return new Set(RUNTIME_BADGES);
+}
 
 /**
  * Kebab-case CSS suffix used with `.event-log-type.<suffix>` in
@@ -74,8 +101,6 @@ function runtimeBadgeClassName(badge: RuntimeEventLogBadge): string {
       return "info";
     case "ERROR":
       return "error";
-    case "BACKUP_PUBLISH":
-      return "backup-publish";
     case "ONBOARD":
       return "onboard";
   }
@@ -148,26 +173,6 @@ function summarizeEntry(entry: RuntimeEventLogEntry): string {
     return `${op} failed${code}${payload?.message ? ` — ${payload.message}` : ""}`;
   }
   if (entry.source === "local_mutation") {
-    // Today the only local_mutation producer is publishProfileBackup's
-    // BACKUP_PUBLISH entry — see `BackupPublishLocalMutationPayload`
-    // in `AppStateTypes.ts`. Surface a terse one-liner that matches
-    // the inline error copy on the Publish Backup modal so users can
-    // correlate the two surfaces at a glance (VAL-BACKUP-007).
-    const payload = entry.payload as {
-      kind?: string;
-      reason?: "no-relays" | "all-offline";
-      attemptedRelayCount?: number;
-    } | null;
-    if (payload?.kind === "backup_publish_failed") {
-      const count = payload.attemptedRelayCount ?? 0;
-      if (payload.reason === "no-relays") {
-        return "Backup publish failed — no relays configured";
-      }
-      if (payload.reason === "all-offline") {
-        return `Backup publish failed — all ${count} relays offline`;
-      }
-      return "Backup publish failed";
-    }
     // fix-m7-scrutiny-r1-sponsor-concurrency-and-badge —
     // VAL-ONBOARD-011 ONBOARD badge summaries. Truncate
     // request_id to 10 chars like the completion-channel copy for
@@ -199,6 +204,70 @@ function summarizeEntry(entry: RuntimeEventLogEntry): string {
   return String(kind);
 }
 
+function runtimeEventKind(entry: RuntimeEventLogEntry): string | null {
+  const payload = entry.payload as { kind?: unknown } | null;
+  return typeof payload?.kind === "string" && payload.kind.length > 0
+    ? payload.kind
+    : null;
+}
+
+function eventLogGroupKey(entry: RuntimeEventLogEntry): string | null {
+  if (!LOW_SIGNAL_GROUP_BADGES.has(entry.badge)) return null;
+  if (entry.badge === "PING") {
+    return `${entry.badge}:${entry.source}`;
+  }
+  return `${entry.badge}:${runtimeEventKind(entry) ?? entry.source}`;
+}
+
+function groupSummary(entry: RuntimeEventLogEntry): string {
+  if (entry.source === "completion") {
+    const payload = entry.payload as Record<string, unknown>;
+    const key = payload && typeof payload === "object"
+      ? Object.keys(payload)[0]
+      : "";
+    return key ? `${key} completed` : "Operation completed";
+  }
+  return runtimeEventKind(entry) ?? summarizeEntry(entry);
+}
+
+function groupEventLogRows(
+  entries: RuntimeEventLogEntry[],
+): EventLogDisplayRow[] {
+  const rows: EventLogDisplayRow[] = [];
+  for (let idx = 0; idx < entries.length; idx += 1) {
+    const first = entries[idx];
+    const key = eventLogGroupKey(first);
+    if (!key) {
+      rows.push({ kind: "single", id: `event-${first.seq}`, entry: first });
+      continue;
+    }
+
+    const group = [first];
+    let cursor = idx + 1;
+    while (cursor < entries.length) {
+      const candidate = entries[cursor];
+      if (eventLogGroupKey(candidate) !== key) break;
+      if (Math.abs(first.at - candidate.at) > EVENT_LOG_GROUP_WINDOW_MS) break;
+      group.push(candidate);
+      cursor += 1;
+    }
+
+    if (group.length < 2) {
+      rows.push({ kind: "single", id: `event-${first.seq}`, entry: first });
+      continue;
+    }
+
+    rows.push({
+      kind: "group",
+      id: `group-${key}-${group[0].seq}-${group[group.length - 1].seq}`,
+      entries: group,
+      summary: `${groupSummary(first)} ×${group.length}`,
+    });
+    idx = cursor - 1;
+  }
+  return rows;
+}
+
 /**
  * Module-scoped filter selection cache. The `selectedBadges` Set
  * survives unmount/remount cycles so a user that:
@@ -216,12 +285,12 @@ function summarizeEntry(entry: RuntimeEventLogEntry): string {
 const eventLogFilterCache: {
   selectedBadges: Set<RuntimeEventLogBadge>;
 } = {
-  selectedBadges: new Set(RUNTIME_BADGES),
+  selectedBadges: defaultRuntimeFilterBadges(),
 };
 
-/** Test-only helper: reset module-scoped filter cache to "all selected". */
+/** Test-only helper: reset module-scoped filter cache to the unfiltered default. */
 export function __resetEventLogFilterPersistenceForTest(): void {
-  eventLogFilterCache.selectedBadges = new Set(RUNTIME_BADGES);
+  eventLogFilterCache.selectedBadges = defaultRuntimeFilterBadges();
 }
 
 /**
@@ -292,6 +361,10 @@ function RuntimeEventLog() {
   const clearRuntimeEventLog = state.clearRuntimeEventLog;
 
   const [filterOpen, setFilterOpen] = useState(false);
+  const filterMenuId = useId();
+  const filterWrapRef = useRef<HTMLDivElement | null>(null);
+  const filterTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const filterMenuRef = useRef<HTMLDivElement | null>(null);
   // Initialise from the module-level cache so filter selections survive
   // unmount/remount cycles (see `eventLogFilterCache`).
   const [selectedBadges, setSelectedBadgesState] = useState<Set<RuntimeEventLogBadge>>(
@@ -313,18 +386,102 @@ function RuntimeEventLog() {
     },
     [],
   );
+
+  const closeFilterMenu = useCallback((restoreFocus = true) => {
+    setFilterOpen(false);
+    if (restoreFocus) {
+      filterTriggerRef.current?.focus();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!filterOpen) return;
+    const handleMouseDown = (event: MouseEvent) => {
+      const wrapper = filterWrapRef.current;
+      if (!wrapper) return;
+      if (event.target instanceof Node && wrapper.contains(event.target)) {
+        return;
+      }
+      closeFilterMenu(false);
+    };
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, [closeFilterMenu, filterOpen]);
+
+  useEffect(() => {
+    if (!filterOpen) return;
+    queueMicrotask(() => {
+      const menu = filterMenuRef.current;
+      if (!menu) return;
+      const selected =
+        menu.querySelector<HTMLButtonElement>(
+          '[role="menuitemcheckbox"][aria-checked="true"]',
+        ) ??
+        menu.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]');
+      selected?.focus();
+    });
+  }, [filterOpen]);
+
+  const handleFilterTriggerKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLButtonElement>) => {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        setFilterOpen(true);
+      }
+    },
+    [],
+  );
+
+  const handleFilterMenuKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeFilterMenu();
+        return;
+      }
+      if (
+        event.key !== "ArrowDown" &&
+        event.key !== "ArrowUp" &&
+        event.key !== "Home" &&
+        event.key !== "End"
+      ) {
+        return;
+      }
+      const buttons = Array.from(
+        event.currentTarget.querySelectorAll<HTMLButtonElement>(
+          "button:not(:disabled)",
+        ),
+      );
+      if (buttons.length === 0) return;
+      event.preventDefault();
+      const currentIndex = buttons.indexOf(
+        document.activeElement as HTMLButtonElement,
+      );
+      const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+      const nextIndex =
+        event.key === "Home"
+          ? 0
+          : event.key === "End"
+            ? buttons.length - 1
+            : event.key === "ArrowDown"
+              ? (safeIndex + 1) % buttons.length
+              : (safeIndex - 1 + buttons.length) % buttons.length;
+      buttons[nextIndex]?.focus();
+    },
+    [closeFilterMenu],
+  );
   // Multiple rows may be expanded simultaneously — independent per
   // row. Supports VAL-EVENTLOG-020 ("Expand state persists across new
   // event ingestion") and the VAL-CROSS-015 flow of expanding two
   // related rows to compare request_ids.
-  const [expandedSeqs, setExpandedSeqs] = useState<Set<number>>(
+  const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const toggleExpanded = useCallback((seq: number) => {
-    setExpandedSeqs((previous) => {
+  const toggleExpanded = useCallback((rowId: string) => {
+    setExpandedRowIds((previous) => {
       const next = new Set(previous);
-      if (next.has(seq)) next.delete(seq);
-      else next.add(seq);
+      if (next.has(rowId)) next.delete(rowId);
+      else next.add(rowId);
       return next;
     });
   }, []);
@@ -345,7 +502,7 @@ function RuntimeEventLog() {
   // rows, just hide them"), so the only gating we need is the empty
   // buffer itself. When `runtimeEventLog` is empty the list renders
   // "No events yet"; when it repopulates, rows appear immediately.
-  const visibleRows = useMemo(() => {
+  const visibleEntries = useMemo(() => {
     const filtered =
       selectedBadges.size === RUNTIME_BADGES.length
         ? runtimeEventLog
@@ -353,6 +510,10 @@ function RuntimeEventLog() {
     // Reverse into newest-first order without mutating the buffer.
     return filtered.slice().sort((a, b) => b.seq - a.seq);
   }, [runtimeEventLog, selectedBadges]);
+  const displayRows = useMemo(
+    () => groupEventLogRows(visibleEntries),
+    [visibleEntries],
+  );
 
   // --- Scroll-anchor preservation (VAL-EVENTLOG-021) ------------------
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -381,7 +542,7 @@ function RuntimeEventLog() {
       el.scrollTop = el.scrollTop + (newHeight - previousHeight);
     }
     previousScrollHeightRef.current = newHeight;
-  }, [visibleRows]);
+  }, [displayRows]);
 
   const handleScroll = useCallback(() => {
     const el = listRef.current;
@@ -436,9 +597,18 @@ function RuntimeEventLog() {
     setSelectedBadges(() => new Set());
   }, [setSelectedBadges]);
 
-  const countLabel = `${visibleRows.length} event${
-    visibleRows.length === 1 ? "" : "s"
+  const countLabel = `${visibleEntries.length} event${
+    visibleEntries.length === 1 ? "" : "s"
   }`;
+  const activeFilterCount = selectedBadges.size;
+  const activeFilterLabel =
+    activeFilterCount === RUNTIME_BADGES.length
+      ? "No filters"
+      : `${activeFilterCount} active`;
+  const filterAriaLabel =
+    activeFilterCount === RUNTIME_BADGES.length
+      ? `Filter event log, no filters active, showing all ${RUNTIME_BADGES.length} badges`
+      : `Filter event log, ${activeFilterCount} of ${RUNTIME_BADGES.length} badges active`;
 
   return (
     <div className="event-log-panel">
@@ -447,7 +617,7 @@ function RuntimeEventLog() {
         <div className="event-log-title">Event Log</div>
         <StatusPill>{countLabel}</StatusPill>
         <span className="event-log-spacer" />
-        {!atTop && visibleRows.length > 0 ? (
+        {!atTop && displayRows.length > 0 ? (
           <button
             type="button"
             className="event-log-link event-log-jump"
@@ -463,20 +633,34 @@ function RuntimeEventLog() {
         >
           Clear
         </button>
-        <div className="event-log-filter-wrap">
+        <div className="event-log-filter-wrap" ref={filterWrapRef}>
           <button
+            ref={filterTriggerRef}
             type="button"
             className="event-log-filter"
+            aria-label={filterAriaLabel}
             aria-expanded={filterOpen}
+            aria-haspopup="menu"
+            aria-controls={filterMenuId}
             onClick={() => setFilterOpen((open) => !open)}
+            onKeyDown={handleFilterTriggerKeyDown}
           >
-            Filter
+            <span>Filter</span>
+            <span className="event-log-filter-count">
+              {activeFilterLabel}
+            </span>
+            <span className="event-log-filter-caret" aria-hidden="true">
+              ▾
+            </span>
           </button>
           {filterOpen ? (
             <div
+              ref={filterMenuRef}
+              id={filterMenuId}
               className="event-log-filter-menu"
               role="menu"
               aria-label="Event log filters"
+              onKeyDown={handleFilterMenuKeyDown}
             >
               <div className="event-log-filter-actions">
                 <button
@@ -494,38 +678,51 @@ function RuntimeEventLog() {
                   Clear all
                 </button>
               </div>
-              {RUNTIME_BADGES.map((badge) => (
-                <button
-                  key={badge}
-                  type="button"
-                  role="menuitemcheckbox"
-                  aria-checked={selectedBadges.has(badge)}
-                  className={selectedBadges.has(badge) ? "active" : undefined}
-                  onClick={() => toggleBadge(badge)}
-                >
-                  {badge}
-                </button>
-              ))}
+              {RUNTIME_BADGES.map((badge) => {
+                const selected = selectedBadges.has(badge);
+                return (
+                  <button
+                    key={badge}
+                    type="button"
+                    role="menuitemcheckbox"
+                    aria-checked={selected}
+                    className={selected ? "active" : undefined}
+                    onClick={() => toggleBadge(badge)}
+                  >
+                    <span
+                      className="event-log-filter-check"
+                      aria-hidden="true"
+                    />
+                    <span
+                      className={`event-log-filter-badge ${runtimeBadgeClassName(
+                        badge,
+                      )}`}
+                    >
+                      {badge}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           ) : null}
         </div>
       </div>
-      {visibleRows.length > 0 ? (
+      {displayRows.length > 0 ? (
         <div
           className="event-log-list"
           ref={listRef}
           onScroll={handleScroll}
         >
-          {visibleRows.map((entry) => {
-            const expanded = expandedSeqs.has(entry.seq);
-            const scrubbed = scrubEventLogPayload(entry.payload);
+          {displayRows.map((row) => {
+            const entry = row.kind === "single" ? row.entry : row.entries[0];
+            const expanded = expandedRowIds.has(row.id);
             return (
-              <div className="event-log-item" key={entry.seq}>
+              <div className="event-log-item" key={row.id}>
                 <button
                   type="button"
-                  className="event-log-row"
+                  className={`event-log-row${row.kind === "group" ? " grouped" : ""}`}
                   aria-expanded={expanded}
-                  onClick={() => toggleExpanded(entry.seq)}
+                  onClick={() => toggleExpanded(row.id)}
                 >
                   <span className="event-log-time">
                     {formatHhMmSs(entry.at)}
@@ -535,15 +732,49 @@ function RuntimeEventLog() {
                   >
                     {entry.badge}
                   </span>
-                  <span className="event-log-copy">{summarizeEntry(entry)}</span>
+                  <span className="event-log-copy">
+                    {row.kind === "group" ? row.summary : summarizeEntry(entry)}
+                  </span>
+                  {row.kind === "group" ? (
+                    <span className="event-log-count-badge">
+                      {row.entries.length}
+                    </span>
+                  ) : null}
                   <span className="event-log-chevron" aria-hidden="true">
                     ⌄
                   </span>
                 </button>
-                {expanded ? (
+                {expanded && row.kind === "single" ? (
                   <pre className="event-log-expanded">
-                    {JSON.stringify(scrubbed, null, 2)}
+                    {JSON.stringify(
+                      scrubEventLogPayload(entry.payload),
+                      null,
+                      2,
+                    )}
                   </pre>
+                ) : null}
+                {expanded && row.kind === "group" ? (
+                  <div className="event-log-expanded event-log-group-expanded">
+                    {row.entries.map((child) => (
+                      <div className="event-log-group-entry" key={child.seq}>
+                        <div className="event-log-group-entry-head">
+                          <span className="event-log-group-time">
+                            {formatHhMmSs(child.at)}
+                          </span>
+                          <span className="event-log-group-summary">
+                            {summarizeEntry(child)}
+                          </span>
+                        </div>
+                        <pre className="event-log-group-payload">
+                          {JSON.stringify(
+                            scrubEventLogPayload(child.payload),
+                            null,
+                            2,
+                          )}
+                        </pre>
+                      </div>
+                    ))}
+                  </div>
                 ) : null}
               </div>
             );

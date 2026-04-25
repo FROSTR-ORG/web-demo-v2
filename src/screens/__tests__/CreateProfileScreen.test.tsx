@@ -154,11 +154,11 @@ describe("CreateProfileScreen", () => {
     expect(screen.getByText("Peer #0")).toBeInTheDocument();
     expect(screen.getByText("Peer #1")).toBeInTheDocument();
     expect(screen.getByText("Peer #2")).toBeInTheDocument();
-    expect(screen.getByText("Local profile")).toBeInTheDocument();
-    expect(screen.getAllByText("SIGN").length).toBe(2);
-    expect(screen.getAllByText("ECDH").length).toBe(2);
-    expect(screen.getAllByText("PING").length).toBe(2);
-    expect(screen.getAllByText("ONBOARD").length).toBe(2);
+    expect(screen.queryByText("Local profile")).not.toBeInTheDocument();
+    expect(screen.getAllByText("SIGN").length).toBe(3);
+    expect(screen.getAllByText("ECDH").length).toBe(3);
+    expect(screen.getAllByText("PING").length).toBe(3);
+    expect(screen.getAllByText("ONBOARD").length).toBe(3);
   });
 
   it("does not render any 'Remote Package Password' text (VAL-FOLLOWUP-007)", () => {

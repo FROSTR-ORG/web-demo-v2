@@ -3,7 +3,7 @@
 A FROST threshold signing web application for Nostr — Paper-parity prototype UI
 plus a fully wired `bifrost-bridge-wasm` signer runtime for multi-device key
 management, keyset creation, rotation, replace-share, source-side onboarding
-sponsorship, recovery, and encrypted profile backup/restore.
+sponsorship, recovery, and encrypted profile file import/export.
 
 ## Current State
 
@@ -12,11 +12,11 @@ reference content parity (`igloo-paper`) across 10 flows. The `bifrost-rs` WASM
 bridge is fully integrated — the app runs real FROST key generation, real
 multi-device sign / ECDH / ping / onboard round-trips over Nostr relays
 (`wss://relay.primal.net` / `wss://relay.damus.io` / `wss://nos.lol` by default,
-plus an optional local `bifrost-devtools` relay for e2e), real encrypted
-profile backup/restore via NIP-16/33 replaceable events, and persistent
+plus an optional local `bifrost-devtools` relay for e2e), encrypted
+`bfprofile` file import/export, and persistent
 IndexedDB-backed profile storage. The Dashboard, Policies, Approvals, Event
-Log, and Settings surfaces all read from the live runtime; the only mocked
-rendering path is the read-only `/demo/:scenarioId` gallery. The validation
+Log, and Settings surfaces all read from the live runtime; the deterministic
+`/demo/:scenarioId` gallery is the only mocked rendering path. The validation
 contract enumerates **223 behavioral assertions** covering the full UI +
 runtime surface and is reproduced below by 1059+ Vitest cases plus the
 Playwright demo-gallery + multi-device e2e suites.
@@ -38,10 +38,8 @@ Playwright demo-gallery + multi-device e2e suites.
     --host 127.0.0.1 --port 8194
   ```
   This listens on `ws://127.0.0.1:8194` (NOT `wss://`) — transport-only, so it
-  is suitable for publish/subscribe/sign/ECDH/ping/onboard tests but NOT for
-  the `wss://`-only relay-restore UI form (see
-  `.factory/library/user-testing.md` for the DEV-only opt-in used by the
-  restore-from-relay spec). Most multi-device specs self-host the relay in
+  is suitable for publish/subscribe/sign/ECDH/ping/onboard tests. Most
+  multi-device specs self-host the relay in
   `beforeAll` / kill it in `afterAll`, so you usually do not need to start it
   manually; starting it by hand will cause port 8194 contention with those
   specs.
@@ -49,10 +47,19 @@ Playwright demo-gallery + multi-device e2e suites.
   `bifrost-devtools` build and individual multi-device specs self-skip with a
   clear reason.
 
+## Docs for Agents
+
+Start with `docs/README.md` for the docs map and `docs/agent-runbook.md` for
+safe agent workflow. The expanded architecture notes live in
+`docs/web-demo-architecture.md`; `/demo` scenario workflow lives in
+`docs/demo-scenario-guide.md`; runtime-vs-Paper exceptions live in
+`docs/runtime-deviations-from-paper.md`.
+
 ## Flows Implemented
 
 All flows follow their Paper design reference exactly (copy, typography,
-layout).
+layout), except for the runtime-constrained deviations documented under
+`docs/runtime-deviations-from-paper.md`.
 
 ### Welcome — `/`
 - First-visit variant ("Split your Nostr key.") and returning-user variant
@@ -95,19 +102,25 @@ per-peer permission badges SIGN/ECDH/PING/ONBOARD), policies view, pending
 approvals, event log, modals (clear credentials, export profile, export
 complete, policy prompt, signing failed), and Settings sidebar with Device
 Profile / Group Profile / Replace Share + Rotate Keyset / Export & Backup /
-Profile Security sections. Source is organized under
+Profile Security sections. Relay backup publish/restore is intentionally not
+surfaced in this web demo; onboarding happens through `bfonboard` packages and
+profile transfer happens through `bfprofile` import/export. Source is organized under
 `src/screens/DashboardScreen/` (index, states/, panels/, modals/, sidebar/,
 mocks.ts, types.ts).
 
-## Demo Gallery
+## Real Routes vs Demo Gallery
 
-The `/demo` route hosts a first-class gallery of every canonical screen +
-variant, keyed by scenario id. Each scenario seeds `MockAppStateProvider` with
-the exact fixtures needed to render that screen, so every assertion in
-`.factory/missions/<id>/validation-contract.md` is reachable via a stable
-`/demo/{scenario-id}` URL. The gallery toolbar exposes
-`All screens / Prev / Next / Raw / Reference`; append `?chrome=0` to any
-scenario URL to strip the chrome for clean capture.
+Product routes are mounted through `src/app/CoreRoutes.tsx` under the real
+`AppStateProvider`. The `/demo` route hosts a first-class gallery of every
+canonical screen + variant, keyed by scenario id and rendered through
+`MockAppStateProvider`. Demo scenarios are deterministic review fixtures; real
+routes are the source of truth for runtime behavior.
+
+Each demo scenario is reachable via a stable `/demo/{scenario-id}` URL. The
+gallery toolbar exposes `All screens / Prev / Next / Raw / Reference`; append
+`?chrome=0` to any scenario URL to strip the chrome for clean capture.
+See `docs/demo-scenario-guide.md` before adding scenario ids, changing
+Paper-reference assets, or relying on the demo bridge.
 
 ## Setup & Run
 
@@ -169,19 +182,22 @@ Two providers implement the same `useAppState()` API:
 
 ## Further Reading
 
-- `.factory/library/architecture.md` — layered system overview (UI →
-  AppStateProvider → RuntimeClient → WASM + RuntimeRelayPump → relays).
-- `.factory/library/environment.md` — ports, local relay, test-observability
-  hooks, concurrency budget.
-- `.factory/library/user-testing.md` — validator guidance (agent-browser,
-  shell, Playwright), `backup-publish-restore-live.spec.ts` harness, and the
-  full list of dev-only `window.__debug` / `window.__iglooTest*` hooks.
+- `docs/README.md` — public docs hub and recommended read order for agents.
+- `docs/agent-runbook.md` — first inspection pass, safe edit boundaries, route
+  orientation, local relay caveats, and validation commands.
+- `docs/web-demo-architecture.md` — layered runtime overview, module
+  boundaries, data flows, persistence rules, and testing surfaces.
+- `docs/demo-scenario-guide.md` — `/demo/:scenarioId` registry rules,
+  Paper-reference sync, variant behavior, and demo bridge safety.
+- `docs/outside-runtime-flow-invariants.md` — security and phase-gating rules
+  for setup, backup, restore, and recovery flows.
 - `docs/runtime-deviations-from-paper.md` — every intentional deviation from
   `igloo-paper`, each cited back to the Paper source and the covering
   `VAL-*` assertion IDs.
-- `docs/web-demo-architecture.md` — screen/app-state layout conventions.
 - `docs/allowed-console-warnings.md` — zero-warn policy + the (currently
   empty) allowlist.
+- `.factory/library/user-testing.md` — internal validator detail for
+  agent-browser, Playwright, local relay harnesses, and DEV-only hooks.
 
 ## Design Reference
 

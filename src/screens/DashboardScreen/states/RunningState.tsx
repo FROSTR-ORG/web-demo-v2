@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../../../components/ui";
 import type {
+  PendingDispatchEntry,
+  PeerLatencySample,
+} from "../../../app/AppStateTypes";
+import type {
   PeerPermissionState,
   PendingOperation,
   PeerStatus,
@@ -17,6 +21,7 @@ import type { PeerRefreshErrorInfo } from "../panels/PeerRow";
 import {
   PendingApprovalsPanel,
   deriveApprovalRowsFromRuntime,
+  filterPendingApprovalOperations,
   formatApprovalTtl,
 } from "../panels/PendingApprovalsPanel";
 import { RelayHealthPanel } from "../panels/RelayHealthPanel";
@@ -44,16 +49,20 @@ export function RunningState({
   peerRefreshErrors,
   peerPermissionStates,
   runtimeRelays,
+  pendingDispatchIndex,
+  peerLatencyByPubkey,
 }: {
   relays: string[];
   onlineCount: number;
   signReadyLabel: string;
   peers: PeerStatus[];
   pendingOperations: PendingOperation[];
+  pendingDispatchIndex?: Record<string, PendingDispatchEntry>;
+  peerLatencyByPubkey?: Record<string, PeerLatencySample>;
   paperPanels: boolean;
   sidebarOpen?: boolean;
   onStop: () => void;
-  onRefresh: () => void | Promise<void>;
+  onRefresh?: () => void | Promise<void>;
   onOpenPolicyPrompt?: (request: PolicyPromptRequest) => void;
   peerRefreshErrors?: Record<string, PeerRefreshErrorInfo>;
   /**
@@ -67,7 +76,7 @@ export function RunningState({
    * m5-relay-telemetry — per-relay telemetry snapshot sourced from
    * {@link RuntimeRelayPump}. Rendered by {@link RelayHealthPanel} in
    * runtime mode (paperPanels=false) so validators and users can
-   * observe live Latency / Events / Last-Seen columns
+   * observe live Relay RTT / Events / Last-Seen columns
    * (VAL-SETTINGS-010 through VAL-SETTINGS-014). Omitted in Paper/demo
    * mode to preserve pixel-parity.
    */
@@ -88,6 +97,17 @@ export function RunningState({
     return () => window.clearInterval(id);
   }, []);
 
+  const visiblePendingOperations = useMemo(
+    () =>
+      paperPanels
+        ? pendingOperations
+        : filterPendingApprovalOperations(
+            pendingOperations,
+            pendingDispatchIndex,
+          ),
+    [paperPanels, pendingOperations, pendingDispatchIndex],
+  );
+
   const runtimeRows = useMemo(
     () =>
       // Paper/demo mode: use the Paper-fixture rows so visual-fidelity
@@ -95,8 +115,12 @@ export function RunningState({
       // the live `pending_operations` snapshot.
       paperPanels
         ? MOCK_PENDING_APPROVAL_ROWS
-        : deriveApprovalRowsFromRuntime(pendingOperations, peers, nowMs),
-    [paperPanels, pendingOperations, peers, nowMs],
+        : deriveApprovalRowsFromRuntime(
+            visiblePendingOperations,
+            peers,
+            nowMs,
+          ),
+    [paperPanels, visiblePendingOperations, peers, nowMs],
   );
 
   const nearestLabel = useMemo(() => {
@@ -106,13 +130,13 @@ export function RunningState({
     // smallest remaining TTL even when the first row happens not to be
     // the soonest (ordering is preserved from the runtime snapshot).
     let minRemaining = Infinity;
-    for (const op of pendingOperations) {
+    for (const op of visiblePendingOperations) {
       const remaining = op.timeout_at * 1000 - nowMs;
       if (remaining < minRemaining) minRemaining = remaining;
     }
     if (!Number.isFinite(minRemaining)) return undefined;
     return formatApprovalTtl(minRemaining);
-  }, [paperPanels, runtimeRows, pendingOperations, nowMs]);
+  }, [paperPanels, runtimeRows, visiblePendingOperations, nowMs]);
 
   return (
     <>
@@ -142,6 +166,8 @@ export function RunningState({
         onRefresh={onRefresh}
         peerRefreshErrors={peerRefreshErrors}
         peerPermissionStates={peerPermissionStates}
+        peerLatencyByPubkey={peerLatencyByPubkey}
+        nowMs={nowMs}
       />
 
       {/*

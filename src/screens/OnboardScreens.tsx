@@ -112,7 +112,11 @@ export function EnterPackageScreen() {
   }
 
   return (
-    <AppShell mainVariant="flow">
+    <AppShell
+      mainVariant="flow"
+      brandSubtitle="Threshold Signing for Nostr"
+      headerMeta="Onboard"
+    >
       <div className="screen-column">
         <BackLink
           onClick={() => {
@@ -378,7 +382,11 @@ function HandshakeContent({
       : packageString;
 
   return (
-    <AppShell mainVariant="flow">
+    <AppShell
+      mainVariant="flow"
+      brandSubtitle="Threshold Signing for Nostr"
+      headerMeta="Onboard"
+    >
       <div className="screen-column">
         {/* VAL-ONB-002: No BackLink above the heading on the handshake screen. */}
         <div className="screen-heading">
@@ -495,7 +503,11 @@ export function OnboardingFailedScreen() {
     : "onboard-error-alert bg-[#EAB3081A] border-[#EAB30840]";
 
   return (
-    <AppShell mainVariant="flow">
+    <AppShell
+      mainVariant="flow"
+      brandSubtitle="Threshold Signing for Nostr"
+      headerMeta="Onboard"
+    >
       <div className="screen-column">
         <BackLink
           onClick={() => {
@@ -634,7 +646,11 @@ function OnboardingCompleteContent({
   }
 
   return (
-    <AppShell mainVariant="flow">
+    <AppShell
+      mainVariant="flow"
+      brandSubtitle="Threshold Signing for Nostr"
+      headerMeta="Onboard"
+    >
       <div className="screen-column">
         {/* No Back link — terminal success state */}
 

@@ -31,6 +31,10 @@ function previewPackageText(packageText: string): string {
   return `${base}…`;
 }
 
+function shareDisplayNumber(position: number): number {
+  return position + 1;
+}
+
 export function RotateDistributeSharesScreen() {
   const navigate = useNavigate();
   const {
@@ -47,7 +51,6 @@ export function RotateDistributeSharesScreen() {
   const [packageStates, setPackageStates] = useState(MOCK_REMOTE_PACKAGES);
   const remotePackages =
     rotateKeysetSession?.onboardingPackages ?? packageStates;
-  const localIdx = rotateKeysetSession?.localShare?.idx ?? 0;
   const blocked =
     !rotatePhaseAtLeast(rotateKeysetSession, "profile_created") &&
     !demoDistribute;
@@ -142,8 +145,7 @@ export function RotateDistributeSharesScreen() {
         <div className="package-card saved">
           <div className="package-head">
             <div className="package-title-row">
-              <div className="package-title">Share {localIdx + 1}</div>
-              <div className="package-index">Index {localIdx}</div>
+              <div className="package-title">Share {shareDisplayNumber(0)}</div>
             </div>
             <StatusPill tone="success" marker="check">
               Saved to Igloo Web
@@ -153,10 +155,11 @@ export function RotateDistributeSharesScreen() {
         </div>
 
         <div className="package-stack">
-          {remotePackages.map((pkg) => (
+          {remotePackages.map((pkg, index) => (
             <RotateRemoteShareCard
               key={pkg.idx}
               pkg={pkg}
+              displayNumber={shareDisplayNumber(index + 1)}
               distributed={packageDistributed(pkg)}
               actionsDisabled={!pkg.packageCreated}
               resolveSecret={() => resolveSecret(pkg)}
@@ -188,6 +191,7 @@ export function RotateDistributeSharesScreen() {
 
 function RotateRemoteShareCard({
   pkg,
+  displayNumber,
   distributed,
   actionsDisabled,
   resolveSecret,
@@ -196,6 +200,7 @@ function RotateRemoteShareCard({
   onUpdatePkg,
 }: {
   pkg: OnboardingPackageView;
+  displayNumber: number;
   distributed: boolean;
   actionsDisabled: boolean;
   resolveSecret: () => { packageText: string; password: string };
@@ -246,8 +251,7 @@ function RotateRemoteShareCard({
     <div className={`package-card${pkg.packageCreated ? "" : " pending"}`}>
       <div className="package-head">
         <div className="package-title-row">
-          <div className="package-title">Share {pkg.idx + 1}</div>
-          <div className="package-index">Index {pkg.idx}</div>
+          <div className="package-title">Share {displayNumber}</div>
         </div>
         <StatusPill
           tone={chip.tone}
@@ -275,7 +279,7 @@ function RotateRemoteShareCard({
               <input
                 className="input password-input"
                 type="password"
-                aria-label={`Package password for share ${pkg.idx + 1}`}
+                aria-label={`Package password for share ${displayNumber}`}
                 value={password}
                 disabled={busy}
                 onChange={(event) => {

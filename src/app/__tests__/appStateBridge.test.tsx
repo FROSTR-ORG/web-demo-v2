@@ -217,6 +217,7 @@ function makeSnapshot(
     activeProfile: makeProfile(),
     runtimeStatus: null,
     runtimeRelays: [],
+    peerLatencyByPubkey: {},
     signerPaused: false,
     createSession: null,
     importSession: null,
@@ -256,6 +257,12 @@ function CapturedState({
       </div>
     </>
   );
+}
+
+interface TestWindow extends Window {
+  __iglooTestInjectEventLogEntries?: (
+    entries: Array<{ badge: "PING"; payload?: unknown }>,
+  ) => void;
 }
 
 beforeEach(() => {
@@ -360,6 +367,7 @@ describe("appStateBridge helpers", () => {
       "createSession",
       "importSession",
       "onboardSession",
+      "peerLatencyByPubkey",
       "profiles",
       "recoverSession",
       "replaceShareSession",
@@ -370,6 +378,7 @@ describe("appStateBridge helpers", () => {
     ]);
     expect(snapshot.signerPaused).toBe(true);
     expect(snapshot.runtimeRelays).toEqual([]);
+    expect(snapshot.peerLatencyByPubkey).toEqual({});
     expect(snapshot.createSession).toBeNull();
     expect(snapshot.importSession).toBeNull();
     expect(snapshot.onboardSession).toBeNull();
@@ -536,6 +545,7 @@ describe("MockAppStateProvider bridge arming", () => {
     activeProfile: makeProfile({ id: "prof_mock", label: "Mock Key" }),
     runtimeStatus: null,
     runtimeRelays: [],
+    peerLatencyByPubkey: {},
     signerPaused: false,
     createSession: null,
     importSession: null,
@@ -554,6 +564,7 @@ describe("MockAppStateProvider bridge arming", () => {
     updatePackageState: () => undefined,
     setPackageDeviceLabel: () => undefined,
     encodeDistributionPackage: async () => undefined,
+    retryDistributionPackageAdoption: async () => undefined,
     markPackageDistributed: () => undefined,
     finishDistribution: async () => "prof_mock",
     clearCreateSession: () => undefined,
@@ -621,13 +632,22 @@ describe("MockAppStateProvider bridge arming", () => {
       },
       event: { id: "mock", pubkey: "mock", created_at: 0, kind: 30078, tags: [], content: "mock", sig: "mock" },
     }),
-    publishProfileBackup: async () => ({
-      event: { id: "mock", pubkey: "mock", created_at: 0, kind: 10000, tags: [], content: "mock", sig: "mock" },
+    publishTestNote: async ({ content }) => ({
+      requestId: "mock-note",
+      eventId: "0".repeat(64),
+      nevent: "nevent1mock",
+      event: {
+        id: "0".repeat(64),
+        pubkey: "1".repeat(64),
+        created_at: 1,
+        kind: 1,
+        tags: [],
+        content,
+        sig: "2".repeat(128),
+      },
       reached: [],
+      failed: [],
     }),
-    restoreProfileFromRelay: async () => {
-      throw new Error("mock");
-    },
     setSignerPaused: () => undefined,
     refreshRuntime: () => undefined,
     restartRuntimeConnections: async () => undefined,
@@ -759,6 +779,7 @@ describe("MockAppStateProvider bridge arming", () => {
     expect(parsed.activeProfile).toBeNull();
     expect(parsed.runtimeStatus).toBeNull();
     expect(parsed.runtimeRelays).toEqual([]);
+    expect(parsed.peerLatencyByPubkey).toEqual({});
   });
 
   it("MockAppStateProvider.lockProfile clears runtimeStatus and activeProfile", async () => {
@@ -1122,6 +1143,16 @@ describe("AppStateProvider runtime relay lifecycle", () => {
     await act(async () => {
       await captured.unlockProfile(profile.id, "pw");
     });
+    await act(async () => {
+      (window as TestWindow).__iglooTestInjectEventLogEntries?.([
+        { badge: "PING", payload: { before: "restart" } },
+      ]);
+    });
+    await waitFor(() => {
+      expect(captured.runtimeEventLog).toHaveLength(1);
+    });
+    const eventLogBeforeRestart = captured.runtimeEventLog[0];
+
     act(() => {
       captured.setSignerPaused(true);
     });
@@ -1138,6 +1169,7 @@ describe("AppStateProvider runtime relay lifecycle", () => {
     expect(restarted.startCalls).toBe(1);
     expect(restarted.refreshAllCalls).toBe(1);
     expect(captured.signerPaused).toBe(false);
+    expect(captured.runtimeEventLog).toEqual([eventLogBeforeRestart]);
   });
 
   it("lockProfile and clearCredentials tear down relay resources", async () => {

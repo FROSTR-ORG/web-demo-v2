@@ -27,7 +27,6 @@ import {
   ReplacementFailedScreen,
   ShareReplacedScreen
 } from "../screens/ReplaceShareScreens";
-import { RestoreFromRelayScreen } from "../screens/RestoreFromRelayScreen";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
 
 type RoutesLocation = Parameters<typeof Routes>[0]["location"];
@@ -46,7 +45,6 @@ export function CoreRoutes({ location, extraRoutes, relative = false }: { locati
       <Route path={pathFor("/create/profile", relative)} element={<CreateProfileScreen />} />
       <Route path={pathFor("/create/distribute", relative)} element={<DistributeSharesScreen />} />
       <Route path={pathFor("/create/complete", relative)} element={<DistributionCompleteScreen />} />
-      <Route path={pathFor("/restore-from-relay", relative)} element={<RestoreFromRelayScreen />} />
       <Route path={pathFor("/import", relative)} element={<LoadBackupScreen />} />
       <Route path={pathFor("/import/decrypt", relative)} element={<DecryptBackupScreen />} />
       <Route path={pathFor("/import/review", relative)} element={<ReviewSaveScreen />} />
@@ -72,6 +70,7 @@ export function CoreRoutes({ location, extraRoutes, relative = false }: { locati
       <Route path={pathFor("/replace-share/replaced", relative)} element={<ShareReplacedScreen />} />
       <Route path={pathFor("/recover/:profileId", relative)} element={<CollectSharesScreen />} />
       <Route path={pathFor("/recover/:profileId/success", relative)} element={<RecoverSuccessScreen />} />
+      <Route path={pathFor("/dashboard/:profileId/test", relative)} element={<DashboardScreen mode="test" />} />
       <Route path={pathFor("/dashboard/:profileId", relative)} element={<DashboardScreen />} />
       <Route path="*" element={<Navigate to={relative ? "." : "/"} replace />} />
     </Routes>

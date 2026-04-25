@@ -90,7 +90,7 @@ export async function buildStoredProfileRecord(
   const record: StoredProfileRecord = {
     summary: {
       id: profileId,
-      label: options.label ?? normalizedPayload.group_package.group_name,
+      label: options.label ?? normalizedPayload.device.name,
       deviceName: normalizedPayload.device.name,
       groupName: normalizedPayload.group_package.group_name,
       threshold: normalizedPayload.group_package.threshold,

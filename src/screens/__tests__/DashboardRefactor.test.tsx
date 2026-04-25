@@ -282,16 +282,21 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
       const labels = Array.from(sidebar.querySelectorAll(".settings-section-label")).map(
         (el) => el.textContent
       );
-      // m7-onboard-sponsor-ui — "Onboard a Device" sits between
-      // Replace Share and Export & Backup per VAL-ONBOARD-001.
       expect(labels).toEqual([
         "Device Profile",
         "Group Profile",
         "Replace Share",
-        "Onboard a Device",
         "Export & Backup",
         "Profile Security",
       ]);
+      expect(screen.queryByText("Onboard a Device")).not.toBeInTheDocument();
+      expect(screen.queryByText("Onboard Device")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Sponsor a new device to join this keyset"),
+      ).not.toBeInTheDocument();
+      expect(
+        sidebar.querySelector('[data-testid="settings-onboard-sponsor-btn"]'),
+      ).toBeNull();
       // Device Profile content
       expect(screen.getByText("Profile Name")).toBeInTheDocument();
       expect(screen.getByText("Profile Password")).toBeInTheDocument();
@@ -407,7 +412,7 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
     });
   });
 
-  describe("Dashboard summary bar is stable across all states", () => {
+  describe("Dashboard summary strip stays removed across all states", () => {
     it.each([
       ["running"],
       ["connecting"],
@@ -415,11 +420,10 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
       ["relays-offline"],
       ["signing-blocked"],
     ] as const)(
-      "renders the group/share summary bar for %s",
+      "does not render the standalone group/share strip for %s",
       (state) => {
         renderAt({ dashboard: { state } });
-        expect(screen.getByText("My Signing Key")).toBeInTheDocument();
-        expect(screen.getByText("Share #0")).toBeInTheDocument();
+        expect(document.querySelector(".dashboard-summary")).toBeNull();
       }
     );
   });
@@ -447,12 +451,12 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
   });
 
   describe("Policies header toggle preserves state-to-policies switch (VAL-DSH-034)", () => {
-    it("clicking Policies switches to policies view; clicking again returns to running state", () => {
+    it("clicking Policies switches to policies view; clicking Dashboard returns to running state", () => {
       renderAt({ dashboard: { state: "running", paperPanels: true } });
-      const policiesBtn = screen.getByText("Policies");
+      const policiesBtn = screen.getByRole("button", { name: "Policies" });
       fireEvent.click(policiesBtn);
       expect(screen.getByText("Signer Policies")).toBeInTheDocument();
-      fireEvent.click(policiesBtn);
+      fireEvent.click(screen.getByRole("button", { name: /back to dashboard/i }));
       expect(screen.queryByText("Signer Policies")).not.toBeInTheDocument();
       expect(screen.getByText("Signer Running")).toBeInTheDocument();
     });

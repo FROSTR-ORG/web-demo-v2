@@ -17,6 +17,7 @@ export function SigningBlockedState({
   onReviewApprovals,
   noncePoolDepleted = false,
   onTriggerSync,
+  paperPanels = false,
 }: {
   onStop: () => void;
   onOpenPolicies?: () => void;
@@ -27,6 +28,7 @@ export function SigningBlockedState({
    */
   noncePoolDepleted?: boolean;
   onTriggerSync?: () => void;
+  paperPanels?: boolean;
 }) {
   return (
     <>
@@ -79,14 +81,16 @@ export function SigningBlockedState({
             </Button>
           </div>
         ) : null}
-        <div className="dash-capacity-alert" aria-label="Signing capacity">
-          <span className="dash-capacity-label">Signing Capacity</span>
-          <span className="dash-capacity-track" />
-          <span className="dash-capacity-state">
-            <span className="dash-capacity-x">×</span>
-            0 ready
-          </span>
-        </div>
+        {paperPanels ? null : (
+          <div className="dash-capacity-alert" aria-label="Signing capacity">
+            <span className="dash-capacity-label">Signing Capacity</span>
+            <span className="dash-capacity-track" />
+            <span className="dash-capacity-state">
+              <span className="dash-capacity-x">×</span>
+              0 ready
+            </span>
+          </div>
+        )}
         <div className="dash-two-col">
           <div className="dash-sub-panel">
             <div className="dash-panel-kicker">Common Causes</div>

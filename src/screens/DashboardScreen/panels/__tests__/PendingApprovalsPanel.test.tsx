@@ -4,6 +4,7 @@ import type { PendingOperation, PeerStatus } from "../../../../lib/bifrost/types
 import {
   PendingApprovalsPanel,
   deriveApprovalRowsFromRuntime,
+  filterPendingApprovalOperations,
   formatApprovalTtl,
   __resetPendingApprovalsCollapseForTest,
 } from "../PendingApprovalsPanel";
@@ -153,6 +154,69 @@ describe("deriveApprovalRowsFromRuntime", () => {
     ];
     const rows = deriveApprovalRowsFromRuntime(pending, [], nowMs);
     expect(rows[0].ttl).toBe("0s");
+  });
+
+  it("hides tagged background refresh-all Ping operations while keeping user ping dispatches", () => {
+    const pending: PendingOperation[] = [
+      makePending({
+        op_type: "Ping",
+        request_id: "req-background-ping",
+        target_peers: [peerAPubkey],
+        timeout_at: nowSecs + 15,
+      }),
+      makePending({
+        op_type: "Ping",
+        request_id: "req-explicit-ping",
+        target_peers: [peerAPubkey],
+        timeout_at: nowSecs + 20,
+      }),
+      makePending({
+        op_type: "Sign",
+        request_id: "req-sign",
+        target_peers: [peerAPubkey],
+        timeout_at: nowSecs + 25,
+      }),
+    ];
+
+    const filtered = filterPendingApprovalOperations(pending, {
+      "req-background-ping": {
+        type: "ping",
+        peer_pubkey: peerAPubkey,
+        probeSource: "refresh",
+        dispatchedAt: nowMs,
+      },
+      "req-explicit-ping": {
+        type: "ping",
+        peer_pubkey: peerAPubkey,
+        probeSource: "user",
+        dispatchedAt: nowMs,
+      },
+    });
+    expect(filtered.map((op) => op.request_id)).toEqual([
+      "req-explicit-ping",
+      "req-sign",
+    ]);
+
+    const rows = deriveApprovalRowsFromRuntime(pending, [], nowMs, {
+      pendingDispatchIndex: {
+        "req-background-ping": {
+          type: "ping",
+          peer_pubkey: peerAPubkey,
+          probeSource: "refresh",
+          dispatchedAt: nowMs,
+        },
+        "req-explicit-ping": {
+          type: "ping",
+          peer_pubkey: peerAPubkey,
+          probeSource: "user",
+          dispatchedAt: nowMs,
+        },
+      },
+    });
+    expect(rows.map((row) => row.id)).toEqual([
+      "req-explicit-ping",
+      "req-sign",
+    ]);
   });
 
   it("extracts SIGN message preview from the real nested SignSession byte-array shape emitted by bifrost-rs", () => {

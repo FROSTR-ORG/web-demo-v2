@@ -94,41 +94,6 @@ export const UNSAVED_CHANGES_DISCARD_LABEL = "Discard";
  * respects the user's locale while still displaying a real stored
  * timestamp. Tests pin the locale via the same formatter to match.
  */
-/**
- * m6-backup-publish — format a unix-seconds timestamp into a
- * Paper-faithful relative-time label used by the "Last published"
- * indicator rendered below the Publish Backup row (VAL-BACKUP-005 /
- * VAL-BACKUP-031). Returns `"just now"` for the first second so two
- * rapid-fire publishes within the same wall-clock second still
- * render a sensible string. The `nowMs` argument is passed by the
- * caller so a 1 s re-render tick can advance the copy smoothly.
- *
- * Exported so component tests can pin on the boundary conditions
- * (just-now / seconds / minutes / hours / days) without rendering
- * the whole sidebar.
- */
-export function formatLastBackupPublishedRelative(
-  publishedAtSeconds: number | undefined,
-  nowMs: number,
-): string | null {
-  if (
-    typeof publishedAtSeconds !== "number" ||
-    !Number.isFinite(publishedAtSeconds)
-  ) {
-    return null;
-  }
-  const publishedAtMs = publishedAtSeconds * 1000;
-  const diffSecs = Math.max(0, Math.floor((nowMs - publishedAtMs) / 1000));
-  if (diffSecs <= 1) return "just now";
-  if (diffSecs < 60) return `${diffSecs}s ago`;
-  const mins = Math.floor(diffSecs / 60);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
-
 export function formatProfileDate(timestampMs: number | undefined): string {
   if (typeof timestampMs !== "number" || !Number.isFinite(timestampMs)) {
     return MISSING_PROFILE_DATE_PLACEHOLDER;
@@ -156,20 +121,6 @@ interface SettingsSidebarProps {
   onClearCredentials: () => void;
   onExport: () => void;
   onExportShare: () => void;
-  /**
-   * m6-backup-publish — opens the PublishBackupModal which drives the
-   * encrypted kind-10000 publish flow (VAL-BACKUP-001 through
-   * VAL-BACKUP-007). Optional so existing demo/test callers that
-   * predate the feature continue to render without providing the
-   * handler; callers that OMIT it will hide the action row.
-   */
-  onPublishBackup?: () => void;
-  /**
-   * m7-onboard-sponsor-ui — disables the "Onboard a Device" entry and
-   * surfaces a tooltip/help hint when the signer is paused
-   * (VAL-ONBOARD-024). Defaults to `false`.
-   */
-  signerPaused?: boolean;
 }
 
 export function SettingsSidebar({
@@ -184,8 +135,6 @@ export function SettingsSidebar({
   onClearCredentials,
   onExport,
   onExportShare,
-  onPublishBackup,
-  signerPaused = false,
 }: SettingsSidebarProps) {
   const navigate = useNavigate();
   const {
@@ -261,7 +210,6 @@ export function SettingsSidebar({
     | "lock"
     | "clearCredentials"
     | "replaceShare"
-    | "onboardSponsor"
   >(null);
 
   // Keep the draft in sync with the persisted name whenever the user is
@@ -571,8 +519,7 @@ export function SettingsSidebar({
       | "close"
       | "lock"
       | "clearCredentials"
-      | "replaceShare"
-      | "onboardSponsor",
+      | "replaceShare",
     run: () => void,
   ): void {
     if (!hasUnsavedChanges()) {
@@ -613,11 +560,6 @@ export function SettingsSidebar({
       // navigate to the Replace Share flow.
       onClose();
       navigate("/replace-share");
-    } else if (action === "onboardSponsor") {
-      // m7-onboard-sponsor-ui — same pattern as replaceShare: dismiss
-      // the sidebar, then hand off to the sponsor configure screen.
-      onClose();
-      navigate("/onboard-sponsor");
     }
   }
 
@@ -1050,54 +992,6 @@ export function SettingsSidebar({
 
           </div>
 
-          {/* ONBOARD A DEVICE (m7-onboard-sponsor-ui) */}
-          <div className="settings-section">
-            <div className="settings-section-header">
-              <span className="settings-section-label">Onboard a Device</span>
-              <span className="settings-section-rule" />
-            </div>
-            <div className="settings-action-row">
-              <div className="settings-action-info">
-                <div className="settings-action-name">Onboard a Device</div>
-                <div className="settings-action-desc">
-                  Sponsor a new device to join this keyset
-                </div>
-              </div>
-              <button
-                type="button"
-                className="settings-btn-blue"
-                data-testid="settings-onboard-sponsor-btn"
-                aria-label="Onboard a Device"
-                aria-describedby={
-                  signerPaused ? "settings-onboard-sponsor-paused" : undefined
-                }
-                disabled={signerPaused}
-                title={
-                  signerPaused
-                    ? "Signer is paused. Resume the signer to sponsor a new device."
-                    : undefined
-                }
-                onClick={() =>
-                  guardNav("onboardSponsor", () => {
-                    onClose();
-                    navigate("/onboard-sponsor");
-                  })
-                }
-              >
-                Onboard Device
-              </button>
-            </div>
-            {signerPaused && (
-              <div
-                className="settings-hint"
-                id="settings-onboard-sponsor-paused"
-                data-testid="settings-onboard-sponsor-paused-hint"
-              >
-                Signer is paused. Resume the signer to sponsor a new device.
-              </div>
-            )}
-          </div>
-
           {/* EXPORT & BACKUP */}
           <div className="settings-section">
             <div className="settings-section-header">
@@ -1125,72 +1019,6 @@ export function SettingsSidebar({
                   Export
                 </button>
               </div>
-              {/*
-                m6-backup-publish — "Publish Backup to Relay" action row
-                (VAL-BACKUP-001). Clicking opens the PublishBackupModal
-                which collects a password + confirm, validates strength,
-                and dispatches publishProfileBackup. Rendered only when
-                the parent supplies the handler so demo/test callers
-                that predate the feature keep working unchanged.
-              */}
-              {onPublishBackup && (
-                <>
-                  <div className="settings-action-row">
-                    <div className="settings-action-info">
-                      <div className="settings-action-name">
-                        Publish Backup to Relay
-                      </div>
-                      <div className="settings-action-desc">
-                        Publish an encrypted kind-10000 backup to every
-                        configured relay
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="settings-btn-blue"
-                      onClick={onPublishBackup}
-                      data-testid="settings-publish-backup-btn"
-                    >
-                      Publish
-                    </button>
-                  </div>
-                  {/*
-                    VAL-BACKUP-005 / VAL-BACKUP-031 — "Last published"
-                    indicator. Renders directly below the Publish row
-                    once the profile has a stored `lastBackupPublishedAt`
-                    marker. Copy: "Last published: <relative time> —
-                    reached N/M relays" where `M` is the configured
-                    relay count on the active profile. `null` → no row
-                    rendered so the section stays tight for first-time
-                    users.
-                  */}
-                  {(() => {
-                    const publishedAt = activeProfile?.lastBackupPublishedAt;
-                    const reached =
-                      activeProfile?.lastBackupReachedRelayCount ?? 0;
-                    const configured =
-                      activeProfile?.relays?.length ?? relays.length ?? 0;
-                    const relative = formatLastBackupPublishedRelative(
-                      publishedAt,
-                      Date.now(),
-                    );
-                    if (relative === null) return null;
-                    return (
-                      <div
-                        className="settings-action-row"
-                        data-testid="settings-publish-backup-last-published"
-                      >
-                        <div className="settings-action-info">
-                          <div className="settings-action-desc">
-                            Last published: {relative} — reached {reached}/
-                            {configured} relays
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </>
-              )}
             </div>
           </div>
 

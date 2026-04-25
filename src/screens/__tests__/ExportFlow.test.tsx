@@ -1,4 +1,4 @@
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -103,92 +103,90 @@ function renderDashboard() {
   );
 }
 
+function openSettingsExportProfile() {
+  fireEvent.click(screen.getByLabelText("Settings"));
+  const settings = screen.getByTestId("settings-sidebar");
+  expect(within(settings).getByText("Export Profile")).toBeInTheDocument();
+  const [exportButton] = within(settings).getAllByRole("button", {
+    name: "Export",
+  });
+  fireEvent.click(exportButton);
+  return screen.getByTestId("export-profile-modal");
+}
+
 describe("Export Profile Modal", () => {
-  it("opens when header Export button is clicked", () => {
+  it("does not expose Export in the dashboard header", () => {
     renderDashboard();
-    expect(screen.queryByTestId("export-profile-modal")).not.toBeInTheDocument();
-    // Find the Export button in the header
-    const exportButtons = screen.getAllByText("Export");
-    fireEvent.click(exportButtons[0]);
-    expect(screen.getByTestId("export-profile-modal")).toBeInTheDocument();
+    const header = screen.getByRole("banner");
+    expect(within(header).queryByRole("button", { name: /export/i })).not.toBeInTheDocument();
   });
 
   it("renders title, description, summary, password inputs, strength bar, Cancel and Export buttons", () => {
     renderDashboard();
-    fireEvent.click(screen.getAllByText("Export")[0]);
-
-    expect(screen.getByText("Export Profile")).toBeInTheDocument();
-    expect(screen.getByText(/encrypted backup/i)).toBeInTheDocument();
+    const modal = openSettingsExportProfile();
+    expect(within(modal).getByText("Export Profile")).toBeInTheDocument();
+    expect(within(modal).getByText(/encrypted backup/i)).toBeInTheDocument();
     // Summary line appears both in dashboard bar and modal
-    const modal = screen.getByTestId("export-profile-modal");
     expect(modal.querySelector(".export-modal-summary")?.textContent).toContain("Share #0");
-    expect(screen.getByLabelText("Export Password")).toBeInTheDocument();
-    expect(screen.getByLabelText("Confirm Password")).toBeInTheDocument();
-    expect(screen.getByTestId("password-strength-bar")).toBeInTheDocument();
-    expect(screen.getByText("Cancel")).toBeInTheDocument();
-    // The Export submit button
-    const exportBtns = screen.getAllByText("Export");
-    expect(exportBtns.length).toBeGreaterThanOrEqual(2); // header + modal
+    expect(within(modal).getByLabelText("Export Password")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("Confirm Password")).toBeInTheDocument();
+    expect(within(modal).getByTestId("password-strength-bar")).toBeInTheDocument();
+    expect(within(modal).getByText("Cancel")).toBeInTheDocument();
+    expect(within(modal).getByRole("button", { name: "Export" })).toBeInTheDocument();
   });
 
   it("Cancel button dismisses the modal", () => {
     renderDashboard();
-    fireEvent.click(screen.getAllByText("Export")[0]);
-    expect(screen.getByTestId("export-profile-modal")).toBeInTheDocument();
+    const modal = openSettingsExportProfile();
+    expect(modal).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("Cancel"));
+    fireEvent.click(within(modal).getByText("Cancel"));
     expect(screen.queryByTestId("export-profile-modal")).not.toBeInTheDocument();
   });
 
   it("close X button dismisses the modal", () => {
     renderDashboard();
-    fireEvent.click(screen.getAllByText("Export")[0]);
-    expect(screen.getByTestId("export-profile-modal")).toBeInTheDocument();
+    const modal = openSettingsExportProfile();
+    expect(modal).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText("Close modal"));
+    fireEvent.click(within(modal).getByLabelText("Close modal"));
     expect(screen.queryByTestId("export-profile-modal")).not.toBeInTheDocument();
   });
 
   it("Export button is disabled until passwords match", () => {
     renderDashboard();
-    fireEvent.click(screen.getAllByText("Export")[0]);
+    const modal = openSettingsExportProfile();
 
-    // Find the submit Export button inside the modal
-    const modalExportBtns = screen.getByTestId("export-profile-modal").querySelectorAll("button");
-    const submitBtn = Array.from(modalExportBtns).find((btn) => btn.textContent === "Export");
-    expect(submitBtn).toBeTruthy();
-    expect(submitBtn!.hasAttribute("disabled")).toBe(true);
+    const submitBtn = within(modal).getByRole("button", { name: "Export" });
+    expect(submitBtn).toBeDisabled();
 
     // Type matching passwords
-    fireEvent.change(screen.getByLabelText("Export Password"), { target: { value: "testpass123" } });
-    fireEvent.change(screen.getByLabelText("Confirm Password"), { target: { value: "testpass123" } });
+    fireEvent.change(within(modal).getByLabelText("Export Password"), { target: { value: "testpass123" } });
+    fireEvent.change(within(modal).getByLabelText("Confirm Password"), { target: { value: "testpass123" } });
 
-    expect(submitBtn!.hasAttribute("disabled")).toBe(false);
+    expect(submitBtn).not.toBeDisabled();
   });
 
   it("shows match indicator when passwords match", () => {
     renderDashboard();
-    fireEvent.click(screen.getAllByText("Export")[0]);
+    const modal = openSettingsExportProfile();
 
-    fireEvent.change(screen.getByLabelText("Export Password"), { target: { value: "test123" } });
-    fireEvent.change(screen.getByLabelText("Confirm Password"), { target: { value: "test123" } });
+    fireEvent.change(within(modal).getByLabelText("Export Password"), { target: { value: "test123" } });
+    fireEvent.change(within(modal).getByLabelText("Confirm Password"), { target: { value: "test123" } });
 
     // The matched class should be applied and check icon visible
-    const confirmShell = screen.getByLabelText("Confirm Password").parentElement;
+    const confirmShell = within(modal).getByLabelText("Confirm Password").parentElement;
     expect(confirmShell?.classList.contains("matched")).toBe(true);
   });
 
   it("Export button transitions to Export Complete modal", async () => {
     renderDashboard();
-    fireEvent.click(screen.getAllByText("Export")[0]);
+    const modal = openSettingsExportProfile();
 
-    fireEvent.change(screen.getByLabelText("Export Password"), { target: { value: "StrongPass1" } });
-    fireEvent.change(screen.getByLabelText("Confirm Password"), { target: { value: "StrongPass1" } });
+    fireEvent.change(within(modal).getByLabelText("Export Password"), { target: { value: "StrongPass1" } });
+    fireEvent.change(within(modal).getByLabelText("Confirm Password"), { target: { value: "StrongPass1" } });
 
-    // Click submit Export
-    const modalExportBtns = screen.getByTestId("export-profile-modal").querySelectorAll("button");
-    const submitBtn = Array.from(modalExportBtns).find((btn) => btn.textContent === "Export");
-    fireEvent.click(submitBtn!);
+    fireEvent.click(within(modal).getByRole("button", { name: "Export" }));
 
     await waitFor(() => {
       expect(screen.queryByTestId("export-profile-modal")).not.toBeInTheDocument();
@@ -202,14 +200,12 @@ describe("Export Complete Modal", () => {
   async function openExportComplete() {
     renderDashboard();
     // Open export profile
-    fireEvent.click(screen.getAllByText("Export")[0]);
+    const modal = openSettingsExportProfile();
     // Fill passwords
-    fireEvent.change(screen.getByLabelText("Export Password"), { target: { value: "StrongPass1" } });
-    fireEvent.change(screen.getByLabelText("Confirm Password"), { target: { value: "StrongPass1" } });
+    fireEvent.change(within(modal).getByLabelText("Export Password"), { target: { value: "StrongPass1" } });
+    fireEvent.change(within(modal).getByLabelText("Confirm Password"), { target: { value: "StrongPass1" } });
     // Submit
-    const modalExportBtns = screen.getByTestId("export-profile-modal").querySelectorAll("button");
-    const submitBtn = Array.from(modalExportBtns).find((btn) => btn.textContent === "Export");
-    fireEvent.click(submitBtn!);
+    fireEvent.click(within(modal).getByRole("button", { name: "Export" }));
     await screen.findByTestId("export-complete-modal");
   }
 
@@ -280,13 +276,10 @@ describe("Export from Settings Sidebar", () => {
 
     // Click the Export button inside the sidebar
     const sidebar = screen.getByTestId("settings-sidebar");
-    const sidebarExportBtn = sidebar.querySelector(".settings-btn-blue");
-    expect(sidebarExportBtn).toBeTruthy();
-    // The first .settings-btn-blue might be Replace Share; find the Export one
-    const sidebarButtons = sidebar.querySelectorAll(".settings-btn-blue");
-    const exportBtn = Array.from(sidebarButtons).find((btn) => btn.textContent === "Export");
-    expect(exportBtn).toBeTruthy();
-    fireEvent.click(exportBtn!);
+    const [exportBtn] = within(sidebar).getAllByRole("button", {
+      name: "Export",
+    });
+    fireEvent.click(exportBtn);
 
     // VAL-DSH-031: Settings sidebar stays open while the Export Profile
     // and Export Complete modals are shown; the modal layer (z-index 200)
@@ -300,20 +293,21 @@ describe("Export from Settings Sidebar", () => {
     renderDashboard();
     fireEvent.click(screen.getByLabelText("Settings"));
 
-    const exportShareRow = screen.getByText("Export Share").closest(".settings-action-row");
-    expect(exportShareRow).not.toBeNull();
-    fireEvent.click(exportShareRow!.querySelector(".settings-btn-blue")!);
+    const sidebar = screen.getByTestId("settings-sidebar");
+    expect(within(sidebar).getByText("Export Share")).toBeInTheDocument();
+    const [, exportShareButton] = within(sidebar).getAllByRole("button", {
+      name: "Export",
+    });
+    fireEvent.click(exportShareButton);
 
-    expect(screen.getByTestId("export-profile-modal")).toBeInTheDocument();
+    const modal = screen.getByTestId("export-profile-modal");
+    expect(modal).toBeInTheDocument();
     expect(screen.getAllByText("Export Share").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByLabelText("Share Export Password")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("Share Export Password")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Share Export Password"), { target: { value: "StrongPass1" } });
-    fireEvent.change(screen.getByLabelText("Confirm Password"), { target: { value: "StrongPass1" } });
-    const submitBtn = Array.from(
-      screen.getByTestId("export-profile-modal").querySelectorAll("button"),
-    ).find((btn) => btn.textContent === "Export");
-    fireEvent.click(submitBtn!);
+    fireEvent.change(within(modal).getByLabelText("Share Export Password"), { target: { value: "StrongPass1" } });
+    fireEvent.change(within(modal).getByLabelText("Confirm Password"), { target: { value: "StrongPass1" } });
+    fireEvent.click(within(modal).getByRole("button", { name: "Export" }));
 
     await screen.findByTestId("export-complete-modal");
     expect(screen.getByText("Share Package Ready")).toBeInTheDocument();

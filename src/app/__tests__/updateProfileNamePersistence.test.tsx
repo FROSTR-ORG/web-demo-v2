@@ -158,6 +158,13 @@ describe("AppStateProvider.updateProfileName — persistence and validation", ()
       });
       // Active profile summary in memory also reflects the trimmed name
       expect(latest().activeProfile?.deviceName).toBe("Alice Laptop");
+      expect(latest().activeProfile?.label).toBe("Alice Laptop");
+      await waitFor(() =>
+        expect(
+          latest().profiles.find((profile) => profile.id === activeProfileId)
+            ?.label,
+        ).toBe("Alice Laptop"),
+      );
     },
     60_000,
   );
@@ -258,6 +265,7 @@ describe("AppStateProvider.updateProfileName — persistence and validation", ()
       await waitFor(() =>
         expect(latest().activeProfile?.deviceName).toBe("Persistent Name"),
       );
+      expect(latest().activeProfile?.label).toBe("Persistent Name");
       expect(
         await readStoredDeviceName(activeProfileId, profilePassword),
       ).toBe("Persistent Name");

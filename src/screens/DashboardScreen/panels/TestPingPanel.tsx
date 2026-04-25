@@ -4,11 +4,9 @@ import { useAppState } from "../../../app/AppState";
 const HEX_RE = /^[0-9a-fA-F]{64}$/;
 
 /**
- * Dev-only affordance for smoke-testing the `ping` runtime command from the
- * Dashboard without needing a second device. Sibling of {@link TestSignPanel}
- * and {@link TestEcdhPanel}. Rendered only when `import.meta.env.DEV` is true
- * so Vite's dead-code elimination strips this panel (and its mock-style
- * helpers) from production builds.
+ * Web-demo affordance for smoke-testing the `ping` runtime command from the
+ * profile-scoped Test page without needing a second device. Sibling of
+ * {@link TestSignPanel} and {@link TestEcdhPanel}.
  *
  * Fulfils:
  *   - Feature `fix-m1-keyboard-ping-trigger-and-enter-activation` — adds a
@@ -39,8 +37,8 @@ export function TestPingPanel({
    * rendered even if the input is valid. Derived by the caller from
    * signer-paused / stopped dashboard states — a ping can still round-
    * trip while the wire is in `connecting` / `relays-offline` /
-   * `signing-blocked`, mirroring the PeersPanel "Refresh peers" icon
-   * which is unconditionally clickable.
+   * `signing-blocked`, mirroring the Test page's peer-refresh command
+   * which is intentionally available in those states.
    */
   pingBlocked: boolean;
   /**
@@ -105,12 +103,11 @@ export function TestPingPanel({
       aria-labelledby={`${inputId}-heading`}
     >
       <div className="value" id={`${inputId}-heading`}>
-        Test Ping (dev)
+        Test Ping
       </div>
       <p className="help">
         Dispatches a <code>ping</code> command to the runtime for the peer
-        identified by the 32-byte hex pubkey below. Dev-only; absent from
-        production builds.
+        identified by the 32-byte hex pubkey below.
       </p>
       <form onSubmit={onSubmit} className="test-ping-form">
         <div className="field">

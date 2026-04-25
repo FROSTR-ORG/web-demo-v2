@@ -1,8 +1,12 @@
 import { useLocation } from "react-router-dom";
 
+import type { RecoverVariant } from "../screens/RecoverScreen/DemoCollectSharesScreen";
+
 export type DashboardDemoState = "running" | "connecting" | "stopped" | "relays-offline" | "signing-blocked";
 export type DashboardDemoModal = "policy-prompt" | "signing-failed" | "clear-credentials" | "export-profile" | "export-complete";
 export type DashboardDemoExportMode = "profile" | "share";
+export type DashboardDemoView = "dashboard" | "policies" | "recover";
+export type DashboardDemoRecoverStep = "collect" | "success";
 
 export interface DemoUiState {
   welcome?: {
@@ -20,6 +24,7 @@ export interface DemoUiState {
     backupPreset?: string;
     passwordPreset?: string;
     profilePasswordPreset?: string;
+    isPaperDemo?: boolean;
     errorVariant?: "wrong-password" | "corrupted";
   };
   onboard?: {
@@ -48,7 +53,11 @@ export interface DemoUiState {
   };
   dashboard?: {
     state?: DashboardDemoState;
+    view?: DashboardDemoView;
     showPolicies?: boolean;
+    recoverStep?: DashboardDemoRecoverStep;
+    recoverVariant?: RecoverVariant;
+    recoverCopied?: boolean;
     modal?: DashboardDemoModal;
     settingsOpen?: boolean;
     exportMode?: DashboardDemoExportMode;

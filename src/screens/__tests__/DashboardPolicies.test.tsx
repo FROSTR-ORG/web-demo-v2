@@ -139,10 +139,14 @@ function renderDashboard() {
 describe("DashboardScreen — Policies view", () => {
   it("clicking Policies header button shows the Policies view", () => {
     renderDashboard();
-    const policiesBtn = screen.getByText("Policies");
+    const policiesBtn = screen.getByRole("button", { name: "Policies" });
+    expect(policiesBtn).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(policiesBtn);
     expect(screen.getByText("Signer Policies")).toBeInTheDocument();
     expect(screen.getByText("Peer Policies")).toBeInTheDocument();
+    const dashboardBtn = screen.getByRole("button", { name: /back to dashboard/i });
+    expect(dashboardBtn).toHaveTextContent("Dashboard");
+    expect(dashboardBtn).toHaveAttribute("aria-pressed", "true");
   });
 
   it("Signer Policies panel shows default policy dropdown and a rule row per active override (VAL-POLICIES-014 read leg)", () => {
@@ -238,21 +242,29 @@ describe("DashboardScreen — Policies view", () => {
     });
   });
 
-  it("summary bar persists in Policies view", () => {
+  it("opens Policies view without restoring the removed dashboard summary strip", () => {
     renderDashboard();
     fireEvent.click(screen.getByText("Policies"));
-    expect(screen.getByText("My Signing Key")).toBeInTheDocument();
+    expect(document.querySelector(".dashboard-summary")).toBeNull();
+    expect(screen.getByText("Signer Policies")).toBeInTheDocument();
   });
 
-  it("clicking Policies button again returns to main dashboard view", () => {
+  it("clicking Back to dashboard returns to main dashboard view", () => {
     renderDashboard();
     // Open policies
-    fireEvent.click(screen.getByText("Policies"));
+    fireEvent.click(screen.getByRole("button", { name: "Policies" }));
     expect(screen.getByText("Signer Policies")).toBeInTheDocument();
-    // Click again to close
-    fireEvent.click(screen.getByText("Policies"));
+    const dashboardBtn = screen.getByRole("button", { name: /back to dashboard/i });
+    expect(dashboardBtn).toHaveTextContent("Dashboard");
+    expect(dashboardBtn).toHaveAttribute("aria-pressed", "true");
+    // Return to the main dashboard view
+    fireEvent.click(dashboardBtn);
     // Now should be back to running state
     expect(screen.getByText("Signer Running")).toBeInTheDocument();
     expect(screen.queryByText("Signer Policies")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Policies" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 });

@@ -32,9 +32,15 @@ test("creates a keyset and reaches the Paper-skinned runtime dashboard", async (
   await expect(page.getByRole("heading", { name: "Distribute Shares" })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("Mark Copied")).toHaveCount(0);
   await expect(page.getByText(/bfonboard1/).first()).toHaveCount(0);
+  await expect(page.locator(".package-title")).toHaveText([
+    "Share 1",
+    "Share 2",
+    "Share 3",
+  ]);
+  await expect(page.locator(".package-index")).toHaveCount(0);
 
   // Per-share Password input + "Create package" CTA rendered for every
-  // remote share (2 for a 2-of-3 with local share idx 0). Each card
+  // remote share (2 for a 2-of-3). Each card
   // transitions PRE → POST when its CTA is clicked; the CTA count
   // strictly decreases. Once every card is POST the remote-package
   // stack reveals the live `bfonboard1…` preview.
@@ -69,5 +75,7 @@ test("creates a keyset and reaches the Paper-skinned runtime dashboard", async (
 
   await expect(page.locator(".app-header")).toHaveCount(1);
   await expect(page.getByText(/Peers:/i).first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("main").getByText("E2E Signing Key").first()).toBeVisible();
+  await expect(
+    page.getByRole("main").getByText(/Signer (Running|Connecting)/i).first(),
+  ).toBeVisible();
 });

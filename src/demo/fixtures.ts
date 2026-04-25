@@ -287,6 +287,7 @@ export function createDemoAppState(
     activeProfile: null,
     runtimeStatus: null,
     runtimeRelays: [],
+    peerLatencyByPubkey: {},
     signerPaused: false,
     createSession: null,
     importSession: null,
@@ -308,6 +309,7 @@ export function createDemoAppState(
     // want to observe the dispatch can pass an override in
     // `createDemoAppState({encodeDistributionPackage: spy, ...})`.
     encodeDistributionPackage: async () => undefined,
+    retryDistributionPackageAdoption: async () => undefined,
     markPackageDistributed: () => undefined,
     finishDistribution: async () => DEMO_PROFILE_ID,
     clearCreateSession: () => undefined,
@@ -375,14 +377,24 @@ export function createDemoAppState(
       },
       event: { id: "mock", pubkey: "mock", created_at: 0, kind: 30078, tags: [], content: "mock", sig: "mock" },
     }),
-    publishProfileBackup: async () => ({
-      event: { id: "mock", pubkey: "mock", created_at: 0, kind: 10000, tags: [], content: "mock", sig: "mock" },
-      reached: [],
-    }),
-    restoreProfileFromRelay: async () => {
-      throw new Error(
-        "restoreProfileFromRelay is not implemented in the demo fixture.",
-      );
+    publishTestNote: async ({ content }) => {
+      const eventId = "0".repeat(64);
+      return {
+        requestId: "mock-request-note",
+        eventId,
+        nevent: "nevent1mock",
+        event: {
+          id: eventId,
+          pubkey: DEMO_GROUP_PK_HEX,
+          created_at: Math.floor(now / 1000),
+          kind: 1,
+          tags: [],
+          content,
+          sig: "a".repeat(128),
+        },
+        reached: ["wss://relay.primal.net"],
+        failed: [],
+      };
     },
     setSignerPaused: () => undefined,
     refreshRuntime: () => undefined,

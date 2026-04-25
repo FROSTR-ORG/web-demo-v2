@@ -50,6 +50,9 @@ export function MockAppStateProvider({
   const [activeProfile, setActiveProfile] = useState(value.activeProfile);
   const [runtimeStatus, setRuntimeStatus] = useState(value.runtimeStatus);
   const [runtimeRelays, setRuntimeRelays] = useState(value.runtimeRelays);
+  const [peerLatencyByPubkey, setPeerLatencyByPubkey] = useState(
+    value.peerLatencyByPubkey ?? {},
+  );
   const [signerPaused, setSignerPausedState] = useState(value.signerPaused);
   const [createSession, setCreateSession] = useState(value.createSession);
   const [importSession, setImportSession] = useState(value.importSession);
@@ -388,6 +391,55 @@ export function MockAppStateProvider({
     [value],
   );
 
+  const retryDistributionPackageAdoption = useCallback(
+    async (idx: number) => {
+      const fallback =
+        "Retry could not start — mark distributed manually if handoff is done.";
+      try {
+        const requestId = await value.retryDistributionPackageAdoption(idx);
+        setCreateSession((session) => {
+          if (!session) return session;
+          return {
+            ...session,
+            onboardingPackages: session.onboardingPackages.map((entry) =>
+              entry.idx === idx
+                ? requestId
+                  ? {
+                      ...entry,
+                      pendingDispatchRequestId: requestId,
+                      adoptionError: undefined,
+                    }
+                  : {
+                      ...entry,
+                      adoptionError: entry.adoptionError ?? fallback,
+                    }
+                : entry,
+            ),
+          };
+        });
+        return requestId;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setCreateSession((session) => {
+          if (!session) return session;
+          return {
+            ...session,
+            onboardingPackages: session.onboardingPackages.map((entry) =>
+              entry.idx === idx
+                ? {
+                    ...entry,
+                    adoptionError: message || entry.adoptionError || fallback,
+                  }
+                : entry,
+            ),
+          };
+        });
+        throw err;
+      }
+    },
+    [value],
+  );
+
   // fix-followup-distribute-2a — mirror markPackageDistributed so
   // screens driven by MockAppStateProvider see the chip flip to
   // "Distributed" immediately.
@@ -400,7 +452,12 @@ export function MockAppStateProvider({
           ...session,
           onboardingPackages: session.onboardingPackages.map((entry) =>
             entry.idx === idx
-              ? { ...entry, manuallyMarkedDistributed: true }
+              ? {
+                  ...entry,
+                  manuallyMarkedDistributed: true,
+                  pendingDispatchRequestId: undefined,
+                  adoptionError: undefined,
+                }
               : entry,
           ),
         };
@@ -766,6 +823,7 @@ export function MockAppStateProvider({
       }
       setRuntimeStatus(value.runtimeStatus);
       setRuntimeRelays(value.runtimeRelays);
+      setPeerLatencyByPubkey(value.peerLatencyByPubkey ?? {});
       setSignerPausedState(false);
     },
     [value],
@@ -801,7 +859,9 @@ export function MockAppStateProvider({
       }
       await value.updateProfileName(trimmed);
       setActiveProfile((previous) =>
-        previous ? { ...previous, deviceName: trimmed } : previous,
+        previous
+          ? { ...previous, label: trimmed, deviceName: trimmed }
+          : previous,
       );
     },
     [value],
@@ -838,6 +898,7 @@ export function MockAppStateProvider({
     value.lockProfile();
     setRuntimeStatus(null);
     setRuntimeRelays([]);
+    setPeerLatencyByPubkey({});
     setActiveProfile(null);
     setSignerPausedState(false);
     setCreateSession(null);
@@ -864,6 +925,7 @@ export function MockAppStateProvider({
     setActiveProfile(null);
     setRuntimeStatus(null);
     setRuntimeRelays([]);
+    setPeerLatencyByPubkey({});
     setSignerPausedState(false);
     setCreateSession(null);
     setImportSession(null);
@@ -896,6 +958,7 @@ export function MockAppStateProvider({
     setSignerPausedState(false);
     setRuntimeRelays(value.runtimeRelays);
     setRuntimeStatus(value.runtimeStatus);
+    setPeerLatencyByPubkey(value.peerLatencyByPubkey ?? {});
   }, [value]);
 
   const exportRuntimePackages = useCallback(
@@ -905,17 +968,6 @@ export function MockAppStateProvider({
 
   const createProfileBackup = useCallback(
     () => value.createProfileBackup(),
-    [value],
-  );
-
-  const publishProfileBackup = useCallback(
-    (password: string) => value.publishProfileBackup(password),
-    [value],
-  );
-
-  const restoreProfileFromRelay = useCallback(
-    (input: Parameters<AppStateValue["restoreProfileFromRelay"]>[0]) =>
-      value.restoreProfileFromRelay(input),
     [value],
   );
 
@@ -985,6 +1037,7 @@ export function MockAppStateProvider({
       activeProfile,
       runtimeStatus,
       runtimeRelays,
+      peerLatencyByPubkey,
       signerPaused,
       createSession,
       importSession,
@@ -1016,6 +1069,7 @@ export function MockAppStateProvider({
       updatePackageState,
       setPackageDeviceLabel,
       encodeDistributionPackage,
+      retryDistributionPackageAdoption,
       markPackageDistributed,
       clearCreateSession,
       beginImport,
@@ -1052,8 +1106,6 @@ export function MockAppStateProvider({
       clearCredentials,
       exportRuntimePackages,
       createProfileBackup,
-      publishProfileBackup,
-      restoreProfileFromRelay,
       setSignerPaused,
       restartRuntimeConnections,
     }),
@@ -1063,6 +1115,7 @@ export function MockAppStateProvider({
       activeProfile,
       runtimeStatus,
       runtimeRelays,
+      peerLatencyByPubkey,
       signerPaused,
       createSession,
       importSession,
@@ -1094,6 +1147,7 @@ export function MockAppStateProvider({
       updatePackageState,
       setPackageDeviceLabel,
       encodeDistributionPackage,
+      retryDistributionPackageAdoption,
       markPackageDistributed,
       clearCreateSession,
       beginImport,
@@ -1130,8 +1184,6 @@ export function MockAppStateProvider({
       clearCredentials,
       exportRuntimePackages,
       createProfileBackup,
-      publishProfileBackup,
-      restoreProfileFromRelay,
       setSignerPaused,
       restartRuntimeConnections,
     ],

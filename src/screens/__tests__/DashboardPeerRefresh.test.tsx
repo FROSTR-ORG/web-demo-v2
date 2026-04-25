@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * DashboardPeerRefresh — validates features `m1-ping-refresh-dispatch`
  * and `fix-m1-non-sign-failure-surface` (VAL-OPS-011 / VAL-OPS-015):
  *
- *  1. Clicking the Peers Refresh affordance dispatches a
+ *  1. Clicking the Test page peer-refresh affordance dispatches a
  *     `refresh_all_peers` command through `handleRuntimeCommand`.
  *  2. When ANY `ping` `OperationFailure` arrives targeting a peer that
  *     resolves to a visible PeerRow, that row renders an inline
@@ -175,6 +175,22 @@ function renderDashboard() {
   );
 }
 
+function renderTestPage() {
+  return render(
+    <MemoryRouter
+      initialEntries={[
+        { pathname: "/dashboard/test-profile-id/test", state: null },
+      ]}
+    >
+      <Routes>
+        <Route path="/dashboard/:profileId/test" element={<DashboardScreen mode="test" />} />
+        <Route path="/dashboard/:profileId" element={<DashboardScreen />} />
+        <Route path="/" element={<div data-testid="welcome-screen">Welcome</div>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 beforeEach(() => {
   appStateHolder.current = createDefaultAppState();
   mockHandleRuntimeCommand.mockClear();
@@ -192,9 +208,11 @@ afterEach(() => {
 });
 
 describe("Dashboard peer refresh — dispatch wiring", () => {
-  it("clicking 'Refresh peers' dispatches refresh_all_peers via handleRuntimeCommand", async () => {
-    renderDashboard();
-    const refreshBtn = screen.getByLabelText("Refresh peers");
+  it("clicking Test page 'Refresh peers' dispatches refresh_all_peers via handleRuntimeCommand", async () => {
+    renderTestPage();
+    const refreshBtn = screen
+      .getByTestId("test-peer-refresh-panel")
+      .querySelector("button[type='submit']") as HTMLButtonElement;
     fireEvent.click(refreshBtn);
     // handleRuntimeCommand is async; flush microtasks.
     await Promise.resolve();
@@ -242,17 +260,8 @@ describe("Dashboard peer refresh — error surface (VAL-OPS-011)", () => {
   it("renders the inline 'Refresh failed' indicator on an offline peer whose ping failed", async () => {
     const { rerender } = renderDashboard();
 
-    // Click Refresh first so the dashboard snapshots which peers are
-    // offline at dispatch time.
-    await act(async () => {
-      fireEvent.click(screen.getByLabelText("Refresh peers"));
-      // Flush the async handleRuntimeCommand + refreshRuntime kick.
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
     // Simulate the runtime having drained a ping failure for peer #2 (the
-    // offline-at-dispatch peer). Re-render with the updated slice.
+    // offline peer). Re-render with the updated slice.
     appStateHolder.current = {
       ...appStateHolder.current,
       runtimeFailures: [
@@ -291,11 +300,6 @@ describe("Dashboard peer refresh — error surface (VAL-OPS-011)", () => {
 
   it("raises the refresh-failed indicator on any peer row a ping failure targets (broadened under fix-m1-non-sign-failure-surface)", async () => {
     const { rerender } = renderDashboard();
-    await act(async () => {
-      fireEvent.click(screen.getByLabelText("Refresh peers"));
-      await Promise.resolve();
-      await Promise.resolve();
-    });
 
     // Under the non-sign failure surface refactor, every non-sign failure
     // whose failed_peer resolves to a PeerRow renders the inline indicator
@@ -334,12 +338,7 @@ describe("Dashboard peer refresh — error surface (VAL-OPS-011)", () => {
   it("clears the refresh error indicator when the peer transitions back to online", async () => {
     const { rerender } = renderDashboard();
 
-    // Dispatch refresh, then feed a ping failure to raise the indicator.
-    await act(async () => {
-      fireEvent.click(screen.getByLabelText("Refresh peers"));
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    // Feed a ping failure to raise the indicator.
     appStateHolder.current = {
       ...appStateHolder.current,
       runtimeFailures: [

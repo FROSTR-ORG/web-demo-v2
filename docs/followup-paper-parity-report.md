@@ -63,7 +63,7 @@ scenario: `/demo/shared-distribute-shares`.
 - Layout drift: **no drift detected.** Section order matches Paper
   (Stepper → Page Intro → How-this-step-works → Share 1 Local → Share 2 remote (pre-state)
   → Share 3 remote (post-state) → Primary CTA). The per-share row layout matches:
-  header row (title + index + status chip) → bfonboard preview / waiting helper →
+  header row (share title + status chip) → bfonboard preview / waiting helper →
   Package Password input or masked display + Create package button when pre-state →
   action row (Copy package / Copy password / QR code / Mark distributed).
 - Missing element: **fix-in-code applied.** Paper 8GU-0 renders no BackLink on the

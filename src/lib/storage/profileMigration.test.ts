@@ -63,7 +63,7 @@ describe("migrateProfileRecord — legacy profile shape → current shape", () =
     const current: StoredProfileRecord = {
       summary: {
         id: "profile-1",
-        label: "Alice Group",
+        label: "Alice Laptop",
         deviceName: "Alice Laptop",
         groupName: "Alice Group",
         threshold: 2,
@@ -104,7 +104,10 @@ describe("migrateProfileRecord — legacy profile shape → current shape", () =
       const migrated = migrateProfileRecord(legacy);
       expect(migrated).not.toBeNull();
       expect(migrated!.summary.updatedAt).toBe(1_680_000_000_000);
-      // Non-timestamp fields are preserved verbatim.
+      // Legacy summaries that used the keyset name as their selector
+      // label are upgraded to the Device Profile name.
+      expect(migrated!.summary.label).toBe("Old Laptop");
+      // Other non-timestamp fields are preserved verbatim.
       expect(migrated!.summary.deviceName).toBe("Old Laptop");
       expect(migrated!.summary.relays).toEqual(["wss://relay.primal.net"]);
       expect(migrated!.summary.groupName).toBe("Legacy Group");

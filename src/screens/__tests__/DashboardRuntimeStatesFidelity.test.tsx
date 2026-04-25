@@ -122,7 +122,7 @@ describe("Dashboard runtime-state fidelity", () => {
       renderWithoutDemoUi();
       expect(screen.getByText("Signer Running")).toBeInTheDocument();
       expect(screen.getByText("2/2 sign ready")).toBeInTheDocument();
-      expect(screen.getByText("Avg: --")).toBeInTheDocument();
+      expect(screen.getByText("Peer avg: --")).toBeInTheDocument();
       // Event Log panel is now wired to the real RuntimeEventLog buffer
       // (feature m4-event-log-panel) and renders in both Paper and
       // runtime modes. With an empty buffer the panel shows
@@ -139,11 +139,21 @@ describe("Dashboard runtime-state fidelity", () => {
       expect(screen.queryByText("Pending Operations")).not.toBeInTheDocument();
     });
 
+    it("surfaces active keyset context from public profile/runtime metadata", () => {
+      renderWithoutDemoUi();
+      const contextStrip = screen.getByLabelText("Active keyset context");
+      expect(contextStrip).toHaveTextContent("My Signing Key");
+      expect(contextStrip).toHaveTextContent("2/3");
+      expect(contextStrip).toHaveTextContent("npub1qe3...7k4m");
+      expect(contextStrip).toHaveTextContent("Share #0");
+      expect(contextStrip).toHaveTextContent("mock-share-0");
+    });
+
     it("keeps the explicit raw runtime-panel opt-out available", () => {
       renderAt({ dashboard: { state: "running", paperPanels: false } });
       expect(screen.getByText("Signer Running")).toBeInTheDocument();
       expect(screen.getByText("2/2 sign ready")).toBeInTheDocument();
-      expect(screen.getByText("Avg: --")).toBeInTheDocument();
+      expect(screen.getByText("Peer avg: --")).toBeInTheDocument();
       // Event Log panel renders in the raw-runtime opt-out too — it's
       // always mounted; only the data source differs between modes.
       expect(screen.getByText("Event Log")).toBeInTheDocument();
@@ -205,15 +215,16 @@ describe("Dashboard runtime-state fidelity", () => {
   });
 
   describe("VAL-DSH-006: Policies header button shows active highlight when open", () => {
-    it("toggling Policies applies button-header-active className and aria-pressed=true", () => {
+    it("switches the header action to Dashboard with clear active semantics", () => {
       renderAt({ dashboard: { state: "running", paperPanels: true } });
-      const policiesBtn = screen.getByText("Policies").closest("button");
-      expect(policiesBtn).not.toBeNull();
-      expect(policiesBtn!.classList.contains("button-header-active")).toBe(false);
-      expect(policiesBtn!.getAttribute("aria-pressed")).toBe("false");
-      fireEvent.click(policiesBtn!);
-      expect(policiesBtn!.classList.contains("button-header-active")).toBe(true);
-      expect(policiesBtn!.getAttribute("aria-pressed")).toBe("true");
+      const policiesBtn = screen.getByRole("button", { name: "Policies" });
+      expect(policiesBtn.classList.contains("button-header-active")).toBe(false);
+      expect(policiesBtn.getAttribute("aria-pressed")).toBe("false");
+      fireEvent.click(policiesBtn);
+      const dashboardBtn = screen.getByRole("button", { name: /back to dashboard/i });
+      expect(dashboardBtn).toHaveTextContent("Dashboard");
+      expect(dashboardBtn.classList.contains("button-header-active")).toBe(true);
+      expect(dashboardBtn.getAttribute("aria-pressed")).toBe("true");
     });
   });
 
@@ -286,6 +297,20 @@ describe("Dashboard runtime-state fidelity", () => {
       expect(screen.getByText("Operator Action")).toBeInTheDocument();
       expect(screen.getByText("Open Policies")).toBeInTheDocument();
       expect(screen.getByText("Review Approvals")).toBeInTheDocument();
+    });
+
+    it("shows Signing Capacity when paperPanels is false", () => {
+      renderAt({
+        dashboard: { state: "signing-blocked", paperPanels: false },
+      });
+      expect(screen.getByText("Signing Capacity")).toBeInTheDocument();
+    });
+
+    it("hides Signing Capacity and shows Common Causes/Operator Action when paperPanels is true", () => {
+      renderAt({ dashboard: { state: "signing-blocked", paperPanels: true } });
+      expect(screen.queryByText("Signing Capacity")).not.toBeInTheDocument();
+      expect(screen.getByText("Common Causes")).toBeInTheDocument();
+      expect(screen.getByText("Operator Action")).toBeInTheDocument();
     });
   });
 });

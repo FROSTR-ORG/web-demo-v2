@@ -188,6 +188,77 @@ describe("RuntimeRelayPump", () => {
     expect(relay.closed).toBe(true);
   });
 
+  it("tags refresh_all fan-out Ping request ids before drain callbacks run", async () => {
+    const calls: string[] = [];
+    class RefreshRuntime extends FakeRuntime {
+      private refreshQueued = false;
+      private pending: RuntimeStatusSummary["pending_operations"] = [];
+
+      override handleCommand(command: unknown) {
+        super.handleCommand(command);
+        if (
+          typeof command === "object" &&
+          command !== null &&
+          (command as { type?: string }).type === "refresh_all_peers"
+        ) {
+          this.refreshQueued = true;
+        }
+      }
+
+      override tick(now: number) {
+        super.tick(now);
+        if (this.refreshQueued && this.pending.length === 0) {
+          this.pending = [
+            {
+              op_type: "Ping",
+              request_id: "req-refresh-ping",
+              started_at: now,
+              timeout_at: now + 10_000,
+              target_peers: ["peer-a"],
+              threshold: 1,
+              collected_responses: [],
+              context: null,
+            },
+          ];
+        }
+      }
+
+      override runtimeStatus(): RuntimeStatusSummary {
+        return {
+          ...super.runtimeStatus(),
+          pending_operations: this.pending,
+        };
+      }
+
+      override drainCompletions() {
+        calls.push("drain");
+        return super.drainCompletions();
+      }
+    }
+
+    const runtime = new RefreshRuntime();
+    const relay = new FakeRelayConnection("wss://relay.test");
+    const tagged: string[][] = [];
+    const pump = new RuntimeRelayPump({
+      runtime: runtime as never,
+      relays: ["wss://relay.test"],
+      relayClient: new FakeRelayClient([relay]),
+      eventKind: 27000,
+      now: () => 1,
+      onRefreshPingRequestIds: (requestIds) => {
+        calls.push("refresh");
+        tagged.push(requestIds);
+      },
+    });
+
+    await pump.start();
+    await pump.refreshAll();
+
+    expect(tagged).toEqual([["req-refresh-ping"]]);
+    expect(calls.indexOf("refresh")).toBeGreaterThanOrEqual(0);
+    expect(calls.indexOf("refresh")).toBeLessThan(calls.lastIndexOf("drain"));
+  });
+
   it("marks failed connects and failed publishes offline", async () => {
     const runtime = new FakeRuntime();
     const offline = new FakeRelayConnection("wss://offline.test", {
@@ -643,13 +714,11 @@ describe("RuntimeRelayPump", () => {
   );
 
   /**
-   * m6-backup-publish — `publishEvent` is the direct-publish API used
-   * by `AppStateProvider.publishProfileBackup`. It publishes a prepared
-   * Nostr event to every online relay in parallel with independent
-   * error handling so one relay failing does not short-circuit the
-   * others (VAL-BACKUP-002 / VAL-BACKUP-006 / VAL-BACKUP-007).
+   * `publishEvent` publishes a prepared Nostr event to every online
+   * relay in parallel with independent error handling so one relay
+   * failing does not short-circuit the others.
    */
-  describe("publishEvent (m6-backup-publish)", () => {
+  describe("publishEvent", () => {
     it("publishes a prepared event to every online relay and returns `reached`", async () => {
       const runtime = new FakeRuntime();
       const relayA = new FakeRelayConnection("wss://relay-a.test");

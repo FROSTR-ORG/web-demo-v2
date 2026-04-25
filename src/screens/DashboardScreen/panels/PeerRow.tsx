@@ -1,5 +1,4 @@
 import { AlertTriangle } from "lucide-react";
-import { useEffect, useState } from "react";
 import { PeerPermissionTag } from "../../../components/PeerPermissionTags";
 import { shortHex } from "../../../lib/bifrost/format";
 import { resolveRequestPolicyAllows } from "../../../lib/bifrost/policy";
@@ -7,7 +6,19 @@ import type {
   PeerPermissionState,
   PeerStatus,
 } from "../../../lib/bifrost/types";
+import type { PeerLatencySample } from "../../../app/AppStateTypes";
 import { paperLatency, paperPeerKey } from "../mocks";
+
+export const PEER_LATENCY_FRESH_MS = 60_000;
+
+export function freshPeerLatencyMs(
+  sample: PeerLatencySample | null | undefined,
+  nowMs: number,
+): number | null {
+  if (!sample) return null;
+  const ageMs = Math.max(0, nowMs - sample.measuredAt);
+  return ageMs <= PEER_LATENCY_FRESH_MS ? sample.latencyMs : null;
+}
 
 /**
  * Inline refresh/ping error surface for peers whose most recent
@@ -34,67 +45,14 @@ export interface PeerRefreshErrorInfo {
   failedAt?: number;
 }
 
-/**
- * Convert a `PeerStatus.last_seen` epoch value into the Paper-faithful
- * "Last seen <X> ago" copy used in the trailing slot of an online peer
- * row. The runtime's `peer_permission_states` surface exposes `last_seen`
- * as a Unix timestamp in **seconds** (see `bifrost-signer/src/lib.rs`
- * `now_unix_secs`). Demo/mock fixtures occasionally seed it in
- * milliseconds (`Date.now()`), so we auto-detect the unit by magnitude —
- * anything greater than 10^12 is treated as ms, otherwise seconds —
- * before computing the delta so both paths produce a plausible label.
- *
- * Exposed as a named export so the Vitest component test can exercise
- * the boundary conditions (just-now / seconds / minutes / hours / days /
- * null / stale-in-the-future clock skew) without rendering the whole
- * row.
- */
-export function formatLastSeen(
-  lastSeen: number | null | undefined,
-  nowMs: number,
-): string {
-  if (lastSeen === null || lastSeen === undefined) return "Last seen —";
-  // Accept either seconds (runtime `now_unix_secs`) or milliseconds
-  // (demo fixtures / `Date.now()`). 10^12 ms ≈ Sept 2001, so values below
-  // that threshold are reliably seconds.
-  const lastSeenMs = lastSeen > 1e12 ? lastSeen : lastSeen * 1000;
-  const diffSecs = Math.max(0, Math.floor((nowMs - lastSeenMs) / 1000));
-  if (diffSecs <= 1) return "Last seen just now";
-  if (diffSecs < 60) return `Last seen ${diffSecs}s ago`;
-  const mins = Math.floor(diffSecs / 60);
-  if (mins < 60) return `Last seen ${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `Last seen ${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `Last seen ${days}d ago`;
-}
-
-/**
- * Forces PeerRow to re-compute relative-time copy at ~1s cadence even if
- * the enclosing `runtime_status` snapshot hasn't changed. Together with
- * the parent's 2.5s poll tick this keeps the rendered `last_seen` string
- * advancing within the <=3s window VAL-OPS-010/011 require after a
- * Refresh click — without relying solely on props churn.
- */
-function useNow(intervalMs = 1000): number {
-  const [now, setNow] = useState<number>(() => Date.now());
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setNow(Date.now());
-    }, intervalMs);
-    return () => {
-      window.clearInterval(id);
-    };
-  }, [intervalMs]);
-  return now;
-}
-
 export function PeerRow({
   peer,
   paper,
   sidebarOpen,
   refreshError,
   permissionState,
+  latencySample,
+  nowMs = Date.now(),
 }: {
   peer: PeerStatus;
   paper?: boolean;
@@ -112,19 +70,25 @@ export function PeerRow({
    * regress.
    */
   permissionState?: PeerPermissionState | null;
+  latencySample?: PeerLatencySample | null;
+  nowMs?: number;
 }) {
   const incomingPct = Math.min(100, peer.incoming_available);
   const outgoingPct = Math.min(100, peer.outgoing_available);
   const lowPool = peer.online && Math.min(peer.incoming_available, peer.outgoing_available) < 25;
   const rowState = peer.online ? (lowPool ? "warning" : "") : "offline";
-  const now = useNow();
 
-  // Paper-reference mode keeps the static "24ms/38ms/Ready" latency copy
-  // used by demo-gallery screenshots so pixel-parity regressions don't
-  // drift when the real dashboard adopts the relative-time string.
+  const measuredLatencyMs = freshPeerLatencyMs(latencySample, nowMs);
   const onlineLatencyLabel = paper
     ? paperLatency(peer.idx)
-    : formatLastSeen(peer.last_seen, now);
+    : measuredLatencyMs === null
+      ? "--"
+      : `${measuredLatencyMs}ms`;
+  const latencyTitle = paper
+    ? undefined
+    : measuredLatencyMs === null
+      ? "No fresh peer RTT sample yet."
+      : "Peer RTT measured from Ping dispatch to completion.";
 
   // When an effective_policy-backed permissionState is provided, badges
   // are driven directly by the runtime grant matrix. Otherwise fall back
@@ -223,17 +187,9 @@ export function PeerRow({
           </span>
         ) : peer.online ? (
           <span
-            className="peer-last-seen"
-            data-testid={`peer-last-seen-${peer.idx}`}
-            title={
-              peer.last_seen === null || peer.last_seen === undefined
-                ? undefined
-                : new Date(
-                    peer.last_seen > 1e12
-                      ? peer.last_seen
-                      : peer.last_seen * 1000,
-                  ).toISOString()
-            }
+            className="peer-latency"
+            data-testid={`peer-latency-${peer.idx}`}
+            title={latencyTitle}
           >
             {onlineLatencyLabel}
           </span>

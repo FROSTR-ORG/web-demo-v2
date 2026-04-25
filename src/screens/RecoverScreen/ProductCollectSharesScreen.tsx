@@ -10,9 +10,19 @@ import { ShareBlock } from "./ShareBlock";
 import { errorMessage, isValidatedSession, shortPubkey } from "./recoverUtils";
 import type { SourceInput } from "./types";
 
-export function ProductCollectSharesScreen() {
-  const { profileId } = useParams();
-  const navigate = useNavigate();
+interface ProductCollectSharesContentProps {
+  profileId: string;
+  showBackLink?: boolean;
+  onBack?: () => void;
+  onRecovered: () => void;
+}
+
+export function ProductCollectSharesContent({
+  profileId,
+  showBackLink = false,
+  onBack,
+  onRecovered,
+}: ProductCollectSharesContentProps) {
   const {
     activeProfile,
     recoverSession,
@@ -52,7 +62,7 @@ export function ProductCollectSharesScreen() {
     );
 
   if (!profileId || !activeProfile || activeProfile.id !== profileId) {
-    return <Navigate to="/" replace />;
+    return null;
   }
   const currentProfileId = profileId;
   const threshold = activeProfile.threshold;
@@ -96,7 +106,7 @@ export function ProductCollectSharesScreen() {
     setError(null);
     try {
       await recoverNsec();
-      navigate(`/recover/${currentProfileId}/success`);
+      onRecovered();
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
@@ -106,130 +116,152 @@ export function ProductCollectSharesScreen() {
 
   function handleBack() {
     clearRecoverSession();
-    navigate(`/dashboard/${currentProfileId}`);
+    onBack?.();
   }
+
+  return (
+    <div className="screen-column">
+      {showBackLink ? (
+        <button type="button" className="back-link" onClick={handleBack}>
+          <ChevronLeft size={14} />
+          Back to Signer
+        </button>
+      ) : null}
+
+      <div className="screen-heading">
+        <h1 className="page-title">Recover NSEC</h1>
+        <p className="page-copy">
+          Recovering your nsec requires {threshold} of your {totalShares}{" "}
+          shares.
+        </p>
+      </div>
+
+      <ShareBlock label="Source Share #1 — This Browser" loaded={validated}>
+        <input
+          className={
+            validated ? "recover-share-input loaded" : "recover-share-input"
+          }
+          type="password"
+          placeholder="Saved profile password"
+          aria-label="Saved profile password"
+          value={profilePassword}
+          onChange={(event) => {
+            clearRecoverSession();
+            setError(null);
+            setProfilePassword(event.target.value);
+          }}
+        />
+        {validated && recoverSession.sources[0] ? (
+          <LoadedShareDisplay>
+            {shortPubkey(recoverSession.sources[0].memberPubkey)}
+          </LoadedShareDisplay>
+        ) : null}
+      </ShareBlock>
+
+      {sourceInputs.map((source, index) => {
+        const sourceNumber = index + 2;
+        const loadedSource = validated
+          ? recoverSession.sources[index + 1]
+          : null;
+        return (
+          <ShareBlock
+            label={`Source Share #${sourceNumber} — bfshare`}
+            loaded={Boolean(loadedSource)}
+            mono
+            key={sourceNumber}
+          >
+            <textarea
+              className={
+                loadedSource
+                  ? "recover-share-input loaded"
+                  : "recover-share-input"
+              }
+              placeholder="Paste bfshare package..."
+              aria-label={`Source Share #${sourceNumber} bfshare package`}
+              value={source.packageText}
+              onChange={(event) =>
+                updateSource(index, { packageText: event.target.value })
+              }
+              rows={4}
+            />
+            <input
+              className={
+                loadedSource
+                  ? "recover-share-input loaded"
+                  : "recover-share-input"
+              }
+              type="password"
+              placeholder="Package password"
+              aria-label={`Source Share #${sourceNumber} package password`}
+              value={source.password}
+              onChange={(event) =>
+                updateSource(index, { password: event.target.value })
+              }
+            />
+            {loadedSource ? (
+              <LoadedShareDisplay>
+                {shortPubkey(loadedSource.memberPubkey)}
+              </LoadedShareDisplay>
+            ) : null}
+          </ShareBlock>
+        );
+      })}
+
+      <Button
+        type="button"
+        variant="secondary"
+        size="full"
+        disabled={!canValidate || validating}
+        onClick={handleValidate}
+      >
+        {validating ? "Validating Sources..." : "Validate Sources"}
+      </Button>
+      <Button
+        type="button"
+        variant="primary"
+        size="full"
+        disabled={!validated || recovering}
+        onClick={handleRecover}
+      >
+        {recovering ? "Recovering NSEC..." : "Recover NSEC"}
+      </Button>
+
+      <div className="recover-divider" />
+
+      {error ? (
+        <div className="recover-error-panel">
+          <div className="recover-error-icon">!</div>
+          <div className="recover-error-content">
+            <div className="recover-error-title">Recovery Error</div>
+            <div className="recover-error-copy">{error}</div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function ProductCollectSharesScreen() {
+  const { profileId } = useParams();
+  const navigate = useNavigate();
+  const { activeProfile } = useAppState();
+
+  if (!profileId || !activeProfile || activeProfile.id !== profileId) {
+    return <Navigate to="/" replace />;
+  }
+  const currentProfileId = profileId;
 
   return (
     <AppShell
       mainVariant="flow"
       headerMeta={<RecoverHeader keysetName={activeProfile.groupName} />}
     >
-      <div className="screen-column">
-        <button type="button" className="back-link" onClick={handleBack}>
-          <ChevronLeft size={14} />
-          Back to Signer
-        </button>
-
-        <div className="screen-heading">
-          <h1 className="page-title">Recover NSEC</h1>
-          <p className="page-copy">
-            Recovering your nsec requires {threshold} of your {totalShares}{" "}
-            shares.
-          </p>
-        </div>
-
-        <ShareBlock label="Source Share #1 — This Browser" loaded={validated}>
-          <input
-            className={
-              validated ? "recover-share-input loaded" : "recover-share-input"
-            }
-            type="password"
-            placeholder="Saved profile password"
-            aria-label="Saved profile password"
-            value={profilePassword}
-            onChange={(event) => {
-              clearRecoverSession();
-              setError(null);
-              setProfilePassword(event.target.value);
-            }}
-          />
-          {validated && recoverSession.sources[0] ? (
-            <LoadedShareDisplay>
-              {shortPubkey(recoverSession.sources[0].memberPubkey)}
-            </LoadedShareDisplay>
-          ) : null}
-        </ShareBlock>
-
-        {sourceInputs.map((source, index) => {
-          const sourceNumber = index + 2;
-          const loadedSource = validated
-            ? recoverSession.sources[index + 1]
-            : null;
-          return (
-            <ShareBlock
-              label={`Source Share #${sourceNumber} — bfshare`}
-              loaded={Boolean(loadedSource)}
-              mono
-              key={sourceNumber}
-            >
-              <textarea
-                className={
-                  loadedSource
-                    ? "recover-share-input loaded"
-                    : "recover-share-input"
-                }
-                placeholder="Paste bfshare package..."
-                aria-label={`Source Share #${sourceNumber} bfshare package`}
-                value={source.packageText}
-                onChange={(event) =>
-                  updateSource(index, { packageText: event.target.value })
-                }
-                rows={4}
-              />
-              <input
-                className={
-                  loadedSource
-                    ? "recover-share-input loaded"
-                    : "recover-share-input"
-                }
-                type="password"
-                placeholder="Package password"
-                aria-label={`Source Share #${sourceNumber} package password`}
-                value={source.password}
-                onChange={(event) =>
-                  updateSource(index, { password: event.target.value })
-                }
-              />
-              {loadedSource ? (
-                <LoadedShareDisplay>
-                  {shortPubkey(loadedSource.memberPubkey)}
-                </LoadedShareDisplay>
-              ) : null}
-            </ShareBlock>
-          );
-        })}
-
-        <Button
-          type="button"
-          variant="secondary"
-          size="full"
-          disabled={!canValidate || validating}
-          onClick={handleValidate}
-        >
-          {validating ? "Validating Sources..." : "Validate Sources"}
-        </Button>
-        <Button
-          type="button"
-          variant="primary"
-          size="full"
-          disabled={!validated || recovering}
-          onClick={handleRecover}
-        >
-          {recovering ? "Recovering NSEC..." : "Recover NSEC"}
-        </Button>
-
-        <div className="recover-divider" />
-
-        {error ? (
-          <div className="recover-error-panel">
-            <div className="recover-error-icon">!</div>
-            <div className="recover-error-content">
-              <div className="recover-error-title">Recovery Error</div>
-              <div className="recover-error-copy">{error}</div>
-            </div>
-          </div>
-        ) : null}
-      </div>
+      <ProductCollectSharesContent
+        profileId={currentProfileId}
+        showBackLink
+        onBack={() => navigate(`/dashboard/${currentProfileId}`)}
+        onRecovered={() => navigate(`/recover/${currentProfileId}/success`)}
+      />
     </AppShell>
   );
 }

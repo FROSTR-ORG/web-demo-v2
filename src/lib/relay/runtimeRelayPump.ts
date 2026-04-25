@@ -116,6 +116,13 @@ interface RuntimeRelayPumpOptions {
    */
   onDrains?: (drains: RuntimeDrainBatch) => void;
   /**
+   * Called after `refresh_all_peers` has materialised its fan-out Ping
+   * operations and before the resulting drains are emitted. App state uses
+   * this to tag background liveness probes so they do not masquerade as
+   * user/dev pings when completions or failures arrive later.
+   */
+  onRefreshPingRequestIds?: (requestIds: string[]) => void;
+  /**
    * Optional observer called on every underlying socket event (open/close/
    * error) for diagnostic consumers. The pump itself already uses socket
    * events to drive per-relay telemetry; this hook is for additional
@@ -164,6 +171,7 @@ export class RuntimeRelayPump {
   private readonly now: () => number;
   private readonly onRelayStatusChange?: (statuses: RuntimeRelayStatus[]) => void;
   private readonly onDrains?: (drains: RuntimeDrainBatch) => void;
+  private readonly onRefreshPingRequestIds?: (requestIds: string[]) => void;
   private readonly connections: RuntimeRelayConnectionState[];
   private relayStatusesValue: RuntimeRelayStatus[];
   private stopped = true;
@@ -196,6 +204,7 @@ export class RuntimeRelayPump {
     this.now = options.now ?? (() => Date.now());
     this.onRelayStatusChange = options.onRelayStatusChange;
     this.onDrains = options.onDrains;
+    this.onRefreshPingRequestIds = options.onRefreshPingRequestIds;
     this.connections = relays.map((url) => ({
       url,
       connection: null,
@@ -330,10 +339,48 @@ export class RuntimeRelayPump {
   }
 
   async refreshAll(): Promise<RuntimeStatusSummary> {
+    let baselineIds: Set<string> | null = null;
     if (!this.stopped) {
+      baselineIds = new Set(
+        this.runtime.runtimeStatus().pending_operations.map(
+          (op) => op.request_id,
+        ),
+      );
       this.runtime.handleCommand({ type: "refresh_all_peers" });
     }
-    return this.pump();
+    this.runtime.tick(this.now());
+    if (baselineIds) {
+      const requestIds = this.runtime
+        .runtimeStatus()
+        .pending_operations.filter(
+          (op) => op.op_type === "Ping" && !baselineIds.has(op.request_id),
+        )
+        .map((op) => op.request_id);
+      if (requestIds.length > 0) {
+        try {
+          this.onRefreshPingRequestIds?.(requestIds);
+        } catch (err) {
+          console.error("[RuntimeRelayPump] onRefreshPingRequestIds failed", err);
+        }
+      }
+    }
+    if (!this.stopped) {
+      await this.publishOutboundEvents();
+    }
+    const completions = this.runtime.drainCompletions();
+    const failures = this.runtime.drainFailures();
+    const events = this.runtime.drainRuntimeEvents();
+    if (
+      this.onDrains &&
+      (completions.length > 0 || failures.length > 0 || events.length > 0)
+    ) {
+      try {
+        this.onDrains({ completions, failures, events });
+      } catch {
+        // Callback must not break pumping. Swallow and continue.
+      }
+    }
+    return this.runtime.runtimeStatus();
   }
 
   async pump(): Promise<RuntimeStatusSummary> {
@@ -716,20 +763,13 @@ export class RuntimeRelayPump {
   }
 
   /**
-   * m6-backup-publish — publish a single prepared Nostr event to every
-   * relay that is currently `online`. Each relay is dialed in parallel
-   * with independent error handling so one relay failing does not
-   * short-circuit the others. Returns the list of relay URLs that
-   * accepted the publish (`reached`) and the list that rejected or
-   * threw (`failed`). A pump that is stopped, has no online relays, or
-   * was never started resolves to empty arrays. The caller is
-   * responsible for treating "no relays reached" as a user-visible
-   * error state (VAL-BACKUP-007).
-   *
-   * This helper does NOT route through `runtime.drainOutboundEvents()`
-   * because the backup event is constructed in userspace (via
-   * `build_profile_backup_event`) and signed with the share-secret-
-   * derived keypair — it never enters the runtime's outbound queue.
+   * Publish a single prepared Nostr event to every relay that is currently
+   * `online`. Each relay is dialed in parallel with independent error
+   * handling so one relay failing does not short-circuit the others.
+   * Returns the list of relay URLs that accepted the publish (`reached`)
+   * and the list that rejected or threw (`failed`). A pump that is
+   * stopped, has no online relays, or was never started resolves to empty
+   * arrays. Callers decide whether "no relays reached" is user-visible.
    */
   async publishEvent(
     event: unknown,

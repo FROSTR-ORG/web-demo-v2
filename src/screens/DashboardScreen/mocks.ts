@@ -295,8 +295,12 @@ export function paperPeerKey(index: number, fallback: string) {
   return shortHex(fallback, 12, 8);
 }
 
+export function paperLatencyMs(index: number): number {
+  if (index === 0) return 24;
+  if (index === 1) return 38;
+  return 31;
+}
+
 export function paperLatency(index: number) {
-  if (index === 0) return "24ms";
-  if (index === 1) return "38ms";
-  return "Ready";
+  return `${paperLatencyMs(index)}ms`;
 }

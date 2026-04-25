@@ -18,7 +18,7 @@ describe("demo scenarios", () => {
   it("covers every Paper screen state", () => {
     const canonical = demoScenarios.filter((scenario) => scenario.canonical !== false);
     const variants = demoScenarios.filter((scenario) => scenario.canonical === false);
-    expect(canonical).toHaveLength(49);
+    expect(canonical).toHaveLength(51);
     expect(variants.map((scenario) => scenario.id).sort()).toEqual([
       "dashboard-peer-policy-chips",
       "import-error-corrupted",
@@ -105,6 +105,8 @@ describe("demo scenarios", () => {
   it("covers the second-pass Paper parity gap text", () => {
     const checks = [
       { id: "dashboard-running", text: ["Event Log", "Pending Approvals", "~186 ready", "Avg: 31ms"] },
+      { id: "dashboard-recover", text: ["Incompatible Shares", "03b7e1f9d2c8...4j8w"] },
+      { id: "dashboard-recover-success", text: ["Security Warning", "Recovered NSEC:"] },
       { id: "recover-collect-shares", text: ["Incompatible Shares", "03b7e1f9d2c8...4j8w"] },
       { id: "import-error-corrupted", text: ["Backup Corrupted"] },
       { id: "onboard-failed-rejected", text: ["Onboarding Rejected"] },

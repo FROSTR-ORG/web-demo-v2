@@ -867,11 +867,11 @@ describe("RotateDistributeSharesScreen", () => {
     mocks.rotateKeysetSession = {
       phase: "profile_created",
       sourceProfile: { id: "prof_work", label: "Work Key" },
-      localShare: { idx: 0 },
+      localShare: { idx: 1 },
       createdProfileId: "prof_rotated",
       onboardingPackages: [
         {
-          idx: 1,
+          idx: 2,
           memberPubkey: "member",
           packageText: "bfonboard1abc",
           password: "[redacted]",
@@ -908,12 +908,20 @@ describe("RotateDistributeSharesScreen", () => {
   });
 
   it("renders local and remote share cards", () => {
-    render(
+    const { container } = render(
       <MemoryRouter>
         <RotateDistributeSharesScreen />
       </MemoryRouter>,
     );
     expect(screen.getByText("Saved to Igloo Web")).toBeInTheDocument();
+    expect(
+      Array.from(container.querySelectorAll(".package-title")).map((node) =>
+        node.textContent?.trim(),
+      ),
+    ).toEqual(["Share 1", "Share 2", "Share 3"]);
+    expect(container.querySelector(".package-index")).toBeNull();
+    expect(screen.queryByText(/^Index \d+$/)).not.toBeInTheDocument();
+    expect(screen.getByText("Share 1")).toBeInTheDocument();
     expect(screen.getByText("Share 2")).toBeInTheDocument();
     expect(screen.getByText("Share 3")).toBeInTheDocument();
   });
@@ -995,11 +1003,11 @@ describe("RotateDistributeSharesScreen", () => {
     mocks.rotateKeysetSession = {
       phase: "profile_created",
       sourceProfile: { id: "prof_work", label: "Work Key" },
-      localShare: { idx: 0 },
+      localShare: { idx: 1 },
       createdProfileId: "prof_rotated",
       onboardingPackages: [
         {
-          idx: 1,
+          idx: 2,
           memberPubkey: "member",
           packageText: "",
           password: "",
@@ -1024,7 +1032,7 @@ describe("RotateDistributeSharesScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /Create package/i }));
     await waitFor(() =>
       expect(mocks.encodeRotateDistributionPackage).toHaveBeenCalledWith(
-        1,
+        2,
         "distribution-password",
       ),
     );
@@ -1035,11 +1043,11 @@ describe("RotateDistributeSharesScreen", () => {
     mocks.rotateKeysetSession = {
       phase: "profile_created",
       sourceProfile: { id: "prof_work", label: "Work Key" },
-      localShare: { idx: 0 },
+      localShare: { idx: 1 },
       createdProfileId: "prof_rotated",
       onboardingPackages: [
         {
-          idx: 1,
+          idx: 2,
           memberPubkey: "member",
           packageText: "bfonboard1preview",
           password: "[redacted]",
@@ -1059,7 +1067,7 @@ describe("RotateDistributeSharesScreen", () => {
       </MemoryRouter>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Mark distributed/i }));
-    expect(mocks.markRotatePackageDistributed).toHaveBeenCalledWith(1);
+    expect(mocks.markRotatePackageDistributed).toHaveBeenCalledWith(2);
   });
 });
 

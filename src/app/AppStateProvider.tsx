@@ -17,7 +17,6 @@ import {
   createKeysetBundle,
   createKeysetBundleFromNsec,
   createOnboardingRequestBundle,
-  decodeBfsharePackage,
   encodeBfsharePackage,
   encodeOnboardPackage,
   defaultManualPeerPolicyOverrides,
@@ -27,9 +26,7 @@ import {
   decodeProfilePackage,
   deriveProfileIdFromShareSecret,
   onboardPayloadForRemoteShare,
-  parseProfileBackupEvent,
   peerPolicyOverridesFromPermissions,
-  profileBackupEventKind,
   profilePayloadForShare,
   recoverNsecFromShares,
   resolveShareIndex,
@@ -45,6 +42,7 @@ import type {
   DerivedPublicNonceWire,
   GroupPackageWire,
   KeysetBundle,
+  OperationFailure,
   OnboardingPackageView,
   RuntimeBootstrapInput,
   RuntimeEvent,
@@ -58,6 +56,11 @@ import {
   type RuntimeDrainBatch,
   type RuntimeRelayStatus,
 } from "../lib/relay/runtimeRelayPump";
+import {
+  buildTextNoteForSigning,
+  encodeMinimalNevent,
+  finalizeTextNoteEvent,
+} from "../lib/nostr/testNote";
 import type { RelaySocketEvent } from "../lib/relay/browserRelayClient";
 import {
   OnboardingRelayError,
@@ -77,6 +80,7 @@ import {
   allPackagesDistributed,
   buildPendingOnboardingPackageView,
   normalizePackageStatePatch,
+  packageDistributed,
 } from "./distributionPackages";
 import {
   buildStoredProfileRecord,
@@ -114,7 +118,6 @@ import {
 import type {
   AppStateValue,
   CreateDraft,
-  BackupPublishLocalMutationPayload,
   CreateKeysetDraft,
   CreateProfileDraft,
   CreateSession,
@@ -129,6 +132,7 @@ import type {
   OnboardingPackageStatePatch,
   OnboardSession,
   PeerDeniedEvent,
+  PeerLatencySample,
   PendingDispatchEntry,
   PolicyOverrideEntry,
   PolicyPromptDecision,
@@ -147,6 +151,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [runtimeStatus, setRuntimeStatus] =
     useState<RuntimeStatusSummary | null>(null);
   const [runtimeRelays, setRuntimeRelays] = useState<RuntimeRelayStatus[]>([]);
+  const [peerLatencyByPubkey, setPeerLatencyByPubkey] = useState<
+    Record<string, PeerLatencySample>
+  >({});
   const [signerPaused, setSignerPausedState] = useState(false);
   const [createSession, setCreateSession] = useState<CreateSession | null>(
     null,
@@ -192,6 +199,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [runtimeFailures, setRuntimeFailures] = useState<
     EnrichedOperationFailure[]
   >([]);
+  const runtimeCompletionsRef = useRef<CompletedOperation[]>([]);
+  const runtimeFailuresRef = useRef<EnrichedOperationFailure[]>([]);
   const [pendingDispatchIndex, setPendingDispatchIndex] = useState<
     Record<string, PendingDispatchEntry>
   >({});
@@ -325,14 +334,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const simulatorRef = useRef<LocalRuntimeSimulator | null>(null);
   const relayPumpRef = useRef<RuntimeRelayPump | null>(null);
   const liveRelayUrlsRef = useRef<string[]>([]);
-  /**
-   * m6-backup-publish — most-recent `created_at` (seconds) emitted by
-   * {@link publishProfileBackup} in this session. Used to bump the
-   * next publish's timestamp monotonically so two rapid-fire publishes
-   * always produce strictly newer replaceable events (VAL-BACKUP-031).
-   * `null` until the first publish.
-   */
-  const lastBackupPublishSecondsRef = useRef<number | null>(null);
   /**
    * Serialised shape of the most-recent command dispatched via
    * `handleRuntimeCommand`. Used to debounce rapid-fire identical dispatches
@@ -589,6 +590,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setActiveProfile(snapshot.activeProfile ?? null);
       setRuntimeStatus(snapshot.runtimeStatus ?? null);
       setRuntimeRelays(snapshot.runtimeRelays ?? []);
+      setPeerLatencyByPubkey(snapshot.peerLatencyByPubkey ?? {});
       setSignerPausedState(Boolean(snapshot.signerPaused));
       setCreateSession(null);
       setImportSession(null);
@@ -633,6 +635,37 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
    * union; we extract it defensively.
    */
   const absorbDrains = useCallback((drains: RuntimeDrainBatch) => {
+    const indexSnapshot = pendingDispatchIndexRef.current;
+    const userFacingFailures = drains.failures.filter(
+      (failure) => !isUncorrelatedPingFailure(failure, indexSnapshot),
+    );
+    const eventLogCompletions = drains.completions.filter(
+      (completion) => !isUncorrelatedPingCompletion(completion, indexSnapshot),
+    );
+    if (drains.completions.length > 0) {
+      const measuredAt = Date.now();
+      const samples: Record<string, PeerLatencySample> = {};
+      for (const completion of drains.completions) {
+        const ping = (completion as { Ping?: { request_id: string; peer: string } }).Ping;
+        if (!ping?.request_id) continue;
+        const entry = indexSnapshot[ping.request_id];
+        if (!entry || entry.type !== "ping") continue;
+        const peer = entry.peer_pubkey ?? ping.peer;
+        if (!peer) continue;
+        samples[peer] = {
+          latencyMs: Math.max(0, measuredAt - entry.dispatchedAt),
+          measuredAt,
+          requestId: ping.request_id,
+          source: entry.probeSource === "refresh" ? "refresh" : "user",
+        };
+      }
+      if (Object.keys(samples).length > 0) {
+        setPeerLatencyByPubkey((previous) => ({
+          ...previous,
+          ...samples,
+        }));
+      }
+    }
     if (drains.completions.length > 0) {
       // m7-onboard-sponsor-flow — VAL-ONBOARD-009 / VAL-ONBOARD-011.
       // Detect an Onboard completion matching the active sponsor
@@ -679,6 +712,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         merged.sort((a, b) =>
           completionRequestId(a).localeCompare(completionRequestId(b)),
         );
+        runtimeCompletionsRef.current = merged;
         return merged;
       });
       // Advance any tracked lifecycle entries to `completed`. Keyed by the
@@ -755,8 +789,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // correlation exists (VAL-OPS-007). Falls back to the raw payload
       // when no correlation is available; the UI renders a clear
       // "message not resolvable" reason in that case.
-      const indexSnapshot = pendingDispatchIndexRef.current;
-      const enriched: EnrichedOperationFailure[] = drains.failures.map(
+      const enriched: EnrichedOperationFailure[] = userFacingFailures.map(
         (failure) => {
           const entry = indexSnapshot[failure.request_id];
           if (!entry) return { ...failure };
@@ -770,11 +803,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           return result;
         },
       );
-      setRuntimeFailures((previous) => {
-        const merged = [...previous, ...enriched];
-        merged.sort((a, b) => a.request_id.localeCompare(b.request_id));
-        return merged;
-      });
+      if (enriched.length > 0) {
+        setRuntimeFailures((previous) => {
+          const merged = [...previous, ...enriched];
+          merged.sort((a, b) => a.request_id.localeCompare(b.request_id));
+          runtimeFailuresRef.current = merged;
+          return merged;
+        });
+      }
       const failures = new Map<string, { at: number; reason: string }>();
       const now = Date.now();
       for (const failure of drains.failures) {
@@ -878,6 +914,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           const nextPackages = session.onboardingPackages.map((entry) => {
             const requestId = entry.pendingDispatchRequestId;
             if (!requestId) return entry;
+            if (packageDistributed(entry)) return entry;
             if (onboardCompletionIds.has(requestId) && !entry.peerOnline) {
               changed = true;
               return {
@@ -904,11 +941,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         });
       }
     }
-    // Populate the dashboard RuntimeEventLog ring buffer from every drain
-    // channel. Preserves drain order: events first (they precede the
-    // completions/failures they describe in the runtime's own ordering),
-    // then completions, then failures. Each entry is tagged with a typed
-    // badge used by the Event Log panel for colour/label rendering
+    // Populate the dashboard RuntimeEventLog ring buffer from user-facing
+    // drain channels. bifrost-rs exposes three relevant drains here:
+    // lifecycle `RuntimeEvent`s, semantic `CompletedOperation`s, and
+    // user-facing `OperationFailure`s. Keep raw lifecycle events in
+    // `lifecycleEvents` for diagnostics, but only promote meaningful
+    // runtime events into the visible Event Log; routine queue/tick/relay
+    // plumbing such as `command_queued`, `status_changed`, and
+    // `inbound_accepted` would otherwise drown out sign/onboard/error rows.
+    // Preserves drain order for the visible rows: events first, then
+    // completions, then failures. Each entry is tagged with a typed badge
+    // used by the Event Log panel for colour/label rendering
     // (VAL-EVENTLOG-005 / VAL-EVENTLOG-014 / VAL-EVENTLOG-024).
     if (
       drains.events.length > 0 ||
@@ -918,6 +961,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const now = Date.now();
       const newEntries: RuntimeEventLogEntry[] = [];
       for (const event of drains.events) {
+        if (!isVisibleRuntimeEventLogEvent(event)) continue;
         runtimeEventLogSeqRef.current += 1;
         newEntries.push({
           seq: runtimeEventLogSeqRef.current,
@@ -927,7 +971,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           payload: event,
         });
       }
-      for (const completion of drains.completions) {
+      for (const completion of eventLogCompletions) {
         runtimeEventLogSeqRef.current += 1;
         newEntries.push({
           seq: runtimeEventLogSeqRef.current,
@@ -937,7 +981,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           payload: completion,
         });
       }
-      for (const failure of drains.failures) {
+      for (const failure of userFacingFailures) {
         runtimeEventLogSeqRef.current += 1;
         newEntries.push({
           seq: runtimeEventLogSeqRef.current,
@@ -999,6 +1043,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const resetDrainSlices = useCallback(() => {
     setRuntimeCompletions([]);
     setRuntimeFailures([]);
+    runtimeCompletionsRef.current = [];
+    runtimeFailuresRef.current = [];
     setLifecycleEvents([]);
     setSignDispatchLog({});
     setSignLifecycleLog([]);
@@ -1006,6 +1052,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setPeerDenialQueue([]);
     setPolicyOverrides([]);
     setRuntimeEventLog([]);
+    setPeerLatencyByPubkey({});
     pendingDispatchIndexRef.current = {};
     pendingUnmatchedDispatchesRef.current = [];
     lastDispatchRef.current = null;
@@ -1571,10 +1618,44 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       if (Object.keys(additions).length === 0) return;
       pendingUnmatchedDispatchesRef.current = stillUnmatched;
+      pendingDispatchIndexRef.current = {
+        ...pendingDispatchIndexRef.current,
+        ...additions,
+      };
       setPendingDispatchIndex((previous) => ({ ...previous, ...additions }));
     },
     [],
   );
+
+  const markRefreshPingProbeIds = useCallback((requestIds: string[]) => {
+    const unique = Array.from(new Set(requestIds.filter(Boolean)));
+    if (unique.length === 0) return;
+    const dispatchedAt = Date.now();
+    const additions: Record<string, PendingDispatchEntry> = {};
+    for (const requestId of unique) {
+      if (pendingDispatchIndexRef.current[requestId]) continue;
+      additions[requestId] = {
+        type: "ping",
+        probeSource: "refresh",
+        dispatchedAt,
+      };
+    }
+    if (Object.keys(additions).length === 0) return;
+    pendingDispatchIndexRef.current = {
+      ...pendingDispatchIndexRef.current,
+      ...additions,
+    };
+    setPendingDispatchIndex((previous) => {
+      let changed = false;
+      const next: Record<string, PendingDispatchEntry> = { ...previous };
+      for (const [requestId, entry] of Object.entries(additions)) {
+        if (next[requestId]) continue;
+        next[requestId] = entry;
+        changed = true;
+      }
+      return changed ? next : previous;
+    });
+  }, []);
 
   const applyRuntimeStatus = useCallback(
     (status: RuntimeStatusSummary | null) => {
@@ -1599,13 +1680,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const startLiveRelayPump = useCallback(
-    async (runtime: RuntimeClient, relayUrls: string[]) => {
+    async (
+      runtime: RuntimeClient,
+      relayUrls: string[],
+      options: { resetDrains?: boolean } = {},
+    ) => {
       const relays = Array.from(
         new Set(relayUrls.map((relay) => relay.trim()).filter(Boolean)),
       );
+      const resetDrains = options.resetDrains ?? true;
       liveRelayUrlsRef.current = relays;
       stopRelayPump(false);
-      resetDrainSlices();
+      if (resetDrains) {
+        resetDrainSlices();
+      }
       if (relays.length === 0) {
         setRuntimeRelays([]);
         return runtime.runtimeStatus();
@@ -1616,6 +1704,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         relays,
         onRelayStatusChange: setRuntimeRelays,
         onDrains: absorbDrains,
+        onRefreshPingRequestIds: markRefreshPingProbeIds,
         onSocketEvent: recordRelaySocketEvent,
       });
       relayPumpRef.current = pump;
@@ -1630,7 +1719,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       return status;
     },
-    [absorbDrains, augmentStatus, resetDrainSlices, stopRelayPump],
+    [
+      absorbDrains,
+      augmentStatus,
+      markRefreshPingProbeIds,
+      resetDrainSlices,
+      stopRelayPump,
+    ],
   );
 
   const setRuntime = useCallback(
@@ -1642,6 +1737,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (simulatorRef.current && simulatorRef.current !== simulator) {
         simulatorRef.current.stop();
         simulatorRef.current.setOnDrains(undefined);
+        simulatorRef.current.setOnRefreshPingRequestIds(undefined);
       }
       if (!relayUrls?.length) {
         liveRelayUrlsRef.current = [];
@@ -1651,6 +1747,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       simulatorRef.current = simulator ?? null;
       if (simulator) {
         simulator.setOnDrains(absorbDrains);
+        simulator.setOnRefreshPingRequestIds(markRefreshPingProbeIds);
       }
       resetDrainSlices();
       // Route through `augmentStatus` so any active dev-only nonce-depletion
@@ -1677,7 +1774,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // runtime is now backing `runtimeRef`.
       setBridgeHydrated(false);
     },
-    [absorbDrains, augmentStatus, resetDrainSlices, startLiveRelayPump, stopRelayPump],
+    [
+      absorbDrains,
+      augmentStatus,
+      markRefreshPingProbeIds,
+      resetDrainSlices,
+      startLiveRelayPump,
+      stopRelayPump,
+    ],
   );
 
   const startRuntimeFromPayload = useCallback(
@@ -1806,11 +1910,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // validator that the Settings sidebar uses. Validation failures
       // are rethrown with the verbatim inline-validation copy
       // ("Relay URL must start with wss://") so the /create/profile
-      // form can render the message without re-mapping. The DEV-only
-      // `__iglooTestAllowInsecureRelayForRestore` opt-in (gated behind
-      // `import.meta.env.DEV`) whitelists `ws://127.0.0.1:*` for the
-      // multi-device e2e that targets the local `bifrost-devtools`
-      // relay (plain ws://). See VAL-FOLLOWUP-001 / VAL-FOLLOWUP-010.
+      // form can render the message without re-mapping. The existing
+      // DEV-only `__iglooTestAllowInsecureRelayForRestore` opt-in
+      // (gated behind `import.meta.env.DEV`) whitelists
+      // `ws://127.0.0.1:*` for the multi-device e2e that targets the
+      // local `bifrost-devtools` relay (plain ws://). See
+      // VAL-FOLLOWUP-001 / VAL-FOLLOWUP-010.
       //
       // fix-scrutiny-r1-bootstrap-narrow-dev-allowlist — the allowlist
       // is narrowed to the literal IPv4 `127.0.0.1` ONLY. `localhost`
@@ -1901,7 +2006,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           createdAt,
           updatedAt: createdAt,
           lastUsedAt: createdAt,
-          label: createSession.draft.groupName,
+          label: deviceName,
           unadoptedSharesCiphertext,
           shareAllocations: [],
         });
@@ -2057,6 +2162,67 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const dispatchCreateSessionOnboard = useCallback(
+    async (
+      idx: number,
+      failurePrefix: string,
+    ): Promise<{
+      requestId?: string;
+      adoptionError?: string;
+      debounced?: boolean;
+    }> => {
+      const context = createSessionShareContextRef.current;
+      if (!context) {
+        throw new Error(
+          "No active create session; cannot dispatch adoption.",
+        );
+      }
+      const remoteShare = context.remoteShares.find(
+        (share) => share.idx === idx,
+      );
+      if (!remoteShare) {
+        throw new Error(
+          `No remote share with idx=${idx} in the active create session.`,
+        );
+      }
+      const targetMember = memberForShare(context.group, remoteShare);
+      const onboardCommand = {
+        type: "onboard" as const,
+        peer_pubkey32_hex: memberPubkeyXOnly(targetMember),
+      };
+
+      setCreateSession((session) => {
+        if (!session) return session;
+        return {
+          ...session,
+          onboardingPackages: session.onboardingPackages.map((entry) =>
+            entry.idx === idx
+              ? {
+                  ...entry,
+                  adoptionError: undefined,
+                }
+              : entry,
+          ),
+        };
+      });
+
+      try {
+        const result = await dispatchRuntimeCommandRef.current?.(onboardCommand);
+        if (result?.debounced) {
+          return { debounced: true };
+        }
+        return { requestId: result?.requestId ?? undefined };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          requestId: undefined,
+          adoptionError: `${failurePrefix} — ${message}`,
+        };
+      }
+    },
+    [],
+  );
+
   // fix-followup-distribute-2a — per-share encoder. Produces a
   // populated bfonboard1… package for remote share `idx` using a
   // user-supplied `password`. See {@link AppStateValue.encodeDistributionPackage}
@@ -2096,82 +2262,29 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const nextStash = new Map(createSessionPackageSecretsRef.current);
       nextStash.set(idx, { packageText, password });
       createSessionPackageSecretsRef.current = nextStash;
-      // fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire
-      // — mirror the `createOnboardSponsorPackage` pattern at
-      // AppStateProvider.tsx (onboard sponsor flow): after encoding
-      // the bfonboard package, dispatch `handleRuntimeCommand({type:
-      // "onboard", peer_pubkey32_hex})` for the share's target
-      // member. The returned `requestId` is stashed on
-      // `onboardingPackages[idx].pendingDispatchRequestId` so
-      // `absorbDrains` can correlate drained
-      // `CompletedOperation::Onboard` envelopes back to the share
-      // (echo-driven peerOnline flip) and `OperationFailure {
-      // op_type: "onboard" }` envelopes (adoptionError inline
-      // surface).
-      //
-      // Compute the target peer's x-only pubkey from the group
-      // member matching this share. `memberPubkeyXOnly` lowercases
-      // and strips the 02/03 prefix to produce the 64-hex x-only
-      // form the runtime expects as `peer_pubkey32_hex`.
-      const targetMember = memberForShare(context.group, remoteShare);
-      const onboardCommand = {
-        type: "onboard" as const,
-        peer_pubkey32_hex: memberPubkeyXOnly(targetMember),
-      };
-      // fix-scrutiny-r1-onboard-dispatch-requestid-hygiene-and-real-onboard-e2e
-      // — requestId hygiene (scrutiny r1 blocker #2). Before dispatching,
-      // clear any prior `pendingDispatchRequestId` (and stale
-      // `adoptionError`) on this share so a retry click never leaves a
-      // stale id behind — otherwise a subsequent
-      // `CompletedOperation::Onboard` correlated to the OLD id could
-      // falsely flip `peerOnline` on this share.
-      setCreateSession((session) => {
-        if (!session) return session;
-        return {
-          ...session,
-          onboardingPackages: session.onboardingPackages.map((entry) =>
-            entry.idx === idx
-              ? {
-                  ...entry,
-                  pendingDispatchRequestId: undefined,
-                  adoptionError: undefined,
-                }
-              : entry,
-          ),
-        };
-      });
-      // ONLY populate `pendingDispatchRequestId` from a SUCCESSFUL
-      // dispatch result; on throw it stays explicitly undefined (not
-      // a stale fallback) and the error is surfaced inline on the
-      // share's `adoptionError` so the user sees the dispatch failure.
-      let onboardRequestId: string | undefined;
-      let dispatchError: string | undefined;
-      try {
-        const result = await dispatchRuntimeCommandRef.current?.(onboardCommand);
-        onboardRequestId = result?.requestId ?? undefined;
-      } catch (err) {
-        // Runtime dispatch failures are non-fatal — the package text
-        // itself has been encoded and stashed, so the user can still
-        // hand off the package manually and use "Mark distributed".
-        // But leaving `pendingDispatchRequestId` unset AND leaving
-        // `adoptionError` unset would hide the failure from the user.
-        // Surface the dispatch error inline via adoptionError so the
-        // Distribute card shows "Peer adoption failed — …" and the
-        // manual fallback remains reachable.
-        onboardRequestId = undefined;
-        const message = err instanceof Error ? err.message : String(err);
-        dispatchError = `Onboard dispatch failed — ${message}`;
-      }
+      const dispatchResult = await dispatchCreateSessionOnboard(
+        idx,
+        "Onboard dispatch failed",
+      );
+      const dispatchDebounced = dispatchResult.debounced === true;
       // Populate the redacted preview (first 24 chars of bfonboard1…)
       // and flip packageCreated on the session view. Also stash the
-      // onboard command's requestId (only when captured) so
-      // absorbDrains can correlate later completions / failures.
-      // `pendingDispatchRequestId` is ALWAYS set from onboardRequestId
-      // (no fallback to `entry.pendingDispatchRequestId`) so a retry
-      // click whose dispatch throws produces `undefined`, not a stale
-      // id. `adoptionError` mirrors the same — cleared on successful
-      // dispatch, populated with the inline copy on throw.
+      // onboard command's requestId so absorbDrains can correlate later
+      // completions / failures. A missing requestId means the dispatch never
+      // produced a trackable start, so surface that inline instead of leaving
+      // the row looking pending forever. Debounced dispatches preserve the
+      // existing correlation/error fields because the original request remains
+      // in flight.
+      // Outside the debounced path, `pendingDispatchRequestId` is set from
+      // this dispatch result (no fallback to `entry.pendingDispatchRequestId`)
+      // so a retry click whose dispatch throws produces `undefined`, not a
+      // stale id. `adoptionError` mirrors the same: cleared on successful
+      // dispatch, populated with inline copy on throw or missing requestId.
       const preview = packageText.slice(0, 24);
+      const dispatchStartError = dispatchDebounced
+        ? undefined
+        : dispatchResult.adoptionError ??
+          "onboard failed to start: missing requestId";
       setCreateSession((session) => {
         if (!session) return session;
         return {
@@ -2183,15 +2296,78 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                   packageText: preview,
                   password: "[redacted]",
                   packageCreated: true,
-                  pendingDispatchRequestId: onboardRequestId,
-                  adoptionError: dispatchError,
+                  pendingDispatchRequestId: dispatchDebounced
+                    ? entry.pendingDispatchRequestId
+                    : dispatchResult.requestId
+                      ? dispatchResult.requestId
+                      : undefined,
+                  adoptionError: dispatchDebounced
+                    ? entry.adoptionError
+                    : dispatchResult.requestId
+                      ? undefined
+                      : dispatchStartError,
                 }
               : entry,
           ),
         };
       });
     },
-    [],
+    [dispatchCreateSessionOnboard],
+  );
+
+  const retryDistributionPackageAdoption = useCallback(
+    async (idx: number) => {
+      if (!createSessionPackageSecretsRef.current.has(idx)) {
+        setCreateSession((session) => {
+          if (!session) return session;
+          return {
+            ...session,
+            onboardingPackages: session.onboardingPackages.map((entry) =>
+              entry.idx === idx
+                ? {
+                    ...entry,
+                    pendingDispatchRequestId: undefined,
+                    adoptionError:
+                      "Retry could not start — mark distributed manually if handoff is done.",
+                  }
+                : entry,
+            ),
+          };
+        });
+        return undefined;
+      }
+
+      const dispatchResult = await dispatchCreateSessionOnboard(
+        idx,
+        "Retry could not start",
+      );
+      if (dispatchResult.debounced) {
+        return undefined;
+      }
+      const retryError =
+        dispatchResult.adoptionError ??
+        (dispatchResult.requestId
+          ? undefined
+          : "Retry could not start — mark distributed manually if handoff is done.");
+
+      setCreateSession((session) => {
+        if (!session) return session;
+        return {
+          ...session,
+          onboardingPackages: session.onboardingPackages.map((entry) =>
+            entry.idx === idx
+              ? {
+                  ...entry,
+                  pendingDispatchRequestId: dispatchResult.requestId,
+                  adoptionError: retryError,
+                }
+              : entry,
+          ),
+        };
+      });
+      return dispatchResult.requestId;
+    },
+    [dispatchCreateSessionOnboard],
   );
 
   // fix-followup-distribute-2a — offline fallback / manual confirm.
@@ -2206,7 +2382,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         ...session,
         onboardingPackages: session.onboardingPackages.map((entry) =>
           entry.idx === idx
-            ? { ...entry, manuallyMarkedDistributed: true }
+            ? {
+                ...entry,
+                manuallyMarkedDistributed: true,
+                pendingDispatchRequestId: undefined,
+                adoptionError: undefined,
+              }
             : entry,
         ),
       };
@@ -2497,7 +2678,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           createdAt,
           updatedAt: createdAt,
           lastUsedAt: createdAt,
-          label: group.group_name,
+          label: payload.device.name,
         });
       await saveProfile(record);
       await startRuntimeFromSnapshot(
@@ -3131,7 +3312,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const summary = await savePayloadAsProfile(payload, draft.password, {
         replaceProfileId: rotateKeysetSession.sourceProfile.id,
         createdAt: rotateKeysetSession.sourceProfile.createdAt,
-        label: rotateKeysetSession.sourceProfile.label,
+        label: deviceName,
       });
 
       const remoteShares = nextBundle.shares.filter(
@@ -3859,7 +4040,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         {
           createdAt: activeProfile.createdAt,
           lastUsedAt: Date.now(),
-          label: activeProfile.label,
+          label: trimmed,
           unadoptedSharesCiphertext: existingRecord?.unadoptedSharesCiphertext,
           shareAllocations: existingRecord?.shareAllocations,
         },
@@ -4106,424 +4287,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return { backup, event };
   }, [activeProfile]);
 
-  /**
-   * m6-backup-publish — build + publish an encrypted profile backup as
-   * a signed kind-10000 Nostr event to every configured relay. See
-   * `AppStateValue.publishProfileBackup` JSDoc for the full contract.
-   *
-   * Password is validated here for defense-in-depth even though the
-   * PublishBackupModal gates the CTA upstream (VAL-BACKUP-024 /
-   * VAL-BACKUP-025). We throw the same user-facing copy as the modal
-   * so a direct call from a test or a future alternative surface
-   * surfaces the same message.
-   *
-   * Monotonic `created_at`: if this device has already published a
-   * backup in the current session, the next publish is bumped by at
-   * least one second so relays (and the user's own "last publish"
-   * timestamp) see a strictly newer replaceable event — even if two
-   * calls race within the same wall-clock second (VAL-BACKUP-031).
-   */
-  const publishProfileBackup = useCallback(
-    async (password: string) => {
-      if (typeof password !== "string" || password.length < 8) {
-        throw new Error("Password must be at least 8 characters.");
-      }
-      const runtime = runtimeRef.current;
-      const profile = activeProfileRef.current ?? activeProfile;
-      if (!runtime || !profile) {
-        throw new Error(
-          "No unlocked runtime is available to publish a backup.",
-        );
-      }
-      const pump = relayPumpRef.current;
-      const configuredRelays = profile.relays ?? [];
-      if (configuredRelays.length === 0 || !pump) {
-        // VAL-BACKUP-007 — surface the failure in the runtime event
-        // log in addition to the inline error so the failure is
-        // observable via the EventLogPanel stream. Payload is a
-        // literal, credential-free record by construction (see
-        // `BackupPublishLocalMutationPayload` in AppStateTypes).
-        appendLocalMutationRuntimeEventLogEntry({
-          badge: "BACKUP_PUBLISH",
-          payload: {
-            kind: "backup_publish_failed",
-            reason: "no-relays",
-            attemptedRelayCount: configuredRelays.length,
-          } satisfies BackupPublishLocalMutationPayload,
-        });
-        throw new Error("No relays available to publish to.");
-      }
-      const snapshot = runtime.snapshot();
-      const payload = profilePayloadForShare({
-        profileId: profile.id,
-        deviceName: profile.deviceName,
-        share: snapshot.bootstrap.share,
-        group: snapshot.bootstrap.group,
-        relays: profile.relays,
-        manualPeerPolicyOverrides: defaultManualPeerPolicyOverrides(
-          snapshot.bootstrap.group,
-          snapshot.bootstrap.share.idx,
-        ),
-      });
-      const backup = await createEncryptedProfileBackup(payload);
-      // Bump created_at monotonically vs the most recent publish from
-      // this session so rapid duplicates surface as strictly newer
-      // replaceable events (VAL-BACKUP-031).
-      const nowSeconds = Math.floor(Date.now() / 1000);
-      const lastSeconds = lastBackupPublishSecondsRef.current;
-      const createdAtSeconds =
-        typeof lastSeconds === "number" && nowSeconds <= lastSeconds
-          ? lastSeconds + 1
-          : nowSeconds;
-      lastBackupPublishSecondsRef.current = createdAtSeconds;
-      const event = await buildProfileBackupEvent({
-        shareSecret: snapshot.bootstrap.share.seckey,
-        backup,
-        createdAtSeconds,
-      });
-      const result = await pump.publishEvent(event);
-      if (result.reached.length === 0) {
-        // VAL-BACKUP-007 — distinguish "all relays offline" from the
-        // pre-flight "no relays configured" case by reason tag so
-        // operators can tell at a glance from EventLogPanel which
-        // branch tripped. Payload stays credential-free by
-        // construction.
-        appendLocalMutationRuntimeEventLogEntry({
-          badge: "BACKUP_PUBLISH",
-          payload: {
-            kind: "backup_publish_failed",
-            reason: "all-offline",
-            attemptedRelayCount: configuredRelays.length,
-          } satisfies BackupPublishLocalMutationPayload,
-        });
-        throw new Error("No relays available to publish to.");
-      }
-      // VAL-BACKUP-005 / VAL-BACKUP-031 — persist a "last published"
-      // marker on the stored profile so SettingsSidebar can surface
-      // "Last published: <relative time> — reached N/M relays" below
-      // the Publish Backup row and the value survives lock/unlock.
-      // We update the existing record's summary in-place (no
-      // re-encryption) via saveProfile so the encryptedProfilePackage
-      // is preserved verbatim. Errors here MUST NOT block the publish
-      // outcome — the user's event is already on the relays. On a
-      // persistence failure we still bump the in-memory activeProfile
-      // so the UI reflects the current session, and log in DEV.
-      //
-      // Stale-state guard (scrutiny m6 r2 — fix-m6-publish-
-      // setactiveprofile-guard): between the `pump.publishEvent` await
-      // and the `setActiveProfile(nextSummary)` call below, the user
-      // may have locked (or switched) profiles — clearing
-      // `activeProfileRef.current` and `runtimeRef.current`.
-      // Unconditionally calling `setActiveProfile(nextSummary)` in that
-      // window would "resurrect" a profile the user just locked. We
-      // mirror the pattern used in other async mutators
-      // (e.g. `startLiveRelayPump`'s `runtimeRef.current === runtime`
-      // guard): only apply the summary when the CURRENT active profile
-      // still matches the in-flight `profile.id` AND a runtime is still
-      // attached. Otherwise skip the state update — the IndexedDB
-      // record (keyed by profile.id) has already been saved below, so
-      // the next `reloadProfiles()` / unlock will pick it up.
-      const reachedCount = result.reached.length;
-      try {
-        const existing = await getProfile(profile.id);
-        if (existing) {
-          const nextSummary = {
-            ...existing.summary,
-            lastBackupPublishedAt: createdAtSeconds,
-            lastBackupReachedRelayCount: reachedCount,
-          };
-          await saveProfile({
-            ...existing,
-            summary: nextSummary,
-          });
-          const postPublishActive = activeProfileRef.current;
-          const activeStillMatches =
-            postPublishActive !== null &&
-            postPublishActive.id === profile.id &&
-            runtimeRef.current !== null;
-          if (activeStillMatches) {
-            setActiveProfile(nextSummary);
-          }
-          await reloadProfiles();
-        } else {
-          // Functional updater already guards against profile change
-          // (prev is null after lock; a different profile won't match
-          // `prev.id === profile.id`). We additionally require the
-          // runtime to still be attached so we don't partially re-hydrate
-          // a locked profile's summary into UI state.
-          if (runtimeRef.current !== null) {
-            setActiveProfile((prev) =>
-              prev && prev.id === profile.id
-                ? {
-                    ...prev,
-                    lastBackupPublishedAt: createdAtSeconds,
-                    lastBackupReachedRelayCount: reachedCount,
-                  }
-                : prev,
-            );
-          }
-        }
-      } catch (persistError) {
-        if (import.meta.env.DEV) {
-          console.warn(
-            "publishProfileBackup: failed to persist last-published marker",
-            persistError,
-          );
-        }
-        // Same stale-state guard as the happy path — skip UI update if
-        // the profile was locked/switched during the publish await.
-        if (runtimeRef.current !== null) {
-          setActiveProfile((prev) =>
-            prev && prev.id === profile.id
-              ? {
-                  ...prev,
-                  lastBackupPublishedAt: createdAtSeconds,
-                  lastBackupReachedRelayCount: reachedCount,
-                }
-              : prev,
-          );
-        }
-      }
-      return { event, reached: result.reached };
-    },
-    [activeProfile, reloadProfiles, appendLocalMutationRuntimeEventLogEntry],
-  );
-
-  /**
-   * m6-backup-restore — fetch an encrypted profile-backup event from a
-   * user-supplied relay list + bfshare package, decrypt with the share
-   * secret, and persist as a new SavedProfile (without starting the
-   * runtime).
-   *
-   * See `AppStateValue.restoreProfileFromRelay` JSDoc for the full
-   * contract. User input model:
-   *   - `input.bfshare`           bfshare1… package text
-   *   - `input.bfsharePassword`   unlocks the bfshare AND is used as
-   *                               the new profile's save password
-   *   - `input.backupPassword`    currently same as bfsharePassword
-   *                               (reserved for a future two-password
-   *                               flow — not yet wired in the UI)
-   *   - `input.relays`            must all pass validateRelayUrl
-   *
-   * Error copy is stable and matches the validation contract so the
-   * restore screen can render the user-facing message verbatim:
-   *   - "Relay URL must start with wss://"  (VAL-BACKUP-032)
-   *   - "Invalid password — could not decrypt this backup."
-   *                                         (VAL-BACKUP-011)
-   *   - "No backup found for this share."   (VAL-BACKUP-012)
-   */
-  const restoreProfileFromRelay = useCallback(
-    async (input: {
-      bfshare: string;
-      bfsharePassword: string;
-      backupPassword: string;
-      relays: string[];
-    }) => {
-      if (typeof input.bfsharePassword !== "string" ||
-          input.bfsharePassword.length < 8) {
-        throw new Error(
-          "Invalid password — could not decrypt this backup.",
-        );
-      }
-      const { validateRelayUrl, normalizeRelayList } = await import(
-        "../lib/relay/relayUrl"
-      );
-      const { RELAY_EMPTY_ERROR } = await import("./AppStateTypes");
-      // DEV-only escape hatch: the multi-device Playwright spec for
-      // restore-from-relay talks to a local `bifrost-devtools` relay
-      // exposed over plain `ws://127.0.0.1:8194` (no TLS terminator).
-      // validateRelayUrl enforces wss:// on real user input, so we
-      // provide an opt-in bypass that ONLY applies to this mutator's
-      // internal relay list and leaves every other validation path
-      // (Settings sidebar add-relay, updateRelays, publishProfileBackup)
-      // strict. See `docs/runtime-deviations-from-paper.md` and
-      // `mission AGENTS.md` "Local Relay Caveats" for rationale.
-      const allowInsecureForRestore =
-        import.meta.env.DEV &&
-        typeof window !== "undefined" &&
-        (window as { __iglooTestAllowInsecureRelayForRestore?: boolean })
-          .__iglooTestAllowInsecureRelayForRestore === true;
-      const validateRestoreRelayUrl = (raw: string): string => {
-        if (allowInsecureForRestore && /^ws:\/\//i.test(raw)) {
-          // Minimal structural check so the BrowserRelayClient still gets
-          // a parseable URL. Anything else (missing host, bad scheme) is
-          // still rejected via validateRelayUrl's canonical error.
-          try {
-            const parsed = new URL(raw);
-            if (parsed.protocol.toLowerCase() === "ws:" && parsed.hostname) {
-              return raw;
-            }
-          } catch {
-            /* fall through to strict validator */
-          }
-        }
-        return validateRelayUrl(raw);
-      };
-      // validateRestoreRelayUrl throws RelayValidationError with the
-      // canonical "Relay URL must start with wss://" copy on failure
-      // (same as validateRelayUrl), unless the DEV-only test toggle
-      // whitelists ws:// for this mutator.
-      const normalizedRelays = normalizeRelayList(input.relays ?? [], {
-        validator: validateRestoreRelayUrl,
-      });
-      if (normalizedRelays.length === 0) {
-        throw new Error(RELAY_EMPTY_ERROR);
-      }
-
-      // Decrypt the bfshare package. A wrong password surfaces as a
-      // BifrostPackageError (`wrong_password`) from the WASM bridge;
-      // we re-map it to the canonical invalid-password copy so the
-      // UI can render it verbatim (VAL-BACKUP-011).
-      let share: Awaited<ReturnType<typeof decodeBfsharePackage>>;
-      try {
-        share = await decodeBfsharePackage(
-          input.bfshare.trim(),
-          input.bfsharePassword,
-        );
-      } catch (err) {
-        if (err instanceof BifrostPackageError) {
-          throw new Error(
-            "Invalid password — could not decrypt this backup.",
-          );
-        }
-        throw err;
-      }
-
-      // Derive the share's nostr author pubkey by generating a
-      // throwaway onboarding-request bundle. `local_pubkey32` in the
-      // bundle is computed from the share secret via the exact same
-      // derivation path used by `build_profile_backup_event` on the
-      // publisher side, so this pubkey matches the kind-10000 event's
-      // `pubkey` field.
-      const eventKind = await profileBackupEventKind();
-      // `create_onboarding_request_bundle` validates the peer pubkey
-      // against secp256k1 (must be a valid x-only point), so a
-      // throwaway `"0".repeat(64)` is rejected with "invalid peer
-      // pubkey: crypto error". We use the generator point G's
-      // x-coordinate — a universally valid x-only public key — which
-      // the WASM accepts. The peer identity never materialises
-      // anywhere outside the discarded bundle (we only consume
-      // `local_pubkey32`), so any canonical valid point is sound.
-      const dummyPeer =
-        "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
-      const bundle = await createOnboardingRequestBundle({
-        shareSecret: share.share_secret,
-        peerPubkey32Hex: dummyPeer,
-        eventKind,
-      });
-      const authorPubkey32 = bundle.local_pubkey32;
-
-      // Fan out subscribes on every relay in parallel, each with its
-      // own per-attempt timeout (5s). A hung/slow relay earlier in the
-      // list cannot starve later relays — if any one of them delivers
-      // the EVENT first, the others are torn down immediately. When
-      // every per-relay budget is exhausted we surface the canonical
-      // "No backup found for this share." copy (VAL-BACKUP-012).
-      const { BrowserRelayClient } = await import(
-        "../lib/relay/browserRelayClient"
-      );
-      const { fetchProfileBackupEvent } = await import(
-        "./fetchProfileBackupEvent"
-      );
-      const client = new BrowserRelayClient();
-      const eventJson = await fetchProfileBackupEvent({
-        relays: normalizedRelays,
-        authorPubkey32,
-        eventKind,
-        client,
-      });
-
-      // Decrypt the backup payload. Errors here mean the share key
-      // doesn't match the event author (user pasted a bfshare for a
-      // different device) — surface the same invalid-password copy
-      // because from the user's perspective the restore can't proceed.
-      let backup: Awaited<ReturnType<typeof parseProfileBackupEvent>>;
-      try {
-        backup = await parseProfileBackupEvent({
-          eventJson,
-          shareSecret: share.share_secret,
-        });
-      } catch (err) {
-        throw new Error(
-          "Invalid password — could not decrypt this backup.",
-        );
-      }
-
-      // Build a BfProfilePayload from the decrypted backup. The share
-      // secret comes from the local bfshare (never the relay event).
-      const localShareIdx = await resolveShareIndex(
-        backup.group_package,
-        share.share_secret,
-      );
-      const profileId = await deriveProfileIdFromShareSecret(
-        share.share_secret,
-      );
-      // Merge the user-specified relay list with the backup's relay
-      // list so the restored profile keeps talking to the relays the
-      // user just confirmed are reachable for this share.
-      //
-      // The merge re-validates every URL through
-      // `validateRestoreRelayUrl` so the DEV-only
-      // `__iglooTestAllowInsecureRelayForRestore` opt-in (ws:// for
-      // the local bifrost-devtools relay) is honoured here too.
-      // Without this, the multi-device restore e2e would silently drop
-      // its only relay during the merge step and hit
-      // "At least one relay is required" from buildStoredProfileRecord.
-      //
-      // Invalid legacy backup relays are skipped silently so the
-      // restore does not fail when only the backup list is malformed —
-      // the user's freshly-validated list is already in the merge set.
-      const mergedRelays = normalizeRelayList(
-        [...normalizedRelays, ...backup.device.relays],
-        {
-          validator: validateRestoreRelayUrl,
-          onValidatorError: "skip",
-        },
-      );
-      const payload: BfProfilePayload = {
-        profile_id: profileId,
-        version: backup.version,
-        device: {
-          name: backup.device.name,
-          share_secret: share.share_secret,
-          manual_peer_policy_overrides:
-            backup.device.manual_peer_policy_overrides ?? [],
-          relays: mergedRelays,
-        },
-        group_package: backup.group_package,
-      };
-
-      // Idempotence: deriveProfileIdFromShareSecret yields the same id
-      // for the same share, and saveProfile keys by that id, so a
-      // repeat restore updates the existing record in place.
-      const existing = await getProfile(profileId);
-      const alreadyExisted = existing !== null;
-
-      const { record } = await buildStoredProfileRecord(
-        payload,
-        input.bfsharePassword,
-        {
-          label: backup.group_package.group_name,
-          createdAt: existing?.summary.createdAt,
-          // fix-m7-onboard-distinct-share-allocation — preserve any
-          // pool already associated with the pre-existing record on
-          // re-restore. Fresh restores won't carry one (the backup
-          // envelope doesn't include remote shares).
-          unadoptedSharesCiphertext: existing?.unadoptedSharesCiphertext,
-          shareAllocations: existing?.shareAllocations,
-        },
-      );
-      await saveProfile(record);
-      void localShareIdx; // already captured inside buildStoredProfileRecord
-      await reloadProfiles();
-      return {
-        profile: record.summary,
-        alreadyExisted,
-      };
-    },
-    [reloadProfiles],
-  );
-
   const restartRuntimeConnections = useCallback(async () => {
     const runtime = runtimeRef.current;
     if (!runtime) {
@@ -4542,7 +4305,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     const relays = liveRelayUrlsRef.current.length
       ? liveRelayUrlsRef.current
       : activeProfile?.relays ?? [];
-    await startLiveRelayPump(runtime, relays);
+    await startLiveRelayPump(runtime, relays, { resetDrains: false });
     if (relayPumpRef.current) {
       const status = await relayPumpRef.current.refreshAll();
       if (runtimeRef.current === runtime) {
@@ -4558,6 +4321,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     pendingDispatchIndexRef.current = pendingDispatchIndex;
   }, [pendingDispatchIndex]);
+
+  useEffect(() => {
+    runtimeCompletionsRef.current = runtimeCompletions;
+  }, [runtimeCompletions]);
+
+  useEffect(() => {
+    runtimeFailuresRef.current = runtimeFailures;
+  }, [runtimeFailures]);
 
   // Keep peerDenialQueueRef in lock-step with state so resolvePeerDenial
   // can look up the resolving entry without re-creating its identity on
@@ -5034,8 +4805,28 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       runtime.handleCommand(cmd);
 
       if (expectedType === null) {
-        // refresh_all_peers fans out to pings internally; no single pending
-        // op represents the command's request_id.
+        // refresh_all_peers fans out to background Ping probes; tag the
+        // produced request_ids explicitly before any later drains arrive so
+        // user/dev pings are not inferred from correlation misses.
+        if (cmd.type === "refresh_all_peers") {
+          try {
+            runtime.tick(now);
+            const statusAfter = runtime.runtimeStatus();
+            markRefreshPingProbeIds(
+              statusAfter.pending_operations
+                .filter(
+                  (op) => op.op_type === "Ping" && !before.has(op.request_id),
+                )
+                .map((op) => op.request_id),
+            );
+            setRuntimeStatus(augmentStatus(statusAfter));
+            correlatePendingOperations(statusAfter.pending_operations);
+          } catch {
+            // Preserve the historical best-effort dispatch contract: callers
+            // still get requestId:null for refresh-all even if status capture
+            // is temporarily unavailable.
+          }
+        }
         return { requestId: null, debounced: false };
       }
 
@@ -5098,9 +4889,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (dispatchMetadata.peer_pubkey !== undefined) {
           indexEntry.peer_pubkey = dispatchMetadata.peer_pubkey;
         }
+        if (dispatchMetadata.probeSource !== undefined) {
+          indexEntry.probeSource = dispatchMetadata.probeSource;
+        }
         const capturedRequestId = requestId;
+        pendingDispatchIndexRef.current = {
+          ...pendingDispatchIndexRef.current,
+          [capturedRequestId]:
+            pendingDispatchIndexRef.current[capturedRequestId] ?? indexEntry,
+        };
         setPendingDispatchIndex((prev) =>
-          prev[capturedRequestId] ? prev : { ...prev, [capturedRequestId]: indexEntry },
+          prev[capturedRequestId]
+            ? prev
+            : { ...prev, [capturedRequestId]: indexEntry },
         );
       }
       // After capturing our own dispatch, run the async correlation pass
@@ -5154,7 +4955,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       return { requestId, debounced: false };
     },
-    [augmentStatus, correlatePendingOperations],
+    [augmentStatus, correlatePendingOperations, markRefreshPingProbeIds],
   );
 
   // m7-onboard-sponsor-flow — install the latest `handleRuntimeCommand`
@@ -5201,6 +5002,82 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     absorbDrains(drains);
     applyRuntimeStatus(runtime.runtimeStatus());
   }, [absorbDrains, applyRuntimeStatus, signerPaused]);
+
+  const publishTestNote: AppStateValue["publishTestNote"] = useCallback(
+    async ({ content }) => {
+      const profile = activeProfile;
+      const status = runtimeStatus;
+      if (!profile || !status) {
+        throw new Error("Cannot publish note: no unlocked profile is active.");
+      }
+      if (signerPausedRef.current || !status.readiness.sign_ready) {
+        throw new Error("Cannot publish note: signing is not ready.");
+      }
+      const groupPublicKey =
+        status.metadata.group_public_key || profile.groupPublicKey;
+      const eventForSigning = await buildTextNoteForSigning({
+        pubkey: groupPublicKey,
+        content,
+      });
+      const dispatch = await handleRuntimeCommand({
+        type: "sign",
+        message_hex_32: eventForSigning.id,
+      });
+      if (!dispatch.requestId) {
+        throw new Error(
+          dispatch.debounced
+            ? "Cannot publish note: sign request was debounced."
+            : "Cannot publish note: sign request did not register.",
+        );
+      }
+
+      const deadline = Date.now() + TEST_NOTE_SIGN_TIMEOUT_MS;
+      let signature: string | null = null;
+      while (Date.now() < deadline) {
+        const completion = runtimeCompletionsRef.current.find(
+          (entry) =>
+            "Sign" in entry && entry.Sign.request_id === dispatch.requestId,
+        );
+        if (completion && "Sign" in completion) {
+          signature = completion.Sign.signatures_hex64[0] ?? null;
+          break;
+        }
+        const failure = runtimeFailuresRef.current.find(
+          (entry) => entry.request_id === dispatch.requestId,
+        );
+        if (failure) {
+          throw new Error(
+            `Cannot publish note: signing failed (${failure.code}: ${failure.message}).`,
+          );
+        }
+        try {
+          if (relayPumpRef.current) {
+            applyRuntimeStatus(await relayPumpRef.current.pump());
+          } else {
+            refreshRuntime();
+          }
+        } catch {
+          refreshRuntime();
+        }
+        await sleep(TEST_NOTE_SIGN_POLL_MS);
+      }
+      if (!signature) {
+        throw new Error("Cannot publish note: signing timed out.");
+      }
+
+      const event = finalizeTextNoteEvent(eventForSigning, signature);
+      const publish = await relayPumpRef.current?.publishEvent(event);
+      return {
+        requestId: dispatch.requestId,
+        eventId: event.id,
+        nevent: encodeMinimalNevent(event.id),
+        event,
+        reached: publish?.reached ?? [],
+        failed: publish?.failed ?? [],
+      };
+    },
+    [activeProfile, applyRuntimeStatus, handleRuntimeCommand, refreshRuntime, runtimeStatus],
+  );
 
   useEffect(() => {
     // When the provider was hydrated from the demo bridge there is no real
@@ -5308,6 +5185,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       activeProfile,
       runtimeStatus,
       runtimeRelays,
+      peerLatencyByPubkey,
       signerPaused,
       createSession,
       importSession,
@@ -5340,6 +5218,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       updatePackageState,
       setPackageDeviceLabel,
       encodeDistributionPackage,
+      retryDistributionPackageAdoption,
       markPackageDistributed,
       finishDistribution,
       clearCreateSession,
@@ -5378,8 +5257,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       clearCredentials,
       exportRuntimePackages,
       createProfileBackup,
-      publishProfileBackup,
-      restoreProfileFromRelay,
+      publishTestNote,
       setSignerPaused,
       refreshRuntime,
       restartRuntimeConnections,
@@ -5389,6 +5267,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       activeProfile,
       runtimeStatus,
       runtimeRelays,
+      peerLatencyByPubkey,
       signerPaused,
       createSession,
       importSession,
@@ -5421,6 +5300,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       updatePackageState,
       setPackageDeviceLabel,
       encodeDistributionPackage,
+      retryDistributionPackageAdoption,
       markPackageDistributed,
       finishDistribution,
       clearCreateSession,
@@ -5459,8 +5339,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       clearCredentials,
       exportRuntimePackages,
       createProfileBackup,
-      publishProfileBackup,
-      restoreProfileFromRelay,
+      publishTestNote,
       setSignerPaused,
       refreshRuntime,
       restartRuntimeConnections,
@@ -5509,7 +5388,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           nonces: DerivedPublicNonceWire[];
         }>;
         // Multi-device e2e specs that exercise profile-bound mutators
-        // (e.g. publishProfileBackup, updateRelays) need an
+        // (e.g. updateRelays) need an
         // `activeProfile` record alongside the live runtime. Supplying
         // `persistProfile: { password }` drives the normal
         // `savePayloadAsProfile` path so IndexedDB contains an
@@ -5533,12 +5412,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // no AppState side-effects; DEV-only like every other
       // `__iglooTest*` hook.
       __iglooTestDecodeBfonboardPackage?: typeof decodeBfonboardPackage;
-      // m6-backup-restore — expose the WASM bfshare encoder so the
-      // restore-from-relay multi-device e2e can convert a share secret
-      // + relays + password into the `bfshare1…` package string that
-      // the restore screen consumes. Encodes via
-      // `encode_bfshare_package` on the bridge; no AppState side-
-      // effects. Test-only, DEV-gated like the other hooks.
+      // Expose the WASM bfshare encoder so multi-device e2e specs can
+      // convert a share secret + relays + password into a `bfshare1…`
+      // package string without routing through an unrelated UI flow.
+      // Encodes via `encode_bfshare_package` on the bridge; no AppState
+      // side-effects. Test-only, DEV-gated like the other hooks.
       __iglooTestEncodeBfshare?: (input: {
         shareSecret: string;
         relays: string[];
@@ -5771,8 +5649,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       };
       if (input.persistProfile) {
         // Drive the real save-and-activate path so `activeProfile` is
-        // populated alongside the runtime — required for mutators
-        // like `publishProfileBackup` and `updateRelays`.
+        // populated alongside the runtime — required for mutators like
+        // `updateRelays`.
         await savePayloadAsProfile(payload, input.persistProfile.password, {
           label: input.persistProfile.label,
         });
@@ -5795,9 +5673,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       return memberPubkeyXOnly(member);
     };
-    // m6-backup-restore — encode a bfshare1… package so the
-    // multi-device e2e can feed it into the restore screen without
-    // running the full Create flow on a second context.
+    // Encode a bfshare1… package for multi-device e2e flows that need
+    // an external source share without running the full Create flow in
+    // another context.
     globalWindow.__iglooTestEncodeBfshare = async (input) => {
       return encodeBfsharePackage(
         {
@@ -6090,6 +5968,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (simulatorRef.current) {
         simulatorRef.current.stop();
         simulatorRef.current.setOnDrains(undefined);
+        simulatorRef.current.setOnRefreshPingRequestIds(undefined);
       }
       const simulator = new LocalRuntimeSimulator(runtime);
       await simulator.attachVirtualPeers({
@@ -6100,6 +5979,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       simulator.start();
       simulator.refreshAll();
       simulator.setOnDrains(absorbDrains);
+      simulator.setOnRefreshPingRequestIds(markRefreshPingProbeIds);
       simulatorRef.current = simulator;
       applyRuntimeStatus(simulator.pump(4));
     };
@@ -6127,6 +6007,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     savePayloadAsProfile,
     stopRelayPump,
     absorbDrains,
+    markRefreshPingProbeIds,
   ]);
 
   return (
@@ -6292,6 +6173,23 @@ function completionRequestId(completion: CompletedOperation): string {
   return payload?.request_id ?? "";
 }
 
+function isUncorrelatedPingCompletion(
+  completion: CompletedOperation,
+  index: Record<string, PendingDispatchEntry>,
+): boolean {
+  const ping = (completion as { Ping?: { request_id: string } }).Ping;
+  if (!ping?.request_id) return false;
+  return index[ping.request_id]?.probeSource === "refresh";
+}
+
+function isUncorrelatedPingFailure(
+  failure: OperationFailure,
+  index: Record<string, PendingDispatchEntry>,
+): boolean {
+  if (failure.op_type !== "ping") return false;
+  return index[failure.request_id]?.probeSource === "refresh";
+}
+
 /**
  * Map a {@link CompletedOperation} discriminant to the typed badge used
  * by the Event Log panel.
@@ -6316,11 +6214,34 @@ function badgeForCompletion(
 }
 
 /**
- * Map a {@link RuntimeEvent.kind} to the typed event-log badge. Accepts
- * both the PascalCase and snake_case spellings that bifrost-rs may emit
- * (the type definition includes both) by lower-casing before matching.
- * Unknown kinds fall through to `INFO` so a forward-compatible runtime
- * never throws on a newly-introduced event.
+ * bifrost-rs lifecycle events are diagnostic by default. The dashboard
+ * Event Log should surface stateful/user-meaningful runtime edges, while
+ * suppressing high-volume plumbing rows:
+ *  - `inbound_accepted`: relay envelope accepted for processing
+ *  - `command_queued`: local command was enqueued after `handle_command`
+ *  - `status_changed`: emitted after `tick` when runtime status JSON changes
+ *
+ * All raw lifecycle events remain available in `lifecycleEvents` and DEV
+ * debug surfaces; this predicate only controls the visible log.
+ */
+function isVisibleRuntimeEventLogEvent(event: RuntimeEvent): boolean {
+  const kind = String(event.kind).toLowerCase();
+  return !(
+    kind === "inboundaccepted" ||
+    kind === "inbound_accepted" ||
+    kind === "commandqueued" ||
+    kind === "command_queued" ||
+    kind === "statuschanged" ||
+    kind === "status_changed"
+  );
+}
+
+/**
+ * Map a {@link RuntimeEvent.kind} to the typed event-log badge for visible
+ * runtime rows. Accepts both the PascalCase and snake_case spellings that
+ * bifrost-rs may emit (the type definition includes both) by lower-casing
+ * before matching. Unknown kinds fall through to `INFO` so a
+ * forward-compatible runtime never throws on a newly-introduced event.
  */
 function badgeForRuntimeEvent(event: RuntimeEvent): RuntimeEventLogBadge {
   switch (String(event.kind).toLowerCase()) {
@@ -6335,9 +6256,6 @@ function badgeForRuntimeEvent(event: RuntimeEvent): RuntimeEventLogBadge {
     case "commandqueued":
     case "command_queued":
       return "INFO";
-    case "inboundaccepted":
-    case "inbound_accepted":
-      return "ECHO";
     case "configupdated":
     case "config_updated":
       return "INFO";
@@ -6417,7 +6335,7 @@ interface RuntimeCommandDescriptor {
   pendingOpType: "Sign" | "Ecdh" | "Ping" | "Onboard" | null;
   dispatchMetadata: Pick<
     PendingDispatchEntry,
-    "type" | "message_hex_32" | "peer_pubkey"
+    "type" | "message_hex_32" | "peer_pubkey" | "probeSource"
   > | null;
   lifecycleOpType: "sign" | "ecdh" | "ping" | null;
   lifecyclePreview: string | null;
@@ -6455,12 +6373,23 @@ function runtimeCommandDescriptor(
         lifecyclePreview: cmd.pubkey32_hex.slice(0, 10).toLowerCase(),
       };
     case "ping":
+      return {
+        pendingOpType: "Ping",
+        dispatchMetadata: {
+          type: "ping",
+          peer_pubkey: cmd.peer_pubkey32_hex,
+          probeSource: "user",
+        },
+        lifecycleOpType: "ping",
+        lifecyclePreview: cmd.peer_pubkey32_hex.slice(0, 10).toLowerCase(),
+      };
     case "refresh_peer":
       return {
         pendingOpType: "Ping",
         dispatchMetadata: {
           type: "ping",
           peer_pubkey: cmd.peer_pubkey32_hex,
+          probeSource: "refresh",
         },
         lifecycleOpType: "ping",
         lifecyclePreview: cmd.peer_pubkey32_hex.slice(0, 10).toLowerCase(),
@@ -6486,6 +6415,12 @@ function runtimeCommandDescriptor(
 }
 
 const HANDLE_COMMAND_DEBOUNCE_MS = 300;
+const TEST_NOTE_SIGN_TIMEOUT_MS = 30_000;
+const TEST_NOTE_SIGN_POLL_MS = 250;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
 
 /**
  * Retention window for {@link PendingDispatchEntry} after settlement

@@ -129,15 +129,20 @@ export function CreateKeysetScreen() {
   }
 
   return (
-    <AppShell mainVariant="flow">
-      <form className="screen-column" onSubmit={submit}>
-        <Stepper current={1} variant="create" />
+    <AppShell
+      mainVariant="flow"
+      brandSubtitle="Threshold Signing for Nostr"
+      headerMeta="Create"
+    >
+      <form className="screen-column create-keyset-column" onSubmit={submit}>
         <BackLink
           onClick={() => {
             resetNsecField();
             navigate("/");
           }}
+          label="Back to Welcome"
         />
+        <Stepper current={1} variant="create" />
         <PageHeading
           title="Create New Keyset"
           copy="Define the group profile for a new keyset. After creation, you'll create the local profile and distribute shares to the remaining devices."

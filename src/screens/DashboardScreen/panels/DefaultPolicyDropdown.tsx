@@ -553,7 +553,8 @@ export const DefaultPolicyDropdown = forwardRef<
                 onMouseEnter={() => setActiveIndex(index)}
                 tabIndex={-1}
               >
-                {option}
+                <span className="dropdown-option-check" aria-hidden="true" />
+                <span className="dropdown-option-label">{option}</span>
               </button>
             );
           })}

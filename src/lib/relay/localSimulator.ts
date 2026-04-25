@@ -20,11 +20,19 @@ export class LocalRuntimeSimulator {
   private peers: RuntimeClient[] = [];
   private running = false;
   private onDrains?: (drains: RuntimeDrainBatch) => void;
+  private onRefreshPingRequestIds?: (requestIds: string[]) => void;
+  private refreshAllBaselineIds: Set<string> | null = null;
 
   constructor(private readonly local: RuntimeClient) {}
 
   setOnDrains(onDrains: ((drains: RuntimeDrainBatch) => void) | undefined): void {
     this.onDrains = onDrains;
+  }
+
+  setOnRefreshPingRequestIds(
+    onRefreshPingRequestIds: ((requestIds: string[]) => void) | undefined,
+  ): void {
+    this.onRefreshPingRequestIds = onRefreshPingRequestIds;
   }
 
   async attachVirtualPeers(input: LocalSimulatorInput): Promise<void> {
@@ -45,6 +53,9 @@ export class LocalRuntimeSimulator {
   }
 
   refreshAll(): void {
+    this.refreshAllBaselineIds = new Set(
+      this.local.runtimeStatus().pending_operations.map((op) => op.request_id),
+    );
     this.local.handleCommand({ type: "refresh_all_peers" });
   }
 
@@ -60,6 +71,21 @@ export class LocalRuntimeSimulator {
     for (let i = 0; i < iterations; i += 1) {
       const now = Date.now() + i;
       this.local.tick(now);
+      if (this.refreshAllBaselineIds) {
+        const baseline = this.refreshAllBaselineIds;
+        const pingOps = this.local
+          .runtimeStatus()
+          .pending_operations.filter(
+            (op) => op.op_type === "Ping" && !baseline.has(op.request_id),
+          );
+        const requestIds = pingOps.map((op) => op.request_id);
+        if (requestIds.length > 0) {
+          this.onRefreshPingRequestIds?.(requestIds);
+          this.refreshAllBaselineIds = null;
+        } else if (this.local.runtimeStatus().pending_operations.length === 0) {
+          this.refreshAllBaselineIds = null;
+        }
+      }
       const localOutbound = this.local.drainOutboundEvents();
       for (const event of localOutbound) {
         for (const peer of this.peers) {
@@ -118,4 +144,3 @@ export class LocalRuntimeSimulator {
     return this.local.runtimeStatus();
   }
 }
-

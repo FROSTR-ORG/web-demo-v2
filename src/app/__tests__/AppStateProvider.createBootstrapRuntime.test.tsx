@@ -256,9 +256,8 @@ describe("AppStateProvider.createProfile — bootstrap runtime source (VAL-FOLLO
       ).rejects.toThrow("Relay URL must start with wss://");
       expect(readRuntimeSource()).toBeNull();
 
-      // DEV opt-in: local ws:// whitelisted for this mutator just like
-      // restoreProfileFromRelay. The same flag gates both paths per the
-      // feature description.
+      // DEV opt-in: local ws:// is whitelisted for the bootstrap create
+      // mutator so live local-relay tests can use ws://127.0.0.1.
       (
         window as typeof window & {
           __iglooTestAllowInsecureRelayForRestore?: boolean;
