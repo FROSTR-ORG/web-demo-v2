@@ -138,7 +138,7 @@ describe("DistributionCompleteScreen — Paper LN7-0 parity (VAL-FOLLOWUP-012)",
     renderScreen();
     expect(
       screen.getByText(
-        "Track which remote bfonboard adoption packages have been distributed. Finish when each target device is ready to adopt its fresh share through the standard onboarding flow.",
+        "Track remote bfonboard packages as they are handed off. Finish once each target device is ready to adopt its fresh share.",
       ),
     ).toBeInTheDocument();
   });
@@ -181,11 +181,11 @@ describe("DistributionCompleteScreen — Paper LN7-0 parity (VAL-FOLLOWUP-012)",
   it("renders the success callout EXACT when allPackagesDistributed", () => {
     renderScreen();
     const callout = screen
-      .getByText(/All packages distributed/)
+      .getByText(/All remote packages complete/)
       .closest(".success-callout");
     expect(callout).not.toBeNull();
     expect(callout?.textContent).toContain(
-      "All packages distributed — 2 of 2 remote bfonboard packages have been marked distributed. Continue when device adoption handoff can proceed.",
+      "2 of 2 remote bfonboard packages are complete. Handoff is accounted for.",
     );
   });
 

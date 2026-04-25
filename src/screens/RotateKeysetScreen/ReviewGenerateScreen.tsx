@@ -67,7 +67,7 @@ export function ReviewGenerateScreen() {
       }
       mainVariant="flow"
     >
-      <div className="screen-column">
+      <div className="screen-column rotate-review-column">
         <Stepper current={1} variant="rotate-keyset" />
         <BackLink
           onClick={() =>

@@ -110,7 +110,10 @@ import {
   setupErrorFromPackage,
 } from "./setupFlowErrors";
 import {
+  DEMO_PASSWORD_MIN_LENGTH,
+  PACKAGE_PASSWORD_TOO_SHORT_ERROR,
   PROFILE_NAME_MAX_LENGTH,
+  PROFILE_PASSWORD_TOO_SHORT_ERROR,
   RELAY_EMPTY_ERROR,
   RUNTIME_EVENT_LOG_MAX,
   SetupFlowError,
@@ -1812,8 +1815,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         label?: string;
       } = {},
     ) => {
-      if (password.length < 8) {
-        throw new Error("Profile password must be at least 8 characters.");
+      if (password.length < DEMO_PASSWORD_MIN_LENGTH) {
+        throw new Error(PROFILE_PASSWORD_TOO_SHORT_ERROR);
       }
       const { record, normalizedPayload, localShareIdx } =
         await buildStoredProfileRecord(payload, password, {
@@ -1890,8 +1893,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (!deviceName) {
         throw new Error("Profile name is required.");
       }
-      if (draft.password.length < 8) {
-        throw new Error("Profile password must be at least 8 characters.");
+      if (draft.password.length < DEMO_PASSWORD_MIN_LENGTH) {
+        throw new Error(PROFILE_PASSWORD_TOO_SHORT_ERROR);
       }
       if (draft.password !== draft.confirmPassword) {
         throw new Error("Profile passwords do not match.");
@@ -2191,21 +2194,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         peer_pubkey32_hex: memberPubkeyXOnly(targetMember),
       };
 
-      setCreateSession((session) => {
-        if (!session) return session;
-        return {
-          ...session,
-          onboardingPackages: session.onboardingPackages.map((entry) =>
-            entry.idx === idx
-              ? {
-                  ...entry,
-                  adoptionError: undefined,
-                }
-              : entry,
-          ),
-        };
-      });
-
       try {
         const result = await dispatchRuntimeCommandRef.current?.(onboardCommand);
         if (result?.debounced) {
@@ -2229,10 +2217,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   // for the full contract.
   const encodeDistributionPackage = useCallback(
     async (idx: number, password: string) => {
-      if (typeof password !== "string" || password.length < 8) {
-        throw new Error(
-          "Package password must be at least 8 characters.",
-        );
+      if (
+        typeof password !== "string" ||
+        password.length < DEMO_PASSWORD_MIN_LENGTH
+      ) {
+        throw new Error(PACKAGE_PASSWORD_TOO_SHORT_ERROR);
       }
       const context = createSessionShareContextRef.current;
       if (!context) {
@@ -2271,15 +2260,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // and flip packageCreated on the session view. Also stash the
       // onboard command's requestId so absorbDrains can correlate later
       // completions / failures. A missing requestId means the dispatch never
-      // produced a trackable start, so surface that inline instead of leaving
-      // the row looking pending forever. Debounced dispatches preserve the
-      // existing correlation/error fields because the original request remains
-      // in flight.
-      // Outside the debounced path, `pendingDispatchRequestId` is set from
-      // this dispatch result (no fallback to `entry.pendingDispatchRequestId`)
-      // so a retry click whose dispatch throws produces `undefined`, not a
-      // stale id. `adoptionError` mirrors the same: cleared on successful
-      // dispatch, populated with inline copy on throw or missing requestId.
+      // produced a trackable start, so surface that inline without clearing any
+      // existing correlation id. Debounced dispatches preserve the existing
+      // correlation/error fields because the original request remains in flight.
       const preview = packageText.slice(0, 24);
       const dispatchStartError = dispatchDebounced
         ? undefined
@@ -2300,7 +2283,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                     ? entry.pendingDispatchRequestId
                     : dispatchResult.requestId
                       ? dispatchResult.requestId
-                      : undefined,
+                      : entry.pendingDispatchRequestId,
                   adoptionError: dispatchDebounced
                     ? entry.adoptionError
                     : dispatchResult.requestId
@@ -2326,7 +2309,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               entry.idx === idx
                 ? {
                     ...entry,
-                    pendingDispatchRequestId: undefined,
                     adoptionError:
                       "Retry could not start — mark distributed manually if handoff is done.",
                   }
@@ -2358,7 +2340,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             entry.idx === idx
               ? {
                   ...entry,
-                  pendingDispatchRequestId: dispatchResult.requestId,
+                  pendingDispatchRequestId: dispatchResult.requestId
+                    ? dispatchResult.requestId
+                    : entry.pendingDispatchRequestId,
                   adoptionError: retryError,
                 }
               : entry,
@@ -2651,8 +2635,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           "Complete onboarding before saving this profile.",
         );
       }
-      if (draft.password.length < 8) {
-        throw new Error("Profile password must be at least 8 characters.");
+      if (draft.password.length < DEMO_PASSWORD_MIN_LENGTH) {
+        throw new Error(PROFILE_PASSWORD_TOO_SHORT_ERROR);
       }
       if (draft.password !== draft.confirmPassword) {
         throw new Error("Profile passwords do not match.");
@@ -2876,7 +2860,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         throw new Error(UNADOPTED_POOL_EXHAUSTED_ERROR);
       }
       const profilePassword = input.profilePassword ?? "";
-      if (profilePassword.length < 8) {
+      if (profilePassword.length < DEMO_PASSWORD_MIN_LENGTH) {
         throw new Error(
           (await import("./AppStateTypes"))
             .ONBOARD_SPONSOR_PROFILE_PASSWORD_ERROR,
@@ -3276,8 +3260,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (!deviceName) {
         throw new Error("Profile name is required.");
       }
-      if (draft.password.length < 8) {
-        throw new Error("Profile password must be at least 8 characters.");
+      if (draft.password.length < DEMO_PASSWORD_MIN_LENGTH) {
+        throw new Error(PROFILE_PASSWORD_TOO_SHORT_ERROR);
       }
       if (draft.password !== draft.confirmPassword) {
         throw new Error("Profile passwords do not match.");
@@ -3350,8 +3334,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const encodeRotateDistributionPackage = useCallback(
     async (idx: number, password: string) => {
-      if (typeof password !== "string" || password.length < 8) {
-        throw new Error("Package password must be at least 8 characters.");
+      if (
+        typeof password !== "string" ||
+        password.length < DEMO_PASSWORD_MIN_LENGTH
+      ) {
+        throw new Error(PACKAGE_PASSWORD_TOO_SHORT_ERROR);
       }
       const context = rotateSessionShareContextRef.current;
       if (!context) {
@@ -3803,7 +3790,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
    * `decodeProfilePackage` + `buildStoredProfileRecord` is already
    * wired; this mutator additionally enforces:
    *
-   *   - Minimum length of 8 characters on the new password
+   *   - Minimum web-demo password length on the new password
    *     (VAL-SETTINGS-028) — the UI enforces this live for Save-button
    *     gating but we repeat the guard here so direct provider callers
    *     (tests, programmatic callers) cannot bypass it.
@@ -3827,8 +3814,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (!activeProfile) {
         throw new Error("No active profile.");
       }
-      if (newPassword.length < 8) {
-        throw new Error("New password must be at least 8 characters.");
+      if (newPassword.length < DEMO_PASSWORD_MIN_LENGTH) {
+        throw new Error(
+          `New password must be at least ${DEMO_PASSWORD_MIN_LENGTH} characters.`,
+        );
       }
       if (newPassword === oldPassword) {
         throw new Error("New password must differ from current.");
@@ -5066,11 +5055,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
 
       const event = finalizeTextNoteEvent(eventForSigning, signature);
-      const publish = await relayPumpRef.current?.publishEvent(event);
+      const relayPump = relayPumpRef.current;
+      if (!relayPump || typeof relayPump.publishEvent !== "function") {
+        throw new Error(
+          "Cannot publish note: relay transport is unavailable after signing.",
+        );
+      }
+      const publish = await relayPump.publishEvent(event);
       return {
         requestId: dispatch.requestId,
         eventId: event.id,
-        nevent: encodeMinimalNevent(event.id),
+        nevent: encodeMinimalNevent(event.id, publish.reached),
         event,
         reached: publish?.reached ?? [],
         failed: publish?.failed ?? [],

@@ -53,6 +53,9 @@ const mockExpireRecoveredNsec = vi.fn(() => {
   mockRecoverSession = null;
 });
 let mockRecoverSession: RecoverSession | null = null;
+// The mocked useAppState returns the current mockRecoverSession on each render;
+// recover actions mutate it, and DashboardRecoverPanel observes the change on
+// the component-triggered rerender that follows each user action.
 
 // Build fake profile/peer objects via computed-property concatenation so the
 // pre-commit secret-detection scanner doesn't rewrite the literal values.

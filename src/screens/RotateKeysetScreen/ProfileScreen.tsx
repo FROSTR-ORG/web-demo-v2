@@ -1,18 +1,9 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Check, X } from "lucide-react";
 import { useAppState } from "../../app/AppState";
-import { PeerPermissionTagGroup } from "../../components/PeerPermissionTags";
-import { AppShell, PageHeading } from "../../components/shell";
-import {
-  BackLink,
-  Button,
-  PasswordField,
-  SectionHeader,
-  Stepper,
-  TextField,
-} from "../../components/ui";
+import { AppShell } from "../../components/shell";
 import { useDemoUi } from "../../demo/demoUi";
+import { ProfileSetupForm } from "../ProfileSetupForm";
 import { MOCK_ROTATE_MEMBERS, MOCK_SOURCE_SHARE_1 } from "./mocks";
 import { navigateWithRotateState, rotatePhaseAtLeast } from "./utils";
 
@@ -111,164 +102,41 @@ export function RotateCreateProfileScreen() {
       }
       mainVariant="flow"
     >
-      <div className="screen-column">
-        <Stepper current={2} variant="rotate-keyset" />
-        <BackLink
-          onClick={() =>
-            navigateWithRotateState(
-              navigate,
-              "/rotate-keyset/progress",
-              routeState,
-            )
+      <ProfileSetupForm
+        stepperVariant="rotate-keyset"
+        profileName={deviceName}
+        password={password}
+        confirmPassword={confirmPassword}
+        relays={relays}
+        relayInput={relayInput}
+        localShareIdx={rotatedLocalShare?.idx ?? 0}
+        keysetName={rotatedGroup?.group_name ?? MOCK_SOURCE_SHARE_1.label}
+        members={members}
+        busy={busy}
+        error={error}
+        submitType="button"
+        continueDisabled={Boolean(rotateKeysetSession) && !confirmMatches}
+        onContinue={() => void handleContinue()}
+        onBack={() =>
+          navigateWithRotateState(
+            navigate,
+            "/rotate-keyset/progress",
+            routeState,
+          )
+        }
+        onProfileNameChange={setDeviceName}
+        onPasswordChange={setPassword}
+        onConfirmPasswordChange={setConfirmPassword}
+        onRelayInputChange={setRelayInput}
+        onRelayAdd={() => {
+          const relay = relayInput.trim();
+          if (relay && !relays.includes(relay)) {
+            setRelays((cur) => [...cur, relay]);
+            setRelayInput("wss://");
           }
-        />
-        <PageHeading
-          title="Create Profile"
-          copy="Set the local profile name, password, relays, and peer permissions for the assigned share before distributing the remaining device packages."
-        />
-
-        <SectionHeader
-          title="Profile Name"
-          copy="A name for this profile to identify it in the peer list."
-        />
-        <TextField
-          label="Profile Name"
-          value={deviceName}
-          onChange={(e) => setDeviceName(e.target.value)}
-        />
-
-        <div className="assigned-share-card">
-          <div className="assigned-share-head">
-            <span className="check-disc">
-              <Check size={15} />
-            </span>
-            <div>
-              <div className="value">Assigned Local Share</div>
-              <div className="help">
-                The local share for this device is already assigned and ready
-                for profile creation.
-              </div>
-            </div>
-          </div>
-          <div className="kv-row">
-            <div>
-              <div className="kicker">Local Share</div>
-              <div className="value">
-                Share #{rotatedLocalShare?.idx ?? 0}, Encrypted
-              </div>
-            </div>
-            <div>
-              <div className="kicker">Keyset</div>
-              <div className="value">
-                {rotatedGroup?.group_name ?? MOCK_SOURCE_SHARE_1.label}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="password-group">
-          <SectionHeader
-            title="Profile Password"
-            copy="This password encrypts your profile on this device. You'll need it each time you unlock it."
-            infoIcon
-          />
-          <div className="profile-password-row">
-            <PasswordField
-              label="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <PasswordField
-              label="Confirm Password"
-              value={confirmPassword}
-              checked={confirmMatches}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <SectionHeader title="Relays" />
-        <div className="relay-list">
-          {relays.map((relay, index) => (
-            <div className="relay-row" key={relay}>
-              <div className="relay-details">
-                <span className="value">{relay}</span>
-                {index === 0 ? (
-                  <span className="relay-status">Connected - 24ms latency</span>
-                ) : null}
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() =>
-                  setRelays((cur) => cur.filter((r) => r !== relay))
-                }
-                aria-label={`Remove ${relay}`}
-              >
-                <X size={14} />
-              </Button>
-            </div>
-          ))}
-          <div className="relay-row relay-add-row">
-            <span className="input-shell">
-              <input
-                className="input"
-                value={relayInput}
-                onChange={(e) => setRelayInput(e.target.value)}
-              />
-            </span>
-            <Button
-              type="button"
-              className="relay-add-button"
-              onClick={() => {
-                const r = relayInput.trim();
-                if (r && !relays.includes(r)) {
-                  setRelays((cur) => [...cur, r]);
-                  setRelayInput("wss://");
-                }
-              }}
-            >
-              Add
-            </Button>
-          </div>
-        </div>
-
-        <SectionHeader
-          title="Peer Permissions"
-          copy="Set default permissions for each peer. You can change these later in Settings."
-        />
-        <div className="permission-list">
-          {members.map((member) => (
-            <div className="permission-row" key={member.idx}>
-              <div className="permission-main">
-                <span className="value">
-                  Peer #{member.idx}
-                  {member.idx === rotatedLocalShare?.idx ? " (Local)" : ""}
-                </span>
-                {member.idx !== rotatedLocalShare?.idx ? (
-                  <span className="help">
-                    {member.pubkey.slice(0, 8)}...{member.pubkey.slice(-4)}
-                  </span>
-                ) : null}
-              </div>
-              <div className="inline-actions">
-                <PeerPermissionTagGroup />
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {error ? <div className="error">{error}</div> : null}
-        <Button
-          type="button"
-          size="full"
-          disabled={busy || (Boolean(rotateKeysetSession) && !confirmMatches)}
-          onClick={() => void handleContinue()}
-        >
-          {busy ? "Creating Profile..." : "Continue to Distribute Shares"}
-        </Button>
-      </div>
+        }}
+        onRelayRemove={(relay) => setRelays((cur) => cur.filter((entry) => entry !== relay))}
+      />
     </AppShell>
   );
 }

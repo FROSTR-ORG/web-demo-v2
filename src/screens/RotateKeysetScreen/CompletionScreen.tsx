@@ -91,7 +91,7 @@ export function RotateDistributionCompleteScreen() {
         />
         <PageHeading
           title="Distribution Completion"
-          copy="Track which remote bfonboard adoption packages have been distributed. Finish when each target device is ready to adopt its fresh share through the standard onboarding flow."
+          copy="Track remote bfonboard packages as they are handed off. Finish once each target device is ready to adopt its fresh share."
         />
 
         <div className="completion-card">
@@ -105,6 +105,7 @@ export function RotateDistributionCompleteScreen() {
                   </span>
                   <span>
                     <span className="value">{row.title}</span>
+                    <span className="completion-subvalue">New Device</span>
                   </span>
                 </div>
                 <div className="inline-actions">
@@ -122,12 +123,12 @@ export function RotateDistributionCompleteScreen() {
         <div className="success-callout">
           <strong>
             {complete
-              ? "All packages distributed"
+              ? "All remote packages complete"
               : "Distribution can continue"}
           </strong>
           <span>
-            {accounted} of {total} remote bfonboard packages have been accounted
-            for. Continue when device adoption handoff can proceed.
+            {accounted} of {total} remote bfonboard packages are complete.
+            Handoff is accounted for.
           </span>
         </div>
 

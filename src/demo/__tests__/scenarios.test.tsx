@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
@@ -18,7 +18,7 @@ describe("demo scenarios", () => {
   it("covers every Paper screen state", () => {
     const canonical = demoScenarios.filter((scenario) => scenario.canonical !== false);
     const variants = demoScenarios.filter((scenario) => scenario.canonical === false);
-    expect(canonical).toHaveLength(51);
+    expect(canonical).toHaveLength(52);
     expect(variants.map((scenario) => scenario.id).sort()).toEqual([
       "dashboard-peer-policy-chips",
       "import-error-corrupted",
@@ -31,9 +31,29 @@ describe("demo scenarios", () => {
   });
 
   it("has synced reference screenshots for every scenario", () => {
+    const publicReferenceDir = join(process.cwd(), "public", "paper-reference");
+    const expectedPublicPngs = new Set(
+      demoScenarios
+        .filter((scenario) => scenario.canonical !== false)
+        .map((scenario) => `${scenario.id}.png`),
+    );
+    const publicPngs = readdirSync(publicReferenceDir)
+      .filter((entry) => entry.endsWith(".png"))
+      .sort();
+
     for (const scenario of demoScenarios) {
       const referencePath = join(process.cwd(), "public", scenario.paperReference);
       expect(existsSync(referencePath), `${scenario.id} is missing ${scenario.paperReference}`).toBe(true);
+    }
+
+    expect(publicPngs).toEqual([...expectedPublicPngs].sort());
+  });
+
+  it("resolves every scenario Paper source screenshot", () => {
+    const paperRoot = resolve(process.cwd(), process.env.IGLOO_PAPER_PATH ?? "../igloo-paper");
+    for (const scenario of demoScenarios) {
+      const sourcePath = join(paperRoot, scenario.paperPath, "screenshot.png");
+      expect(existsSync(sourcePath), `${scenario.id} Paper source missing at ${sourcePath}`).toBe(true);
     }
   });
 

@@ -60,11 +60,18 @@ export function cargoAvailable(): boolean {
 }
 
 function resolveDevtoolsBinary(): string {
+  if (BIFROST_RS_CANDIDATES.length === 0) {
+    throw new Error("No bifrost-rs candidates configured for bifrost-devtools.");
+  }
   for (const dir of BIFROST_RS_CANDIDATES) {
     const candidate = `${dir}/target/release/bifrost-devtools`;
     if (existsSync(candidate)) return candidate;
   }
-  return `${BIFROST_RS_CANDIDATES[0]}/target/release/bifrost-devtools`;
+  throw new Error(
+    `bifrost-devtools binary missing. Checked: ${BIFROST_RS_CANDIDATES.map(
+      (dir) => `${dir}/target/release/bifrost-devtools`,
+    ).join(", ")}.`,
+  );
 }
 
 async function portIsBound(host: string, port: number): Promise<boolean> {
@@ -126,10 +133,10 @@ export async function startBifrostDevtoolsRelay(): Promise<{
   stop: () => Promise<void>;
 }> {
   const workerIndex = process.env.TEST_WORKER_INDEX;
-  if (workerIndex && workerIndex !== "0" && workerIndex !== "1") {
+  if (workerIndex && workerIndex !== "0") {
     throw new Error(
       `Real-peer relay uses fixed ${RELAY_URL} and requires serial test execution. ` +
-        "Run with --workers=1 or avoid startBifrostDevtoolsRelay() from parallel workers.",
+        "Run with --workers=1 / serial execution or avoid startBifrostDevtoolsRelay() from parallel workers.",
     );
   }
 

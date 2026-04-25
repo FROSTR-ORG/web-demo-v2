@@ -7,6 +7,7 @@ import { DistributeSharesScreen } from "../screens/DistributeSharesScreen";
 import { DistributionCompleteScreen } from "../screens/DistributionCompleteScreen";
 import { GenerationProgressScreen } from "../screens/GenerationProgressScreen";
 import { LoadBackupScreen, DecryptBackupScreen, ReviewSaveScreen, ImportErrorScreen } from "../screens/ImportScreens";
+import { ProfileLoadTransitionScreen } from "../screens/ProfileLoadTransitionScreen";
 import { EnterPackageScreen, HandshakeScreen, OnboardingFailedScreen, OnboardingCompleteScreen } from "../screens/OnboardScreens";
 import { OnboardSponsorConfigScreen, OnboardSponsorHandoffScreen } from "../screens/OnboardSponsorScreens";
 import { CollectSharesScreen, RecoverSuccessScreen } from "../screens/RecoverScreens";
@@ -70,6 +71,8 @@ export function CoreRoutes({ location, extraRoutes, relative = false }: { locati
       <Route path={pathFor("/replace-share/replaced", relative)} element={<ShareReplacedScreen />} />
       <Route path={pathFor("/recover/:profileId", relative)} element={<CollectSharesScreen />} />
       <Route path={pathFor("/recover/:profileId/success", relative)} element={<RecoverSuccessScreen />} />
+      <Route path={pathFor("/dashboard/:profileId/loading", relative)} element={<ProfileLoadTransitionScreen />} />
+      <Route path={pathFor("/dashboard/:profileId/profile-load-failed", relative)} element={<ProfileLoadTransitionScreen variant="error" />} />
       <Route path={pathFor("/dashboard/:profileId/test", relative)} element={<DashboardScreen mode="test" />} />
       <Route path={pathFor("/dashboard/:profileId", relative)} element={<DashboardScreen />} />
       <Route path="*" element={<Navigate to={relative ? "." : "/"} replace />} />

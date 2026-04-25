@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppState } from "../../../app/AppState";
 import {
+  DEMO_PASSWORD_MIN_LENGTH,
   PROFILE_NAME_MAX_LENGTH,
   RELAY_EMPTY_ERROR,
 } from "../../../app/AppStateTypes";
@@ -35,7 +36,7 @@ export { RELAY_DUPLICATE_ERROR, RELAY_INVALID_URL_ERROR };
  * length enforced in `AppStateProvider.changeProfilePassword` so the
  * UI can reject sub-minimum inputs before dispatch (VAL-SETTINGS-028).
  */
-export const CHANGE_PASSWORD_MIN_LENGTH = 8;
+export const CHANGE_PASSWORD_MIN_LENGTH = DEMO_PASSWORD_MIN_LENGTH;
 
 /**
  * Inline-validation copy surfaced by the Change Password flow. Exported

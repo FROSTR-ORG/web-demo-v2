@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { WelcomeScreen } from "../WelcomeScreen";
@@ -193,7 +193,36 @@ describe("WelcomeScreen", () => {
     expect(screen.getByLabelText("Profile Password")).toBeInTheDocument();
   });
 
-  it("shows error text on wrong password without closing modal", async () => {
+  it("shows profile loading while unlock is pending", async () => {
+    mocks.profiles = [makeProfile("p1", "My Signing Key")];
+    let resolveUnlock!: () => void;
+    mocks.unlockProfile.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveUnlock = resolve;
+      }),
+    );
+    render(
+      <MemoryRouter>
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByText("Unlock"));
+    fireEvent.change(screen.getByLabelText("Profile Password"), {
+      target: { value: "profile-password" },
+    });
+    fireEvent.submit(screen.getByRole("dialog").querySelector("form")!);
+
+    expect(await screen.findByText("Loading profile...")).toBeInTheDocument();
+    expect(screen.getByText("Preparing your dashboard.")).toBeInTheDocument();
+    expect(screen.queryByText("Unlock Profile")).not.toBeInTheDocument();
+
+    resolveUnlock();
+    await waitFor(() => {
+      expect(mocks.navigate).toHaveBeenCalledWith("/dashboard/p1");
+    });
+  });
+
+  it("shows profile-load error on wrong password and Try Again reopens the modal", async () => {
     mocks.profiles = [makeProfile("p1", "My Signing Key")];
     mocks.unlockProfile.mockRejectedValueOnce(new Error("Incorrect password. Please try again."));
     render(
@@ -208,11 +237,35 @@ describe("WelcomeScreen", () => {
     fireEvent.change(passwordInput, { target: { value: "wrongpass" } });
     // Submit the form
     fireEvent.submit(screen.getByRole("dialog").querySelector("form")!);
-    // Wait for error to appear
-    const errorEl = await screen.findByText("Incorrect password. Please try again.");
-    expect(errorEl).toBeInTheDocument();
-    // Modal should still be open
+    expect(await screen.findByText("Couldn’t load profile")).toBeInTheDocument();
+    expect(screen.getByText("Try again, or return to your profiles.")).toBeInTheDocument();
+    expect(screen.queryByText("Unlock Profile")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try Again" }));
     expect(screen.getByText("Unlock Profile")).toBeInTheDocument();
+    expect(screen.getByLabelText("Profile Password")).toBeInTheDocument();
+  });
+
+  it("Back to Profiles exits the profile-load error state", async () => {
+    mocks.profiles = [makeProfile("p1", "My Signing Key")];
+    mocks.unlockProfile.mockRejectedValueOnce(new Error("Incorrect password. Please try again."));
+    render(
+      <MemoryRouter>
+        <WelcomeScreen />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByText("Unlock"));
+    fireEvent.change(screen.getByLabelText("Profile Password"), {
+      target: { value: "wrongpass" },
+    });
+    fireEvent.submit(screen.getByRole("dialog").querySelector("form")!);
+
+    expect(await screen.findByText("Couldn’t load profile")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back to Profiles" }));
+
+    expect(screen.getByText("Welcome back.")).toBeInTheDocument();
+    expect(screen.getByText("My Signing Key")).toBeInTheDocument();
+    expect(screen.queryByText("Couldn’t load profile")).not.toBeInTheDocument();
   });
 
   it("Rotate button navigates to /rotate-keyset with profile state", () => {

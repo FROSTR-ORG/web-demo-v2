@@ -1,5 +1,5 @@
 /**
- * Paper visual parity regression test for the 5 main dashboard states.
+ * Paper visual parity regression test for the 6 main dashboard states.
  *
  * Feature: m7-paper-parity-visuals (+ fix-m7-scrutiny-r1-paper-parity-baseline-source)
  *
@@ -82,10 +82,16 @@ const STATES: readonly DashboardStateCase[] = [
     paperFixture: "dashboard-running.png"
   },
   {
-    id: "connecting",
-    scenarioId: "dashboard-connecting",
-    expectedCopy: /Signer Connecting/i,
-    paperFixture: "dashboard-connecting.png"
+    id: "loading-profile",
+    scenarioId: "dashboard-loading-profile",
+    expectedCopy: /Loading profile/i,
+    paperFixture: "dashboard-loading-profile.png"
+  },
+  {
+    id: "profile-load-failed",
+    scenarioId: "dashboard-profile-load-failed",
+    expectedCopy: /Couldn’t load profile/i,
+    paperFixture: "dashboard-profile-load-failed.png"
   },
   {
     id: "stopped",

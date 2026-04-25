@@ -119,9 +119,9 @@ describe("AppStateProvider.changeProfilePassword — validation & persistence", 
 
       await expect(
         act(async () => {
-          await latest().changeProfilePassword(profilePassword, "short");
+          await latest().changeProfilePassword(profilePassword, "abc");
         }),
-      ).rejects.toThrow(/at least 8/i);
+      ).rejects.toThrow(/at least 4/i);
 
       expect(snapshotRecord(activeProfileId)).toBe(before);
     },

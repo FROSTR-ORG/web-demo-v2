@@ -42,7 +42,7 @@ the runtime, Paper parity, or local relay constraints.
 | --- | --- |
 | Docs-only | `rg -n 'T[O]DO\|T[B]D\|F[I]XME' README.md docs/*.md`; `git diff --stat`; targeted link/source checks from `agent-runbook.md`. |
 | Demo fixture or Paper-reference change | `npm run paper:sync`; `npm run paper:drift -- --threshold=0.02`; `npx vitest run src/demo/__tests__/scenarios.test.tsx src/demo/__tests__/crossAreaFinalGate.test.tsx --config vitest.config.ts`. |
-| Paper parity UI split | Focused screen tests for the product/demo boundary; `npm run paper:drift -- --mode=live --threshold=0.02` for a ranked live-DOM queue; raw `npm run paper:drift -- --threshold=0.02` after any Paper sync. |
+| Paper parity UI split | Focused screen tests for the product/demo boundary; `npm run paper:drift:live` for a ranked live-DOM queue; raw `npm run paper:drift -- --threshold=0.02` after any Paper sync. |
 | TypeScript UI/refactor change | `npx tsc --noEmit -p tsconfig.json --pretty false`; `npx vitest run --config vitest.config.ts` or narrower related tests. |
 | Multi-device/runtime change | Relevant `src/e2e/multi-device/*.spec.ts` with `--project=desktop --workers 1`, plus the local relay notes in `agent-runbook.md`. |
 | Dashboard real-peer workability | `npm run test:e2e:dashboard-real-peers`; this starts `bifrost-devtools` on `ws://127.0.0.1:8194` and verifies dashboard states, event logs, policies, sign/ECDH/ping, and permission feedback against real peers. |

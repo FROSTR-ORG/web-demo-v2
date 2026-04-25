@@ -151,10 +151,11 @@ function focusableElements(root: HTMLElement): HTMLElement[] {
  *    {@link CONTENT_MAX_CHARS} with an ellipsis (VAL-APPROVALS-022 /
  *    VAL-APPROVALS-023).
  *  - Scoped variants ("Always for kind:N" / "Always deny for domain")
- *    are NOT rendered: the bifrost-rs `setPolicyOverride` surface only
- *    accepts peer-level overrides, so exposing scoped buttons would
- *    silently fall back to the same peer-level write. The deviation is
- *    documented in `docs/runtime-deviations-from-paper.md`.
+ *    are hidden by default because the bifrost-rs `setPolicyOverride`
+ *    surface only accepts peer-level overrides. Paper fixture mode may
+ *    opt into those visual CTAs with `showPaperScopedActions`, while real
+ *    runtime surfaces stay peer-level only. The split is documented in
+ *    `docs/runtime-deviations-from-paper.md`.
  *  - TTL: honours `event.ttl_ms` when the upstream event provides one;
  *    falls back to a {@link CLIENT_TTL_MS} 60 s client-side timer that
  *    dismisses the modal as a policy-neutral deny without mutating
@@ -164,6 +165,7 @@ export function PolicyPromptModal({
   event,
   onResolve,
   onDismiss,
+  showPaperScopedActions = false,
 }: {
   event: PeerDeniedEvent;
   onResolve: (decision: PolicyPromptDecision) => void | Promise<void>;
@@ -174,6 +176,7 @@ export function PolicyPromptModal({
    * queue advances to the next peer-denied entry.
    */
   onDismiss: () => void;
+  showPaperScopedActions?: boolean;
 }) {
   const modalRef = useRef<HTMLDivElement | null>(null);
   const firstActionRef = useRef<HTMLButtonElement | null>(null);
@@ -487,10 +490,9 @@ export function PolicyPromptModal({
           <span>Expires in {formatRemaining(remainingMs)}</span>
         </div>
 
-        {/* Action buttons. Scoped variants (kind / domain) are deliberately
-         * not rendered — bifrost-rs exposes only peer-level overrides
-         * through `setPolicyOverride`. See
-         * `docs/runtime-deviations-from-paper.md` for the deviation note. */}
+        {/* Runtime surfaces stay peer-level. Paper fixture mode may render
+         * scoped-looking CTAs for visual parity; they still dispatch through
+         * the existing peer-level allow/deny decisions. */}
         <div className="policy-actions">
           <div className="policy-action-row">
             <button
@@ -525,6 +527,24 @@ export function PolicyPromptModal({
               Always deny
             </button>
           </div>
+          {showPaperScopedActions ? (
+            <div className="policy-action-row">
+              <button
+                type="button"
+                className="policy-btn allow-outline"
+                onClick={() => dispatchDecision("allow-always")}
+              >
+                Always for kind:1
+              </button>
+              <button
+                type="button"
+                className="policy-btn deny-outline"
+                onClick={() => dispatchDecision("deny-always")}
+              >
+                Always deny for primal.net
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

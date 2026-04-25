@@ -247,7 +247,7 @@ async function publishTestNoteUntilReached(
         { timeout: 45_000 },
       );
       await expect(panel.getByTestId("test-publish-note-relays")).toContainText(
-        /Published to [1-9]/,
+        /Published to [1-9]\d*/,
         { timeout: 45_000 },
       );
       return requestId;

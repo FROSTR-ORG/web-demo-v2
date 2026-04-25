@@ -1,3 +1,5 @@
+import { DEMO_PASSWORD_MIN_LENGTH } from "../../app/AppStateTypes";
+
 /**
  * fix-m7-onboard-distinct-share-allocation — encrypted "unadopted
  * shares" pool.
@@ -170,7 +172,7 @@ const ENVELOPE_VERSION = 1 as const;
  *  pool. Matches the UI gate on the OnboardSponsorConfigScreen / the
  *  profile-unlock password so pool decryption never uses a weaker
  *  secret than the profile it belongs to. */
-export const UNADOPTED_POOL_MIN_PASSWORD_LENGTH = 8;
+export const UNADOPTED_POOL_MIN_PASSWORD_LENGTH = DEMO_PASSWORD_MIN_LENGTH;
 
 function isSubtleAvailable(): boolean {
   return (

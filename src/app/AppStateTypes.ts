@@ -20,6 +20,13 @@ import type { NostrTextNoteEvent } from "../lib/nostr/testNote";
 import type { RuntimeRelayStatus } from "../lib/relay/runtimeRelayPump";
 import type { RuntimeExportPackages } from "./runtimeExports";
 
+/** Web-demo-only password minimum. Production can keep a stricter policy. */
+export const DEMO_PASSWORD_MIN_LENGTH = 4;
+export const PROFILE_PASSWORD_TOO_SHORT_ERROR =
+  `Profile password must be at least ${DEMO_PASSWORD_MIN_LENGTH} characters.`;
+export const PACKAGE_PASSWORD_TOO_SHORT_ERROR =
+  `Package password must be at least ${DEMO_PASSWORD_MIN_LENGTH} characters.`;
+
 export interface CreateDraft {
   groupName: string;
   threshold: number;
@@ -232,7 +239,7 @@ export interface OnboardSponsorSession {
 export const ONBOARD_SPONSOR_LABEL_EMPTY_ERROR =
   "Device label cannot be empty.";
 export const ONBOARD_SPONSOR_PASSWORD_TOO_SHORT_ERROR =
-  "Password must be at least 8 characters.";
+  `Password must be at least ${DEMO_PASSWORD_MIN_LENGTH} characters.`;
 export const ONBOARD_SPONSOR_PASSWORD_MISMATCH_ERROR =
   "Passwords do not match.";
 /**
@@ -269,9 +276,8 @@ export const ONBOARD_SPONSOR_DUPLICATE_LABEL_WARNING =
 export const ONBOARD_SPONSOR_PROFILE_PASSWORD_ERROR =
   "Profile password is required to unlock the share pool.";
 
-/** Minimum password length for onboard-sponsor hand-off (mirrors
- *  VAL-ONBOARD-003 ≥ 8 chars). */
-export const ONBOARD_SPONSOR_PASSWORD_MIN_LENGTH = 8;
+/** Minimum password length for onboard-sponsor hand-off in the web demo. */
+export const ONBOARD_SPONSOR_PASSWORD_MIN_LENGTH = DEMO_PASSWORD_MIN_LENGTH;
 
 export type OnboardingPackageStatePatch = Partial<
   Pick<
@@ -978,7 +984,7 @@ export interface AppStateValue {
    * per-share {@link password}.
    *
    * Responsibilities:
-   *   - Validates `password.length >= 8` and throws a readable Error
+   *   - Validates `password.length >= DEMO_PASSWORD_MIN_LENGTH` and throws a readable Error
    *     when the invariant is violated.
    *   - Looks up the plaintext share secrets from the provider's
    *     per-create-session stash (populated by `createProfile`).

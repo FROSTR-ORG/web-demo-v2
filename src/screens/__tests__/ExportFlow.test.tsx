@@ -106,8 +106,10 @@ function renderDashboard() {
 function openSettingsExportProfile() {
   fireEvent.click(screen.getByLabelText("Settings"));
   const settings = screen.getByTestId("settings-sidebar");
-  expect(within(settings).getByText("Export Profile")).toBeInTheDocument();
-  const [exportButton] = within(settings).getAllByRole("button", {
+  const exportProfileLabel = within(settings).getByText("Export Profile");
+  const exportProfileRow = exportProfileLabel.closest(".settings-action-row");
+  expect(exportProfileRow).not.toBeNull();
+  const exportButton = within(exportProfileRow as HTMLElement).getByRole("button", {
     name: "Export",
   });
   fireEvent.click(exportButton);
@@ -294,8 +296,10 @@ describe("Export from Settings Sidebar", () => {
     fireEvent.click(screen.getByLabelText("Settings"));
 
     const sidebar = screen.getByTestId("settings-sidebar");
-    expect(within(sidebar).getByText("Export Share")).toBeInTheDocument();
-    const [, exportShareButton] = within(sidebar).getAllByRole("button", {
+    const exportShareLabel = within(sidebar).getByText("Export Share");
+    const exportShareRow = exportShareLabel.closest(".settings-action-row");
+    expect(exportShareRow).not.toBeNull();
+    const exportShareButton = within(exportShareRow as HTMLElement).getByRole("button", {
       name: "Export",
     });
     fireEvent.click(exportShareButton);

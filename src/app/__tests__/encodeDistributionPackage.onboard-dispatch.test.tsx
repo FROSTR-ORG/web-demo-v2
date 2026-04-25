@@ -303,7 +303,7 @@ describe("encodeDistributionPackage — onboard dispatch (fix-followup-distribut
   // fallback), while surfacing the dispatch error inline as
   // `adoptionError`.
   it(
-    "clears stale pendingDispatchRequestId on retry click and does not store a requestId when the dispatch itself throws",
+    "retains pendingDispatchRequestId on retry click when the dispatch itself throws",
     async () => {
       const getState = await renderProvider();
       const { remoteShares } = await prepareActiveCreateSession(getState);
@@ -333,9 +333,9 @@ describe("encodeDistributionPackage — onboard dispatch (fix-followup-distribut
       // Retry click — force `RuntimeClient.handleCommand` to throw so
       // that `handleRuntimeCommand` propagates the error out of the
       // inner dispatch call. `encodeDistributionPackage` must catch
-      // the throw, leave `pendingDispatchRequestId` explicitly
-      // undefined (no stale fallback to the prior id), and surface
-      // the dispatch error inline via `adoptionError`.
+      // the throw, retain `pendingDispatchRequestId` for the original
+      // accepted request, and surface the dispatch error inline via
+      // `adoptionError`.
       const dispatchThrowMessage = "simulated runtime dispatch failure";
       const handleCommandSpy = vi
         .spyOn(RuntimeClient.prototype, "handleCommand")
@@ -363,20 +363,15 @@ describe("encodeDistributionPackage — onboard dispatch (fix-followup-distribut
       // off manually.
       expect(pkgAfter.packageCreated).toBe(true);
       expect(pkgAfter.packageText.startsWith("bfonboard1")).toBe(true);
-      // pendingDispatchRequestId is explicitly undefined — NOT a
-      // stale fallback to `firstRequestId`. This prevents a drained
-      // CompletedOperation::Onboard for the old id from falsely
-      // flipping peerOnline on a retry whose dispatch failed.
-      expect(pkgAfter.pendingDispatchRequestId).toBeUndefined();
-      expect(pkgAfter.pendingDispatchRequestId).not.toBe(firstRequestId);
+      // The retry never produced a new request id, so keep correlating
+      // the original accepted dispatch until runtime drains resolve it.
+      expect(pkgAfter.pendingDispatchRequestId).toBe(firstRequestId);
       // adoptionError surfaces the dispatch-throw message so the user
       // sees the failure inline on the Distribute card.
       expect(pkgAfter.adoptionError).toBeTruthy();
       expect(pkgAfter.adoptionError).toContain(dispatchThrowMessage);
-      // peerOnline stays false — a stale echo for the first dispatch
-      // must not flip it, and in-flight `runtimeStatus.pending_operations`
-      // for the first requestId (if any) can no longer correlate
-      // through the share (pendingDispatchRequestId is cleared).
+      // peerOnline stays false until a runtime drain for the retained
+      // request id confirms adoption.
       expect(pkgAfter.peerOnline).toBe(false);
     },
     30_000,

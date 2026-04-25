@@ -140,17 +140,13 @@ describe("DashboardRefactorRegression — audit-gap details preserved after refa
     // copy superseded by the reactive denial surface's client-side
     // countdown).
     expect(screen.getByText(/Expires in/)).toBeInTheDocument();
-    // Peer-level CTAs only — scoped variants removed per VAL-APPROVALS-013.
+    // Peer-level CTAs remain present; Paper fixture mode also renders
+    // the scoped action row for screenshot parity.
     for (const label of ["Deny", "Allow once", "Always allow", "Always deny"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
-    expect(screen.queryByText("Always for kind:1")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Always deny for kind:1"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Always deny for primal.net"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("Always for kind:1")).toBeInTheDocument();
+    expect(screen.getByText("Always deny for primal.net")).toBeInTheDocument();
   });
 
   it("VAL-DSH-018 — Signing Failed modal renders neutral fallback copy (no synthesized peer-response ratio) + Dismiss/Retry", () => {

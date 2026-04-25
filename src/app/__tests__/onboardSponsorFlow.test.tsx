@@ -375,7 +375,7 @@ describe("fix-m7-onboard-distinct-share-allocation — pool allocation", () => {
           deviceLabel: "Bob Laptop",
           password: "sponsor-password",
           relays: ["wss://relay.local"],
-          profilePassword: "short",
+          profilePassword: "abc",
         });
       } catch (err) {
         errorMessage = err instanceof Error ? err.message : String(err);

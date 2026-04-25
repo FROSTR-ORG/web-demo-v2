@@ -224,15 +224,16 @@ not as the main architecture guide.
   `--update-snapshots` against the app's own Paper-fixture render
   (`paperPanels=true`) — i.e. app-vs-self, not app-vs-paper — which only catches
   self-regression, not drift from the canonical Paper artboards. Scrutiny
-  flagged this as self-referential parity; the fix requires the 5 dashboard-state
+  flagged this as self-referential parity; the fix requires the dashboard-state
   baselines to be **exported from the igloo-paper source artboards** at
-  `igloo-paper/screens/dashboard/{1-signer-dashboard, 1b-connecting, 2-stopped,
-  2b-all-relays-offline, 2c-signing-blocked}/screenshot.png` and used as the
+  `igloo-paper/screens/dashboard/{1-signer-dashboard, 1b-loading-profile,
+  1b-error-profile-load-failed, 2-stopped, 2b-all-relays-offline,
+  2c-signing-blocked}/screenshot.png` and used as the
   PRIMARY parity reference, with the app-self baselines retained as a SECONDARY
   self-consistency check.
 - **web-demo-v2 implementation**:
-  `src/e2e/visual/paper-fixtures/dashboard-{running,connecting,stopped,relays-offline,signing-blocked}.png`
-  hold verbatim copies of the 5 Paper artboard exports (do not regenerate from
+  `src/e2e/visual/paper-fixtures/dashboard-{running,loading-profile,profile-load-failed,stopped,relays-offline,signing-blocked}.png`
+  hold verbatim copies of the Paper artboard exports (do not regenerate from
   the app; re-export from `igloo-paper` when the source artboard changes).
   `src/e2e/visual/dashboard-states.spec.ts` runs two comparisons per state:
   (a) primary — live `.app-shell` screenshot pixel-diffed against the Paper
@@ -424,7 +425,7 @@ not as the main architecture guide.
   payload with an always-labelled Peer responses line, not Paper placeholders); VAL-OPS-007
   (Retry correlates via enriched `message_hex_32` from `pendingDispatchIndex`).
 
-### PolicyPromptModal — scoped (kind / domain) CTA variants not exposed (VAL-APPROVALS-013)
+### PolicyPromptModal — scoped (kind / domain) CTA variants are demo-only (VAL-APPROVALS-013)
 
 - **Paper / task source**: `igloo-paper/screens/dashboard/.../PolicyPromptModal` renders six
   decision CTAs when a peer denial surfaces: `Deny`, `Allow once`, `Always allow`, plus the
@@ -441,15 +442,20 @@ not as the main architecture guide.
   tuple. There is no kind-scoped or domain-scoped override shape plumbed to the WASM bridge
   or to the signer policy struct. `bifrost-rs` is read-only reference material for this
   mission and must not be modified to add one.
-- **What the app renders instead**: four peer-level decision buttons —
+- **What runtime surfaces render**: four peer-level decision buttons —
   `Allow once`, `Always allow`, `Deny`, `Always deny`. "Allow once" is tracked
   client-side in a session-scoped `sessionAllowOnceRef` set and automatically rolled back
   to the signer via `setPolicyOverride(peer, "deny")` on `lockProfile()` (VAL-APPROVALS-009),
   while `Always allow` / `Always deny` persist through the runtime's peer-level override.
-  The scoped CTAs are deliberately NOT rendered: exposing them would silently route through
-  the same peer-level write, violating the user's assumption that clicking
-  `Always deny for kind:1` only denies kind:1. The `DENIED_VARIANTS` comment block inside
-  the modal source links back to this entry.
+  Scoped CTAs are deliberately hidden by default: exposing them on a real runtime surface
+  would silently route through the same peer-level write, violating the user's assumption
+  that clicking `Always deny for kind:1` only denies kind:1.
+- **Paper fixture behavior**: deterministic Paper review scenarios may pass
+  `paperPanels=true`, which maps to `PolicyPromptModal.showPaperScopedActions=true`.
+  In that demo-only mode the modal renders the Paper scoped CTA labels for visual parity,
+  while the underlying runtime contract and production routes remain peer-level only.
+  Tests cover both sides: runtime/default component coverage asserts the scoped labels are
+  absent, and Paper-fidelity scenario coverage asserts the scoped labels are present.
 - **Allow-once rollback target is `"deny"`, not `"unset"` (VAL-APPROVALS-009)**: the
   `lockProfile()` rollback loop in `src/app/AppStateProvider.tsx` writes
   `setPolicyOverride({ ..., value: "deny" })` for every tracked allow-once entry — NOT
@@ -1460,7 +1466,7 @@ end-to-end.
   hand-off affordances), VAL-ONBOARD-016 ("Replace Share"
   terminology — no "Rotate Share" residue).
 
-### 2026-04-23 — Peer Permissions row uses `ToggleSwitch` instead of Paper pill badges (60R-0 / VAL-FOLLOWUP-007)
+### 2026-04-24 — Peer Permissions row now uses Paper pill badges (60R-0 / VAL-FOLLOWUP-007)
 
 - **Paper source**: `igloo-ui` file, page `core`, artboard `60R-0` —
   "Web — Shared — 2. Create Profile". The Peer Permissions rows render
@@ -1469,25 +1475,14 @@ end-to-end.
   allowed, muted fill indicates it is denied. Clicking a pill toggles
   the value.
 - **web-demo-v2 implementation**:
-  `src/screens/CreateProfileScreen.tsx` — each peer row renders four
-  `ToggleSwitch` components (slider-style on/off switches from
-  `src/components/ToggleSwitch.tsx`) with the method name (`SIGN` /
-  `ECDH` / `PING` / `ONBOARD`) as the switch label.
-- **Rationale for the deviation**: `ToggleSwitch` is the established
-  design-system primitive for boolean user-controlled toggles used
-  elsewhere (`PoliciesState`, `SettingsSidebar` rows). The live
-  render must support interactive toggling of these four permissions
-  per peer during Create Profile; Paper's pill-badge visual is a
-  static "final state" snapshot that does not spec the toggle
-  interaction model. Introducing a separate "chip-toggle" primitive
-  (clickable pill that toggles saturated/muted) purely for parity
-  would fragment the design system and duplicate toggle affordance
-  logic without improving user clarity — the two controls are
-  semantically equivalent. The `fix-followup-paper-parity-final-review`
-  audit explicitly flagged this and resolved it as a documented
-  intentional deviation rather than fix-in-code (which would
-  exceed the "copy/layout/hierarchy fidelity" scope the audit
-  procedure limits itself to).
+  `src/screens/ProfileSetupForm.tsx` now renders `PeerPermissionTagGroup`
+  / `PeerPermissionTag` for both read-only and interactive permission
+  rows. The pill badge remains the visible primitive while click/keyboard
+  interaction still toggles the underlying permission value.
+- **Rationale for ledger update**: this is no longer an intentional
+  runtime deviation. The implementation has converged on the Paper
+  pill-badge primitive while preserving the same boolean interaction
+  semantics.
 - **Assertion IDs covered**: VAL-FOLLOWUP-007 continues to hold —
   the `CreateProfileDraft` type has no `distributionPassword` /
   `confirmDistributionPassword` keys and the rendered DOM has zero
@@ -1610,3 +1605,34 @@ end-to-end.
   8GU-0, 60R-0, LN7-0 with timestamps" is satisfied (all three IDs
   appear in `baselines.json`, correctly mapped to their real Paper
   artboards).
+
+### 2026-04-24 — Broad live Paper drift passes the 2% gate after shared layout / Stepper / Create Profile remediation
+
+- **Verification command**:
+  `npm run paper:drift:live -- --keep-passing-artifacts`.
+- **Result after remediation**: the broad all-scenario live audit passes the
+  repository's 2% Paper-parity gate. The highest residual scenarios are now
+  below threshold, led by the dashboard cluster rather than open failures.
+- **What was fixed**: shared flow rhythm, Stepper state colors/width,
+  and Create Profile structure now use shared Paper-aligned primitives
+  across `/create/profile` and `/rotate-keyset/profile`. The focused
+  `followup-paper-parity.spec.ts` and `dashboard-states.spec.ts` suites
+  both pass.
+- **Remaining deviation**: a stricter 1.5% live audit can remain useful as a
+  future polish queue, but 2% is the current acceptance gate. Treat residuals
+  below 2% as ranked inspection targets, not failing parity.
+
+### 2026-04-24 — Distribution / rotate errors / dashboard density remediation is below the 2% live gate
+
+- **Verification command**:
+  `npm run paper:drift:live -- --keep-passing-artifacts`.
+- **Result after the second remediation pass**: focused component tests,
+  focused visual specs, and the broad live audit pass at the 2% threshold.
+- **Highest residuals under threshold**: `dashboard-running`,
+  `dashboard-signing-blocked`, `dashboard-relays-offline`, `dashboard-stopped`,
+  `dashboard-recover-success`, `recover-success`, `import-review-save-profile`,
+  `rotate-keyset-distribute`, `shared-distribution-completion`, and
+  `shared-create-profile`.
+- **Remaining deviation**: the dashboard cluster remains the highest residual
+  inspection target because of panel density, row geometry, and page-height
+  differences, but it is no longer an open parity failure at the current gate.

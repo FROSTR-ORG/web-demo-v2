@@ -196,10 +196,10 @@ describe("OnboardSponsorConfigScreen — VAL-ONBOARD-003 / 019 / 021 / 024", () 
     expect(cta.disabled).toBe(false);
   });
 
-  it("rejects password shorter than 8 characters", () => {
+  it("rejects password shorter than the demo minimum", () => {
     renderConfig();
     const pw = screen.getByTestId("onboard-sponsor-password-input");
-    fireEvent.change(pw, { target: { value: "short" } });
+    fireEvent.change(pw, { target: { value: "abc" } });
     expect(
       screen.getByText(ONBOARD_SPONSOR_PASSWORD_TOO_SHORT_ERROR),
     ).toBeInTheDocument();

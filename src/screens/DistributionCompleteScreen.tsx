@@ -26,7 +26,7 @@ import { shortHex } from "../lib/bifrost/format";
  */
 
 export const DISTRIBUTION_COMPLETION_SUBHEAD =
-  "Track which remote bfonboard adoption packages have been distributed. Finish when each target device is ready to adopt its fresh share through the standard onboarding flow.";
+  "Track remote bfonboard packages as they are handed off. Finish once each target device is ready to adopt its fresh share.";
 
 export function DistributionCompleteScreen() {
   const navigate = useNavigate();
@@ -107,6 +107,9 @@ export function DistributionCompleteScreen() {
                         {" — "}
                         {completionLabel(pkg)}
                       </span>
+                      <span className="completion-subvalue">
+                        {pkg.peerOnline ? "Existing Device" : "New Device"}
+                      </span>
                     </span>
                   </div>
                   <div className="inline-actions">
@@ -150,9 +153,8 @@ export function DistributionCompleteScreen() {
               All remote packages complete
             </strong>
             <span>
-              All packages distributed — {distributedCount} of {total} remote
-              bfonboard packages have been marked distributed. Continue when
-              device adoption handoff can proceed.
+              {distributedCount} of {total} remote bfonboard packages are
+              complete. Handoff is accounted for.
             </span>
           </div>
         ) : null}

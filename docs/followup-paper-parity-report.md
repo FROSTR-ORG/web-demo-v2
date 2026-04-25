@@ -39,14 +39,9 @@ Paper source: `60R-0`. Implementation: `src/screens/CreateProfileScreen.tsx`. De
 - Extra element: **no extras.** VAL-FOLLOWUP-007 is satisfied — the Create Profile DOM has
   no "Remote Package Password" or "Confirm Remote Package Password" copy (they moved to
   Distribute Shares as per-share fields in feature fix-followup-distribute-2a).
-- Color / typography drift: **documented deviation.** The peer permission row renders a
-  `ToggleSwitch` control (slider-style on/off switch with a colored label) rather than
-  Paper's colored pill badges (saturated when the method is allowed, muted when denied).
-  The switch is the design-system primitive already used by the dashboard `PoliciesState`
-  panel and the Settings sidebar; converting to a separate chip-toggle primitive would
-  fragment the design system without improving user clarity. See
-  `docs/runtime-deviations-from-paper.md` > "Peer Permissions row uses ToggleSwitch instead
-  of Paper pill badges (VAL-FOLLOWUP-007 / 60R-0)".
+- Color / typography drift: **no longer a documented deviation.** The peer permission row
+  now renders the Paper pill-badge primitive via `PeerPermissionTagGroup`; interactive rows
+  retain click/keyboard toggling while matching Paper's saturated/muted badge treatment.
 
 ## /create/distribute
 
@@ -139,8 +134,6 @@ scenario: `/demo/shared-distribution-completion`.
      callout body per Paper LN7-0.
 - **documented deviations** (added to `docs/runtime-deviations-from-paper.md` in the same
   commit):
-  1. Peer permission rows on `/create/profile` use `ToggleSwitch` rather than Paper's
-     pill badges — design-system alignment.
-  2. `/create/complete` callout body copy pinned by VAL-FOLLOWUP-012 exact-text contract.
-  3. `/create/complete` still omits Paper's secondary New/Existing device sub-label.
+  1. `/create/complete` callout body copy pinned by VAL-FOLLOWUP-012 exact-text contract.
+  2. `/create/complete` still omits Paper's secondary New/Existing device sub-label.
 - **no drift** for every other aspect audited.

@@ -255,8 +255,10 @@ describe("RuntimeRelayPump", () => {
     await pump.refreshAll();
 
     expect(tagged).toEqual([["req-refresh-ping"]]);
-    expect(calls.indexOf("refresh")).toBeGreaterThanOrEqual(0);
-    expect(calls.indexOf("refresh")).toBeLessThan(calls.lastIndexOf("drain"));
+    const refreshIndex = calls.indexOf("refresh");
+    const postRefreshDrainIndex = calls.indexOf("drain", refreshIndex + 1);
+    expect(refreshIndex).toBeGreaterThanOrEqual(0);
+    expect(postRefreshDrainIndex).toBeGreaterThan(refreshIndex);
   });
 
   it("marks failed connects and failed publishes offline", async () => {

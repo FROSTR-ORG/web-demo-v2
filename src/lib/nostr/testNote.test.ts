@@ -71,4 +71,22 @@ describe("test note Nostr event helpers", () => {
       "nevent1qqsxzltx7v2zgm65av4ec2w077lav8pvj7u6t0dm35vjxst2ydh0frq6f2cfz",
     );
   });
+
+  it("adds relay hints to nevent TLV payloads when relays are provided", () => {
+    const eventId =
+      "617d66f314246f54eb2b9c29cff7bfd61c2c97b9a5bdbb8d1923416a236ef48c";
+    const minimal = encodeMinimalNevent(eventId);
+    const hinted = encodeMinimalNevent(eventId, ["wss://relay.example.com"]);
+
+    expect(hinted).toMatch(/^nevent1/);
+    expect(hinted).not.toBe(minimal);
+  });
+
+  it("rejects relay hints that exceed a single TLV length byte", () => {
+    expect(() =>
+      encodeMinimalNevent("617d66f314246f54eb2b9c29cff7bfd61c2c97b9a5bdbb8d1923416a236ef48c", [
+        `wss://${"r".repeat(256)}`,
+      ]),
+    ).toThrow(/255-byte TLV limit/i);
+  });
 });

@@ -40,7 +40,7 @@ export interface DemoUiState {
     completionPreset?: boolean;
   };
   recover?: {
-    variant?: "incompatible-shares" | "success";
+    variant?: RecoverVariant;
     revealed?: boolean;
     copied?: boolean;
   };

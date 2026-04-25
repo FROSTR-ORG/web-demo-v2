@@ -26,13 +26,15 @@ export function RotateWrongPasswordScreen() {
       : `Source Share #${state?.details?.sourceIndex ?? 2}`;
   const message =
     state?.errorMessage ??
-    "Wrong password. Unable to decrypt this bfshare source package.";
-  const showPaperPlaceholders = !state;
+    "Wrong password. Unable to decrypt this source package.";
+  const paperAlignedMessage = message.replace(
+    "bfshare source package",
+    "source package",
+  );
   const failedPackageDisplay =
     state?.details?.packagePrefix ??
-    (showPaperPlaceholders ? "bfshare1qvz8k2afcqqszq..." : null);
-  const showRelayWarning =
-    Boolean(state?.details?.relayChecked) || showPaperPlaceholders;
+    "bfshare1qvz8k2afcqqszq...";
+  const showRelayWarning = true;
 
   return (
     <AppShell headerMeta={MOCK_SOURCE_SHARE_1.label} mainVariant="flow">
@@ -44,8 +46,8 @@ export function RotateWrongPasswordScreen() {
           }
         />
         <PageHeading
-          title="Source Share Error"
-          copy="One or more bfshare source packages could not be validated. Check the details below and retry."
+          title="Source Package Error"
+          copy="One or more source packages could not be validated. Check the details below and retry."
         />
 
         {/* ---- Failed source share card ---- */}
@@ -112,7 +114,7 @@ export function RotateWrongPasswordScreen() {
                 strokeLinecap="round"
               />
             </svg>
-            <span>{message}</span>
+            <span>{paperAlignedMessage}</span>
           </div>
 
           {showRelayWarning ? (
@@ -138,7 +140,7 @@ export function RotateWrongPasswordScreen() {
                   strokeLinecap="round"
                 />
               </svg>
-              <span>No encrypted backup found on relays for this share.</span>
+              <span>No share data found for this source package.</span>
             </div>
           ) : null}
         </div>

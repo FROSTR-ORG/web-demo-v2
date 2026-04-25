@@ -756,6 +756,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
 
   function handleReturnToDashboard() {
     if (testPageActive) {
+      setDashboardView("dashboard");
       navigate(`/dashboard/${profileId}`);
       return;
     }
@@ -783,7 +784,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
   const recoverHeaderAriaLabel = recoverActive ? "Back to dashboard" : undefined;
   const policiesHeaderLabel = policiesActive ? "Dashboard" : "Policies";
   const policiesHeaderAriaLabel = policiesActive ? "Back to dashboard" : undefined;
-  const showTestHeaderButton = !testPageActive;
+  const showTestHeaderButton = !testPageActive && !paperPanels;
   const sharePublicKeyLabel =
     runtimeStatus.metadata.share_public_key ||
     `share-${activeProfile.localShareIdx}`;
@@ -949,6 +950,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
                 sidebarOpen={settingsOpen}
                 runtimeRelays={paperPanels ? undefined : runtimeRelays}
                 onStop={handleStopSigner}
+                onRefresh={paperPanels ? handleTriggerSync : undefined}
                 onOpenPolicyPrompt={
                   // VAL-APPROVALS-018 / fix-m2-policy-prompt-never-proactive-open:
                   // The runtime PolicyPromptModal must ONLY open in
@@ -1022,9 +1024,9 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
 
         {/* Non-sign failure banner stack — aria-live region that surfaces
          * ECDH/ping/onboard OperationFailures that couldn't be attributed
-         * to a visible PeerRow (VAL-OPS-015). Rendered unconditionally so
-         * the banner is available in production, sitting near the command
-         * and activity surfaces on the Test page. When empty the container
+         * to a visible PeerRow (VAL-OPS-015). It appears on both the Test page
+         * and the main dashboard signer view (`dashboardView === "dashboard"`)
+         * while staying excluded from paperPanels. When empty the container
          * stays mounted so SR announcements on newly-added banners fire
          * without the whole region remounting. */}
         {(testPageActive || dashboardView === "dashboard") && !paperPanels ? (
@@ -1093,6 +1095,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
                 event={policyModalEvent}
                 onResolve={handleResolvePolicyPrompt}
                 onDismiss={handleDismissPolicyPrompt}
+                showPaperScopedActions={paperPanels}
               />
             )}
           </>

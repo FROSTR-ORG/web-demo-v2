@@ -299,7 +299,7 @@ describe("Build availability — TestSignPanel is available in every web-demo bu
     );
     expect(panelSrc).not.toMatch(/import\.meta\.env\.DEV/);
     expect(panelSrc).not.toMatch(
-      /\bDev-only\b|\bdev-only\b|not (?:shipped|included) in production/,
+      /\bdev-only\b|not (?:shipped|included) in production/i,
     );
     expect(panelSrc).not.toMatch(/mockOpenPolicyPrompt/);
     expect(panelSrc).not.toMatch(/__DEV__/);

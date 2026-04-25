@@ -83,7 +83,7 @@ function renderDashboard() {
       initialEntries={[
         {
           pathname: "/dashboard/test-profile-id",
-          state: { demoUi: { dashboard: { showMockControls: true } } },
+          state: { demoUi: { dashboard: { showMockControls: true, paperPanels: false } } },
         },
       ]}
     >
@@ -103,7 +103,7 @@ describe("DashboardScreen — Signer Policy Prompt Modal", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("renders title, request badge, peer info, details table, expiration, and 4 peer-level decision buttons (scoped variants hidden per VAL-APPROVALS-013 deviation)", () => {
+  it("renders title, request badge, peer info, details table, expiration, and 4 runtime peer-level decision buttons when Paper fixture mode is disabled", () => {
     renderDashboard();
     fireEvent.click(screen.getByLabelText("Open Policy Prompt"));
     const dialog = screen.getByRole("dialog");
@@ -129,11 +129,9 @@ describe("DashboardScreen — Signer Policy Prompt Modal", () => {
     // Expiration timer — the reactive modal applies a session TTL when the
     // Paper fixture provides a display string rather than a numeric ms.
     expect(screen.getByText(/Expires in/)).toBeInTheDocument();
-    // 4 peer-level action buttons. Scoped variants (Always for kind:1,
-    // Always deny for kind:1, Always deny for <domain>) are NOT rendered
-    // because `RuntimeClient.setPolicyOverride` only exposes peer-level
-    // granularity — documented deviation in
-    // docs/runtime-deviations-from-paper.md (VAL-APPROVALS-013).
+    // Runtime mode renders only the 4 peer-level action buttons. Scoped
+    // variants are reserved for Paper fixture mode because
+    // `RuntimeClient.setPolicyOverride` only exposes peer-level granularity.
     expect(screen.getByText("Deny")).toBeInTheDocument();
     expect(screen.getByText("Allow once")).toBeInTheDocument();
     expect(screen.getByText("Always allow")).toBeInTheDocument();

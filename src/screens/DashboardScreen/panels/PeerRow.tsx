@@ -104,10 +104,10 @@ export function PeerRow({
       : peer.should_send_nonces,
     ping: usePolicy
       ? resolveRequestPolicyAllows(permissionState, "ping")
-      : paper || !peer.should_send_nonces,
+      : !peer.should_send_nonces,
     onboard: usePolicy
       ? resolveRequestPolicyAllows(permissionState, "onboard")
-      : !!paper && peer.idx === 1,
+      : false,
   };
 
   return (

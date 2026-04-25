@@ -107,7 +107,7 @@ export function SigningBlockedState({
               <Button type="button" variant="primary" onClick={onOpenPolicies}>
                 Open Policies
               </Button>
-              <Button type="button" variant="ghost" onClick={onReviewApprovals}>
+              <Button type="button" variant="secondary" onClick={onReviewApprovals}>
                 Review Approvals
               </Button>
             </div>
