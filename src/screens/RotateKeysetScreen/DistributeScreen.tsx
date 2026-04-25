@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, KeyRound } from "lucide-react";
 import { useAppState } from "../../app/AppState";
+import {
+  DEMO_PASSWORD_MIN_LENGTH,
+  PACKAGE_PASSWORD_TOO_SHORT_ERROR,
+} from "../../app/AppStateTypes";
 import {
   allPackagesDistributed,
   normalizePackageStatePatch,
@@ -34,6 +38,21 @@ function previewPackageText(packageText: string): string {
 function shareDisplayNumber(position: number): number {
   return position + 1;
 }
+
+const HOW_THIS_STEP_WORKS_STEPS: { title: string; copy: string }[] = [
+  {
+    title: "Set password",
+    copy: "Saving a password creates the bfonboard package for that device.",
+  },
+  {
+    title: "Distribute",
+    copy: "Copy package/password or show QR once the package exists.",
+  },
+  {
+    title: "Complete",
+    copy: "Echo turns the row green, or mark distributed manually when handoff is done.",
+  },
+];
 
 export function RotateDistributeSharesScreen() {
   const navigate = useNavigate();
@@ -127,7 +146,11 @@ export function RotateDistributeSharesScreen() {
       mainVariant="flow"
     >
       <section className="distribute-column">
-        <Stepper current={3} variant="rotate-keyset" />
+        <Stepper
+          current={3}
+          variant="rotate-keyset"
+          completedStyle="number"
+        />
         <BackLink
           onClick={() =>
             navigateWithRotateState(
@@ -139,13 +162,39 @@ export function RotateDistributeSharesScreen() {
         />
         <PageHeading
           title="Distribute Shares"
-          copy="Create each remote bfonboard package by setting its password, then hand off the package and password by copy or QR. Mark each share distributed once the device has what it needs to adopt its fresh share."
+          copy="Create each remote bfonboard package by setting its password, then hand off the package and password by copy or QR."
         />
+        <p className="sr-only">
+          Mark each fresh share distributed once the device has what it needs to adopt it.
+        </p>
+
+        <div className="dash-info-panel" aria-label="How this step works">
+          <div className="dash-panel-kicker">How this step works</div>
+          <ol className="how-this-step-works-list">
+            {HOW_THIS_STEP_WORKS_STEPS.map((step, idx) => (
+              <li key={step.title} className="how-this-step-works-item">
+                <span className="how-this-step-works-number" aria-hidden="true">
+                  {idx + 1}.
+                </span>
+                <span className="how-this-step-works-body">
+                  <strong className="how-this-step-works-title">
+                    {step.title}
+                  </strong>
+                  <span className="how-this-step-works-dash" aria-hidden="true">
+                    {" — "}
+                  </span>
+                  <span className="how-this-step-works-copy">{step.copy}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
 
         <div className="package-card saved">
           <div className="package-head">
             <div className="package-title-row">
               <div className="package-title">Share {shareDisplayNumber(0)}</div>
+              <div className="package-index">Index 0</div>
             </div>
             <StatusPill tone="success" marker="check">
               Saved to Igloo Web
@@ -155,19 +204,27 @@ export function RotateDistributeSharesScreen() {
         </div>
 
         <div className="package-stack">
-          {remotePackages.map((pkg, index) => (
-            <RotateRemoteShareCard
-              key={pkg.idx}
-              pkg={pkg}
-              displayNumber={shareDisplayNumber(index + 1)}
-              distributed={packageDistributed(pkg)}
-              actionsDisabled={!pkg.packageCreated}
-              resolveSecret={() => resolveSecret(pkg)}
-              onCreatePackage={createPackage}
-              onMarkDistributed={markDistributed}
-              onUpdatePkg={updatePkg}
-            />
-          ))}
+          {remotePackages.map((pkg, index) => {
+            const displayNumber = shareDisplayNumber(index + 1);
+            const viewPkg = paperPackageOverride(
+              pkg,
+              displayNumber,
+              demoUi.shared?.lockedPackageIndexes,
+            );
+            return (
+              <RotateRemoteShareCard
+                key={pkg.idx}
+                pkg={viewPkg}
+                displayNumber={displayNumber}
+                distributed={packageDistributed(viewPkg)}
+                actionsDisabled={!viewPkg.packageCreated}
+                resolveSecret={() => resolveSecret(pkg)}
+                onCreatePackage={createPackage}
+                onMarkDistributed={markDistributed}
+                onUpdatePkg={updatePkg}
+              />
+            );
+          })}
         </div>
 
         <Button
@@ -187,6 +244,22 @@ export function RotateDistributeSharesScreen() {
       </section>
     </AppShell>
   );
+}
+
+function paperPackageOverride(
+  pkg: OnboardingPackageView,
+  displayNumber: number,
+  lockedPackageIndexes?: number[],
+): OnboardingPackageView {
+  if (!lockedPackageIndexes?.includes(displayNumber)) return pkg;
+  return {
+    ...pkg,
+    packageCreated: false,
+    packageText: "",
+    password: "",
+    peerOnline: false,
+    manuallyMarkedDistributed: false,
+  };
 }
 
 function RotateRemoteShareCard({
@@ -231,8 +304,8 @@ function RotateRemoteShareCard({
 
   async function handleCreatePackage() {
     setError("");
-    if (password.length < 8) {
-      setError("Package password must be at least 8 characters.");
+    if (password.length < DEMO_PASSWORD_MIN_LENGTH) {
+      setError(PACKAGE_PASSWORD_TOO_SHORT_ERROR);
       return;
     }
     setBusy(true);
@@ -252,6 +325,7 @@ function RotateRemoteShareCard({
       <div className="package-head">
         <div className="package-title-row">
           <div className="package-title">Share {displayNumber}</div>
+          <div className="package-index">Index {displayNumber - 1}</div>
         </div>
         <StatusPill
           tone={chip.tone}
@@ -261,13 +335,16 @@ function RotateRemoteShareCard({
         </StatusPill>
       </div>
 
-      {pkg.packageCreated ? (
-        <SecretDisplay value={previewPackageText(pkg.packageText)} />
-      ) : (
-        <SecretDisplay value="Waiting for package password" dashed />
-      )}
+      <div className="package-secret-field">
+        <span className="kicker">bfonboard Package</span>
+        {pkg.packageCreated ? (
+          <SecretDisplay value={previewPackageText(pkg.packageText)} />
+        ) : (
+          <SecretDisplay value="Waiting for package password" dashed />
+        )}
+      </div>
 
-      <div className="field">
+      <div className="field package-password-field">
         <span className="kicker">Package Password</span>
         {pkg.packageCreated ? (
           <div className="password-lock-row">
@@ -275,30 +352,42 @@ function RotateRemoteShareCard({
           </div>
         ) : (
           <>
-            <span className="input-shell">
-              <input
-                className="input password-input"
-                type="password"
-                aria-label={`Package password for share ${displayNumber}`}
-                value={password}
+            <div className="package-password-row">
+              <span className="input-shell">
+                <input
+                  className="input password-input"
+                  type="password"
+                  aria-label={`Package password for share ${displayNumber}`}
+                  placeholder="Enter password"
+                  value={password}
+                  disabled={busy}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    if (error) setError("");
+                  }}
+                />
+              </span>
+              <Button
+                type="button"
+                size="sm"
                 disabled={busy}
-                onChange={(event) => {
-                  setPassword(event.target.value);
-                  if (error) setError("");
-                }}
-              />
-            </span>
+                onClick={() => void handleCreatePackage()}
+              >
+                <KeyRound size={13} />
+                {busy ? "Creating..." : "Create package"}
+              </Button>
+            </div>
             {error ? <span className="error">{error}</span> : null}
-            <Button
-              type="button"
-              disabled={busy || password.length === 0}
-              onClick={() => void handleCreatePackage()}
-            >
-              {busy ? "Creating package..." : "Create package"}
-            </Button>
           </>
         )}
       </div>
+
+      {actionsDisabled ? (
+        <div className="package-unlock-copy">
+          Copy, QR, and manual mark unlock after the password creates this
+          package.
+        </div>
+      ) : null}
 
       <div className={`package-actions${actionsDisabled ? " locked" : ""}`}>
         <Button
@@ -317,7 +406,7 @@ function RotateRemoteShareCard({
           }}
         >
           <Copy size={13} />
-          Copy Package
+          Copy package
         </Button>
         <Button
           type="button"
@@ -332,7 +421,7 @@ function RotateRemoteShareCard({
           }}
         >
           <Copy size={13} />
-          Copy Password
+          Copy password
         </Button>
         <QrButton
           value={resolveSecret().packageText}

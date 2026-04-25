@@ -103,14 +103,20 @@ function renderDashboard() {
   );
 }
 
-function openSettingsExportProfile() {
+function clickSettingsActionRowExport(label: string) {
   fireEvent.click(screen.getByLabelText("Settings"));
   const settings = screen.getByTestId("settings-sidebar");
-  expect(within(settings).getByText("Export Profile")).toBeInTheDocument();
-  const [exportButton] = within(settings).getAllByRole("button", {
+  const actionLabel = within(settings).getByText(label);
+  const actionRow = actionLabel.closest(".settings-action-row");
+  expect(actionRow).not.toBeNull();
+  const exportButton = within(actionRow as HTMLElement).getByRole("button", {
     name: "Export",
   });
   fireEvent.click(exportButton);
+}
+
+function openSettingsExportProfile() {
+  clickSettingsActionRowExport("Export Profile");
   return screen.getByTestId("export-profile-modal");
 }
 
@@ -291,14 +297,7 @@ describe("Export from Settings Sidebar", () => {
 
   it("Settings sidebar Export Share opens share export mode and produces bfshare", async () => {
     renderDashboard();
-    fireEvent.click(screen.getByLabelText("Settings"));
-
-    const sidebar = screen.getByTestId("settings-sidebar");
-    expect(within(sidebar).getByText("Export Share")).toBeInTheDocument();
-    const [, exportShareButton] = within(sidebar).getAllByRole("button", {
-      name: "Export",
-    });
-    fireEvent.click(exportShareButton);
+    clickSettingsActionRowExport("Export Share");
 
     const modal = screen.getByTestId("export-profile-modal");
     expect(modal).toBeInTheDocument();

@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, KeyRound } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAppState } from "../app/AppState";
+import {
+  DEMO_PASSWORD_MIN_LENGTH,
+  PACKAGE_PASSWORD_TOO_SHORT_ERROR,
+} from "../app/AppStateTypes";
 import { AppShell, PageHeading } from "../components/shell";
 import {
   Button,
@@ -11,6 +15,7 @@ import {
   Stepper,
 } from "../components/ui";
 import { packageDistributed } from "../app/distributionPackages";
+import { useDemoUi } from "../demo/demoUi";
 import type { OnboardingPackageView } from "../lib/bifrost/types";
 
 /**
@@ -89,6 +94,7 @@ export function DistributeSharesScreen() {
     updatePackageState,
     getCreateSessionPackageSecret,
   } = useAppState();
+  const demoUi = useDemoUi();
 
   if (
     !createSession?.keyset ||
@@ -120,7 +126,7 @@ export function DistributeSharesScreen() {
   return (
     <AppShell headerMeta={createSession.draft.groupName} mainVariant="flow">
       <section className="distribute-column">
-        <Stepper current={3} variant="shared" />
+        <Stepper current={3} variant="shared" completedStyle="number" />
         {/* fix-followup-paper-parity-final-review — Paper 8GU-0 renders
             no BackLink on the Distribute Shares screen. Once a profile
             has been created and per-share onboard dispatches are in
@@ -159,6 +165,7 @@ export function DistributeSharesScreen() {
               <div className="package-title">
                 Share {shareDisplayNumber(0)}
               </div>
+              <div className="package-index">Index 0</div>
             </div>
             <StatusPill tone="success" marker="check">
               Saved to Igloo Web
@@ -171,7 +178,11 @@ export function DistributeSharesScreen() {
           {createSession.onboardingPackages.map((pkg, index) => (
             <RemoteShareCard
               key={pkg.idx}
-              pkg={pkg}
+              pkg={paperPackageOverride(
+                pkg,
+                shareDisplayNumber(index + 1),
+                demoUi.shared?.lockedPackageIndexes,
+              )}
               displayNumber={shareDisplayNumber(index + 1)}
               encodeDistributionPackage={encodeDistributionPackage}
               retryDistributionPackageAdoption={retryDistributionPackageAdoption}
@@ -194,6 +205,22 @@ export function DistributeSharesScreen() {
       </section>
     </AppShell>
   );
+}
+
+function paperPackageOverride(
+  pkg: OnboardingPackageView,
+  displayNumber: number,
+  lockedPackageIndexes?: number[],
+): OnboardingPackageView {
+  if (!lockedPackageIndexes?.includes(displayNumber)) return pkg;
+  return {
+    ...pkg,
+    packageCreated: false,
+    packageText: "",
+    password: "",
+    peerOnline: false,
+    manuallyMarkedDistributed: false,
+  };
 }
 
 function RemoteShareCard({
@@ -246,8 +273,8 @@ function RemoteShareCard({
   async function onCreatePackage() {
     setError("");
     setRetryError("");
-    if (password.length < 8) {
-      setError("Package password must be at least 8 characters.");
+    if (password.length < DEMO_PASSWORD_MIN_LENGTH) {
+      setError(PACKAGE_PASSWORD_TOO_SHORT_ERROR);
       return;
     }
     setBusy(true);
@@ -297,6 +324,7 @@ function RemoteShareCard({
       <div className="package-head">
         <div className="package-title-row">
           <div className="package-title">Share {displayNumber}</div>
+          <div className="package-index">Index {displayNumber - 1}</div>
         </div>
         <StatusPill
           tone={chip.tone}
@@ -306,13 +334,16 @@ function RemoteShareCard({
         </StatusPill>
       </div>
 
-      {pkg.packageCreated ? (
-        <SecretDisplay value={previewPackageText(pkg.packageText)} />
-      ) : (
-        <SecretDisplay value="Waiting for package password" dashed />
-      )}
+      <div className="package-secret-field">
+        <span className="kicker">bfonboard Package</span>
+        {pkg.packageCreated ? (
+          <SecretDisplay value={previewPackageText(pkg.packageText)} />
+        ) : (
+          <SecretDisplay value="Waiting for package password" dashed />
+        )}
+      </div>
 
-      <div className="field">
+      <div className="field package-device-label-field sr-only">
         <span className="kicker">Device Label</span>
         <span className="input-shell">
           <input
@@ -328,7 +359,7 @@ function RemoteShareCard({
         </span>
       </div>
 
-      <div className="field">
+      <div className="field package-password-field">
         <span className="kicker">Package Password</span>
         {pkg.packageCreated ? (
           <div className="password-lock-row">
@@ -336,28 +367,33 @@ function RemoteShareCard({
           </div>
         ) : (
           <>
-            <span className="input-shell">
-              <input
-                className="input password-input"
-                type="password"
-                aria-label={`Package password for share ${displayNumber}`}
-                required
-                value={password}
-                onChange={(event) => {
-                  setPassword(event.target.value);
-                  if (error) setError("");
-                }}
+            <div className="package-password-row">
+              <span className="input-shell">
+                <input
+                  className="input password-input"
+                  type="password"
+                  aria-label={`Package password for share ${displayNumber}`}
+                  placeholder="Enter password"
+                  required
+                  value={password}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    if (error) setError("");
+                  }}
+                  disabled={busy}
+                />
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void onCreatePackage()}
                 disabled={busy}
-              />
-            </span>
+              >
+                <KeyRound size={13} />
+                {busy ? "Creating..." : "Create package"}
+              </Button>
+            </div>
             {error ? <span className="error">{error}</span> : null}
-            <Button
-              type="button"
-              onClick={() => void onCreatePackage()}
-              disabled={busy || password.length === 0}
-            >
-              {busy ? "Creating package..." : "Create package"}
-            </Button>
           </>
         )}
       </div>
@@ -371,6 +407,13 @@ function RemoteShareCard({
         <span className="error" role="alert">
           {retryError}
         </span>
+      ) : null}
+
+      {actionsDisabled ? (
+        <div className="package-unlock-copy">
+          Copy, QR, and manual mark unlock after the password creates this
+          package.
+        </div>
       ) : null}
 
       <div

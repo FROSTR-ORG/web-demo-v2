@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BookOpen, Github, Globe } from "lucide-react";
+import { Bird, BookOpen, Github, Globe } from "lucide-react";
 import logoUrl from "../assets/igloo-logo.png";
 
 interface AppShellProps {
@@ -42,6 +42,7 @@ export function AppShell({ children, brandSubtitle, headerMeta, headerActions, h
         <Globe size={16} />
         <BookOpen size={16} />
         <Github size={16} />
+        <Bird size={16} />
       </footer>
     </div>
   );

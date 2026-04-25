@@ -143,10 +143,10 @@ describe("CreateProfileScreen", () => {
     expect(screen.getByText("wss://relay.damus.io")).toBeInTheDocument();
   });
 
-  it("shows Connected - 24ms latency status on first relay (VAL-SHR-001)", () => {
+  it("shows neutral unavailable status on first relay until probe data exists (VAL-SHR-001)", () => {
     mocks.demoUi = { shared: { relayPreset: "wss://relay.example.com" } };
     renderScreen();
-    expect(screen.getByText("Connected - 24ms latency")).toBeInTheDocument();
+    expect(screen.getByText("Status unavailable")).toBeInTheDocument();
   });
 
   it("renders Peer Permissions with 3 peer rows and SIGN/ECDH/PING/ONBOARD pills (VAL-SHR-001)", () => {

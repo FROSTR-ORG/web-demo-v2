@@ -53,6 +53,9 @@ const mockExpireRecoveredNsec = vi.fn(() => {
   mockRecoverSession = null;
 });
 let mockRecoverSession: RecoverSession | null = null;
+// The mocked useAppState returns the current mockRecoverSession on each render;
+// recover actions mutate it, and DashboardRecoverPanel observes the change on
+// the component-triggered rerender that follows each user action.
 
 // Build fake profile/peer objects via computed-property concatenation so the
 // pre-commit secret-detection scanner doesn't rewrite the literal values.
@@ -443,7 +446,7 @@ describe("Dashboard Event Log controls", () => {
   it("filters rows, expands details, and clears visible events", () => {
     renderAt({ dashboard: { state: "running", paperPanels: true } });
 
-    fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Filter/ }));
     fireEvent.click(screen.getByRole("menuitemradio", { name: "Sign" }));
     expect(screen.getByText("2 events")).toBeInTheDocument();
     expect(screen.queryByText("Pool sync with peer #0 — 50 received · 50 sent")).not.toBeInTheDocument();

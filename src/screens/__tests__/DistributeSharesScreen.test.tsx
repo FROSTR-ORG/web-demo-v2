@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { PACKAGE_PASSWORD_TOO_SHORT_ERROR } from "../../app/AppStateTypes";
 import { DistributeSharesScreen } from "../DistributeSharesScreen";
 
 /**
@@ -191,15 +192,18 @@ describe("DistributeSharesScreen — LOCAL share badge (VAL-FOLLOWUP-008)", () =
     ).toBeInTheDocument();
   });
 
-  it("renders Paper-facing share titles by row order without internal index metadata", () => {
+  it("renders Paper-facing share titles and index metadata", () => {
     const { container } = renderScreen();
     expect(
       Array.from(container.querySelectorAll(".package-title")).map((node) =>
         node.textContent?.trim(),
       ),
     ).toEqual(["Share 1", "Share 2", "Share 3"]);
-    expect(container.querySelector(".package-index")).toBeNull();
-    expect(screen.queryByText(/^Index \d+$/)).not.toBeInTheDocument();
+    expect(
+      Array.from(container.querySelectorAll(".package-index")).map((node) =>
+        node.textContent?.trim(),
+      ),
+    ).toEqual(["Index 0", "Index 1", "Index 2"]);
   });
 });
 
@@ -417,16 +421,16 @@ describe("DistributeSharesScreen — Create package click wiring", () => {
     );
   });
 
-  it("rejects password.length < 8 with an inline error and does NOT invoke encodeDistributionPackage", async () => {
+  it("rejects password shorter than the demo minimum with an inline error and does NOT invoke encodeDistributionPackage", async () => {
     renderScreen();
     const input = screen.getByLabelText("Package password for share 2") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "short" } });
+    fireEvent.change(input, { target: { value: "abc" } });
     const createButton = screen
       .getAllByRole("button", { name: /Create package/i })[0];
     fireEvent.click(createButton);
     await waitFor(() => {
       expect(
-        screen.getByText("Package password must be at least 8 characters."),
+        screen.getByText(PACKAGE_PASSWORD_TOO_SHORT_ERROR),
       ).toBeInTheDocument();
     });
     expect(mocks.encodeDistributionPackage).not.toHaveBeenCalled();
@@ -435,14 +439,14 @@ describe("DistributeSharesScreen — Create package click wiring", () => {
   it("invokes encodeDistributionPackage(idx, password) on valid submit", async () => {
     renderScreen();
     const input = screen.getByLabelText("Package password for share 2") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "verysecretpw" } });
+    fireEvent.change(input, { target: { value: "demo" } });
     const createButton = screen
       .getAllByRole("button", { name: /Create package/i })[0];
     fireEvent.click(createButton);
     await waitFor(() => {
       expect(mocks.encodeDistributionPackage).toHaveBeenCalledWith(
         2,
-        "verysecretpw",
+        "demo",
       );
     });
   });

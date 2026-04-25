@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ListFilter } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import {
   useCallback,
@@ -814,6 +814,13 @@ function LegacyFixtureEventLog({
     : filter === "all" && rows === MOCK_EVENT_LOG_ROWS
       ? `${MOCK_EVENT_TOTAL} events`
       : `${visibleRows.length} events`;
+  // `paperActiveFilterCount` is cosmetic: when `rows === MOCK_EVENT_LOG_ROWS`,
+  // keep the legacy fixture screenshot count without wiring it to live filter state.
+  const paperActiveFilterCount = 4;
+  const filterAriaLabel =
+    rows === MOCK_EVENT_LOG_ROWS
+      ? `Filter, ${paperActiveFilterCount} active`
+      : "Filter";
 
   return (
     <div className="event-log-panel">
@@ -833,10 +840,20 @@ function LegacyFixtureEventLog({
           <button
             type="button"
             className="event-log-filter"
+            aria-label={filterAriaLabel}
             aria-expanded={filterOpen}
             onClick={() => setFilterOpen((value) => !value)}
           >
-            Filter
+            <ListFilter size={12} aria-hidden="true" />
+            <span>Filter</span>
+            {rows === MOCK_EVENT_LOG_ROWS ? (
+              <span className="event-log-filter-count">
+                {paperActiveFilterCount} active
+              </span>
+            ) : null}
+            <span className="event-log-filter-caret" aria-hidden="true">
+              ▾
+            </span>
           </button>
           {filterOpen ? (
             <div

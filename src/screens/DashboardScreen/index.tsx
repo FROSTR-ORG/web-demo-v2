@@ -25,10 +25,6 @@ import { SigningFailedModal } from "./modals/SigningFailedModal";
 import { DashboardRecoverPanel } from "./panels/DashboardRecoverPanel";
 import { DashboardStateAnnouncer } from "./panels/DashboardStateAnnouncer";
 import { MockStateToggle } from "./panels/MockStateToggle";
-import {
-  NonSignFailureBannerStack,
-  type NonSignFailureBannerEntry,
-} from "./panels/NonSignFailureBanner";
 import { OfflineBanner } from "./panels/OfflineBanner";
 import { SignActivityPanel } from "./panels/SignActivityPanel";
 import { TestEcdhPanel } from "./panels/TestEcdhPanel";
@@ -215,20 +211,18 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
   const consumedFailureIdsRef = useRef<Set<string>>(new Set());
   // --- Non-sign failure surface (VAL-OPS-011 / VAL-OPS-015) ------------
   // Per `fix-m1-non-sign-failure-surface`: every user-facing non-sign
-  // OperationFailure (op_type in {ecdh, ping, onboard}) must surface
-  // somewhere non-modal so VAL-OPS-015's "non-modal feedback appears" is
-  // observable. AppStateProvider filters background refresh-all Ping probe
-  // failures before they reach this slice.
+  // OperationFailure (op_type in {ecdh, ping, onboard}) that can be
+  // attributed to a visible PeerRow surfaces as an inline row indicator.
+  // AppStateProvider filters background refresh-all Ping probe failures
+  // before they reach this slice.
   //
   //   - If the failure has a `failed_peer` that resolves to a visible
   //     PeerRow, we mirror it into `peerRefreshErrors` and the row renders
   //     an inline warning indicator.
-  //   - Otherwise (no failed_peer or peer not in the current peers list —
-  //     e.g. an ECDH timeout before a peer was selected), we push a banner
-  //     into `nonSignFailureBanners` so the aria-live Activity-surface
-  //     banner stack renders it for the user.
+  //   - Otherwise, dashboard chrome stays quiet; the failure remains
+  //     available in the runtime Event Log.
   //
-  // Both surfaces auto-clear after 30 s; banners can be dismissed manually.
+  // Inline row indicators auto-clear after 30 s.
   // `consumedNonSignFailureIdsRef` tracks which runtime failure request_ids
   // we've already routed so the same failure is not surfaced twice on
   // subsequent pump ticks even though it lingers in `runtimeFailures`.
@@ -236,9 +230,6 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
   const [peerRefreshErrors, setPeerRefreshErrors] = useState<
     Record<string, PeerRefreshErrorInfo>
   >({});
-  const [nonSignFailureBanners, setNonSignFailureBanners] = useState<
-    NonSignFailureBannerEntry[]
-  >([]);
   const showMockControls = Boolean(demoUi.dashboard?.showMockControls);
   const paperPanels = demoUi.dashboard?.paperPanels ?? Boolean(demoUi.dashboard);
 
@@ -341,12 +332,11 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
   }, [activeSignFailure, handleRuntimeCommand, signDispatchLog]);
 
   // VAL-OPS-011 / VAL-OPS-015: Route every user-facing non-sign
-  // OperationFailure into a non-modal surface. Peer-resolvable failures
-  // attach to the corresponding PeerRow via `peerRefreshErrors`; all other
-  // non-sign failures raise a banner in the aria-live Activity-surface
-  // stack. Sign failures remain routed to SigningFailedModal via the
-  // separate effect above — this effect deliberately ignores
-  // `op_type === "sign"`.
+  // OperationFailure that can be resolved to a visible PeerRow into that
+  // row's inline `peerRefreshErrors` state. Orphan/unknown-peer non-sign
+  // failures stay in the runtime Event Log only. Sign failures remain
+  // routed to SigningFailedModal via the separate effect above — this
+  // effect deliberately ignores `op_type === "sign"`.
   useEffect(() => {
     if (!runtimeFailures || runtimeFailures.length === 0) return;
     const now = Date.now();
@@ -357,7 +347,6 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
       }
     }
     let peerPatch: Record<string, PeerRefreshErrorInfo> | null = null;
-    const newBanners: NonSignFailureBannerEntry[] = [];
     for (const failure of runtimeFailures) {
       if (failure.op_type === "sign") continue;
       if (consumedNonSignFailureIdsRef.current.has(failure.request_id)) {
@@ -375,76 +364,41 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
           message: failure.message,
           failedAt: now,
         };
-      } else {
-        newBanners.push({
-          id: failure.request_id,
-          op_type: failure.op_type,
-          code: failure.code,
-          message: failure.message,
-          createdAt: now,
-        });
       }
     }
     if (peerPatch) {
       setPeerRefreshErrors((previous) => ({ ...previous, ...peerPatch }));
     }
-    if (newBanners.length > 0) {
-      setNonSignFailureBanners((previous) => {
-        // Newest first so the most recent failure is visually at the top.
-        const merged = [...newBanners.reverse(), ...previous];
-        // Cap the stack so pathological runtime churn doesn't unbounded-grow
-        // the DOM. 5 is enough to surface bursts during an induced failure
-        // storm while keeping the Activity surface uncluttered.
-        return merged.slice(0, 5);
-      });
-    }
   }, [runtimeFailures, runtimeStatus]);
 
-  // 30s auto-clear sweep for both non-sign surfaces. Runs once a second
+  // 30s auto-clear sweep for peer-row non-sign failures. Runs once a second
   // while there is at least one entry so the DOM removes stale indicators
-  // without requiring runtime churn or a manual dismiss.
+  // without requiring runtime churn.
   useEffect(() => {
     const hasPeerErrors = Object.keys(peerRefreshErrors).length > 0;
-    const hasBanners = nonSignFailureBanners.length > 0;
-    if (!hasPeerErrors && !hasBanners) return;
+    if (!hasPeerErrors) return;
     const id = window.setInterval(() => {
       const now = Date.now();
-      if (hasPeerErrors) {
-        setPeerRefreshErrors((previous) => {
-          let changed = false;
-          const next: Record<string, PeerRefreshErrorInfo> = {};
-          for (const [pubkey, info] of Object.entries(previous)) {
-            if (
-              info.failedAt !== undefined &&
-              now - info.failedAt >= 30_000
-            ) {
-              changed = true;
-              continue;
-            }
-            next[pubkey] = info;
+      setPeerRefreshErrors((previous) => {
+        let changed = false;
+        const next: Record<string, PeerRefreshErrorInfo> = {};
+        for (const [pubkey, info] of Object.entries(previous)) {
+          if (
+            info.failedAt !== undefined &&
+            now - info.failedAt >= 30_000
+          ) {
+            changed = true;
+            continue;
           }
-          return changed ? next : previous;
-        });
-      }
-      if (hasBanners) {
-        setNonSignFailureBanners((previous) => {
-          const next = previous.filter(
-            (banner) => now - banner.createdAt < 30_000,
-          );
-          return next.length === previous.length ? previous : next;
-        });
-      }
+          next[pubkey] = info;
+        }
+        return changed ? next : previous;
+      });
     }, 1000);
     return () => {
       window.clearInterval(id);
     };
-  }, [peerRefreshErrors, nonSignFailureBanners]);
-
-  const handleDismissNonSignFailureBanner = useCallback((id: string) => {
-    setNonSignFailureBanners((previous) =>
-      previous.filter((banner) => banner.id !== id),
-    );
-  }, []);
+  }, [peerRefreshErrors]);
 
   // Clear a peer's refresh error the moment it transitions back to online —
   // a successful ping response is the runtime's authoritative signal that
@@ -756,6 +710,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
 
   function handleReturnToDashboard() {
     if (testPageActive) {
+      setDashboardView("dashboard");
       navigate(`/dashboard/${profileId}`);
       return;
     }
@@ -783,7 +738,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
   const recoverHeaderAriaLabel = recoverActive ? "Back to dashboard" : undefined;
   const policiesHeaderLabel = policiesActive ? "Dashboard" : "Policies";
   const policiesHeaderAriaLabel = policiesActive ? "Back to dashboard" : undefined;
-  const showTestHeaderButton = !testPageActive;
+  const showTestHeaderButton = !testPageActive && !paperPanels;
   const sharePublicKeyLabel =
     runtimeStatus.metadata.share_public_key ||
     `share-${activeProfile.localShareIdx}`;
@@ -949,6 +904,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
                 sidebarOpen={settingsOpen}
                 runtimeRelays={paperPanels ? undefined : runtimeRelays}
                 onStop={handleStopSigner}
+                onRefresh={paperPanels ? handleTriggerSync : undefined}
                 onOpenPolicyPrompt={
                   // VAL-APPROVALS-018 / fix-m2-policy-prompt-never-proactive-open:
                   // The runtime PolicyPromptModal must ONLY open in
@@ -1020,20 +976,6 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
           </>
         )}
 
-        {/* Non-sign failure banner stack — aria-live region that surfaces
-         * ECDH/ping/onboard OperationFailures that couldn't be attributed
-         * to a visible PeerRow (VAL-OPS-015). Rendered unconditionally so
-         * the banner is available in production, sitting near the command
-         * and activity surfaces on the Test page. When empty the container
-         * stays mounted so SR announcements on newly-added banners fire
-         * without the whole region remounting. */}
-        {(testPageActive || dashboardView === "dashboard") && !paperPanels ? (
-          <NonSignFailureBannerStack
-            banners={nonSignFailureBanners}
-            onDismiss={handleDismissNonSignFailureBanner}
-          />
-        ) : null}
-
         {testPageActive ? <SignActivityPanel /> : null}
       </section>
 
@@ -1093,6 +1035,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
                 event={policyModalEvent}
                 onResolve={handleResolvePolicyPrompt}
                 onDismiss={handleDismissPolicyPrompt}
+                showPaperScopedActions={paperPanels}
               />
             )}
           </>

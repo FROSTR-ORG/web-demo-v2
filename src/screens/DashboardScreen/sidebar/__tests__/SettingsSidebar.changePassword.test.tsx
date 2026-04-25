@@ -104,15 +104,15 @@ describe("SettingsSidebar — Change Password (VAL-SETTINGS-018/019/026/027/028)
     renderSidebar();
     openChangePassword();
     fireEvent.change(getField(/current password/i), { target: { value: "oldpass123" } });
-    fireEvent.change(getField(/^new password/i), { target: { value: "short" } });
-    fireEvent.change(getField(/confirm new password/i), { target: { value: "short" } });
+    fireEvent.change(getField(/^new password/i), { target: { value: "abc" } });
+    fireEvent.change(getField(/confirm new password/i), { target: { value: "abc" } });
 
     const save = screen.getByRole("button", {
       name: /update password/i,
     }) as HTMLButtonElement;
     expect(save.disabled).toBe(true);
     expect(screen.getByText(CHANGE_PASSWORD_TOO_SHORT_ERROR)).toBeInTheDocument();
-    expect(CHANGE_PASSWORD_MIN_LENGTH).toBe(8);
+    expect(CHANGE_PASSWORD_MIN_LENGTH).toBe(4);
     expect(mockChangeProfilePassword).not.toHaveBeenCalled();
   });
 

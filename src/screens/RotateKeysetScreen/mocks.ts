@@ -32,9 +32,9 @@ export const MOCK_REMOTE_PACKAGES = [
     idx: 2,
     memberPubkey:
       "02c4e8f9a1d3b5c7e9f0a2b4c6d8e0f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c3d7",
-    packageText: "",
-    password: "",
-    packageCreated: false,
+    packageText: "bfonboard1d1qm9v4xp8czdemo-rotate-share-3",
+    password: "paperpass",
+    packageCreated: true,
     peerOnline: false,
     manuallyMarkedDistributed: false,
     packageCopied: false,

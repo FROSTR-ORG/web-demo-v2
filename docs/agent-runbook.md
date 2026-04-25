@@ -46,8 +46,8 @@ Then read the smallest set of docs for the task:
 4. Update `docs/runtime-deviations-from-paper.md` only when the live app must
    intentionally differ from Paper or a validation-contract phrase.
 5. Run focused component tests first. Use `npm run paper:drift` for
-   synced-reference integrity and `npm run paper:drift -- --mode=live` when
-   you need a ranked live DOM versus Paper work queue.
+   synced-reference integrity and `npm run paper:drift:live` when you need a
+   ranked live DOM versus Paper work queue.
 
 ### Demo scenario or Paper-reference asset
 
@@ -121,9 +121,10 @@ There are two parity modes, and they answer different questions:
   Paper PNG versus the same Paper PNG in the app shell. It should pass after
   `npm run paper:sync` unless a reference path, image dimension, or capture
   pipeline is broken.
-- `npm run paper:drift -- --mode=live --threshold=0.02` captures the live mock
-  React DOM at `/demo/:scenarioId`. Treat failures here as a ranked design
-  work queue, not as proof that runtime behavior is wrong.
+- `npm run paper:drift:live` captures the live mock React DOM at
+  `/demo/:scenarioId`. Treat failures here as a ranked design work queue, not
+  as proof that runtime behavior is wrong. This is the required Paper-parity
+  signal for UI remediation work.
 
 For web-demo parity work, patch the live mock DOM to match Paper by default.
 Patch Paper only when the web demo reflects real protocol/runtime behavior or

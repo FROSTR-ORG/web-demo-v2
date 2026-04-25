@@ -11,10 +11,7 @@ import { ShareBlock } from "./ShareBlock";
 import { MOCK_LOCAL_SHARE } from "./mocks";
 import { maskShare } from "./recoverUtils";
 
-export type RecoverVariant =
-  | "incompatible-shares"
-  | "timeout"
-  | "network-failure";
+export type RecoverVariant = "incompatible-shares";
 
 interface DemoCollectSharesContentProps {
   profileId: string;
@@ -120,10 +117,7 @@ export function DemoCollectSharesScreen() {
   }
 
   const currentProfileId = profileId;
-  const variant =
-    demoUi.recover?.variant === "incompatible-shares"
-      ? "incompatible-shares"
-      : undefined;
+  const variant = demoUi.recover?.variant;
 
   return (
     <AppShell mainVariant="flow" headerMeta={<RecoverHeader keysetName={activeProfile.groupName} />}>

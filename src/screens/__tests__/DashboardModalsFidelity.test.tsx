@@ -206,7 +206,7 @@ describe("VAL-DSH-016 — Export Complete modal", () => {
 });
 
 describe("VAL-DSH-017 / VAL-DSH-022 — Signer Policy Prompt modal", () => {
-  it("renders title, subtitle, metadata grid, countdown, and peer-level decision CTAs (scoped variants hidden per VAL-APPROVALS-013 deviation)", () => {
+  it("renders title, subtitle, metadata grid, countdown, peer-level CTAs, and Paper scoped CTAs", () => {
     renderAt({ dashboard: { modal: "policy-prompt", paperPanels: true } });
     expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
     expect(
@@ -221,21 +221,16 @@ describe("VAL-DSH-017 / VAL-DSH-022 — Signer Policy Prompt modal", () => {
     expect(screen.getByText("kind:1 (Short Text Note)")).toBeInTheDocument();
     // Countdown — reactive denial surface renders a live countdown
     expect(screen.getByText(/Expires in/)).toBeInTheDocument();
-    // Four peer-level decision CTAs. Scoped variants removed per
-    // VAL-APPROVALS-013 since bifrost-rs `setPolicyOverride` only exposes
-    // peer-level granularity — see docs/runtime-deviations-from-paper.md.
+    // Four runtime peer-level decision CTAs plus the Paper fixture's
+    // scoped action row. Runtime behavior is still peer-level; the
+    // Paper-only scoped row dispatches through the same preserved
+    // allow/deny handlers.
     ["Deny", "Allow once", "Always allow", "Always deny"]
       .forEach((label) => {
         expect(screen.getByText(label)).toBeInTheDocument();
       });
-    // Scoped buttons must NOT be rendered.
-    expect(screen.queryByText("Always for kind:1")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Always deny for kind:1"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Always deny for primal.net"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("Always for kind:1")).toBeInTheDocument();
+    expect(screen.getByText("Always deny for primal.net")).toBeInTheDocument();
   });
 
   it("VAL-DSH-022 — clicking Open on the first Pending Approvals row opens the Signer Policy modal", () => {

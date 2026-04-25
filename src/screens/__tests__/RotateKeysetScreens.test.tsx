@@ -520,14 +520,14 @@ describe("RotateGenerationProgressScreen", () => {
    ========================================================== */
 
 describe("RotateWrongPasswordScreen", () => {
-  it("renders Source Share Error heading and failed card", () => {
+  it("renders Source Package Error heading and failed card", () => {
     render(
       <MemoryRouter>
         <RotateWrongPasswordScreen />
       </MemoryRouter>,
     );
     expect(
-      screen.getByRole("heading", { name: "Source Share Error" }),
+      screen.getByRole("heading", { name: "Source Package Error" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Source Share #2")).toBeInTheDocument();
     expect(screen.getByText("Failed")).toBeInTheDocument();
@@ -540,7 +540,7 @@ describe("RotateWrongPasswordScreen", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText(/Wrong password/)).toBeInTheDocument();
-    expect(screen.getByText(/No encrypted backup found/)).toBeInTheDocument();
+    expect(screen.getByText(/No share data found/)).toBeInTheDocument();
   });
 
   it("renders bfshare package text and masked password", () => {
@@ -805,7 +805,7 @@ describe("RotateCreateProfileScreen", () => {
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/progress");
   });
 
-  /* VAL-RTK-004: Relays section lists wss://relay.primal.net (Connected - 24ms)
+  /* VAL-RTK-004: Relays section lists wss://relay.primal.net (neutral status)
      and wss://relay.example.com per Paper shared/2-create-profile. */
   it("renders Paper relays wss://relay.primal.net and wss://relay.example.com", () => {
     render(
@@ -815,7 +815,7 @@ describe("RotateCreateProfileScreen", () => {
     );
     expect(screen.getByText("wss://relay.primal.net")).toBeInTheDocument();
     expect(screen.getByText("wss://relay.example.com")).toBeInTheDocument();
-    expect(screen.getByText(/Connected - 24ms/)).toBeInTheDocument();
+    expect(screen.getByText("Status unavailable")).toBeInTheDocument();
   });
 
   /* VAL-RTK-004: Assigned Local Share panel surfaces Local Share / Keyset rows. */
@@ -919,8 +919,11 @@ describe("RotateDistributeSharesScreen", () => {
         node.textContent?.trim(),
       ),
     ).toEqual(["Share 1", "Share 2", "Share 3"]);
-    expect(container.querySelector(".package-index")).toBeNull();
-    expect(screen.queryByText(/^Index \d+$/)).not.toBeInTheDocument();
+    expect(
+      Array.from(container.querySelectorAll(".package-index")).map((node) =>
+        node.textContent?.trim(),
+      ),
+    ).toEqual(["Index 0", "Index 1", "Index 2"]);
     expect(screen.getByText("Share 1")).toBeInTheDocument();
     expect(screen.getByText("Share 2")).toBeInTheDocument();
     expect(screen.getByText("Share 3")).toBeInTheDocument();
@@ -939,7 +942,6 @@ describe("RotateDistributeSharesScreen", () => {
 
     const passwordInputs = screen.getAllByLabelText(/Package password for share/i);
     fireEvent.change(passwordInputs[0], { target: { value: "rotate-pass-1" } });
-    fireEvent.change(passwordInputs[1], { target: { value: "rotate-pass-2" } });
     for (const button of screen.getAllByRole("button", {
       name: /Create package/i,
     })) {
@@ -982,20 +984,25 @@ describe("RotateDistributeSharesScreen", () => {
     expect(screen.getByText(/fresh share/)).toBeInTheDocument();
   });
 
-  it("renders pending remote shares before any package is created", () => {
+  it("renders the Paper mixed state with share 2 pending and share 3 ready", () => {
     render(
       <MemoryRouter>
         <RotateDistributeSharesScreen />
       </MemoryRouter>,
     );
-    expect(screen.getAllByText("Package not created")).toHaveLength(2);
-    expect(screen.getAllByText("Waiting for package password")).toHaveLength(2);
+    expect(screen.getAllByText("Package not created")).toHaveLength(1);
+    expect(screen.getAllByText("Waiting for package password")).toHaveLength(1);
+    expect(screen.getByText("Ready to distribute")).toBeInTheDocument();
+    expect(screen.getByText(/bfonboard1d1qm9v4xp8cz/)).toBeInTheDocument();
     expect(
       screen.getAllByRole("button", { name: /Copy Package/i })[0],
     ).toBeDisabled();
     expect(
       screen.getAllByRole("button", { name: /Copy Password/i })[0],
     ).toBeDisabled();
+    expect(
+      screen.getAllByRole("button", { name: /Copy Package/i })[1],
+    ).toBeEnabled();
   });
 
   it("creates a rotate package per share through the new mutator", async () => {
@@ -1095,7 +1102,7 @@ describe("RotateDistributionCompleteScreen", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("Distribution Status")).toBeInTheDocument();
-    expect(screen.getByText("All packages distributed")).toBeInTheDocument();
+    expect(screen.getByText("All remote packages complete")).toBeInTheDocument();
   });
 
   it("Finish Distribution button navigates to /dashboard/{profileId} when active profile exists", () => {
@@ -1187,7 +1194,7 @@ describe("RotateDistributionCompleteScreen", () => {
     );
     expect(
       screen.getByText(
-        /2 of 2 remote bfonboard packages have been accounted for/,
+        /2 of 2 remote bfonboard packages are complete/,
       ),
     ).toBeInTheDocument();
   });

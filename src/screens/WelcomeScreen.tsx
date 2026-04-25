@@ -8,6 +8,7 @@ import { AppShell } from "../components/shell";
 import { Button, PasswordField } from "../components/ui";
 import { useDemoUi } from "../demo/demoUi";
 import { shortHex } from "../lib/bifrost/format";
+import { ProfileLoadTransitionScreen } from "./ProfileLoadTransitionScreen";
 
 export function WelcomeScreen() {
   const navigate = useNavigate();
@@ -29,6 +30,10 @@ export function WelcomeScreen() {
     demoUi.welcome?.passwordPreset ?? "",
   );
   const [error, setError] = useState(demoUi.welcome?.unlockError ?? "");
+  const [profileLoadTransition, setProfileLoadTransition] = useState<{
+    variant: "loading" | "error";
+    profileId: string;
+  } | null>(null);
   const returning = profiles.length > 0;
   const isMulti = profiles.length >= 2;
   const isMany = profiles.length >= 4;
@@ -88,16 +93,38 @@ export function WelcomeScreen() {
       return;
     }
     setError("");
+    const profileId = unlocking;
+    setUnlocking(null);
+    setProfileLoadTransition({ variant: "loading", profileId });
     try {
-      await unlockProfile(unlocking, password);
-      navigate(`/dashboard/${unlocking}`);
+      await unlockProfile(profileId, password);
+      navigate(`/dashboard/${profileId}`);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Incorrect password. Please try again.",
-      );
+      setError(err instanceof Error ? err.message : String(err));
+      setProfileLoadTransition({ variant: "error", profileId });
     }
+  }
+
+  const transitionProfile = profileLoadTransition
+    ? profiles.find((profile) => profile.id === profileLoadTransition.profileId)
+    : null;
+
+  if (profileLoadTransition && transitionProfile) {
+    return (
+      <ProfileLoadTransitionScreen
+        variant={profileLoadTransition.variant}
+        profile={transitionProfile}
+        onRetry={() => {
+          setProfileLoadTransition(null);
+          setUnlocking(profileLoadTransition.profileId);
+        }}
+        onBackToProfiles={() => {
+          setProfileLoadTransition(null);
+          setUnlocking(null);
+          setError("");
+        }}
+      />
+    );
   }
 
   function openUnlock(profileId: string) {

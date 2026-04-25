@@ -39,9 +39,9 @@ export const DEMO_GROUP_PK_HEX =
 export const DEMO_SHARE_PK_HEX_0 =
   "02a3f8c2d1e2f3a4b5c6d7e8f9a0b1c28f2c4a0000000000000000000000000000";
 export const DEMO_SHARE_PK_HEX_1 =
-  "02d7e1b9f3a4c5d6e7f8a9b0c1d2e33b9e7d000000000000000000000000000000";
+  "02d7e1b9f3a4c5d6e7f8a9b0c1d2e33b9e7d000000000000000000000000003b9e";
 export const DEMO_SHARE_PK_HEX_2 =
-  "029c4a8e2f3b4c5d6e7f8a9b0c1d26a1f5e0000000000000000000000000000000";
+  "029c4a8e2f3b4c5d6e7f8a9b0c1d26a1f5e0000000000000000000000000001f5e";
 export const DEMO_BFPROFILE =
   "bfprofile1qvz8k2afcqqszq2v5v5hnpfdk2auecfnhge355m0dh8g6ms4e2f4j9p0x7z";
 export const DEMO_BFONBOARD =
@@ -218,7 +218,7 @@ export const demoRuntimeStatus: RuntimeStatusSummary = {
     },
     {
       idx: 1,
-      pubkey: "02d7e1b9f3a4c5d6e7f8a9b0c1d2e33b9e7d",
+      pubkey: DEMO_SHARE_PK_HEX_1,
       known: true,
       last_seen: now - 16000,
       online: true,
@@ -230,7 +230,7 @@ export const demoRuntimeStatus: RuntimeStatusSummary = {
     },
     {
       idx: 2,
-      pubkey: "029c4a8e2f3b4c5d6e7f8a9b0c1d26a1f5e",
+      pubkey: DEMO_SHARE_PK_HEX_2,
       known: true,
       last_seen: null,
       online: false,
@@ -254,7 +254,7 @@ export const demoRuntimeStatus: RuntimeStatusSummary = {
       },
     },
     {
-      pubkey: "02d7e1b9f3a4c5d6e7f8a9b0c1d2e33b9e7d",
+      pubkey: DEMO_SHARE_PK_HEX_1,
       manual_override: null,
       remote_observation: null,
       effective_policy: {
@@ -265,7 +265,7 @@ export const demoRuntimeStatus: RuntimeStatusSummary = {
       },
     },
     {
-      pubkey: "029c4a8e2f3b4c5d6e7f8a9b0c1d26a1f5e",
+      pubkey: DEMO_SHARE_PK_HEX_2,
       manual_override: null,
       remote_observation: null,
       effective_policy: {

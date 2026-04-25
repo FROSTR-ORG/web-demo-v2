@@ -111,12 +111,19 @@ Run the broad Paper-reference raster audit with:
 npm run paper:drift -- --threshold=0.02
 ```
 
-The audit captures `.app-shell` at 1440x1080, compares against
+This raw-mode audit captures `.app-shell` at 1440x1080, compares against
 `public/paper-reference/{scenario-id}.png`, writes failure artifacts under
 `test-results/paper-drift/`, and fails when any scenario exceeds 2% drift.
-For diagnostic live mock-DOM parity work, keep the default command unchanged
-and add `-- --mode=live` to capture `/demo/{scenario-id}` instead of the raw
-Paper-reference surface.
+It is a reference-plumbing check: the synced Paper PNG rendered by the app is
+compared against the synced Paper PNG on disk. For implemented-demo parity,
+run the live audit instead:
+
+```bash
+npm run paper:drift:live -- --keep-passing-artifacts
+```
+
+Live mode captures `/demo/{scenario-id}` without `?chrome=0`; this is the
+required signal for UI parity remediation.
 
 ## Paper Parity Split Patterns
 

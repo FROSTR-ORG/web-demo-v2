@@ -1,11 +1,12 @@
 import { Check, X } from "lucide-react";
 import { useState } from "react";
+import { DEMO_PASSWORD_MIN_LENGTH } from "../../../app/AppStateTypes";
 import type { ExportMode } from "../types";
 
 function getPasswordStrength(pw: string): number {
   if (pw.length === 0) return 0;
   let score = 0;
-  if (pw.length >= 6) score += 1;
+  if (pw.length >= DEMO_PASSWORD_MIN_LENGTH) score += 1;
   if (pw.length >= 10) score += 1;
   if (/[A-Z]/.test(pw) && /[0-9]/.test(pw)) score += 1;
   return Math.min(score, 3);
@@ -40,7 +41,8 @@ export function ExportProfileModal({
   const strength = getPasswordStrength(password);
 
   const strengthColors = ["#EF4444", "#F59E0B", "#22C55E"];
-  const canExport = passwordsMatch && password.length >= 8 && !exporting;
+  const canExport =
+    passwordsMatch && password.length >= DEMO_PASSWORD_MIN_LENGTH && !exporting;
   const title = mode === "profile" ? "Export Profile" : "Export Share";
   const passwordLabel = mode === "profile" ? "Export Password" : "Share Export Password";
   const description =

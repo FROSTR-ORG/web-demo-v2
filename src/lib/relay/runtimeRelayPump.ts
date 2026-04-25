@@ -100,6 +100,42 @@ export interface RuntimeDrainBatch {
   events: RuntimeEvent[];
 }
 
+export type RuntimeRelayDiagnosticEvent =
+  | {
+      type: "subscription_started";
+      relays: string[];
+      filter: RelayFilter;
+      at: number;
+    }
+  | {
+      type: "inbound_event";
+      relay: string;
+      eventId?: string;
+      kind?: number;
+      at: number;
+    }
+  | {
+      type: "inbound_accepted" | "inbound_rejected";
+      relay: string;
+      eventId?: string;
+      kind?: number;
+      message?: string;
+      at: number;
+    }
+  | {
+      type: "outbound_drained";
+      count: number;
+      at: number;
+    }
+  | {
+      type: "outbound_publish_ok" | "outbound_publish_failed";
+      relay: string;
+      eventId?: string;
+      kind?: number;
+      message?: string;
+      at: number;
+    };
+
 interface RuntimeRelayPumpOptions {
   runtime: RuntimeClient;
   relays: string[];
@@ -129,6 +165,12 @@ interface RuntimeRelayPumpOptions {
    * recorders such as the dev-only `window.__debug.relayHistory` ring.
    */
   onSocketEvent?: (event: RelaySocketEvent) => void;
+  /**
+   * Dev/test diagnostic hook for source-side relay handshakes. Events are
+   * redacted to ids/kinds/counts only and must never include Nostr content
+   * or package/share material.
+   */
+  onDiagnostic?: (event: RuntimeRelayDiagnosticEvent) => void;
   /**
    * m5-relay-telemetry — override the interval (ms) between per-relay
    * latency probes. Defaults to {@link RELAY_PING_INTERVAL_MS}. Unit
@@ -164,6 +206,17 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function eventMeta(event: unknown): { eventId?: string; kind?: number } {
+  if (typeof event !== "object" || event === null) {
+    return {};
+  }
+  const candidate = event as { id?: unknown; kind?: unknown };
+  return {
+    eventId: typeof candidate.id === "string" ? candidate.id : undefined,
+    kind: typeof candidate.kind === "number" ? candidate.kind : undefined,
+  };
+}
+
 export class RuntimeRelayPump {
   private readonly runtime: RuntimeClient;
   private readonly relayClient: RelayClient;
@@ -178,6 +231,7 @@ export class RuntimeRelayPump {
   private eventKindPromise: Promise<number>;
 
   private readonly onSocketEventHook?: (event: RelaySocketEvent) => void;
+  private readonly onDiagnostic?: (event: RuntimeRelayDiagnosticEvent) => void;
   private readonly lastFilter: { current: RelayFilter | null };
   private readonly pingIntervalMs: number;
   private readonly pingTimeoutMs: number;
@@ -186,6 +240,7 @@ export class RuntimeRelayPump {
     const relays = uniqueRelays(options.relays);
     this.runtime = options.runtime;
     this.onSocketEventHook = options.onSocketEvent;
+    this.onDiagnostic = options.onDiagnostic;
     // Install our own socket-event handler so the pump can drive
     // reconnectCount / lastCloseCode telemetry regardless of whether the
     // caller supplied its own BrowserRelayClient. When the caller did
@@ -229,6 +284,14 @@ export class RuntimeRelayPump {
     return this.relayStatusesValue.map((status) => ({ ...status }));
   }
 
+  private emitDiagnostic(event: RuntimeRelayDiagnosticEvent): void {
+    try {
+      this.onDiagnostic?.(event);
+    } catch {
+      // Diagnostics are observational only and must not affect relay IO.
+    }
+  }
+
   async start(): Promise<RuntimeStatusSummary> {
     this.stopped = false;
     this.connections.forEach((entry) => {
@@ -250,10 +313,15 @@ export class RuntimeRelayPump {
     const eventKind = await this.eventKindPromise;
     const filter: RelayFilter = {
       kinds: [eventKind],
-      authors: metadata.peers,
       "#p": [metadata.share_public_key],
     };
     this.lastFilter.current = filter;
+    this.emitDiagnostic({
+      type: "subscription_started",
+      relays: this.connections.map((entry) => entry.url),
+      filter,
+      at: this.now(),
+    });
 
     await Promise.all(
       this.connections.map((entry) => this.connectOne(entry, filter)),
@@ -618,7 +686,7 @@ export class RuntimeRelayPump {
         return;
       }
       entry.subscription = connection.subscribe(filter, (event) => {
-        this.handleInboundEvent(event);
+        this.handleInboundEvent(event, entry.url);
       });
       // m5-relay-telemetry: reset per-connection counters on (re)connect
       // so VAL-SETTINGS-011 sees `eventsReceived = 0` immediately after
@@ -806,6 +874,13 @@ export class RuntimeRelayPump {
 
   private async publishOutboundEvents(): Promise<void> {
     const events = this.runtime.drainOutboundEvents();
+    if (events.length > 0) {
+      this.emitDiagnostic({
+        type: "outbound_drained",
+        count: events.length,
+        at: this.now(),
+      });
+    }
     const online = this.connections.filter(
       (entry) =>
         entry.connection &&
@@ -815,9 +890,23 @@ export class RuntimeRelayPump {
     await Promise.all(
       online.flatMap((entry) =>
         events.map(async (event) => {
+          const meta = eventMeta(event);
           try {
             await entry.connection?.publish(event);
+            this.emitDiagnostic({
+              type: "outbound_publish_ok",
+              relay: entry.url,
+              ...meta,
+              at: this.now(),
+            });
           } catch (error) {
+            this.emitDiagnostic({
+              type: "outbound_publish_failed",
+              relay: entry.url,
+              ...meta,
+              message: errorMessage(error),
+              at: this.now(),
+            });
             entry.connection?.close();
             entry.subscription = null;
             entry.connection = null;
@@ -831,14 +920,34 @@ export class RuntimeRelayPump {
     );
   }
 
-  private handleInboundEvent(event: unknown): void {
+  private handleInboundEvent(event: unknown, relay: string): void {
     if (this.stopped) {
       return;
     }
+    const meta = eventMeta(event);
+    this.emitDiagnostic({
+      type: "inbound_event",
+      relay,
+      ...meta,
+      at: this.now(),
+    });
     try {
       this.runtime.handleInboundEvent(event);
+      this.emitDiagnostic({
+        type: "inbound_accepted",
+        relay,
+        ...meta,
+        at: this.now(),
+      });
       void this.pump();
-    } catch {
+    } catch (error) {
+      this.emitDiagnostic({
+        type: "inbound_rejected",
+        relay,
+        ...meta,
+        message: errorMessage(error),
+        at: this.now(),
+      });
       // The runtime owns recipient and payload validation. Non-routable relay
       // events are expected on shared subscriptions.
     }

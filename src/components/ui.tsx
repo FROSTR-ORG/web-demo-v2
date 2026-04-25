@@ -153,8 +153,17 @@ export function NumberStepper({
   );
 }
 
-export function Stepper({ current, variant = "create" }: { current: 1 | 2 | 3; variant?: "create" | "shared" | "rotate-keyset" }) {
+export function Stepper({
+  current,
+  variant = "create",
+  completedStyle = "check",
+}: {
+  current: 1 | 2 | 3;
+  variant?: "create" | "shared" | "rotate-keyset";
+  completedStyle?: "check" | "number";
+}) {
   const step1Label = variant === "rotate-keyset" ? "Rotate Keyset" : "Create Keyset";
+  const ariaLabel = variant === "rotate-keyset" ? "Rotate progress" : "Create progress";
   const step2Label = "Setup Profile";
   const step3Label = "Onboard Devices";
   const steps = [
@@ -163,9 +172,19 @@ export function Stepper({ current, variant = "create" }: { current: 1 | 2 | 3; v
     { n: 3, label: step3Label }
   ] as const;
   return (
-    <div className={`stepper stepper-${variant}`} aria-label="Create progress">
+    <div
+      className={`stepper stepper-${variant} stepper-completed-${completedStyle}`}
+      aria-label={ariaLabel}
+    >
       {steps.map((step, index) => (
-        <FragmentStep key={step.n} step={step} current={current} lineDone={step.n < current} last={index === steps.length - 1} />
+        <FragmentStep
+          key={step.n}
+          step={step}
+          current={current}
+          lineDone={step.n < current}
+          last={index === steps.length - 1}
+          completedStyle={completedStyle}
+        />
       ))}
     </div>
   );
@@ -175,18 +194,26 @@ function FragmentStep({
   step,
   current,
   lineDone,
-  last
+  last,
+  completedStyle,
 }: {
   step: { n: 1 | 2 | 3; label: string };
   current: 1 | 2 | 3;
   lineDone: boolean;
   last: boolean;
+  completedStyle: "check" | "number";
 }) {
   const state = step.n < current ? "done" : step.n === current ? "active" : "";
   return (
     <>
-      <div className={`step ${state}`}>
-        <div className="step-dot">{step.n < current ? <Check size={16} /> : step.n}</div>
+      <div className={`step ${state}`} data-step={step.n}>
+        <div className="step-dot" data-step={step.n}>
+          {step.n < current && completedStyle === "check" ? (
+            <Check size={16} />
+          ) : (
+            step.n
+          )}
+        </div>
         <div>{step.label}</div>
       </div>
       {last ? null : <div className={`step-line ${lineDone ? "done" : ""}`} />}

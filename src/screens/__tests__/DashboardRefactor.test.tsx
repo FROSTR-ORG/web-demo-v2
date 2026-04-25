@@ -372,7 +372,7 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
   });
 
   describe("VAL-DSH-017: Signer Policy Prompt modal", () => {
-    it("renders request meta table and peer-level decision CTAs (scoped variants hidden per VAL-APPROVALS-013 deviation)", () => {
+    it("renders request meta table, peer-level decision CTAs, and Paper scoped CTAs", () => {
       renderAt({ dashboard: { modal: "policy-prompt", paperPanels: true } });
       expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
       expect(
@@ -383,13 +383,12 @@ describe("Dashboard refactor — content parity after module split (VAL-DSH-100/
       expect(screen.getByText("PUBKEY")).toBeInTheDocument();
       expect(screen.getByText("DOMAIN")).toBeInTheDocument();
       expect(screen.getByText(/Expires in/)).toBeInTheDocument();
-      // Peer-level decision CTAs (scoped kind/domain variants removed per
-      // VAL-APPROVALS-013 — documented in docs/runtime-deviations-from-paper.md).
       expect(screen.getByText("Deny")).toBeInTheDocument();
       expect(screen.getByText("Allow once")).toBeInTheDocument();
       expect(screen.getByText("Always allow")).toBeInTheDocument();
       expect(screen.getByText("Always deny")).toBeInTheDocument();
-      expect(screen.queryByText("Always for kind:1")).not.toBeInTheDocument();
+      expect(screen.getByText("Always for kind:1")).toBeInTheDocument();
+      expect(screen.getByText("Always deny for primal.net")).toBeInTheDocument();
     });
   });
 

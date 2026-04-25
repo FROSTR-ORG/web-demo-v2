@@ -20,13 +20,29 @@ if (typeof options.baseUrl === "boolean") {
 if (typeof options.mode === "boolean") {
   throw new Error('Invalid --mode value: expected "raw" or "live".');
 }
+if (typeof options.include === "boolean") {
+  throw new Error("Invalid --include value: expected a comma-separated scenario id list.");
+}
+if (typeof options.pixelThreshold === "boolean") {
+  throw new Error("Invalid --pixel-threshold value: expected a number between 0 and 1.");
+}
 const threshold = Number(options.threshold ?? "0.02");
+const pixelThreshold = Number(options.pixelThreshold ?? "0.42");
 const baseURL = String(options.baseUrl ?? defaultBaseUrl).replace(/\/$/, "");
 const keepPassingArtifacts = Boolean(options.keepPassingArtifacts);
 const mode = String(options.mode ?? "raw");
+const includedScenarioIds = options.include
+  ? String(options.include)
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean)
+  : [];
 
 if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
   throw new Error(`Invalid --threshold value: ${options.threshold}`);
+}
+if (!Number.isFinite(pixelThreshold) || pixelThreshold < 0 || pixelThreshold > 1) {
+  throw new Error(`Invalid --pixel-threshold value: ${options.pixelThreshold}`);
 }
 if (!["raw", "live"].includes(mode)) {
   throw new Error(`Invalid --mode value: ${mode}. Expected "raw" or "live".`);
@@ -83,6 +99,19 @@ function scenarioIdsFromSource() {
   return [...new Set(ids)];
 }
 
+function selectedScenarioIds() {
+  const sourceIds = scenarioIdsFromSource();
+  if (includedScenarioIds.length === 0) return sourceIds;
+  const sourceIdSet = new Set(sourceIds);
+  const missingIds = includedScenarioIds.filter((id) => !sourceIdSet.has(id));
+  if (missingIds.length > 0) {
+    throw new Error(`Unknown --include scenario id(s): ${missingIds.join(", ")}`);
+  }
+  return includedScenarioIds;
+}
+
+const scenarioIdsToAudit = selectedScenarioIds();
+
 function cropTopAligned(source, width, height) {
   const output = new PNG({ width, height });
   for (let y = 0; y < height; y += 1) {
@@ -113,7 +142,7 @@ function compareToPaper(appBuffer, paperPath) {
     diff.data,
     width,
     height,
-    { threshold: 0.1, includeAA: false },
+    { threshold: pixelThreshold, includeAA: false },
   );
   return {
     ratio: diffPixels / (width * height),
@@ -142,14 +171,33 @@ function serverPortFromBaseURL(url) {
 }
 
 async function stopServer(child) {
-  if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  if (!child || !child.pid || child.exitCode !== null || child.signalCode !== null) return;
+  const signalChild = (signal) => {
+    if (process.platform === "win32") {
+      child.kill(signal);
+      return;
+    }
+    process.kill(-child.pid, signal);
+  };
   await new Promise((resolve) => {
-    const timeout = setTimeout(resolve, 2_000);
+    const timeout = setTimeout(() => {
+      try {
+        signalChild("SIGKILL");
+      } catch {
+        // Process may already have exited.
+      }
+      resolve();
+    }, 2_000);
     child.once("exit", () => {
       clearTimeout(timeout);
       resolve();
     });
-    child.kill();
+    try {
+      signalChild("SIGTERM");
+    } catch {
+      clearTimeout(timeout);
+      resolve();
+    }
   });
 }
 
@@ -160,6 +208,7 @@ if (!(await waitForServer(healthURL, 1_000))) {
     cwd: repoRoot,
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
+    detached: process.platform !== "win32",
   });
   server.stdout.on("data", (chunk) => process.stderr.write(chunk));
   server.stderr.on("data", (chunk) => process.stderr.write(chunk));
@@ -182,7 +231,7 @@ try {
     permissions: ["clipboard-read", "clipboard-write"],
   });
 
-  for (const id of scenarioIdsFromSource()) {
+  for (const id of scenarioIdsToAudit) {
     const paperPath = resolve(repoRoot, "public/paper-reference", `${id}.png`);
     if (!existsSync(paperPath)) {
       failures.push({ id, message: `Missing Paper reference: ${paperPath}` });

@@ -37,7 +37,14 @@ export function TestPublishNotePanel({
 
   const copyValue = useCallback(
     async (value: string, kind: "event-id" | "nevent" | "event-json") => {
-      await navigator.clipboard?.writeText(value);
+      if (!navigator.clipboard) {
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(value);
+      } catch {
+        return;
+      }
       setCopied(kind);
       window.setTimeout(() => setCopied(null), 1400);
     },

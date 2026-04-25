@@ -22,6 +22,22 @@ const mocks = vi.hoisted(() => ({
     phase: "decoded" | "handshaking" | "ready_to_save" | "failed";
     packageString: string;
     payload: { share_secret: string; relays: string[]; peer_pk: string };
+    progress?: {
+      relays: "pending" | "connecting" | "connected" | "failed";
+      request: "pending" | "published" | "failed";
+      response: "pending" | "candidate" | "received" | "failed";
+      snapshot: "pending" | "built" | "failed";
+      connectedRelays?: string[];
+      publishedRelays?: string[];
+      activeRequestCount?: number;
+      responseCandidateCount?: number;
+      lastResponseRelay?: string;
+      lastEventAt?: number;
+      responseDecodedAt?: number;
+      snapshotBuiltAt?: number;
+      requestAttempts?: number;
+      retryDelayMs?: number;
+    };
     response?: {
       group: { group_name: string; threshold: number; members: Array<{ idx: number; pubkey: string }> };
       nonces: unknown[];
@@ -88,6 +104,12 @@ function makeOnboardSession() {
       share_secret: "1".repeat(64),
       relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
       peer_pk: "02a3f8c2d1e4b7f9a0c3d2e1b6f8a7c4d2e1b9f3a4c5d6e7f8a9b0c1d28f2c"
+    },
+    progress: {
+      relays: "pending" as const,
+      request: "pending" as const,
+      response: "pending" as const,
+      snapshot: "pending" as const
     }
   };
 }
@@ -217,11 +239,62 @@ describe("HandshakeScreen", () => {
     );
     expect(screen.getByText("Onboarding...")).toBeInTheDocument();
     expect(screen.getByText("Connected to relays")).toBeInTheDocument();
-    expect(screen.getByText("Found source device")).toBeInTheDocument();
-    expect(screen.getByText("Receiving keyset data")).toBeInTheDocument();
-    expect(screen.getByText("Saving to device")).toBeInTheDocument();
+    expect(screen.getByText("Request accepted by relays")).toBeInTheDocument();
+    expect(screen.getByText("Waiting for source response")).toBeInTheDocument();
+    expect(screen.getByText("Preparing signer state")).toBeInTheDocument();
+    expect(screen.queryByText("Saving to device")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Cancel Onboarding/i })).toBeInTheDocument();
     expect(mocks.startOnboardHandshake).toHaveBeenCalled();
+  });
+
+  it("does not show later product steps as complete before relay progress reaches them", () => {
+    mocks.onboardSession = {
+      ...makeOnboardSession(),
+      progress: {
+        relays: "connected",
+        request: "pending",
+        response: "pending",
+        snapshot: "pending",
+        connectedRelays: ["wss://relay.primal.net"]
+      }
+    };
+    const { container } = render(
+      <MemoryRouter>
+        <HandshakeScreen />
+      </MemoryRouter>
+    );
+    const rows = Array.from(container.querySelectorAll(".onboard-timeline-step"));
+    const sourceRow = rows.find((row) =>
+      row.textContent?.includes("Request accepted by relays"),
+    );
+    const responseRow = rows.find((row) =>
+      row.textContent?.includes("Waiting for source response"),
+    );
+    expect(sourceRow?.querySelector(".onboard-dot.done")).toBeNull();
+    expect(responseRow?.querySelector(".onboard-dot.done")).toBeNull();
+  });
+
+  it("shows retry detail while waiting for the source response", () => {
+    mocks.onboardSession = {
+      ...makeOnboardSession(),
+      progress: {
+        relays: "connected",
+        request: "published",
+        response: "pending",
+        snapshot: "pending",
+        publishedRelays: ["wss://relay.primal.net"],
+        requestAttempts: 3,
+        retryDelayMs: 5_000
+      }
+    };
+    render(
+      <MemoryRouter>
+        <HandshakeScreen />
+      </MemoryRouter>
+    );
+    expect(
+      screen.getByText(/Waiting for source response · attempt 3 · retrying every 5s/),
+    ).toBeInTheDocument();
   });
 
   it("does not render a Back link (VAL-ONB-002)", () => {
@@ -259,6 +332,39 @@ describe("HandshakeScreen", () => {
     /* When no state, the component renders nothing (Navigate redirects) */
     expect(container.textContent).toBe("");
   });
+
+  it("does not allow product /onboard/handshake to render demo state without an explicit demo marker", () => {
+    mocks.locationState = {
+      packageString: "bfonboard1abc123",
+      demoUi: { onboard: { packagePreset: "bfonboard1abc123" } },
+    };
+    const { container } = render(
+      <MemoryRouter>
+        <HandshakeScreen />
+      </MemoryRouter>
+    );
+    expect(container.textContent).toBe("");
+    expect(screen.queryByText("Found source device")).not.toBeInTheDocument();
+    expect(screen.queryByText("Saving to device")).not.toBeInTheDocument();
+  });
+
+  it("keeps the demo handshake available for explicitly marked demo scenarios", () => {
+    mocks.locationState = {
+      packageString: "bfonboard1abc123",
+      demoUi: {
+        __demoScenario: true,
+        progress: { frozen: true },
+        onboard: { packagePreset: "bfonboard1abc123" },
+      },
+    };
+    render(
+      <MemoryRouter>
+        <HandshakeScreen />
+      </MemoryRouter>
+    );
+    expect(screen.getByText("Onboarding...")).toBeInTheDocument();
+    expect(screen.getByText("Found source device")).toBeInTheDocument();
+  });
 });
 
 describe("OnboardingFailedScreen", () => {
@@ -270,7 +376,7 @@ describe("OnboardingFailedScreen", () => {
     );
     expect(screen.getByText("Onboarding Failed")).toBeInTheDocument();
     expect(screen.getByText("Onboarding Timed Out")).toBeInTheDocument();
-    expect(screen.getByText(/peer did not respond/)).toBeInTheDocument();
+    expect(screen.getByText(/source device confirmed/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Retry/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Back to Onboarding/i })).toBeInTheDocument();
     /* VAL-ONB-003: amber/timeout variant carries Paper's exact Tailwind tokens. */

@@ -45,6 +45,7 @@ import {
   ONBOARD_SPONSOR_RELAY_EMPTY_ERROR,
   ONBOARD_SPONSOR_SIGNER_PAUSED_ERROR,
   ONBOARD_SPONSOR_THRESHOLD_INVALID_ERROR,
+  type OnboardSponsorSession,
 } from "../app/AppStateTypes";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField, TextField } from "../components/ui";
@@ -75,6 +76,43 @@ export function passwordStrengthLabel(password: string): "weak" | "ok" | "strong
   if (password.length >= 14 && categories >= 3) return "strong";
   if (categories >= 2) return "ok";
   return "weak";
+}
+
+function sponsorStatusCopy(
+  session: OnboardSponsorSession,
+): { title: string; description: string; tone: "waiting" | "done" | "failed" } {
+  switch (session.status ?? "awaiting_adoption") {
+    case "completed":
+      return {
+        title: "Device onboarded",
+        description:
+          "The source device received the onboarding confirmation echo.",
+        tone: "done",
+      };
+    case "failed":
+      return {
+        title: "Onboarding failed",
+        description:
+          session.failureReason ??
+          "The source device did not receive a valid onboarding confirmation.",
+        tone: "failed",
+      };
+    case "cancelled":
+      return {
+        title: "Sponsorship cancelled",
+        description:
+          "Late onboarding responses from this package will be rejected.",
+        tone: "failed",
+      };
+    case "awaiting_adoption":
+    default:
+      return {
+        title: "Waiting for new device...",
+        description:
+          "Keep this page open while the new device saves the share and sends its confirmation.",
+        tone: "waiting",
+      };
+  }
 }
 
 /* ==========================================================
@@ -601,6 +639,7 @@ export function OnboardSponsorHandoffScreen() {
   }
 
   const headerMeta = activeProfile?.groupName ?? "Onboard a Device";
+  const statusCopy = sponsorStatusCopy(onboardSponsorSession);
 
   return (
     <AppShell mainVariant="flow" headerMeta={headerMeta}>
@@ -609,6 +648,18 @@ export function OnboardSponsorHandoffScreen() {
           title="Onboard Package Ready"
           copy={`Hand the package below to ${onboardSponsorSession.deviceLabel}. They will enter the password you chose to complete onboarding.`}
         />
+
+        <div
+          className={`onboard-sponsor-status ${statusCopy.tone}`}
+          data-testid="onboard-sponsor-status"
+        >
+          <span className="onboard-sponsor-status-title">
+            {statusCopy.title}
+          </span>
+          <span className="onboard-sponsor-status-copy">
+            {statusCopy.description}
+          </span>
+        </div>
 
         <div className="field">
           <label className="label" htmlFor="onboard-sponsor-package">
@@ -659,6 +710,21 @@ export function OnboardSponsorHandoffScreen() {
             the package.
           </span>
         </div>
+
+        {onboardSponsorSession.status === "failed" && (
+          <Button
+            type="button"
+            variant="secondary"
+            size="full"
+            onClick={() => {
+              clearOnboardSponsorSession();
+              navigate("/onboard-sponsor");
+            }}
+            data-testid="onboard-sponsor-retry-btn"
+          >
+            Create Another Package
+          </Button>
+        )}
 
         <Button
           type="button"

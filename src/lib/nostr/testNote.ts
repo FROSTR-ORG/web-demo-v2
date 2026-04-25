@@ -93,10 +93,18 @@ export function finalizeTextNoteEvent(
   };
 }
 
-export function encodeMinimalNevent(eventId: string): string {
+export function encodeMinimalNevent(eventId: string, relays: string[] = []): string {
   const normalized = normalizeNostrEventId(eventId);
   const eventIdBytes = hexToBytes(normalized);
   const tlvBytes = [0, eventIdBytes.length, ...eventIdBytes];
+  const encoder = new TextEncoder();
+  for (const relay of relays) {
+    const relayBytes = Array.from(encoder.encode(relay));
+    if (relayBytes.length > 255) {
+      throw new Error("Nostr nevent relay hint exceeds the 255-byte TLV limit.");
+    }
+    tlvBytes.push(1, relayBytes.length, ...relayBytes);
+  }
   return bech32Encode("nevent", tlvBytes);
 }
 

@@ -375,7 +375,7 @@ describe("fix-m7-onboard-distinct-share-allocation — pool allocation", () => {
           deviceLabel: "Bob Laptop",
           password: "sponsor-password",
           relays: ["wss://relay.local"],
-          profilePassword: "short",
+          profilePassword: "abc",
         });
       } catch (err) {
         errorMessage = err instanceof Error ? err.message : String(err);
@@ -480,6 +480,51 @@ describe("fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — VAL-ONBOARD-013",
 });
 
 describe("fix-m7-scrutiny-r1-sponsor-concurrency-and-badge — VAL-ONBOARD-011 badge", () => {
+  it("transitions the matching sponsor session to completed when the Onboard echo drains", async () => {
+    const { getState } = await bootProvider();
+    await act(async () => {
+      await getState().createOnboardSponsorPackage({
+        deviceLabel: "Bob Laptop",
+        password: "sponsor-password",
+        relays: ["wss://relay.local"],
+        profilePassword: "profile-password",
+      });
+    });
+    const requestId = getState().onboardSponsorSession?.requestId;
+    expect(requestId).toBeTruthy();
+    expect(getState().onboardSponsorSession?.status).toBe(
+      "awaiting_adoption",
+    );
+
+    const originalDrainCompletions =
+      RuntimeClient.prototype.drainCompletions;
+    let injected = false;
+    RuntimeClient.prototype.drainCompletions = function patched(
+      this: RuntimeClient,
+    ) {
+      const real = originalDrainCompletions.call(this);
+      if (!injected) {
+        injected = true;
+        return [
+          ...real,
+          { Onboard: { request_id: requestId } } as unknown as CompletedOperation,
+        ];
+      }
+      return real;
+    };
+    try {
+      await act(async () => {
+        getState().refreshRuntime();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      await waitFor(() =>
+        expect(getState().onboardSponsorSession?.status).toBe("completed"),
+      );
+    } finally {
+      RuntimeClient.prototype.drainCompletions = originalDrainCompletions;
+    }
+  }, 45_000);
+
   // polish-2nd-pass-code-tests — replaced the original tautology
   // (constructed a TS literal and asserted `entry.badge === 'ONBOARD'`)
   // with a real test that drives a synthetic `CompletedOperation::Onboard`

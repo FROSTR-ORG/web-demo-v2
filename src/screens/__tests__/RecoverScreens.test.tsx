@@ -331,7 +331,7 @@ describe("RecoverSuccessScreen", () => {
     // The fake recovered key is a demo-gallery affordance; product routes must
     // continue reading recovered keys only from the AppState recovery session.
     renderSuccess({
-      demoUi: { recover: { variant: "success", revealed: true } },
+      demoUi: { recover: { revealed: true } },
     });
     expect(
       screen.queryByText(
@@ -349,7 +349,7 @@ describe("RecoverSuccessScreen", () => {
       clipboard: { writeText: vi.fn(() => Promise.resolve()) },
     });
     renderSuccess({
-      demoUi: { recover: { variant: "success", copied: true } },
+      demoUi: { recover: { copied: true } },
     });
 
     const paperNsec =

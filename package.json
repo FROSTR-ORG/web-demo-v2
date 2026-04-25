@@ -13,6 +13,7 @@
     "wasm:build": "node scripts/build-wasm.mjs",
     "paper:sync": "node scripts/sync-paper.mjs",
     "paper:drift": "node scripts/audit-paper-drift.mjs --threshold=0.02",
+    "paper:drift:live": "node scripts/audit-paper-drift.mjs --mode=live --threshold=0.02",
     "lint": "echo 'lint via tsc+vitest (see docs/allowed-console-warnings.md)'",
     "format:check": "echo 'format:check via tsc+vitest (see docs/allowed-console-warnings.md)'"
   },

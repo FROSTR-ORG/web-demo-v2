@@ -26,13 +26,14 @@ export function RotateWrongPasswordScreen() {
       : `Source Share #${state?.details?.sourceIndex ?? 2}`;
   const message =
     state?.errorMessage ??
-    "Wrong password. Unable to decrypt this bfshare source package.";
-  const showPaperPlaceholders = !state;
+    "Wrong password. Unable to decrypt this source package.";
+  const paperAlignedMessage = message.replaceAll(
+    "bfshare source package",
+    "source package",
+  );
   const failedPackageDisplay =
     state?.details?.packagePrefix ??
-    (showPaperPlaceholders ? "bfshare1qvz8k2afcqqszq..." : null);
-  const showRelayWarning =
-    Boolean(state?.details?.relayChecked) || showPaperPlaceholders;
+    "bfshare1qvz8k2afcqqszq...";
 
   return (
     <AppShell headerMeta={MOCK_SOURCE_SHARE_1.label} mainVariant="flow">
@@ -44,8 +45,8 @@ export function RotateWrongPasswordScreen() {
           }
         />
         <PageHeading
-          title="Source Share Error"
-          copy="One or more bfshare source packages could not be validated. Check the details below and retry."
+          title="Source Package Error"
+          copy="One or more source packages could not be validated. Check the details below and retry."
         />
 
         {/* ---- Failed source share card ---- */}
@@ -78,13 +79,11 @@ export function RotateWrongPasswordScreen() {
             </span>
           </div>
 
-          {failedPackageDisplay ? (
-            <div className="rotate-error-field">
-              <span className="rotate-error-field-mono">
-                {failedPackageDisplay}
-              </span>
-            </div>
-          ) : null}
+          <div className="rotate-error-field">
+            <span className="rotate-error-field-mono">
+              {failedPackageDisplay}
+            </span>
+          </div>
           <div className="rotate-error-field">
             <span className="rotate-error-field-mono">••••••••</span>
           </div>
@@ -112,35 +111,33 @@ export function RotateWrongPasswordScreen() {
                 strokeLinecap="round"
               />
             </svg>
-            <span>{message}</span>
+            <span>{paperAlignedMessage}</span>
           </div>
 
-          {showRelayWarning ? (
-            <div className="rotate-error-banner amber">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 14 14"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <circle
-                  cx="7"
-                  cy="7"
-                  r="5.5"
-                  stroke="#FBBF24"
-                  strokeWidth="1.2"
-                />
-                <path
-                  d="M7 4.5v3M7 9.5h.01"
-                  stroke="#FBBF24"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                />
-              </svg>
-              <span>No encrypted backup found on relays for this share.</span>
-            </div>
-          ) : null}
+          <div className="rotate-error-banner amber">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                cx="7"
+                cy="7"
+                r="5.5"
+                stroke="#FBBF24"
+                strokeWidth="1.2"
+              />
+              <path
+                d="M7 4.5v3M7 9.5h.01"
+                stroke="#FBBF24"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span>No share data found for this source package.</span>
+          </div>
         </div>
 
         <Button

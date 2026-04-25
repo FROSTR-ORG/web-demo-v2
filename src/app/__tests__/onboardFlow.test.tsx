@@ -11,12 +11,29 @@ import {
 } from "../../lib/bifrost/packageService";
 import { RuntimeClient } from "../../lib/bifrost/runtimeClient";
 import type { StoredProfileRecord } from "../../lib/bifrost/types";
+import { ONBOARD_HANDSHAKE_TIMEOUT_MS } from "../onboardingTiming";
 
 const relayHarness = vi.hoisted(() => ({
   runOnboardingRelayHandshake: vi.fn(),
   handle: null as null | ((input: {
-    requestEventJson: string;
-    decodeEvent: (event: unknown) => Promise<unknown | null>;
+    initialRequest: {
+      request_id?: string;
+      local_pubkey32: string;
+      event_json: string;
+    };
+    createRetryRequest?: () => Promise<{
+      request_id?: string;
+      local_pubkey32: string;
+      event_json: string;
+    }>;
+    decodeEvent: (
+      event: unknown,
+      requests: readonly {
+        request_id?: string;
+        local_pubkey32: string;
+        event_json: string;
+      }[],
+    ) => Promise<unknown | null>;
     signal?: AbortSignal;
   }) => Promise<unknown>)
 }));
@@ -95,11 +112,13 @@ describe("AppState live onboard requester flow", () => {
     await sourceRuntime.init({}, runtimeBootstrapFromParts(keyset.group, sourceShare));
 
     relayHarness.handle = async (input) => {
-      sourceRuntime.handleInboundEvent(JSON.parse(input.requestEventJson));
+      sourceRuntime.handleInboundEvent(JSON.parse(input.initialRequest.event_json));
       sourceRuntime.tick(Date.now());
       const responseEvent = sourceRuntime.drainOutboundEvents()[0];
       expect(responseEvent).toBeTruthy();
-      const decoded = await input.decodeEvent(responseEvent);
+      const decoded = await input.decodeEvent(responseEvent, [
+        input.initialRequest,
+      ]);
       expect(decoded).toBeTruthy();
       return decoded;
     };
@@ -128,8 +147,12 @@ describe("AppState live onboard requester flow", () => {
       expect.objectContaining({
         relays: ["wss://relay.example.test"],
         sourcePeerPubkey: expect.any(String),
-        localPubkey: expect.any(String),
-        requestEventJson: expect.any(String),
+        initialRequest: expect.objectContaining({
+          local_pubkey32: expect.any(String),
+          event_json: expect.any(String),
+        }),
+        createRetryRequest: expect.any(Function),
+        timeoutMs: ONBOARD_HANDSHAKE_TIMEOUT_MS,
         signal: expect.any(AbortSignal)
       })
     );
@@ -153,6 +176,55 @@ describe("AppState live onboard requester flow", () => {
     expect(decodedProfile.group_package.group_pk).toBe(keyset.group.group_pk);
     expect(decodedProfile.device.relays).toEqual(["wss://relay.example.test"]);
     expect(decodedProfile.device.manual_peer_policy_overrides).toHaveLength(1);
+  }, 45_000);
+
+  it("reaches ready_to_save from a later retry response using the matching bootstrap state", async () => {
+    const keyset = await createKeysetBundle({
+      groupName: "Onboard Retry Key",
+      threshold: 2,
+      count: 2
+    });
+    const sourceShare = keyset.shares[0];
+    const onboardedShare = keyset.shares[1];
+    const sourceRuntime = new RuntimeClient();
+    await sourceRuntime.init({}, runtimeBootstrapFromParts(keyset.group, sourceShare));
+    let retryRequestId = "";
+
+    relayHarness.handle = async (input) => {
+      expect(input.createRetryRequest).toBeTypeOf("function");
+      const retryRequest = await input.createRetryRequest!();
+      retryRequestId = retryRequest.request_id ?? "";
+      sourceRuntime.handleInboundEvent(JSON.parse(retryRequest.event_json));
+      sourceRuntime.tick(Date.now());
+      const responseEvent = sourceRuntime.drainOutboundEvents()[0];
+      expect(responseEvent).toBeTruthy();
+      const decoded = await input.decodeEvent(responseEvent, [retryRequest]);
+      expect(decoded).toBeTruthy();
+      return decoded;
+    };
+
+    const onboardPackage = await encodeOnboardPackage(
+      onboardPayloadForRemoteShare({
+        remoteShare: onboardedShare,
+        localShare: sourceShare,
+        group: keyset.group,
+        relays: ["wss://relay.retry.test"]
+      }),
+      "package-password"
+    );
+    const getState = await renderProvider();
+
+    await act(async () => {
+      await getState().decodeOnboardPackage(onboardPackage, "package-password");
+    });
+    await act(async () => {
+      await getState().startOnboardHandshake();
+    });
+
+    await waitFor(() => expect(getState().onboardSession?.phase).toBe("ready_to_save"));
+    expect(getState().onboardSession?.requestBundle?.request_id).toBe(retryRequestId);
+    expect(getState().onboardSession?.progress?.snapshot).toBe("built");
+    expect(getState().onboardSession?.progress?.requestAttempts).toBe(2);
   }, 45_000);
 
   it("aborts an in-flight onboarding handshake when the session is cleared", async () => {
@@ -199,5 +271,39 @@ describe("AppState live onboard requester flow", () => {
 
     await waitFor(() => expect(getState().onboardSession).toBeNull());
     expect(capturedSignal?.aborted).toBe(true);
+  }, 45_000);
+
+  it("does not mark onboarding ready while relays are connected but no response has arrived", async () => {
+    const keyset = await createKeysetBundle({
+      groupName: "No False Ready Key",
+      threshold: 2,
+      count: 2
+    });
+    const onboardPackage = await encodeOnboardPackage(
+      onboardPayloadForRemoteShare({
+        remoteShare: keyset.shares[1],
+        localShare: keyset.shares[0],
+        group: keyset.group,
+        relays: ["wss://relay.waiting.test"]
+      }),
+      "package-password"
+    );
+    relayHarness.handle = async () => new Promise(() => undefined);
+    const getState = await renderProvider();
+
+    await act(async () => {
+      await getState().decodeOnboardPackage(onboardPackage, "package-password");
+    });
+    void getState().startOnboardHandshake().catch(() => undefined);
+
+    await waitFor(() => {
+      expect(getState().onboardSession?.phase).toBe("handshaking");
+    });
+    expect(getState().onboardSession?.phase).not.toBe("ready_to_save");
+    expect(getState().onboardSession?.progress?.snapshot).not.toBe("built");
+
+    act(() => {
+      getState().clearOnboardSession();
+    });
   }, 45_000);
 });

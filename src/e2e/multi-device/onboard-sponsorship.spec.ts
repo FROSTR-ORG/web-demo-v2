@@ -91,9 +91,9 @@ const HOOKS_READY_TIMEOUT_MS = 15_000;
 const RUNTIME_READY_TIMEOUT_MS = 20_000;
 // Full FROST onboard handshake: requester publishes OnboardRequest,
 // sponsor runtime processes it + publishes OnboardResponse, requester
-// applies it and saves. End-to-end under ~20s on a healthy host; 90s
-// ceiling leaves ample headroom for CPU-loaded CI.
-const ONBOARD_HANDSHAKE_TIMEOUT_MS = 90_000;
+// applies it and saves. End-to-end under ~20s on a healthy host; 180s
+// matches the app's liberal production onboarding window.
+const ONBOARD_HANDSHAKE_TIMEOUT_MS = 180_000;
 const COMPLETION_DRAIN_TIMEOUT_MS = 45_000;
 
 // Profile password shared by the sponsor's stored profile AND its

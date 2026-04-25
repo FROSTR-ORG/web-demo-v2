@@ -85,6 +85,8 @@ function renderConfig(options: {
 function renderHandoff(options: {
   packageText?: string;
   deviceLabel?: string;
+  status?: NonNullable<AppStateValue["onboardSponsorSession"]>["status"];
+  failureReason?: string;
 } = {}) {
   const packageText = options.packageText ?? "bfonboard1testingpackagestring";
   const value = createDemoAppState({
@@ -95,6 +97,8 @@ function renderHandoff(options: {
       packageText,
       relays: baseProfile.relays,
       createdAt: Date.now(),
+      status: options.status,
+      failureReason: options.failureReason,
     },
   });
   return render(
@@ -196,10 +200,10 @@ describe("OnboardSponsorConfigScreen — VAL-ONBOARD-003 / 019 / 021 / 024", () 
     expect(cta.disabled).toBe(false);
   });
 
-  it("rejects password shorter than 8 characters", () => {
+  it("rejects password shorter than the demo minimum", () => {
     renderConfig();
     const pw = screen.getByTestId("onboard-sponsor-password-input");
-    fireEvent.change(pw, { target: { value: "short" } });
+    fireEvent.change(pw, { target: { value: "abc" } });
     expect(
       screen.getByText(ONBOARD_SPONSOR_PASSWORD_TOO_SHORT_ERROR),
     ).toBeInTheDocument();
@@ -341,6 +345,31 @@ describe("OnboardSponsorConfigScreen — VAL-ONBOARD-003 / 019 / 021 / 024", () 
 });
 
 describe("OnboardSponsorHandoffScreen — VAL-ONBOARD-005 / 023 / 025", () => {
+  it("surfaces waiting, completed, and failed onboarding confirmation states", () => {
+    renderHandoff({ status: "awaiting_adoption" });
+    expect(screen.getByTestId("onboard-sponsor-status")).toHaveTextContent(
+      "Waiting for new device...",
+    );
+
+    cleanup();
+    renderHandoff({ status: "completed" });
+    expect(screen.getByTestId("onboard-sponsor-status")).toHaveTextContent(
+      "Device onboarded",
+    );
+
+    cleanup();
+    renderHandoff({
+      status: "failed",
+      failureReason: "timeout: locked peer response timeout",
+    });
+    expect(screen.getByTestId("onboard-sponsor-status")).toHaveTextContent(
+      "timeout: locked peer response timeout",
+    );
+    expect(screen.getByTestId("onboard-sponsor-retry-btn")).toHaveTextContent(
+      "Create Another Package",
+    );
+  });
+
   it("renders the package string in a monospaced textarea (VAL-ONBOARD-005)", () => {
     renderHandoff({ packageText: "bfonboard1abcdefg1234567" });
     const textarea = screen.getByTestId(

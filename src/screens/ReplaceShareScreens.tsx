@@ -6,7 +6,10 @@ import { BackLink, Button, PasswordField } from "../components/ui";
 import { QrScanner } from "../components/QrScanner";
 import { useAppState } from "../app/AppState";
 import { useDemoUi } from "../demo/demoUi";
-import { SetupFlowError } from "../app/AppStateTypes";
+import {
+  DEMO_PASSWORD_MIN_LENGTH,
+  SetupFlowError,
+} from "../app/AppStateTypes";
 
 /* ---------- Validation helpers ---------- */
 
@@ -37,7 +40,7 @@ export function EnterReplacePackageScreen() {
   const canSubmit =
     hasBfonboardPrefix(packageString) &&
     password.length > 0 &&
-    profilePassword.length >= 8;
+    profilePassword.length >= DEMO_PASSWORD_MIN_LENGTH;
 
   async function handleApplyShareUpdate() {
     if (!canSubmit || decoding) return;
