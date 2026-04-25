@@ -103,16 +103,20 @@ function renderDashboard() {
   );
 }
 
-function openSettingsExportProfile() {
+function clickSettingsActionRowExport(label: string) {
   fireEvent.click(screen.getByLabelText("Settings"));
   const settings = screen.getByTestId("settings-sidebar");
-  const exportProfileLabel = within(settings).getByText("Export Profile");
-  const exportProfileRow = exportProfileLabel.closest(".settings-action-row");
-  expect(exportProfileRow).not.toBeNull();
-  const exportButton = within(exportProfileRow as HTMLElement).getByRole("button", {
+  const actionLabel = within(settings).getByText(label);
+  const actionRow = actionLabel.closest(".settings-action-row");
+  expect(actionRow).not.toBeNull();
+  const exportButton = within(actionRow as HTMLElement).getByRole("button", {
     name: "Export",
   });
   fireEvent.click(exportButton);
+}
+
+function openSettingsExportProfile() {
+  clickSettingsActionRowExport("Export Profile");
   return screen.getByTestId("export-profile-modal");
 }
 
@@ -293,16 +297,7 @@ describe("Export from Settings Sidebar", () => {
 
   it("Settings sidebar Export Share opens share export mode and produces bfshare", async () => {
     renderDashboard();
-    fireEvent.click(screen.getByLabelText("Settings"));
-
-    const sidebar = screen.getByTestId("settings-sidebar");
-    const exportShareLabel = within(sidebar).getByText("Export Share");
-    const exportShareRow = exportShareLabel.closest(".settings-action-row");
-    expect(exportShareRow).not.toBeNull();
-    const exportShareButton = within(exportShareRow as HTMLElement).getByRole("button", {
-      name: "Export",
-    });
-    fireEvent.click(exportShareButton);
+    clickSettingsActionRowExport("Export Share");
 
     const modal = screen.getByTestId("export-profile-modal");
     expect(modal).toBeInTheDocument();

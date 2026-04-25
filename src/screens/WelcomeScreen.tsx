@@ -99,7 +99,8 @@ export function WelcomeScreen() {
     try {
       await unlockProfile(profileId, password);
       navigate(`/dashboard/${profileId}`);
-    } catch {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
       setProfileLoadTransition({ variant: "error", profileId });
     }
   }
@@ -116,7 +117,6 @@ export function WelcomeScreen() {
         onRetry={() => {
           setProfileLoadTransition(null);
           setUnlocking(profileLoadTransition.profileId);
-          setError("");
         }}
         onBackToProfiles={() => {
           setProfileLoadTransition(null);

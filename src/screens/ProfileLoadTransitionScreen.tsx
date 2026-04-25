@@ -3,7 +3,6 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAppState } from "../app/AppState";
 import { AppShell } from "../components/shell";
 import { Button } from "../components/ui";
-import { shortHex } from "../lib/bifrost/format";
 
 type ProfileLoadTransitionVariant = "loading" | "error";
 
@@ -42,6 +41,9 @@ export function ProfileLoadTransitionScreen({
       : null);
 
   if (!resolvedProfile) {
+    if (profileId && profiles.length === 0) {
+      return null;
+    }
     return <Navigate to="/" replace />;
   }
 
@@ -86,11 +88,13 @@ export function ProfileLoadTransitionScreen({
             {resolvedProfile.threshold}/{resolvedProfile.memberCount}
           </span>
           <span className="dashboard-context-separator">·</span>
-          <span>{paperGroupKey(resolvedProfile.groupPublicKey)}</span>
-          <span className="dashboard-context-divider" aria-hidden="true" />
+          {isAuthoritativeGroupFingerprint(resolvedProfile.groupPublicKey) ? (
+            <>
+              <span>{resolvedProfile.groupPublicKey}</span>
+              <span className="dashboard-context-divider" aria-hidden="true" />
+            </>
+          ) : null}
           <span>Share #{resolvedProfile.localShareIdx}</span>
-          <span className="dashboard-context-separator">·</span>
-          <span>{paperShareKey(resolvedProfile.localShareIdx)}</span>
         </div>
 
         <div
@@ -131,14 +135,6 @@ export function ProfileLoadTransitionScreen({
   );
 }
 
-function paperGroupKey(value: string) {
-  if (value.startsWith("npub1qe3")) return "npub1qe3...7k4m";
-  if (value.startsWith("npub1d8f")) return "npub1d8f...9k2m";
-  if (value.startsWith("npub1f7a")) return "npub1f7a...4x1n";
-  return shortHex(value, 10, 8);
-}
-
-function paperShareKey(shareIndex: number) {
-  if (shareIndex === 0) return "02a3f8...8f2c";
-  return `share-${shareIndex}`;
+function isAuthoritativeGroupFingerprint(value: string) {
+  return /^[0-9a-f]{64}$/i.test(value);
 }

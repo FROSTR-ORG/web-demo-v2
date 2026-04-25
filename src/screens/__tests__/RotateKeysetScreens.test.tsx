@@ -805,7 +805,7 @@ describe("RotateCreateProfileScreen", () => {
     expect(mocks.navigate).toHaveBeenCalledWith("/rotate-keyset/progress");
   });
 
-  /* VAL-RTK-004: Relays section lists wss://relay.primal.net (Connected - 24ms)
+  /* VAL-RTK-004: Relays section lists wss://relay.primal.net (neutral status)
      and wss://relay.example.com per Paper shared/2-create-profile. */
   it("renders Paper relays wss://relay.primal.net and wss://relay.example.com", () => {
     render(
@@ -815,7 +815,7 @@ describe("RotateCreateProfileScreen", () => {
     );
     expect(screen.getByText("wss://relay.primal.net")).toBeInTheDocument();
     expect(screen.getByText("wss://relay.example.com")).toBeInTheDocument();
-    expect(screen.getByText(/Connected - 24ms/)).toBeInTheDocument();
+    expect(screen.getByText("Status unavailable")).toBeInTheDocument();
   });
 
   /* VAL-RTK-004: Assigned Local Share panel surfaces Local Share / Keyset rows. */

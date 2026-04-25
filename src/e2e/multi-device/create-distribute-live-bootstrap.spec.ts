@@ -24,10 +24,9 @@ import { test, expect, type Page } from "@playwright/test";
  *      password)` which atomically:
  *        - encrypts the bfonboard1… package with the typed
  *          password,
- *        - dispatches `handleRuntimeCommand({type: "onboard",
- *          peer_pubkey32_hex})` for the share's target member,
- *        - stashes the returned `requestId` on the share's
- *          `pendingDispatchRequestId` field.
+ *        - stashes the package/password in the per-share secret ref,
+ *        - leaves the source-side bootstrap dispatch alone because
+ *          onboarding is recipient-initiated.
  *   4. Device B, in a SEPARATE BrowserContext, drives the REAL
  *      /onboard UI end-to-end (scrutiny r1 blocker #3). It
  *      navigates to `/onboard`, pastes the bfonboard1 string into
@@ -40,29 +39,15 @@ import { test, expect, type Page } from "@playwright/test";
  *      saveOnboardedProfile pipeline THROUGH THE UI contract surface,
  *      not the `__iglooTestAdoptOnboardPackage` DEV hook.
  *   5. Within 10 seconds Device A's share idx=1 status chip
- *      auto-flips from "Ready to distribute" → "Distributed" via
- *      the Onboard completion drained through
- *      `AppStateProvider.absorbDrains` — NO manual "Mark
- *      distributed" click required.
+ *      auto-flips from "Ready to distribute" → "Distributed" when
+ *      the source runtime status reports the recipient member pubkey
+ *      online — NO manual "Mark distributed" click required.
  *
- * OperationFailure path (VAL-FOLLOWUP — Device B aborts
- * mid-handshake → Device A surfaces inline retry copy + Retry +
- * Mark distributed stays enabled):
- *   The live-abort path is slow to converge deterministically
- *   (TTL-driven timeout ≥ 60s). To keep the spec stable on
- *   `--repeat-each=3 --workers=1`, we use the DEV-only
- *   `__iglooTestAbsorbDrains` hook to inject an `OperationFailure
- *   { op_type: "onboard", request_id }` that matches the share's
- *   `pendingDispatchRequestId`. `absorbDrains` then surfaces the
- *   canonical inline copy ("Peer adoption failed — retry or mark
- *   distributed manually") on that share's card. The Retry button
- *   re-dispatches a fresh sponsor-side Onboard request for the
- *   already-created package, and Mark distributed remains enabled so
- *   the user can still proceed via the manual fallback. This deliberate DEV-hook
- *   carve-out is documented in `docs/runtime-deviations-from-paper.md`
- *   (see the 2026-04-23 entry
- *   "create-distribute-live-bootstrap OperationFailure path uses
- *   __iglooTestAbsorbDrains").
+ * Manual fallback path:
+ *   Device A can still mark an already-created package distributed
+ *   without waiting for relays. That remains the offline handoff
+ *   escape hatch, while the happy path above proves the live runtime
+ *   peer-online evidence auto-greens the row.
  *
  * Skip gate matches every other multi-device spec in this folder —
  * skip only when `cargo --version` fails; hard-fail on every other
@@ -207,7 +192,7 @@ async function bootstrapDeviceACreateDistribute(page: Page): Promise<number> {
   await page.getByLabel("Keyset Name").fill("Live Bootstrap Key");
   await page.getByRole("button", { name: "Generate", exact: true }).click();
   // Dial the keyset down from the default 2-of-3 → 2-of-2 so there is
-  // exactly one remote share to drive the per-share onboard dispatch.
+  // exactly one remote share to drive the per-share bfonboard handoff.
   await page.getByRole("button", { name: "Decrease Total Shares" }).click();
   await page.getByRole("button", { name: "Create Keyset" }).click();
 
@@ -296,7 +281,7 @@ async function bootstrapDeviceACreateDistribute(page: Page): Promise<number> {
 }
 
 test.describe(
-  "VAL-FOLLOWUP — /create/distribute live bootstrap: per-share onboard dispatch + echo auto-flip",
+  "VAL-FOLLOWUP — /create/distribute live bootstrap: recipient onboard + peer-online auto-flip",
   () => {
     test.skip(
       () => !cargoAvailable(),
@@ -377,7 +362,7 @@ test.describe(
     });
 
     test(
-      "Device A /create/distribute click → Device B adopts via /onboard → Device A idx=1 chip auto-flips to 'Distributed' within 10s (VAL-FOLLOWUP happy path)",
+      "Device A /create/distribute click → Device B adopts via /onboard → Device A auto-marks distributed from peer online",
       async ({ browser }) => {
         const ctxA = await browser.newContext();
         const ctxB = await browser.newContext();
@@ -412,7 +397,8 @@ test.describe(
           //   - the redacted bfonboard1… preview appears
           //   - the chip transitions from "Package not created" → "Ready
           //     to distribute" (info tone)
-          //   - the share's pendingDispatchRequestId is populated
+          //   - no source-side pendingDispatchRequestId is populated;
+          //     recipient-initiated onboarding starts from Device B.
           await expect(
             pageA.locator(".status-pill.info", {
               hasText: "Ready to distribute",
@@ -446,8 +432,7 @@ test.describe(
             remoteIdx,
           );
           expect(packageText.startsWith("bfonboard1")).toBe(true);
-          expect(typeof requestId).toBe("string");
-          expect(requestId!.length).toBeGreaterThan(0);
+          expect(requestId).toBeNull();
 
           // === Device B adopts the bfonboard package via the REAL
           // /onboard UI (scrutiny r1 blocker #3) ===
@@ -535,50 +520,42 @@ test.describe(
               );
             });
 
-          // === Device A's share idx=1 chip auto-flips to "Distributed" ===
-          // Wait for the provider's absorbDrains correlation to flip
-          // peerOnline=true on the matching onboardingPackage, which
-          // advances the DistributeSharesScreen chip from "Ready to
-          // distribute" to "Distributed" without a manual click. The
-          // feature contract requires this to land within 10s of the
-          // Onboard completion drained on Device A.
-          await pageA
-            .waitForFunction(
-              (input: { idx: number }) => {
-                const w = window as unknown as {
-                  __appState?: {
-                    createSession?: {
-                      onboardingPackages?: Array<{
-                        idx: number;
-                        peerOnline: boolean;
-                      }>;
-                    };
+          await pageA.waitForFunction(
+            (idx) => {
+              const w = window as unknown as {
+                __appState?: {
+                  createSession?: {
+                    onboardingPackages?: Array<{
+                      idx: number;
+                      peerOnline: boolean;
+                      pendingDispatchRequestId?: string;
+                      manuallyMarkedDistributed: boolean;
+                    }>;
                   };
                 };
-                const packages =
-                  w.__appState?.createSession?.onboardingPackages ?? [];
-                const entry = packages.find((p) => p.idx === input.idx);
-                return entry?.peerOnline === true;
-              },
-              { idx: remoteIdx },
-              {
-                timeout: ADOPTION_TIMEOUT_MS,
-                polling: 200,
-              },
-            )
-            .catch((err) => {
-              throw new Error(
-                `Device A share idx=${remoteIdx} peerOnline never flipped to true (${err})`,
+              };
+              const packages =
+                w.__appState?.createSession?.onboardingPackages ?? [];
+              const entry = packages.find((p) => p.idx === idx);
+              return (
+                entry?.peerOnline === true &&
+                !entry.pendingDispatchRequestId &&
+                entry.manuallyMarkedDistributed === false
               );
-            });
-          // The chip visible in the DOM reflects the flipped state within
-          // the feature's 10s budget measured from the peerOnline flip.
-          // Target the success status-pill specifically to avoid strict-
-          // mode matches against the info-panel copy and "Mark
-          // distributed" button that always render on this screen.
+            },
+            remoteIdx,
+            { timeout: ADOPTION_TIMEOUT_MS, polling: 250 },
+          );
           await expect(
             pageA.locator(".status-pill.success", { hasText: "Distributed" }),
           ).toHaveCount(1, { timeout: DISTRIBUTE_CHIP_TIMEOUT_MS });
+          await pageA
+            .getByRole("button", { name: "Continue to Completion" })
+            .click();
+          await expect(
+            pageA.getByRole("heading", { name: "Distribution Completion" }),
+          ).toBeVisible();
+          await expect(pageA.getByText("Echo received")).toBeVisible();
         } finally {
           await ctxA.close().catch(() => undefined);
           await ctxB.close().catch(() => undefined);
@@ -587,7 +564,7 @@ test.describe(
     );
 
     test(
-      "Device B aborts mid-handshake → Device A can retry adoption or mark distributed manually (VAL-FOLLOWUP OperationFailure path)",
+      "Device A can mark a recipient-initiated package distributed manually",
       async ({ browser }) => {
         const ctxA = await browser.newContext();
         try {
@@ -632,116 +609,19 @@ test.describe(
             );
             return entry?.pendingDispatchRequestId ?? null;
           }, remoteIdx);
-          expect(typeof requestId).toBe("string");
-          expect(requestId!.length).toBeGreaterThan(0);
-          const requestIdStr: string = requestId as string;
+          expect(requestId).toBeNull();
 
-          // Simulate Device B aborting mid-handshake by feeding an
-          // OperationFailure envelope with op_type:"onboard" matching
-          // the share's pendingDispatchRequestId directly into the
-          // provider's drain handler. The user-visible behaviour
-          // (inline retry copy + Retry + Mark distributed enabled) is
-          // identical to what the runtime would surface when the
-          // requester's in-flight OnboardRequest is abandoned and the
-          // sponsor-side request times out / rejects.
-          await pageA.evaluate((id) => {
-            const w = window as unknown as {
-              __iglooTestAbsorbDrains: (drains: {
-                completions: [];
-                failures: Array<{
-                  request_id: string;
-                  op_type: "onboard";
-                  code: string;
-                  message: string;
-                  failed_peer: null;
-                }>;
-                events: [];
-              }) => void;
-            };
-            w.__iglooTestAbsorbDrains({
-              completions: [],
-              failures: [
-                {
-                  request_id: id,
-                  op_type: "onboard",
-                  code: "peer_rejected",
-                  message: "requester aborted handshake",
-                  failed_peer: null,
-                },
-              ],
-              events: [],
-            });
-          }, requestIdStr);
-
-          await expect(
-            pageA.getByText(
-              "Peer adoption failed — retry or mark distributed manually",
-            ),
-          ).toBeVisible({ timeout: 5_000 });
-          await expect(
-            pageA.locator(".status-pill.error", { hasText: "Adoption failed" }),
-          ).toHaveCount(1);
-          const retryButton = pageA
-            .getByRole("button", { name: /^Retry adoption for share \d+$/ })
-            .first();
-          await expect(retryButton).toBeEnabled();
-          // Mark distributed remains enabled — the manual fallback is
-          // still reachable while the retry affordance is visible.
+          // Manual source-side accounting remains available after the
+          // package is created. The requester owns bootstrapping; the
+          // source user confirms handoff here when they are satisfied.
           const markButton = pageA
             .getByRole("button", { name: /^Mark distributed$/ })
             .first();
           await expect(markButton).toBeEnabled();
-
-          // Retry dispatches a fresh onboard request for the same
-          // already-created package. Wait beyond the command debounce
-          // window so this click cannot be coalesced with the initial
-          // package-create dispatch.
-          await pageA.waitForTimeout(350);
-          await retryButton.click();
-          await expect(
-            pageA.getByRole("button", {
-              name: /^Retry adoption for share \d+$/,
-            }),
-          ).toHaveCount(0, { timeout: 5_000 });
-          await expect(
-            pageA.locator(".status-pill.info", { hasText: "Ready to distribute" }),
-          ).toHaveCount(1, { timeout: 5_000 });
-          await expect
-            .poll(
-              async () =>
-                pageA.evaluate((idx) => {
-                  const w = window as unknown as {
-                    __appState: {
-                      createSession: {
-                        onboardingPackages: Array<{
-                          idx: number;
-                          pendingDispatchRequestId?: string;
-                        }>;
-                      };
-                    };
-                  };
-                  const entry =
-                    w.__appState.createSession.onboardingPackages.find(
-                      (p) => p.idx === idx,
-                    );
-                  return entry?.pendingDispatchRequestId ?? null;
-                }, remoteIdx),
-              { timeout: 5_000 },
-            )
-            .not.toBe(requestIdStr);
-
-          // Manual fallback still works end-to-end — manual
-          // markPackageDistributed flips the chip to success and clears
-          // retry/error state for this package.
           await markButton.click();
           await expect(
             pageA.locator(".status-pill.success", { hasText: "Distributed" }),
           ).toHaveCount(1, { timeout: 5_000 });
-          await expect(
-            pageA.getByText(
-              "Peer adoption failed — retry or mark distributed manually",
-            ),
-          ).toHaveCount(0);
         } finally {
           await ctxA.close().catch(() => undefined);
         }

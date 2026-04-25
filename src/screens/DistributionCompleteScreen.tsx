@@ -13,15 +13,15 @@ import { shortHex } from "../lib/bifrost/format";
  * fix-followup-distribute-2b — Paper LN7-0 rewrite.
  *
  * Header: "Distribution Completion"
- * Subhead (EXACT): "Track which remote bfonboard adoption packages
- *   have been distributed. Finish when each target device is ready
- *   to adopt its fresh share through the standard onboarding flow."
+ * Subhead (EXACT): "Track remote bfonboard packages as they are handed
+ *   off. Finish once each target device is ready to adopt its fresh
+ *   share."
  * Per-member row: recipient pubkey suffix + 'Marked distributed'
  *   green chip (pre-distribution rows expose a Mark-distributed
  *   fallback per VAL-FOLLOWUP-005).
- * Success callout (EXACT): 'All packages distributed — N of N remote
- *   bfonboard packages have been marked distributed. Continue when
- *   device adoption handoff can proceed.'
+ * Success callout (EXACT): 'All remote packages complete' with
+ *   'N of N remote bfonboard packages are complete. Handoff is
+ *   accounted for.'
  * Finish Distribution primary CTA ENABLED iff allPackagesDistributed().
  */
 

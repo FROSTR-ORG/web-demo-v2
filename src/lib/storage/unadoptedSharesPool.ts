@@ -169,10 +169,12 @@ const IV_BYTES = 12;
 const ENVELOPE_VERSION = 1 as const;
 
 /** Minimum characters required on the password used to encrypt the
- *  pool. Matches the UI gate on the OnboardSponsorConfigScreen / the
- *  profile-unlock password so pool decryption never uses a weaker
- *  secret than the profile it belongs to. */
-export const UNADOPTED_POOL_MIN_PASSWORD_LENGTH = DEMO_PASSWORD_MIN_LENGTH;
+ *  pool. Keep the storage-layer crypto floor at 8 characters even when
+ *  demo/profile UI gates are lower. */
+export const UNADOPTED_POOL_MIN_PASSWORD_LENGTH = Math.max(
+  DEMO_PASSWORD_MIN_LENGTH,
+  8,
+);
 
 function isSubtleAvailable(): boolean {
   return (

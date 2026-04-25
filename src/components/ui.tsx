@@ -163,6 +163,7 @@ export function Stepper({
   completedStyle?: "check" | "number";
 }) {
   const step1Label = variant === "rotate-keyset" ? "Rotate Keyset" : "Create Keyset";
+  const ariaLabel = variant === "rotate-keyset" ? "Rotate progress" : "Create progress";
   const step2Label = "Setup Profile";
   const step3Label = "Onboard Devices";
   const steps = [
@@ -173,7 +174,7 @@ export function Stepper({
   return (
     <div
       className={`stepper stepper-${variant} stepper-completed-${completedStyle}`}
-      aria-label="Create progress"
+      aria-label={ariaLabel}
     >
       {steps.map((step, index) => (
         <FragmentStep

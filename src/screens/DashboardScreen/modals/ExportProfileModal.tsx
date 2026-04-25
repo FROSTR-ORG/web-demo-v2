@@ -6,7 +6,7 @@ import type { ExportMode } from "../types";
 function getPasswordStrength(pw: string): number {
   if (pw.length === 0) return 0;
   let score = 0;
-  if (pw.length >= 6) score += 1;
+  if (pw.length >= DEMO_PASSWORD_MIN_LENGTH) score += 1;
   if (pw.length >= 10) score += 1;
   if (/[A-Z]/.test(pw) && /[0-9]/.test(pw)) score += 1;
   return Math.min(score, 3);

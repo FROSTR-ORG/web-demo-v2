@@ -96,7 +96,7 @@ a {
   padding: 0;
   margin: -1px;
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
 }
@@ -1089,7 +1089,7 @@ a {
   align-items: center;
   justify-content: center;
   border: 2px solid var(--ig-border);
-  color: currentColor;
+  color: currentcolor;
   font-weight: 700;
 }
 
@@ -1120,9 +1120,9 @@ a {
 }
 
 .stepper-completed-number .step.done .step-dot {
-  color: currentColor;
+  color: currentcolor;
   background: transparent;
-  border-color: currentColor;
+  border-color: currentcolor;
 }
 
 .step-line {
@@ -1869,7 +1869,7 @@ a {
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: currentColor;
+  background: currentcolor;
 }
 
 .permission-badge {
@@ -1966,7 +1966,7 @@ button.peer-permission-tag {
 }
 
 button.peer-permission-tag:hover:not(:disabled) {
-  border-color: currentColor;
+  border-color: currentcolor;
 }
 
 button.peer-permission-tag:active:not(:disabled) {
@@ -2706,11 +2706,18 @@ button.peer-policy-chip.deny {
   .dashboard-status-row,
   .peers-header,
   .peer-row,
+  .pending-row,
   .package-head,
   .completion-row,
   .permission-row {
     align-items: stretch;
+    display: flex;
     flex-direction: column;
+  }
+
+  .pending-row {
+    grid-template-columns: none;
+    row-gap: 8px;
   }
 
   .divider-text {
@@ -3121,6 +3128,44 @@ button.peer-policy-chip.deny {
   line-height: 18px;
 }
 
+.onboard-sponsor-status {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.38);
+}
+
+.onboard-sponsor-status.waiting {
+  border-color: rgba(96, 165, 250, 0.32);
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.onboard-sponsor-status.done {
+  border-color: rgba(34, 197, 94, 0.32);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.onboard-sponsor-status.failed {
+  border-color: rgba(239, 68, 68, 0.32);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.onboard-sponsor-status-title {
+  color: var(--ig-text);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.onboard-sponsor-status-copy {
+  color: var(--ig-muted);
+  font-size: 13px;
+  line-height: 19px;
+}
+
 /* --- Onboarding Failed alert --- */
 
 .onboard-error-alert {
@@ -3419,8 +3464,8 @@ button.peer-policy-chip.deny {
 }
 
 .how-this-step-works-number {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3429,8 +3474,8 @@ button.peer-policy-chip.deny {
   color: var(--ig-blue-soft);
   background: rgba(30, 58, 138, 0.2);
   font-family: var(--font-share-tech-mono, "Share Tech Mono", monospace);
-  font-size: 11px;
-  line-height: 14px;
+  font-size: 12px;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
@@ -3874,7 +3919,7 @@ button.peer-policy-chip.deny {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: currentColor;
+  background: currentcolor;
 }
 
 /* ========================================
@@ -4413,14 +4458,11 @@ button.peer-policy-chip.deny {
   background: rgba(11, 17, 32, 0.8);
 }
 
-.policy-modal-backdrop:has(.policy-action-row:nth-child(3)) {
-  align-items: flex-start;
-  padding-top: 402px;
-}
-
 .policy-modal {
   width: 480px;
   max-width: 100%;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   /* `min-width: 0` lets the modal collapse below its intrinsic content
    * width so long unbreakable strings in payload rows (EVENT KIND /
    * CONTENT / DOMAIN) cannot force it wider than the backdrop viewport
@@ -7538,7 +7580,7 @@ button.peer-policy-chip.deny {
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: currentColor;
+  background: currentcolor;
 }
 
 .pending-nearest,

@@ -17,6 +17,26 @@ export class OnboardingRelayError extends Error {
   }
 }
 
+export const ONBOARDING_RELAY_HANDSHAKE_TIMEOUT_MS = 180_000;
+export const ONBOARDING_RELAY_RETRY_INTERVAL_MS = 5_000;
+
+export interface OnboardingRelayRequest {
+  request_id?: string;
+  local_pubkey32: string;
+  event_json: string;
+}
+
+export type OnboardingRelayProgressEvent =
+  | { type: "relay_connecting"; relays: string[] }
+  | { type: "relay_connected"; relay: string; connectedRelays: string[] }
+  | { type: "relay_connect_failed"; relay: string; message: string }
+  | { type: "request_published"; relays: string[]; attempt: number; requestId?: string }
+  | { type: "request_publish_failed"; relay: string; message: string; attempt: number; requestId?: string }
+  | { type: "request_retry_scheduled"; attempt: number; delayMs: number }
+  | { type: "response_candidate"; relay?: string }
+  | { type: "response_decoded"; relay?: string }
+  | { type: "timeout" };
+
 export interface RelayConnection {
   url: string;
   connect(): Promise<void>;
@@ -181,6 +201,10 @@ class BrowserRelayConnection implements RelayConnection {
   private subscriptionSeq = 0;
   private subscriptions = new Map<string, (event: unknown) => void>();
   private noticeListeners = new Set<(message: string) => void>();
+  private okListeners = new Map<
+    string,
+    (accepted: boolean, message: string) => void
+  >();
   /**
    * Per-subscription EOSE listeners. Populated transiently by
    * {@link ping} so the probe can resolve on the matching EOSE frame;
@@ -328,6 +352,7 @@ class BrowserRelayConnection implements RelayConnection {
     this.subscriptions.clear();
     this.noticeListeners.clear();
     this.eoseListeners.clear();
+    this.okListeners.clear();
     this.socket = null;
     this.messageListener = null;
     this.persistentCloseListener = null;
@@ -380,8 +405,38 @@ class BrowserRelayConnection implements RelayConnection {
 
   publish(event: unknown): Promise<void> {
     const socket = this.requireOpenSocket();
+    const eventId =
+      event &&
+      typeof event === "object" &&
+      typeof (event as { id?: unknown }).id === "string"
+        ? (event as { id: string }).id
+        : null;
     socket.send(JSON.stringify(["EVENT", event]));
-    return Promise.resolve();
+    if (!eventId) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = globalThis.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        this.okListeners.delete(eventId);
+        // Some relays still omit OK. Treat the already-sent frame as
+        // best-effort success so older relay behavior does not hang flows.
+        resolve();
+      }, 2_000);
+      this.okListeners.set(eventId, (accepted, message) => {
+        if (settled) return;
+        settled = true;
+        globalThis.clearTimeout(timer);
+        this.okListeners.delete(eventId);
+        if (accepted) {
+          resolve();
+        } else {
+          reject(new Error(message || `Relay rejected event: ${this.url}`));
+        }
+      });
+    });
   }
 
   subscribe(
@@ -420,6 +475,7 @@ class BrowserRelayConnection implements RelayConnection {
     this.subscriptions.clear();
     this.noticeListeners.clear();
     this.eoseListeners.clear();
+    this.okListeners.clear();
     this.socket?.close();
     this.socket = null;
     this.messageListener = null;
@@ -435,18 +491,27 @@ class BrowserRelayConnection implements RelayConnection {
   }
 
   private handleMessage(event: MessageEvent): void {
-    let message: unknown;
+    let frame: unknown;
     try {
-      message = JSON.parse(String(event.data));
+      frame = JSON.parse(String(event.data));
     } catch {
       return;
     }
-    if (!Array.isArray(message)) {
+    if (!Array.isArray(frame)) {
       return;
     }
-    const [kind, subscriptionId, payload] = message;
+    const [kind, subscriptionId, payload] = frame;
     if (kind === "NOTICE" && typeof subscriptionId === "string") {
       this.noticeListeners.forEach((listener) => listener(subscriptionId));
+      return;
+    }
+    if (
+      kind === "OK" &&
+      typeof subscriptionId === "string" &&
+      typeof payload === "boolean"
+    ) {
+      const okMessage = typeof frame[3] === "string" ? frame[3] : "";
+      this.okListeners.get(subscriptionId)?.(payload, okMessage);
       return;
     }
     if (kind === "EOSE" && typeof subscriptionId === "string") {
@@ -573,16 +638,37 @@ export async function runOnboardingRelayHandshake<T>(input: {
   relays: string[];
   eventKind: number;
   sourcePeerPubkey: string;
-  localPubkey: string;
-  requestEventJson: string;
-  decodeEvent: (event: unknown) => Promise<T | null>;
+  localPubkey?: string;
+  requestEventJson?: string;
+  initialRequest?: OnboardingRelayRequest;
+  createRetryRequest?: () => Promise<OnboardingRelayRequest>;
+  decodeEvent: (
+    event: unknown,
+    requests: readonly OnboardingRelayRequest[],
+  ) => Promise<T | null>;
+  onProgress?: (event: OnboardingRelayProgressEvent) => void;
   onNotice?: (notice: { relay: string; message: string }) => void;
   relayClient?: RelayClient;
   timeoutMs?: number;
+  retryIntervalMs?: number;
   signal?: AbortSignal;
 }): Promise<T> {
   const relayClient = input.relayClient ?? new BrowserRelayClient();
-  const requestEvent = JSON.parse(input.requestEventJson) as unknown;
+  const initialRequest =
+    input.initialRequest ??
+    (input.localPubkey && input.requestEventJson
+      ? {
+          local_pubkey32: input.localPubkey,
+          event_json: input.requestEventJson,
+        }
+      : null);
+  if (!initialRequest) {
+    throw new OnboardingRelayError(
+      "invalid_onboard_response",
+      "Onboarding request bundle was not provided.",
+    );
+  }
+  const firstRequest = initialRequest;
   const connections = input.relays.map((relay) => relayClient.connect(relay));
   const abortError = () => {
     if (typeof DOMException !== "undefined") {
@@ -602,17 +688,32 @@ export async function runOnboardingRelayHandshake<T>(input: {
 
   const filter: RelayFilter = {
     kinds: [input.eventKind],
-    authors: [input.sourcePeerPubkey],
-    "#p": [input.localPubkey],
+    "#p": [firstRequest.local_pubkey32],
   };
-  const timeoutMs = input.timeoutMs ?? 30_000;
+  const timeoutMs = input.timeoutMs ?? ONBOARDING_RELAY_HANDSHAKE_TIMEOUT_MS;
+  const retryIntervalMs =
+    input.retryIntervalMs ?? ONBOARDING_RELAY_RETRY_INTERVAL_MS;
+  const emitProgress = (event: OnboardingRelayProgressEvent) => {
+    try {
+      input.onProgress?.(event);
+    } catch {
+      // Progress observers are diagnostic/UI only and must not affect relay IO.
+    }
+  };
 
   return new Promise<T>((resolve, reject) => {
     let settled = false;
     const subscriptions: RelaySubscription[] = [];
     let connected: RelayConnection[] = [];
+    let retryTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+    let publishAttempt = 0;
+    const activeRequests: OnboardingRelayRequest[] = [firstRequest];
     const cleanup = () => {
       globalThis.clearTimeout(timer);
+      if (retryTimer) {
+        globalThis.clearTimeout(retryTimer);
+        retryTimer = null;
+      }
       input.signal?.removeEventListener("abort", handleAbort);
       subscriptions.forEach((subscription) => subscription.close());
       connections.forEach((connection) => connection.close());
@@ -625,6 +726,7 @@ export async function runOnboardingRelayHandshake<T>(input: {
     };
 
     const timer = globalThis.setTimeout(() => {
+      emitProgress({ type: "timeout" });
       finish(() =>
         reject(
           new OnboardingRelayError(
@@ -643,7 +745,92 @@ export async function runOnboardingRelayHandshake<T>(input: {
       return;
     }
 
+    const publishRequest = async (
+      request: OnboardingRelayRequest,
+      attempt: number,
+    ): Promise<boolean> => {
+      const requestEvent = JSON.parse(request.event_json) as unknown;
+      const publishResults = await Promise.allSettled(
+        connected.map((connection) => connection.publish(requestEvent)),
+      );
+      if (settled) return false;
+
+      const publishedRelays: string[] = [];
+      publishResults.forEach((result, index) => {
+        const relay = connected[index].url;
+        if (result.status === "fulfilled") {
+          publishedRelays.push(relay);
+          return;
+        }
+        emitProgress({
+          type: "request_publish_failed",
+          relay,
+          attempt,
+          requestId: request.request_id,
+          message:
+            result.reason instanceof Error
+              ? result.reason.message
+              : "Unable to publish onboarding request.",
+        });
+      });
+      if (publishedRelays.length > 0) {
+        emitProgress({
+          type: "request_published",
+          relays: publishedRelays,
+          attempt,
+          requestId: request.request_id,
+        });
+        return true;
+      }
+      return false;
+    };
+
+    const scheduleRetry = () => {
+      if (settled || !input.createRetryRequest || retryIntervalMs <= 0) {
+        return;
+      }
+      const nextAttempt = publishAttempt + 1;
+      emitProgress({
+        type: "request_retry_scheduled",
+        attempt: nextAttempt,
+        delayMs: retryIntervalMs,
+      });
+      retryTimer = globalThis.setTimeout(() => {
+        retryTimer = null;
+        void (async () => {
+          if (settled) return;
+          publishAttempt += 1;
+          let request: OnboardingRelayRequest;
+          try {
+            request = await input.createRetryRequest!();
+          } catch (error) {
+            emitProgress({
+              type: "request_publish_failed",
+              relay: "all",
+              attempt: publishAttempt,
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Unable to prepare onboarding retry.",
+            });
+            scheduleRetry();
+            return;
+          }
+          activeRequests.push(request);
+          const accepted = await publishRequest(request, publishAttempt);
+          if (!settled) {
+            if (!accepted) {
+              // Keep listening; the prior accepted request may still receive
+              // a delayed response on a public relay.
+            }
+            scheduleRetry();
+          }
+        })();
+      }, retryIntervalMs);
+    };
+
     async function connectAndPublish() {
+      emitProgress({ type: "relay_connecting", relays: input.relays });
       const connectedResults = await Promise.allSettled(
         connections.map(async (connection) => {
           await connection.connect();
@@ -658,6 +845,24 @@ export async function runOnboardingRelayHandshake<T>(input: {
             result.status === "fulfilled",
         )
         .map((result) => result.value);
+      connected.forEach((connection, index) => {
+        emitProgress({
+          type: "relay_connected",
+          relay: connection.url,
+          connectedRelays: connected.slice(0, index + 1).map((item) => item.url),
+        });
+      });
+      connectedResults.forEach((result, index) => {
+        if (result.status === "fulfilled") return;
+        emitProgress({
+          type: "relay_connect_failed",
+          relay: input.relays[index],
+          message:
+            result.reason instanceof Error
+              ? result.reason.message
+              : "Relay connection failed.",
+        });
+      });
 
       if (input.signal?.aborted) {
         handleAbort();
@@ -678,45 +883,37 @@ export async function runOnboardingRelayHandshake<T>(input: {
 
       for (const connection of connected) {
         subscriptions.push(
-          connection.subscribe(filter, onEvent, (message) => {
+          connection.subscribe(filter, (event) => onEvent(event, connection.url), (message) => {
             input.onNotice?.({ relay: connection.url, message });
           }),
         );
       }
 
-      const publishResults = await Promise.allSettled(
-        connected.map((connection) => connection.publish(requestEvent)),
-      );
+      publishAttempt = 1;
+      const accepted = await publishRequest(firstRequest, publishAttempt);
       if (settled) return;
-
-      const publishedCount = publishResults.filter(
-        (result) => result.status === "fulfilled",
-      ).length;
-      if (publishedCount > 0) {
+      if (accepted) {
+        scheduleRetry();
         return;
       }
 
-      const firstFailure = publishResults.find(
-        (result): result is PromiseRejectedResult =>
-          result.status === "rejected",
-      );
       finish(() =>
         reject(
           new OnboardingRelayError(
             "relay_unreachable",
-            firstFailure?.reason instanceof Error
-              ? firstFailure.reason.message
-              : "Unable to publish onboarding request.",
+            "Unable to publish onboarding request.",
           ),
         ),
       );
     }
 
-    const onEvent = (event: unknown) => {
+    const onEvent = (event: unknown, relay: string) => {
+      emitProgress({ type: "response_candidate", relay });
       void input
-        .decodeEvent(event)
+        .decodeEvent(event, activeRequests.slice())
         .then((decoded) => {
           if (decoded) {
+            emitProgress({ type: "response_decoded", relay });
             finish(() => resolve(decoded));
           }
         })

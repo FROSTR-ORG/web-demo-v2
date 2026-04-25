@@ -141,13 +141,6 @@ export async function startBifrostDevtoolsRelay(): Promise<{
   }
 
   const binary = resolveDevtoolsBinary();
-  if (!existsSync(binary)) {
-    throw new Error(
-      `bifrost-devtools binary missing at ${binary}. Set BIFROST_RS_DIR, ` +
-        "place a bifrost-rs checkout at ./bifrost-rs or ../bifrost-rs, " +
-        "then build `bifrost-devtools` before this suite.",
-    );
-  }
 
   if (await portIsBound(RELAY_HOST, RELAY_PORT)) {
     throw new Error(

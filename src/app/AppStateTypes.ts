@@ -90,6 +90,27 @@ export interface OnboardSession {
   phase: "decoded" | "handshaking" | "ready_to_save" | "failed";
   packageString: string;
   payload: BfOnboardPayload;
+  progress?: {
+    relays: "pending" | "connecting" | "connected" | "failed";
+    request: "pending" | "published" | "failed";
+    response: "pending" | "candidate" | "received" | "failed";
+    snapshot: "pending" | "built" | "failed";
+    connectedRelays?: string[];
+    publishedRelays?: string[];
+    activeRequestCount?: number;
+    responseCandidateCount?: number;
+    lastResponseRelay?: string;
+    lastRequestPublishFailure?: {
+      relay: string;
+      message: string;
+      attempt: number;
+    };
+    lastEventAt?: number;
+    responseDecodedAt?: number;
+    snapshotBuiltAt?: number;
+    requestAttempts?: number;
+    retryDelayMs?: number;
+  };
   error?: {
     code: SetupFlowError["code"];
     message: string;
@@ -101,6 +122,12 @@ export interface OnboardSession {
     bootstrap_state_hex: string;
     event_json: string;
   };
+  requestBundles?: Array<{
+    request_id: string;
+    local_pubkey32: string;
+    bootstrap_state_hex: string;
+    event_json: string;
+  }>;
   response?: OnboardingResponse;
   runtimeSnapshot?: RuntimeSnapshotInput;
   localShareIdx?: number;
@@ -997,21 +1024,19 @@ export interface AppStateValue {
    *     (first 24 chars of the bfonboard1… string) into
    *     `onboardingPackages[idx].packageText`.
    *
-   * Also dispatches the matching runtime Onboard command so the
-   * provider can correlate later completion/failure drains back to the row.
+   * The source-side row turns green later when runtime status reports
+   * this member pubkey online after the recipient-initiated onboarding
+   * request is accepted. This mutator does not start the bootstrap
+   * Onboard command.
    */
   encodeDistributionPackage: (idx: number, password: string) => Promise<void>;
   /**
-   * Retry the runtime Onboard dispatch for an already-created remote
-   * package. Reuses the existing in-memory package stash and preserves
-   * package text, password, and device-label metadata; only the
-   * `pendingDispatchRequestId` / `adoptionError` retry state is
-   * refreshed. Resolves to the new runtime request id when a dispatch
-   * registers a correlatable pending operation, matching
-   * {@link HandleRuntimeCommandResult}; resolves to `undefined` when no
-   * dispatch is registered (signer paused, debounced, or failed before a
-   * pending operation exists). Unlike {@link encodeDistributionPackage},
-   * callers can use this id to correlate a successful retry registration.
+   * Retry the legacy source-side confirmation probe for an
+   * already-created remote package. Normal onboarding stays
+   * recipient-initiated; this only refreshes
+   * `pendingDispatchRequestId` / `adoptionError` retry state and
+   * resolves to the new runtime request id when a dispatch registers a
+   * correlatable pending operation.
    */
   retryDistributionPackageAdoption: (idx: number) => Promise<string | undefined>;
   /**
@@ -1201,7 +1226,8 @@ export interface AppStateValue {
    * can render it.
    *
    * Flow:
-   *   1. Validate inputs (label non-empty after trim, password ≥ 8 chars,
+   *   1. Validate inputs (label non-empty after trim,
+   *      password.length >= ONBOARD_SPONSOR_PASSWORD_MIN_LENGTH,
    *      every relay a syntactically valid `wss://` URL with no dupes).
    *   2. Reject when the signer is paused (VAL-ONBOARD-024).
    *   3. Reject when the active profile's threshold is misconfigured

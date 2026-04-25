@@ -5,7 +5,7 @@ import { useAppState } from "../app/AppState";
 import { AppShell, PageHeading } from "../components/shell";
 import { BackLink, Button, PasswordField } from "../components/ui";
 import { QrScanner } from "../components/QrScanner";
-import { useDemoUi } from "../demo/demoUi";
+import { isDemoScenarioState, useDemoUi } from "../demo/demoUi";
 
 /* ---------- Label with inline info/help icon (audit gap per VAL-ONB-001/005) ---------- */
 
@@ -71,15 +71,17 @@ function validatePackageString(value: string): {
 
 export function EnterPackageScreen() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { decodeOnboardPackage, clearOnboardSession } = useAppState();
   const demoUi = useDemoUi();
+  const locationState = location.state as { onboardingNotice?: string } | null;
   const [packageString, setPackageString] = useState(
     demoUi.onboard?.packagePreset ?? "",
   );
   const [password, setPassword] = useState(
     demoUi.onboard?.passwordPreset ?? "",
   );
-  const [error, setError] = useState("");
+  const [error, setError] = useState(locationState?.onboardingNotice ?? "");
   const [showQrScanner, setShowQrScanner] = useState(false);
   const validation = validatePackageString(packageString);
   /*
@@ -99,7 +101,14 @@ export function EnterPackageScreen() {
       navigate(
         "/onboard/handshake",
         demoUi.onboard?.packagePreset
-          ? { state: { packageString: packageString.trim() } }
+          ? {
+              state: {
+                packageString: packageString.trim(),
+                ...(isDemoScenarioState(location.state)
+                  ? { demoUi: { ...demoUi, __demoScenario: true as const } }
+                  : {}),
+              },
+            }
           : undefined,
       );
     } catch (err) {
@@ -225,11 +234,22 @@ export function HandshakeScreen() {
     useAppState();
   const demoUi = useDemoUi();
   const state = location.state as { packageString?: string } | null;
-  const demoHandshake = Boolean(demoUi.onboard?.packagePreset);
+  const demoHandshake =
+    isDemoScenarioState(location.state) &&
+    Boolean(demoUi.onboard?.packagePreset);
 
   /* Product handshake requires a decoded onboard session. */
   if (!onboardSession && !demoHandshake) {
-    return <Navigate to="/onboard" replace />;
+    return (
+      <Navigate
+        to="/onboard"
+        replace
+        state={{
+          onboardingNotice:
+            "Load a bfonboard package before starting onboarding.",
+        }}
+      />
+    );
   }
   if (onboardSession?.phase === "ready_to_save") {
     return <Navigate to="/onboard/complete" replace />;
@@ -246,6 +266,7 @@ export function HandshakeScreen() {
       peerPk={onboardSession?.payload.peer_pk}
       deferredLiveHandshake={Boolean(onboardSession)}
       sessionPhase={onboardSession?.phase}
+      sessionProgress={onboardSession?.progress}
       startOnboardHandshake={startOnboardHandshake}
       clearOnboardSession={clearOnboardSession}
       navigate={navigate}
@@ -259,6 +280,7 @@ function HandshakeContent({
   peerPk,
   deferredLiveHandshake,
   sessionPhase,
+  sessionProgress,
   startOnboardHandshake,
   clearOnboardSession,
   navigate,
@@ -268,6 +290,9 @@ function HandshakeContent({
   peerPk?: string;
   deferredLiveHandshake: boolean;
   sessionPhase?: string;
+  sessionProgress?: NonNullable<
+    ReturnType<typeof useAppState>["onboardSession"]
+  >["progress"];
   startOnboardHandshake: () => Promise<void>;
   clearOnboardSession: () => void;
   navigate: ReturnType<typeof useNavigate>;
@@ -280,15 +305,23 @@ function HandshakeContent({
   const peerDetail = peerPk
     ? `${peerPk.slice(0, 10)}...${peerPk.slice(-4)}`
     : "02a3f8c2d1...8f2c";
-  const [steps, setSteps] = useState<TimelineStep[]>([
+  const [demoSteps, setDemoSteps] = useState<TimelineStep[]>([
     { label: "Connected to relays", detail: relayDetail, state: "done" },
     { label: "Found source device", detail: peerDetail, state: "done" },
     { label: "Receiving keyset data", state: "active" },
-    { label: "Saving to device", state: "pending" },
+    { label: "Preparing signer state", state: "pending" },
   ]);
+  const steps = deferredLiveHandshake
+    ? buildLiveHandshakeSteps({
+        progress: sessionProgress,
+        phase: sessionPhase,
+        relayDetail,
+        peerDetail,
+      })
+    : demoSteps;
 
   const advanceHandshake = useCallback(() => {
-    setSteps((prev) => {
+    setDemoSteps((prev) => {
       const activeIdx = prev.findIndex((s) => s.state === "active");
       if (activeIdx === -1) return prev;
       const next = prev.map((s, i) => {
@@ -341,8 +374,11 @@ function HandshakeContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clearOnboardSession, deferredLiveHandshake, navigate]);
 
-  /* Auto-advance visible handshake steps while the real handshake is pending. */
+  /* Demo-only progress animation. Product progress is driven by relay events. */
   useEffect(() => {
+    if (deferredLiveHandshake) {
+      return;
+    }
     if (demoUi.progress?.frozen) {
       return;
     }
@@ -411,7 +447,7 @@ function HandshakeContent({
                 <span className={`onboard-step-label ${step.state}`}>
                   {step.label}
                 </span>
-                {step.detail && step.state === "done" && (
+                {step.detail && step.state !== "pending" && (
                   <span className="onboard-step-detail">{step.detail}</span>
                 )}
               </div>
@@ -463,6 +499,86 @@ function TimelineDot({ state }: { state: HandshakeStep }) {
   return <div className="onboard-dot pending" />;
 }
 
+function buildLiveHandshakeSteps({
+  progress,
+  phase,
+  relayDetail,
+  peerDetail,
+}: {
+  progress?: NonNullable<
+    ReturnType<typeof useAppState>["onboardSession"]
+  >["progress"];
+  phase?: string;
+  relayDetail: string;
+  peerDetail: string;
+}): TimelineStep[] {
+  const relaysConnected =
+    phase === "ready_to_save" ||
+    progress?.relays === "connected" ||
+    progress?.request === "published" ||
+    progress?.response === "received" ||
+    progress?.snapshot === "built";
+  const requestPublished =
+    phase === "ready_to_save" ||
+    progress?.request === "published" ||
+    progress?.response === "received" ||
+    progress?.snapshot === "built";
+  const responseReceived =
+    phase === "ready_to_save" ||
+    progress?.response === "received" ||
+    progress?.snapshot === "built";
+  const snapshotBuilt =
+    phase === "ready_to_save" || progress?.snapshot === "built";
+  const retrySeconds = Math.max(
+    1,
+    Math.round((progress?.retryDelayMs ?? 5_000) / 1_000),
+  );
+  const responseDetail =
+    requestPublished && !responseReceived
+      ? [
+          "Waiting for source response",
+          progress?.requestAttempts
+            ? `attempt ${progress.requestAttempts}`
+            : null,
+          `retrying every ${retrySeconds}s`,
+          progress?.responseCandidateCount
+            ? `${progress.responseCandidateCount} candidate${progress.responseCandidateCount === 1 ? "" : "s"} seen`
+            : null,
+          progress?.lastResponseRelay
+            ? `last from ${progress.lastResponseRelay}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : undefined;
+
+  return [
+    {
+      label: "Connected to relays",
+      detail: relayDetail,
+      state: relaysConnected ? "done" : "active",
+    },
+    {
+      label: "Request accepted by relays",
+      detail: peerDetail,
+      state: requestPublished ? "done" : relaysConnected ? "active" : "pending",
+    },
+    {
+      label: "Waiting for source response",
+      detail: responseReceived ? "Keyset data received" : responseDetail,
+      state: responseReceived
+        ? "done"
+        : requestPublished || progress?.response === "candidate"
+          ? "active"
+          : "pending",
+    },
+    {
+      label: "Preparing signer state",
+      state: snapshotBuilt ? "done" : responseReceived ? "active" : "pending",
+    },
+  ];
+}
+
 /* ==========================================================
    Screen 3 — Onboarding Failed (/onboard/failed)
    ========================================================== */
@@ -490,7 +606,7 @@ export function OnboardingFailedScreen() {
     productError?.message ??
     (rejected
       ? "Challenge verification failed. You may not have a valid share for this group."
-      : "Onboarding peer did not respond within 30 seconds. They may be offline or unreachable.");
+      : "Onboarding timed out before the source device confirmed the handoff. They may be offline or unreachable.");
 
   /*
    * Paper's error variants use Tailwind-style arbitrary hex classes so

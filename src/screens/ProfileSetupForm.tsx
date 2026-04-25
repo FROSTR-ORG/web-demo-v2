@@ -126,7 +126,7 @@ export function ProfileSetupForm({
           <div className="relay-row" key={relay}>
             <div className="relay-details">
               <span className="value">{relay}</span>
-              {index === 0 ? <span className="relay-status">Connected - 24ms latency</span> : null}
+              {index === 0 ? <span className="relay-status">Status unavailable</span> : null}
             </div>
             <Button
               type="button"

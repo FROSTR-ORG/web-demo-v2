@@ -204,29 +204,27 @@ export function RotateDistributeSharesScreen() {
         </div>
 
         <div className="package-stack">
-          {remotePackages.map((pkg, index) => (
-            <RotateRemoteShareCard
-              key={pkg.idx}
-              pkg={paperPackageOverride(
-                pkg,
-                shareDisplayNumber(index + 1),
-                demoUi.shared?.lockedPackageIndexes,
-              )}
-              displayNumber={shareDisplayNumber(index + 1)}
-              distributed={packageDistributed(pkg)}
-              actionsDisabled={
-                !paperPackageOverride(
-                  pkg,
-                  shareDisplayNumber(index + 1),
-                  demoUi.shared?.lockedPackageIndexes,
-                ).packageCreated
-              }
-              resolveSecret={() => resolveSecret(pkg)}
-              onCreatePackage={createPackage}
-              onMarkDistributed={markDistributed}
-              onUpdatePkg={updatePkg}
-            />
-          ))}
+          {remotePackages.map((pkg, index) => {
+            const displayNumber = shareDisplayNumber(index + 1);
+            const viewPkg = paperPackageOverride(
+              pkg,
+              displayNumber,
+              demoUi.shared?.lockedPackageIndexes,
+            );
+            return (
+              <RotateRemoteShareCard
+                key={pkg.idx}
+                pkg={viewPkg}
+                displayNumber={displayNumber}
+                distributed={packageDistributed(viewPkg)}
+                actionsDisabled={!viewPkg.packageCreated}
+                resolveSecret={() => resolveSecret(pkg)}
+                onCreatePackage={createPackage}
+                onMarkDistributed={markDistributed}
+                onUpdatePkg={updatePkg}
+              />
+            );
+          })}
         </div>
 
         <Button

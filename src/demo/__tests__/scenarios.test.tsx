@@ -49,8 +49,11 @@ describe("demo scenarios", () => {
     expect(publicPngs).toEqual([...expectedPublicPngs].sort());
   });
 
-  it("resolves every scenario Paper source screenshot", () => {
+  it("resolves every scenario Paper source screenshot when the Paper repo is available", () => {
     const paperRoot = resolve(process.cwd(), process.env.IGLOO_PAPER_PATH ?? "../igloo-paper");
+    if (!existsSync(paperRoot)) {
+      return;
+    }
     for (const scenario of demoScenarios) {
       const sourcePath = join(paperRoot, scenario.paperPath, "screenshot.png");
       expect(existsSync(sourcePath), `${scenario.id} Paper source missing at ${sourcePath}`).toBe(true);

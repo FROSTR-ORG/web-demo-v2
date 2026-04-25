@@ -85,6 +85,8 @@ function renderConfig(options: {
 function renderHandoff(options: {
   packageText?: string;
   deviceLabel?: string;
+  status?: NonNullable<AppStateValue["onboardSponsorSession"]>["status"];
+  failureReason?: string;
 } = {}) {
   const packageText = options.packageText ?? "bfonboard1testingpackagestring";
   const value = createDemoAppState({
@@ -95,6 +97,8 @@ function renderHandoff(options: {
       packageText,
       relays: baseProfile.relays,
       createdAt: Date.now(),
+      status: options.status,
+      failureReason: options.failureReason,
     },
   });
   return render(
@@ -341,6 +345,31 @@ describe("OnboardSponsorConfigScreen — VAL-ONBOARD-003 / 019 / 021 / 024", () 
 });
 
 describe("OnboardSponsorHandoffScreen — VAL-ONBOARD-005 / 023 / 025", () => {
+  it("surfaces waiting, completed, and failed onboarding confirmation states", () => {
+    renderHandoff({ status: "awaiting_adoption" });
+    expect(screen.getByTestId("onboard-sponsor-status")).toHaveTextContent(
+      "Waiting for new device...",
+    );
+
+    cleanup();
+    renderHandoff({ status: "completed" });
+    expect(screen.getByTestId("onboard-sponsor-status")).toHaveTextContent(
+      "Device onboarded",
+    );
+
+    cleanup();
+    renderHandoff({
+      status: "failed",
+      failureReason: "timeout: locked peer response timeout",
+    });
+    expect(screen.getByTestId("onboard-sponsor-status")).toHaveTextContent(
+      "timeout: locked peer response timeout",
+    );
+    expect(screen.getByTestId("onboard-sponsor-retry-btn")).toHaveTextContent(
+      "Create Another Package",
+    );
+  });
+
   it("renders the package string in a monospaced textarea (VAL-ONBOARD-005)", () => {
     renderHandoff({ packageText: "bfonboard1abcdefg1234567" });
     const textarea = screen.getByTestId(

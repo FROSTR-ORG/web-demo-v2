@@ -12,11 +12,12 @@ import type {
 } from "../lib/bifrost/types";
 import type { ShareAllocationEntry } from "../lib/storage/unadoptedSharesPool";
 import { RELAY_EMPTY_ERROR } from "./AppStateTypes";
+import { ONBOARD_RUNTIME_CONFIG } from "./onboardingTiming";
 
 export async function createRuntimeFromProfilePayload(payload: BfProfilePayload, localShareIdx: number): Promise<RuntimeClient> {
   const runtime = new RuntimeClient();
   await runtime.init(
-    {},
+    ONBOARD_RUNTIME_CONFIG,
     runtimeBootstrapFromParts(payload.group_package, {
       idx: localShareIdx,
       seckey: payload.device.share_secret
@@ -27,7 +28,7 @@ export async function createRuntimeFromProfilePayload(payload: BfProfilePayload,
 
 export async function createRuntimeFromSnapshot(snapshot: RuntimeSnapshotInput): Promise<RuntimeClient> {
   const runtime = new RuntimeClient();
-  await runtime.restore({}, snapshot);
+  await runtime.restore(ONBOARD_RUNTIME_CONFIG, snapshot);
   return runtime;
 }
 

@@ -218,7 +218,7 @@ export const demoRuntimeStatus: RuntimeStatusSummary = {
     },
     {
       idx: 1,
-      pubkey: "02d7e1b9f3a4c5d6e7f8a9b0c1d2e33b9e7d",
+      pubkey: DEMO_SHARE_PK_HEX_1,
       known: true,
       last_seen: now - 16000,
       online: true,
@@ -230,7 +230,7 @@ export const demoRuntimeStatus: RuntimeStatusSummary = {
     },
     {
       idx: 2,
-      pubkey: "029c4a8e2f3b4c5d6e7f8a9b0c1d26a1f5e",
+      pubkey: DEMO_SHARE_PK_HEX_2,
       known: true,
       last_seen: null,
       online: false,
@@ -254,7 +254,7 @@ export const demoRuntimeStatus: RuntimeStatusSummary = {
       },
     },
     {
-      pubkey: "02d7e1b9f3a4c5d6e7f8a9b0c1d2e33b9e7d",
+      pubkey: DEMO_SHARE_PK_HEX_1,
       manual_override: null,
       remote_observation: null,
       effective_policy: {
@@ -265,7 +265,7 @@ export const demoRuntimeStatus: RuntimeStatusSummary = {
       },
     },
     {
-      pubkey: "029c4a8e2f3b4c5d6e7f8a9b0c1d26a1f5e",
+      pubkey: DEMO_SHARE_PK_HEX_2,
       manual_override: null,
       remote_observation: null,
       effective_policy: {

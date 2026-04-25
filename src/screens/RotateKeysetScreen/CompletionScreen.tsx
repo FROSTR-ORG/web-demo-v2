@@ -27,6 +27,7 @@ export function RotateDistributionCompleteScreen() {
   const rows = sessionPackages.length
     ? sessionPackages.map((pkg) => ({
         title: `Member #${pkg.idx + 1} — ${shortHex(pkg.memberPubkey, 8, 4)}`,
+        peerOnline: pkg.peerOnline,
         statuses: [
           pkg.peerOnline ? "Echo received" : "",
           !pkg.peerOnline && pkg.manuallyMarkedDistributed
@@ -34,7 +35,7 @@ export function RotateDistributionCompleteScreen() {
             : "",
         ].filter(Boolean),
       }))
-    : ROTATE_COMPLETION_ROWS;
+    : ROTATE_COMPLETION_ROWS.map((row) => ({ ...row, peerOnline: false }));
   const total = rows.length;
   const accounted = sessionPackages.length
     ? sessionPackages.filter(packageDistributed).length
@@ -105,7 +106,9 @@ export function RotateDistributionCompleteScreen() {
                   </span>
                   <span>
                     <span className="value">{row.title}</span>
-                    <span className="completion-subvalue">New Device</span>
+                    <span className="completion-subvalue">
+                      {row.peerOnline ? "Existing Device" : "New Device"}
+                    </span>
                   </span>
                 </div>
                 <div className="inline-actions">

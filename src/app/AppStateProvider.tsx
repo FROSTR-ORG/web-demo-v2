@@ -44,6 +44,8 @@ import type {
   KeysetBundle,
   OperationFailure,
   OnboardingPackageView,
+  OnboardingRequestBundle,
+  OnboardingResponse,
   RuntimeBootstrapInput,
   RuntimeEvent,
   RuntimeSnapshotInput,
@@ -54,6 +56,7 @@ import type {
 import {
   RuntimeRelayPump,
   type RuntimeDrainBatch,
+  type RuntimeRelayDiagnosticEvent,
   type RuntimeRelayStatus,
 } from "../lib/relay/runtimeRelayPump";
 import {
@@ -64,7 +67,10 @@ import {
 import type { RelaySocketEvent } from "../lib/relay/browserRelayClient";
 import {
   OnboardingRelayError,
+  ONBOARDING_RELAY_RETRY_INTERVAL_MS,
   runOnboardingRelayHandshake,
+  type OnboardingRelayRequest,
+  type OnboardingRelayProgressEvent,
 } from "../lib/relay/browserRelayClient";
 import { LocalRuntimeSimulator } from "../lib/relay/localSimulator";
 import {
@@ -118,6 +124,10 @@ import {
   RUNTIME_EVENT_LOG_MAX,
   SetupFlowError,
 } from "./AppStateTypes";
+import {
+  ONBOARD_HANDSHAKE_TIMEOUT_MS,
+  ONBOARD_RUNTIME_CONFIG,
+} from "./onboardingTiming";
 import type {
   AppStateValue,
   CreateDraft,
@@ -627,6 +637,44 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const markCreatePackagesOnlineFromRuntimeStatus = useCallback(
+    (status: RuntimeStatusSummary | null) => {
+      if (!status) return;
+      const onlinePeers = new Set(
+        status.peers
+          .filter((peer) => peer.online)
+          .map((peer) => peer.pubkey.toLowerCase()),
+      );
+      if (onlinePeers.size === 0) return;
+      setCreateSession((session) => {
+        if (!session) return session;
+        let changed = false;
+        const onboardingPackages = session.onboardingPackages.map((entry) => {
+          if (!entry.packageCreated) return entry;
+          if (!onlinePeers.has(entry.memberPubkey.toLowerCase())) {
+            return entry;
+          }
+          if (
+            entry.peerOnline &&
+            !entry.pendingDispatchRequestId &&
+            !entry.adoptionError
+          ) {
+            return entry;
+          }
+          changed = true;
+          return {
+            ...entry,
+            peerOnline: true,
+            pendingDispatchRequestId: undefined,
+            adoptionError: undefined,
+          };
+        });
+        return changed ? { ...session, onboardingPackages } : session;
+      });
+    },
+    [],
+  );
+
   /**
    * Merge a drained batch into the accumulated completions / failures /
    * lifecycle-events slices. Completions and failures are kept sorted by
@@ -638,6 +686,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
    * union; we extract it defensively.
    */
   const absorbDrains = useCallback((drains: RuntimeDrainBatch) => {
+    const latestStatusEvent = [...drains.events]
+      .reverse()
+      .find((event) => event.status)?.status;
+    if (latestStatusEvent) {
+      setRuntimeStatus(latestStatusEvent);
+      markCreatePackagesOnlineFromRuntimeStatus(latestStatusEvent);
+    }
     const indexSnapshot = pendingDispatchIndexRef.current;
     const userFacingFailures = drains.failures.filter(
       (failure) => !isUncorrelatedPingFailure(failure, indexSnapshot),
@@ -874,25 +929,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         });
       }
     }
-    // fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire
-    // — correlate drained `CompletedOperation::Onboard` and
-    // `OperationFailure { op_type: "onboard" }` envelopes back to the
-    // active create session's onboarding packages via each share's
-    // `pendingDispatchRequestId`. Mirrors the `createOnboardSponsorPackage`
-    // correlation pattern higher up in this drain handler:
-    //   - Completion match ⇒ flip `peerOnline = true`, which (via
-    //     the `packageDistributed(pkg)` predicate) auto-advances the
-    //     Distribute-screen status chip to "Distributed" with NO
-    //     manual Mark-distributed click required.
-    //   - Failure match    ⇒ surface a non-fatal inline error
-    //     `"Peer adoption failed — retry or mark distributed
-    //     manually"` on the share's card. `Mark distributed`
-    //     remains enabled so the user can still proceed through
-    //     the manual fallback.
-    // The correlation runs only when there is an active create
-    // session; later sessions / other screens never read these
-    // fields, so we gate the setter on presence and short-circuit
-    // when no onboarding package matches.
+    // Legacy safety net: older create/distribute sessions may still
+    // carry a pendingDispatchRequestId. New bfonboard distribution is
+    // recipient-initiated and auto-greens from runtime peer-online
+    // status above; only tracked legacy probes should settle through
+    // this completion/failure correlation path.
     if (drains.completions.length > 0 || drains.failures.length > 0) {
       const onboardCompletionIds = new Set<string>();
       for (const completion of drains.completions) {
@@ -1041,7 +1082,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         );
       }
     }
-  }, []);
+  }, [markCreatePackagesOnlineFromRuntimeStatus]);
 
   const resetDrainSlices = useCallback(() => {
     setRuntimeCompletions([]);
@@ -1662,12 +1703,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const applyRuntimeStatus = useCallback(
     (status: RuntimeStatusSummary | null) => {
-      setRuntimeStatus(augmentStatus(status));
+      const augmented = augmentStatus(status);
+      setRuntimeStatus(augmented);
+      markCreatePackagesOnlineFromRuntimeStatus(augmented);
       if (status) {
         correlatePendingOperations(status.pending_operations);
       }
     },
-    [augmentStatus, correlatePendingOperations],
+    [
+      augmentStatus,
+      correlatePendingOperations,
+      markCreatePackagesOnlineFromRuntimeStatus,
+    ],
   );
 
   /**
@@ -1681,6 +1728,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (!import.meta.env.DEV) return;
     appendRelayHistoryEntry(event);
   }, []);
+
+  const recordRuntimeRelayDiagnostic = useCallback(
+    (event: RuntimeRelayDiagnosticEvent) => {
+      if (!import.meta.env.DEV) return;
+      appendRuntimeRelayDiagnosticEntry(event);
+    },
+    [],
+  );
 
   const startLiveRelayPump = useCallback(
     async (
@@ -1709,6 +1764,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         onDrains: absorbDrains,
         onRefreshPingRequestIds: markRefreshPingProbeIds,
         onSocketEvent: recordRelaySocketEvent,
+        onDiagnostic: recordRuntimeRelayDiagnostic,
       });
       relayPumpRef.current = pump;
       setRuntimeRelays(pump.relayStatuses());
@@ -1726,6 +1782,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       absorbDrains,
       augmentStatus,
       markRefreshPingProbeIds,
+      recordRelaySocketEvent,
+      recordRuntimeRelayDiagnostic,
       resetDrainSlices,
       stopRelayPump,
     ],
@@ -2043,9 +2101,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // validation above guarantees `validatedRelays.length > 0` and
       // every entry passes the Settings-parity validator, so no
       // simulator fallback is reachable once we get here
-      // (VAL-FOLLOWUP-001). No onboard commands are dispatched here;
-      // per-share onboard dispatch is deferred to
-      // `encodeDistributionPackage` (feature 3 in this batch).
+      // (VAL-FOLLOWUP-001). No bootstrap onboard commands are
+      // dispatched here; recipient devices later import bfonboard
+      // packages and this live runtime answers their inbound requests.
       const runtime = await createRuntimeFromProfilePayload(
         payload,
         localShare.idx,
@@ -2251,23 +2309,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const nextStash = new Map(createSessionPackageSecretsRef.current);
       nextStash.set(idx, { packageText, password });
       createSessionPackageSecretsRef.current = nextStash;
-      const dispatchResult = await dispatchCreateSessionOnboard(
-        idx,
-        "Onboard dispatch failed",
-      );
-      const dispatchDebounced = dispatchResult.debounced === true;
       // Populate the redacted preview (first 24 chars of bfonboard1…)
-      // and flip packageCreated on the session view. Also stash the
-      // onboard command's requestId so absorbDrains can correlate later
-      // completions / failures. A missing requestId means the dispatch never
-      // produced a trackable start, so surface that inline without clearing any
-      // existing correlation id. Debounced dispatches preserve the existing
-      // correlation/error fields because the original request remains in flight.
+      // and flip packageCreated on the session view. The provisioning side
+      // does NOT proactively dispatch its own onboard command here; per
+      // frostr-infra/docs/ONBOARD.md the recipient imports bfonboard and
+      // sends the onboarding request, while this live signer answers it
+      // through the relay pump.
       const preview = packageText.slice(0, 24);
-      const dispatchStartError = dispatchDebounced
-        ? undefined
-        : dispatchResult.adoptionError ??
-          "onboard failed to start: missing requestId";
       setCreateSession((session) => {
         if (!session) return session;
         return {
@@ -2279,16 +2327,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                   packageText: preview,
                   password: "[redacted]",
                   packageCreated: true,
-                  pendingDispatchRequestId: dispatchDebounced
-                    ? entry.pendingDispatchRequestId
-                    : dispatchResult.requestId
-                      ? dispatchResult.requestId
-                      : entry.pendingDispatchRequestId,
-                  adoptionError: dispatchDebounced
-                    ? entry.adoptionError
-                    : dispatchResult.requestId
-                      ? undefined
-                      : dispatchStartError,
+                  pendingDispatchRequestId: undefined,
+                  adoptionError: undefined,
                 }
               : entry,
           ),
@@ -2497,6 +2537,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           phase: "decoded",
           packageString: trimmed,
           payload,
+          progress: {
+            relays: "pending",
+            request: "pending",
+            response: "pending",
+            snapshot: "pending",
+          },
         });
       } catch (error) {
         throw setupErrorFromPackage(error, {
@@ -2525,6 +2571,132 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     onboardHandshakeSeq.current = attempt.id;
     onboardHandshakeRef.current = attempt;
     const eventKind = await defaultBifrostEventKind();
+    const applyProgress = (event: OnboardingRelayProgressEvent) => {
+      if (onboardHandshakeRef.current?.id !== attempt.id) {
+        return;
+      }
+      setOnboardSession((current) => {
+        if (!current || current.packageString !== baseSession.packageString) {
+          return current;
+        }
+        const progress = current.progress ?? {
+          relays: "pending" as const,
+          request: "pending" as const,
+          response: "pending" as const,
+          snapshot: "pending" as const,
+        };
+        switch (event.type) {
+          case "relay_connecting":
+            return {
+              ...current,
+              progress: { ...progress, relays: "connecting" },
+            };
+          case "relay_connected":
+            return {
+              ...current,
+              progress: {
+                ...progress,
+                relays: "connected",
+                connectedRelays: event.connectedRelays,
+              },
+            };
+          case "relay_connect_failed":
+            return progress.relays === "connected"
+              ? current
+              : {
+                  ...current,
+                  progress: { ...progress, relays: "failed" },
+                };
+          case "request_published":
+            return {
+              ...current,
+              progress: {
+                ...progress,
+                relays: "connected",
+                request: "published",
+                publishedRelays: event.relays,
+                requestAttempts: event.attempt,
+                activeRequestCount: current.requestBundles?.length ?? 1,
+              },
+            };
+          case "request_publish_failed":
+            return progress.request === "published"
+              ? {
+                  ...current,
+                  progress: {
+                    ...progress,
+                    lastRequestPublishFailure: {
+                      relay: event.relay,
+                      message: event.message,
+                      attempt: event.attempt,
+                    },
+                  },
+                }
+              : {
+                  ...current,
+                  progress: {
+                    ...progress,
+                    request: "failed",
+                    requestAttempts: event.attempt,
+                    lastRequestPublishFailure: {
+                      relay: event.relay,
+                      message: event.message,
+                      attempt: event.attempt,
+                    },
+                  },
+                };
+          case "request_retry_scheduled":
+            return {
+              ...current,
+              progress: {
+                ...progress,
+                retryDelayMs: event.delayMs,
+                requestAttempts: Math.max(
+                  progress.requestAttempts ?? 1,
+                  event.attempt - 1,
+                ),
+                activeRequestCount: current.requestBundles?.length ?? 1,
+              },
+            };
+          case "response_candidate":
+            return {
+              ...current,
+              progress: {
+                ...progress,
+                response:
+                  progress.response === "received"
+                    ? "received"
+                    : "candidate",
+                responseCandidateCount:
+                  (progress.responseCandidateCount ?? 0) + 1,
+                lastResponseRelay: event.relay,
+                lastEventAt: Date.now(),
+              },
+            };
+          case "response_decoded":
+            return {
+              ...current,
+              progress: {
+                ...progress,
+                response: "received",
+                lastResponseRelay: event.relay ?? progress.lastResponseRelay,
+                responseDecodedAt: Date.now(),
+              },
+            };
+          case "timeout":
+            return {
+              ...current,
+              progress: {
+                ...progress,
+                response:
+                  progress.response === "received" ? "received" : "failed",
+              },
+            };
+          default:
+            return current;
+        }
+      });
+    };
     try {
       if (
         attempt.controller.signal.aborted ||
@@ -2537,42 +2709,114 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         peerPubkey32Hex: baseSession.payload.peer_pk,
         eventKind,
       });
+      const requestBundles = [requestBundle];
+      const toRelayRequest = (
+        bundle: OnboardingRequestBundle,
+      ): OnboardingRelayRequest => ({
+        request_id: bundle.request_id,
+        local_pubkey32: bundle.local_pubkey32,
+        event_json: bundle.event_json,
+      });
       setOnboardSession({
         ...baseSession,
         phase: "handshaking",
         requestBundle,
+        requestBundles,
+        progress: {
+          ...(baseSession.progress ?? {
+            relays: "pending",
+            request: "pending",
+            response: "pending",
+            snapshot: "pending",
+          }),
+          relays: "connecting",
+          request: "pending",
+          response: "pending",
+          snapshot: "pending",
+          requestAttempts: 0,
+          activeRequestCount: 1,
+          retryDelayMs: ONBOARDING_RELAY_RETRY_INTERVAL_MS,
+        },
       });
 
-      const response = await runOnboardingRelayHandshake({
+      const matched = await runOnboardingRelayHandshake<{
+        response: OnboardingResponse;
+        requestBundle: OnboardingRequestBundle;
+      }>({
         relays: baseSession.payload.relays,
         eventKind,
         sourcePeerPubkey: baseSession.payload.peer_pk,
-        localPubkey: requestBundle.local_pubkey32,
-        requestEventJson: requestBundle.event_json,
-        signal: attempt.controller.signal,
-        decodeEvent: async (event) => {
-          try {
-            return await decodeOnboardingResponseEvent({
-              event,
-              shareSecret: baseSession.payload.share_secret,
-              expectedPeerPubkey32Hex: baseSession.payload.peer_pk,
-              expectedLocalPubkey32Hex: requestBundle.local_pubkey32,
-              requestId: requestBundle.request_id,
-            });
-          } catch (error) {
+        initialRequest: toRelayRequest(requestBundle),
+        createRetryRequest: async () => {
+          const retryBundle = await createOnboardingRequestBundle({
+            shareSecret: baseSession.payload.share_secret,
+            peerPubkey32Hex: baseSession.payload.peer_pk,
+            eventKind,
+          });
+          requestBundles.push(retryBundle);
+          setOnboardSession((current) => {
             if (
-              error instanceof BifrostPackageError &&
-              error.code === "verification_failed"
+              !current ||
+              current.packageString !== baseSession.packageString
             ) {
-              throw new OnboardingRelayError("onboard_rejected", error.message);
+              return current;
             }
-            throw new OnboardingRelayError(
-              "invalid_onboard_response",
-              error instanceof Error
-                ? error.message
-                : "Invalid onboarding response.",
+            return {
+              ...current,
+              requestBundle: retryBundle,
+              requestBundles: requestBundles.slice(),
+              progress: current.progress
+                ? {
+                    ...current.progress,
+                    activeRequestCount: requestBundles.length,
+                  }
+                : current.progress,
+            };
+          });
+          return toRelayRequest(retryBundle);
+        },
+        timeoutMs: ONBOARD_HANDSHAKE_TIMEOUT_MS,
+        retryIntervalMs: ONBOARDING_RELAY_RETRY_INTERVAL_MS,
+        signal: attempt.controller.signal,
+        onProgress: applyProgress,
+        decodeEvent: async (event, requests) => {
+          for (const request of requests) {
+            const bundle = requestBundles.find(
+              (candidate) => candidate.request_id === request.request_id,
             );
+            if (!bundle) {
+              continue;
+            }
+            try {
+              const response = await decodeOnboardingResponseEvent({
+                event,
+                shareSecret: baseSession.payload.share_secret,
+                expectedPeerPubkey32Hex: baseSession.payload.peer_pk,
+                expectedLocalPubkey32Hex: bundle.local_pubkey32,
+                requestId: bundle.request_id,
+              });
+              if (response) {
+                return { response, requestBundle: bundle };
+              }
+            } catch (error) {
+              if (
+                error instanceof BifrostPackageError &&
+                error.code === "verification_failed"
+              ) {
+                throw new OnboardingRelayError(
+                  "onboard_rejected",
+                  error.message,
+                );
+              }
+              throw new OnboardingRelayError(
+                "invalid_onboard_response",
+                error instanceof Error
+                  ? error.message
+                  : "Invalid onboarding response.",
+              );
+            }
           }
+          return null;
         },
       });
       if (
@@ -2582,20 +2826,31 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         throw makeAbortError();
       }
       const runtimeSnapshot = await buildOnboardingRuntimeSnapshot({
-        group: response.group,
+        group: matched.response.group,
         shareSecret: baseSession.payload.share_secret,
         peerPubkey32Hex: baseSession.payload.peer_pk,
-        responseNonces: response.nonces,
-        bootstrapStateHex: requestBundle.bootstrap_state_hex,
+        responseNonces: matched.response.nonces,
+        bootstrapStateHex: matched.requestBundle.bootstrap_state_hex,
       });
-      setOnboardSession({
-        ...baseSession,
+      setOnboardSession((current) => ({
+        ...(current ?? baseSession),
         phase: "ready_to_save",
-        requestBundle,
-        response,
+        requestBundle: matched.requestBundle,
+        requestBundles: requestBundles.slice(),
+        response: matched.response,
         runtimeSnapshot,
         localShareIdx: runtimeSnapshot.bootstrap.share.idx,
-      });
+        progress: {
+          ...((current ?? baseSession).progress ?? {}),
+          relays: "connected",
+          request: "published",
+          response: "received",
+          snapshot: "built",
+          requestAttempts: requestBundles.length,
+          activeRequestCount: requestBundles.length,
+          snapshotBuiltAt: Date.now(),
+        },
+      }));
       if (onboardHandshakeRef.current?.id === attempt.id) {
         onboardHandshakeRef.current = null;
       }
@@ -2610,14 +2865,39 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         onboardHandshakeRef.current = null;
       }
       const setupError = setupErrorFromOnboardingRelay(error);
-      setOnboardSession({
-        ...baseSession,
-        phase: "failed",
-        error: {
-          code: setupError.code,
-          message: setupError.message,
-          details: setupError.details,
-        },
+      setOnboardSession((current) => {
+        const existingProgress = (current ?? baseSession).progress ?? {
+          relays: "pending" as const,
+          request: "pending" as const,
+          response: "pending" as const,
+          snapshot: "pending" as const,
+        };
+        return {
+          ...(current ?? baseSession),
+          phase: "failed",
+          progress: {
+            ...existingProgress,
+            response:
+              setupError.code === "onboard_timeout" ||
+              setupError.code === "onboard_rejected" ||
+              setupError.code === "invalid_onboard_response"
+                ? "failed"
+                : existingProgress.response,
+            relays:
+              setupError.code === "relay_unreachable"
+                ? "failed"
+                : existingProgress.relays,
+            snapshot:
+              setupError.code === "invalid_onboard_response"
+                ? "failed"
+                : existingProgress.snapshot,
+          },
+          error: {
+            code: setupError.code,
+            message: setupError.message,
+            details: setupError.details,
+          },
+        };
       });
       throw setupError;
     }
@@ -5530,6 +5810,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     // runtime snapshot on each read (no stale values).
     const debugSurface: TestObservabilityDebugSurface = {
       relayHistory: getRelayHistoryArray(),
+      runtimeRelayDiagnostics: getRuntimeRelayDiagnosticsArray(),
       visibilityHistory: getVisibilityHistoryArray(),
       // Stable reference mutated in-place by `appendClearCredentialsLogEntry`
       // / `resetClearCredentialsLog` so validators can hold a single
@@ -5567,6 +5848,43 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         // Mirrored in `runtimeEventLogRef` by the effect above so callers
         // do not need to re-render to see the latest state.
         return runtimeEventLogRef.current;
+      },
+      onboardDiagnostics(): OnboardDiagnosticsSnapshot {
+        const session = onboardSession;
+        return {
+          at: Date.now(),
+          visibilityState:
+            typeof document === "undefined"
+              ? "unknown"
+              : document.visibilityState,
+          source: {
+            activeProfileId: activeProfile?.id ?? null,
+            relayPumpAttached: relayPumpRef.current !== null,
+            configuredRelays: liveRelayUrlsRef.current.slice(),
+            runtimeRelays: runtimeRelays.map((relay) => ({ ...relay })),
+            pendingOperationCount:
+              runtimeStatus?.pending_operations.length ?? 0,
+            recentRelayDiagnostics: getRuntimeRelayDiagnosticsArray()
+              .slice(-50)
+              .map((event) => ({ ...event })),
+          },
+          requester: {
+            phase: session?.phase ?? null,
+            packageLoaded: Boolean(session?.packageString),
+            relays: session?.payload.relays.slice() ?? [],
+            sourcePeer: session?.payload.peer_pk
+              ? `${session.payload.peer_pk.slice(0, 10)}...${session.payload.peer_pk.slice(-4)}`
+              : null,
+            progress: session?.progress ? { ...session.progress } : null,
+            activeRequestCount: session?.requestBundles?.length ?? 0,
+            requestIds:
+              session?.requestBundles?.map((bundle) =>
+                bundle.request_id
+                  ? `${bundle.request_id.slice(0, 10)}...${bundle.request_id.slice(-4)}`
+                  : "unknown",
+              ) ?? [],
+          },
+        };
       },
     };
     globalWindow.__debug = debugSurface;
@@ -5617,7 +5935,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           initial_peer_nonces: input.initial_peer_nonces,
         };
         const runtime = new RuntimeClient();
-        await runtime.init({}, bootstrap);
+        await runtime.init(ONBOARD_RUNTIME_CONFIG, bootstrap);
         setRuntime(runtime, undefined, input.relays);
         return;
       }
@@ -5752,7 +6070,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       };
       const waitForPhase = async (
         expected: "decoded" | "ready_to_save",
-        timeoutMs = 30_000,
+        timeoutMs = ONBOARD_HANDSHAKE_TIMEOUT_MS,
       ) => {
         const deadline = Date.now() + timeoutMs;
         while (Date.now() < deadline) {
@@ -5876,7 +6194,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         ],
       };
       const nextRuntime = new RuntimeClient();
-      await nextRuntime.init({}, nextBootstrap);
+      await nextRuntime.init(ONBOARD_RUNTIME_CONFIG, nextBootstrap);
       setRuntime(nextRuntime, undefined, liveRelayUrlsRef.current);
     };
     // Forcibly close every live relay socket with a simulated close code
@@ -5978,14 +6296,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       simulatorRef.current = simulator;
       applyRuntimeStatus(simulator.pump(4));
     };
-    // fix-followup-distribute-per-share-onboard-dispatch-and-echo-wire
-    // — expose absorbDrains so unit tests can simulate runtime drain
+    // Expose absorbDrains so unit tests can simulate runtime drain
     // batches arriving at the provider without spinning up a full
-    // RuntimeRelayPump. Used by
-    // `src/app/__tests__/encodeDistributionPackage.onboard-dispatch.test.tsx`
-    // to verify the onboarding-package correlation against both
-    // `CompletedOperation::Onboard` (peerOnline flip) and
-    // `OperationFailure { op_type: "onboard" }` (adoptionError surface).
+    // RuntimeRelayPump.
     globalWindow.__iglooTestAbsorbDrains = (drains) => {
       absorbDrains(drains);
     };
@@ -6478,12 +6791,35 @@ interface ClearCredentialsLogEntry {
   message?: string;
 }
 
+interface OnboardDiagnosticsSnapshot {
+  at: number;
+  visibilityState: DocumentVisibilityState | "unknown";
+  source: {
+    activeProfileId: string | null;
+    relayPumpAttached: boolean;
+    configuredRelays: string[];
+    runtimeRelays: RuntimeRelayStatus[];
+    pendingOperationCount: number;
+    recentRelayDiagnostics: RuntimeRelayDiagnosticEvent[];
+  };
+  requester: {
+    phase: OnboardSession["phase"] | null;
+    packageLoaded: boolean;
+    relays: string[];
+    sourcePeer: string | null;
+    progress: OnboardSession["progress"] | null;
+    activeRequestCount: number;
+    requestIds: string[];
+  };
+}
+
 /**
  * Shape of the dev-only `window.__debug` surface. Not shipped to
  * production (the installer effect is gated on `import.meta.env.DEV`).
  */
 interface TestObservabilityDebugSurface {
   relayHistory: RelayHistoryEntry[];
+  runtimeRelayDiagnostics: RuntimeRelayDiagnosticEvent[];
   visibilityHistory: VisibilityHistoryEntry[];
   readonly noncePoolSnapshot: NoncePoolSnapshot | null;
   /**
@@ -6494,6 +6830,7 @@ interface TestObservabilityDebugSurface {
    * always observe the current buffer (VAL-EVENTLOG-012 / VAL-EVENTLOG-014).
    */
   readonly runtimeEventLog: RuntimeEventLogEntry[];
+  onboardDiagnostics: () => OnboardDiagnosticsSnapshot;
   /**
    * Append-only phase log for the most recent Clear Credentials
    * invocation (reset each time `clearCredentials()` is called).
@@ -6508,6 +6845,7 @@ interface TestObservabilityDebugSurface {
 // scenario that reconnects a few relays and flips visibility several times;
 // small enough that a misbehaving page can't exhaust memory.
 const RELAY_HISTORY_MAX = 200;
+const RUNTIME_RELAY_DIAGNOSTICS_MAX = 300;
 const VISIBILITY_HISTORY_MAX = 200;
 
 /**
@@ -6525,6 +6863,7 @@ const RELAY_HISTORY_SESSION_KEY = "__debug.relayHistory";
  * consumers who cached `window.__debug.relayHistory`.
  */
 const relayHistoryBuffer: RelayHistoryEntry[] = [];
+const runtimeRelayDiagnosticsBuffer: RuntimeRelayDiagnosticEvent[] = [];
 const visibilityHistoryBuffer: VisibilityHistoryEntry[] = [];
 /**
  * Phase-log ring buffer for the most recent Clear Credentials flow.
@@ -6538,6 +6877,10 @@ const clearCredentialsLogBuffer: ClearCredentialsLogEntry[] = [];
 
 function getRelayHistoryArray(): RelayHistoryEntry[] {
   return relayHistoryBuffer;
+}
+
+function getRuntimeRelayDiagnosticsArray(): RuntimeRelayDiagnosticEvent[] {
+  return runtimeRelayDiagnosticsBuffer;
 }
 
 function getVisibilityHistoryArray(): VisibilityHistoryEntry[] {
@@ -6707,6 +7050,19 @@ function appendRelayHistoryEntry(event: RelaySocketEvent): void {
   // to validators (VAL-OPS-028). The helper itself is DEV-gated, so this
   // call is tree-shaken out of production builds.
   persistRelayHistoryToSessionStorage();
+}
+
+function appendRuntimeRelayDiagnosticEntry(
+  event: RuntimeRelayDiagnosticEvent,
+): void {
+  if (!import.meta.env.DEV) return;
+  runtimeRelayDiagnosticsBuffer.push(event);
+  if (runtimeRelayDiagnosticsBuffer.length > RUNTIME_RELAY_DIAGNOSTICS_MAX) {
+    runtimeRelayDiagnosticsBuffer.splice(
+      0,
+      runtimeRelayDiagnosticsBuffer.length - RUNTIME_RELAY_DIAGNOSTICS_MAX,
+    );
+  }
 }
 
 function appendVisibilityEntry(state: DocumentVisibilityState): void {

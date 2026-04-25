@@ -1,11 +1,13 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import {
   BrowserRelayClient,
+  ONBOARDING_RELAY_HANDSHAKE_TIMEOUT_MS,
   OnboardingRelayError,
   runOnboardingRelayHandshake,
   type RelayClient,
   type RelayConnection,
 } from "./browserRelayClient";
+import { ONBOARD_HANDSHAKE_TIMEOUT_MS } from "../../app/onboardingTiming";
 import type { RelayFilter, RelaySubscription } from "./relayPort";
 
 class FakeSocket {
@@ -239,11 +241,13 @@ describe("BrowserRelayClient", () => {
     expect(reqFrame[0]).toBe("REQ");
     expect(reqFrame[2]).toEqual({ kinds: [27000], authors: ["peer"] });
 
-    await connection.publish({ id: "request-event" });
+    const publish = connection.publish({ id: "request-event" });
     expect(JSON.parse(sockets[0].sent[1])).toEqual([
       "EVENT",
       { id: "request-event" },
     ]);
+    sockets[0].message(JSON.stringify(["OK", "request-event", true, ""]));
+    await publish;
 
     sockets[0].message(
       JSON.stringify(["EVENT", reqFrame[1], { id: "response-event" }]),
@@ -262,12 +266,41 @@ describe("BrowserRelayClient", () => {
     connection.close();
     expect(sockets[0].closed).toBe(true);
   });
+
+  it("rejects publish when the relay returns OK false", async () => {
+    const sockets: FakeSocket[] = [];
+    const client = new BrowserRelayClient((url) => {
+      const socket = new FakeSocket(url);
+      sockets.push(socket);
+      return socket;
+    });
+    const connection = client.connect("wss://relay.test");
+    const open = connection.connect();
+    sockets[0].open();
+    await open;
+
+    const publish = connection.publish({ id: "rejected-event" });
+    sockets[0].message(
+      JSON.stringify(["OK", "rejected-event", false, "restricted: kind"]),
+    );
+
+    await expect(publish).rejects.toThrow(/restricted: kind/);
+    connection.close();
+  });
 });
 
 describe("runOnboardingRelayHandshake", () => {
+  it("uses a liberal app-level onboarding window while tests can still pass small explicit timeouts", () => {
+    expect(ONBOARD_HANDSHAKE_TIMEOUT_MS).toBe(180_000);
+    expect(ONBOARDING_RELAY_HANDSHAKE_TIMEOUT_MS).toBe(
+      ONBOARD_HANDSHAKE_TIMEOUT_MS,
+    );
+  });
+
   it("subscribes before publishing, ignores nonmatching events, resolves first decoded response, and closes sockets", async () => {
     const client = new FakeRelayClient(["wss://one.test", "wss://two.test"]);
     const notices: Array<{ relay: string; message: string }> = [];
+    const progress: string[] = [];
     const handshake = runOnboardingRelayHandshake({
       relays: ["wss://one.test", "wss://two.test"],
       eventKind: 27000,
@@ -276,6 +309,7 @@ describe("runOnboardingRelayHandshake", () => {
       requestEventJson: JSON.stringify({ id: "request" }),
       relayClient: client,
       onNotice: (notice) => notices.push(notice),
+      onProgress: (event) => progress.push(event.type),
       decodeEvent: async (event) =>
         (event as { id?: string }).id === "valid" ? { ok: true } : null,
     });
@@ -283,7 +317,6 @@ describe("runOnboardingRelayHandshake", () => {
     await flushTimers();
     expect(client.connections[0].subscriptions[0].filter).toEqual({
       kinds: [27000],
-      authors: ["peer-pubkey"],
       "#p": ["local-pubkey"],
     });
     expect(client.connections[0].publishes).toEqual([{ id: "request" }]);
@@ -295,6 +328,15 @@ describe("runOnboardingRelayHandshake", () => {
     client.connections[1].subscriptions[0].onEvent({ id: "valid" });
 
     await expect(handshake).resolves.toEqual({ ok: true });
+    expect(progress).toEqual(
+      expect.arrayContaining([
+        "relay_connecting",
+        "relay_connected",
+        "request_published",
+        "response_candidate",
+        "response_decoded",
+      ]),
+    );
     expect(notices).toEqual([{ relay: "wss://one.test", message: "stored" }]);
     expect(client.connections.every((connection) => connection.closed)).toBe(
       true,
@@ -308,6 +350,7 @@ describe("runOnboardingRelayHandshake", () => {
 
   it("rejects when no relay can connect", async () => {
     const client = new FakeRelayClient(["wss://offline.test"], true);
+    const progress: string[] = [];
     await expect(
       runOnboardingRelayHandshake({
         relays: ["wss://offline.test"],
@@ -316,9 +359,14 @@ describe("runOnboardingRelayHandshake", () => {
         localPubkey: "local-pubkey",
         requestEventJson: JSON.stringify({ id: "request" }),
         relayClient: client,
+        onProgress: (event) => progress.push(event.type),
         decodeEvent: async () => null,
       }),
     ).rejects.toMatchObject({ code: "relay_unreachable" });
+    expect(progress).toEqual([
+      "relay_connecting",
+      "relay_connect_failed",
+    ]);
     expect(client.connections[0].closed).toBe(true);
   });
 
@@ -382,6 +430,7 @@ describe("runOnboardingRelayHandshake", () => {
   it("times out and closes relay resources", async () => {
     vi.useFakeTimers();
     const client = new FakeRelayClient(["wss://slow.test"]);
+    const progress: string[] = [];
     const handshake = runOnboardingRelayHandshake({
       relays: ["wss://slow.test"],
       eventKind: 27000,
@@ -390,6 +439,7 @@ describe("runOnboardingRelayHandshake", () => {
       requestEventJson: JSON.stringify({ id: "request" }),
       relayClient: client,
       timeoutMs: 25,
+      onProgress: (event) => progress.push(event.type),
       decodeEvent: async () => null,
     });
     const timeout = expect(handshake).rejects.toMatchObject({
@@ -401,8 +451,117 @@ describe("runOnboardingRelayHandshake", () => {
 
     await timeout;
     await expect(handshake).rejects.toBeInstanceOf(OnboardingRelayError);
+    expect(progress).toContain("request_published");
+    expect(progress).toContain("timeout");
     expect(client.connections[0].closed).toBe(true);
     expect(client.connections[0].subscriptions[0].closed).toBe(true);
+  });
+
+  it("publishes fresh retry requests while waiting for a response, then times out accurately", async () => {
+    vi.useFakeTimers();
+    const client = new FakeRelayClient(["wss://slow.test"]);
+    const progress: Array<{ type: string; attempt?: number }> = [];
+    let retrySeq = 1;
+    const handshake = runOnboardingRelayHandshake({
+      relays: ["wss://slow.test"],
+      eventKind: 27000,
+      sourcePeerPubkey: "peer-pubkey",
+      initialRequest: {
+        request_id: "request-1",
+        local_pubkey32: "local-pubkey",
+        event_json: JSON.stringify({ id: "request-1" }),
+      },
+      createRetryRequest: async () => {
+        retrySeq += 1;
+        return {
+          request_id: `request-${retrySeq}`,
+          local_pubkey32: "local-pubkey",
+          event_json: JSON.stringify({ id: `request-${retrySeq}` }),
+        };
+      },
+      relayClient: client,
+      timeoutMs: 10_500,
+      retryIntervalMs: 5_000,
+      onProgress: (event) =>
+        progress.push({
+          type: event.type,
+          attempt: "attempt" in event ? event.attempt : undefined,
+        }),
+      decodeEvent: async () => null,
+    });
+    const timeout = expect(handshake).rejects.toMatchObject({
+      code: "onboard_timeout",
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(client.connections[0].publishes).toEqual([{ id: "request-1" }]);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(client.connections[0].publishes).toEqual([
+      { id: "request-1" },
+      { id: "request-2" },
+    ]);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(client.connections[0].publishes).toEqual([
+      { id: "request-1" },
+      { id: "request-2" },
+      { id: "request-3" },
+    ]);
+
+    await vi.advanceTimersByTimeAsync(500);
+    await timeout;
+    expect(progress).toEqual(
+      expect.arrayContaining([
+        { type: "request_published", attempt: 1 },
+        { type: "request_retry_scheduled", attempt: 2 },
+        { type: "request_published", attempt: 2 },
+        { type: "request_published", attempt: 3 },
+        { type: "timeout", attempt: undefined },
+      ]),
+    );
+    expect(client.connections[0].closed).toBe(true);
+  });
+
+  it("resolves a response that matches a later fresh request attempt", async () => {
+    vi.useFakeTimers();
+    const client = new FakeRelayClient(["wss://relay.test"]);
+    const handshake = runOnboardingRelayHandshake({
+      relays: ["wss://relay.test"],
+      eventKind: 27000,
+      sourcePeerPubkey: "peer-pubkey",
+      initialRequest: {
+        request_id: "request-1",
+        local_pubkey32: "local-pubkey",
+        event_json: JSON.stringify({ id: "request-1" }),
+      },
+      createRetryRequest: async () => ({
+        request_id: "request-2",
+        local_pubkey32: "local-pubkey",
+        event_json: JSON.stringify({ id: "request-2" }),
+      }),
+      relayClient: client,
+      timeoutMs: 30_000,
+      retryIntervalMs: 5_000,
+      decodeEvent: async (event, requests) => {
+        const responseTo = (event as { responseTo?: string }).responseTo;
+        const matched = requests.find(
+          (request) => request.request_id === responseTo,
+        );
+        return matched ? { matched: matched.request_id } : null;
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(client.connections[0].publishes).toEqual([
+      { id: "request-1" },
+      { id: "request-2" },
+    ]);
+
+    client.connections[0].subscriptions[0].onEvent({ responseTo: "request-2" });
+
+    await expect(handshake).resolves.toEqual({ matched: "request-2" });
+    expect(client.connections[0].closed).toBe(true);
   });
 
   it("aborts and closes relay resources without waiting for timeout", async () => {

@@ -36,11 +36,15 @@ export interface DemoScenario {
 }
 
 function locationFor(id: string, pathname: string, state: Record<string, unknown> = {}): DemoLocation {
+  const demoUi =
+    typeof state.demoUi === "object" && state.demoUi !== null
+      ? { __demoScenario: true, ...state.demoUi }
+      : { __demoScenario: true };
   return {
     pathname,
     search: "",
     hash: "",
-    state,
+    state: { ...state, demoUi },
     key: id
   };
 }

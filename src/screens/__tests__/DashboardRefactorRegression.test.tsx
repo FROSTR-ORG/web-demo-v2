@@ -106,7 +106,7 @@ describe("DashboardRefactorRegression — audit-gap details preserved after refa
     expect(fontFamily.replace(/['"]/g, "").replace(/_/g, " ")).toMatch(/Share Tech Mono/i);
   });
 
-  it("VAL-DSH-017 — Signer Policy Prompt modal renders detail rows (EVENT KIND, CONTENT, PUBKEY, DOMAIN) with exact paper copy and peer-level CTAs (scoped variants hidden per VAL-APPROVALS-013 deviation)", () => {
+  it("VAL-DSH-017 — Signer Policy Prompt modal renders detail rows (EVENT KIND, CONTENT, PUBKEY, DOMAIN) with exact paper copy and fixture-only scoped CTAs visible", () => {
     renderScenario("dashboard-policy-prompt");
     // Title + subtitle
     expect(screen.getByRole("heading", { name: "Signer Policy" })).toBeInTheDocument();
@@ -140,8 +140,8 @@ describe("DashboardRefactorRegression — audit-gap details preserved after refa
     // copy superseded by the reactive denial surface's client-side
     // countdown).
     expect(screen.getByText(/Expires in/)).toBeInTheDocument();
-    // Peer-level CTAs remain present; Paper fixture mode also renders
-    // the scoped action row for screenshot parity.
+    // Runtime PolicyPromptModal suppresses the scoped row by default; the
+    // Paper fixture flag `showPaperScopedActions` renders it for parity here.
     for (const label of ["Deny", "Allow once", "Always allow", "Always deny"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }

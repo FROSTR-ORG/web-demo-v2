@@ -9,6 +9,7 @@ export type DashboardDemoView = "dashboard" | "policies" | "recover";
 export type DashboardDemoRecoverStep = "collect" | "success";
 
 export interface DemoUiState {
+  __demoScenario?: true;
   welcome?: {
     unlockingProfileId?: string;
     unlockError?: string;
@@ -76,4 +77,10 @@ export interface DemoUiState {
 export function useDemoUi(): DemoUiState {
   const location = useLocation();
   return ((location.state as { demoUi?: DemoUiState } | null)?.demoUi ?? {}) as DemoUiState;
+}
+
+export function isDemoScenarioState(state: unknown): boolean {
+  if (typeof state !== "object" || state === null) return false;
+  const candidate = state as { demoUi?: DemoUiState };
+  return candidate.demoUi?.__demoScenario === true;
 }

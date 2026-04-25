@@ -110,6 +110,8 @@ function selectedScenarioIds() {
   return includedScenarioIds;
 }
 
+const scenarioIdsToAudit = selectedScenarioIds();
+
 function cropTopAligned(source, width, height) {
   const output = new PNG({ width, height });
   for (let y = 0; y < height; y += 1) {
@@ -229,7 +231,7 @@ try {
     permissions: ["clipboard-read", "clipboard-write"],
   });
 
-  for (const id of selectedScenarioIds()) {
+  for (const id of scenarioIdsToAudit) {
     const paperPath = resolve(repoRoot, "public/paper-reference", `${id}.png`);
     if (!existsSync(paperPath)) {
       failures.push({ id, message: `Missing Paper reference: ${paperPath}` });

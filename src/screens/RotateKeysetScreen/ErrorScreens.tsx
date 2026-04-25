@@ -27,14 +27,13 @@ export function RotateWrongPasswordScreen() {
   const message =
     state?.errorMessage ??
     "Wrong password. Unable to decrypt this source package.";
-  const paperAlignedMessage = message.replace(
+  const paperAlignedMessage = message.replaceAll(
     "bfshare source package",
     "source package",
   );
   const failedPackageDisplay =
     state?.details?.packagePrefix ??
     "bfshare1qvz8k2afcqqszq...";
-  const showRelayWarning = true;
 
   return (
     <AppShell headerMeta={MOCK_SOURCE_SHARE_1.label} mainVariant="flow">
@@ -80,13 +79,11 @@ export function RotateWrongPasswordScreen() {
             </span>
           </div>
 
-          {failedPackageDisplay ? (
-            <div className="rotate-error-field">
-              <span className="rotate-error-field-mono">
-                {failedPackageDisplay}
-              </span>
-            </div>
-          ) : null}
+          <div className="rotate-error-field">
+            <span className="rotate-error-field-mono">
+              {failedPackageDisplay}
+            </span>
+          </div>
           <div className="rotate-error-field">
             <span className="rotate-error-field-mono">••••••••</span>
           </div>
@@ -117,32 +114,30 @@ export function RotateWrongPasswordScreen() {
             <span>{paperAlignedMessage}</span>
           </div>
 
-          {showRelayWarning ? (
-            <div className="rotate-error-banner amber">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 14 14"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <circle
-                  cx="7"
-                  cy="7"
-                  r="5.5"
-                  stroke="#FBBF24"
-                  strokeWidth="1.2"
-                />
-                <path
-                  d="M7 4.5v3M7 9.5h.01"
-                  stroke="#FBBF24"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                />
-              </svg>
-              <span>No share data found for this source package.</span>
-            </div>
-          ) : null}
+          <div className="rotate-error-banner amber">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                cx="7"
+                cy="7"
+                r="5.5"
+                stroke="#FBBF24"
+                strokeWidth="1.2"
+              />
+              <path
+                d="M7 4.5v3M7 9.5h.01"
+                stroke="#FBBF24"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span>No share data found for this source package.</span>
+          </div>
         </div>
 
         <Button

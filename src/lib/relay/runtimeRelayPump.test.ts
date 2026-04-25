@@ -137,7 +137,7 @@ class FakeRelayClient implements RelayClient {
 }
 
 describe("RuntimeRelayPump", () => {
-  it("subscribes with the runtime filter, refreshes peers, publishes outbound events, and accepts inbound events", async () => {
+  it("subscribes by event kind and local recipient tag, refreshes peers, publishes outbound events, and accepts inbound events", async () => {
     const runtime = new FakeRuntime();
     runtime.outbound.push({ id: "outbound-event" });
     const relay = new FakeRelayConnection("wss://relay.test");
@@ -154,7 +154,6 @@ describe("RuntimeRelayPump", () => {
     await pump.start();
     expect(relay.subscriptions[0].filter).toEqual({
       kinds: [27000],
-      authors: ["peer-a", "peer-b"],
       "#p": ["local-pubkey"],
     });
     // m5-relay-telemetry: online status now carries `eventsReceived`,
@@ -186,6 +185,66 @@ describe("RuntimeRelayPump", () => {
     pump.stop();
     expect(relay.subscriptions[0].closed).toBe(true);
     expect(relay.closed).toBe(true);
+  });
+
+  it("emits redacted source-side relay diagnostics for subscription, inbound handling, and outbound response publish", async () => {
+    const runtime = new FakeRuntime();
+    runtime.outbound.push({
+      id: "response-event",
+      kind: 27000,
+      content: "secret-ciphertext",
+    });
+    const relay = new FakeRelayConnection("wss://relay.test");
+    const diagnostics: unknown[] = [];
+    const pump = new RuntimeRelayPump({
+      runtime: runtime as never,
+      relays: ["wss://relay.test"],
+      relayClient: new FakeRelayClient([relay]),
+      eventKind: 27000,
+      now: () => 123,
+      onDiagnostic: (event) => diagnostics.push(event),
+    });
+
+    await pump.start();
+    relay.subscriptions[0].onEvent({
+      id: "request-event",
+      kind: 27000,
+      content: "secret-request",
+    });
+    await Promise.resolve();
+
+    expect(diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "subscription_started",
+          filter: { kinds: [27000], "#p": ["local-pubkey"] },
+        }),
+        expect.objectContaining({
+          type: "outbound_drained",
+          count: 1,
+        }),
+        expect.objectContaining({
+          type: "outbound_publish_ok",
+          relay: "wss://relay.test",
+          eventId: "response-event",
+          kind: 27000,
+        }),
+        expect.objectContaining({
+          type: "inbound_event",
+          relay: "wss://relay.test",
+          eventId: "request-event",
+          kind: 27000,
+        }),
+        expect.objectContaining({
+          type: "inbound_accepted",
+          relay: "wss://relay.test",
+          eventId: "request-event",
+          kind: 27000,
+        }),
+      ]),
+    );
+    expect(JSON.stringify(diagnostics)).not.toContain("secret-ciphertext");
+    expect(JSON.stringify(diagnostics)).not.toContain("secret-request");
   });
 
   it("tags refresh_all fan-out Ping request ids before drain callbacks run", async () => {
@@ -499,7 +558,6 @@ describe("RuntimeRelayPump", () => {
     expect(add.subscriptions.length).toBe(1);
     expect(add.subscriptions[0].filter).toEqual({
       kinds: [27000],
-      authors: ["peer-a", "peer-b"],
       "#p": ["local-pubkey"],
     });
 
