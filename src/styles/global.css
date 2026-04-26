@@ -221,6 +221,25 @@ a {
   border-top: 1px solid var(--ig-border-soft);
 }
 
+.app-footer .footer-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  text-decoration: none;
+  transition: color 140ms var(--ig-button-ease);
+}
+
+.app-footer .footer-link:hover {
+  color: #93c5fd;
+}
+
+.app-footer .footer-link:focus-visible {
+  color: #93c5fd;
+  outline: 2px solid rgba(147, 197, 253, 0.65);
+  outline-offset: 4px;
+}
+
 .hero {
   display: flex;
   flex-direction: column;

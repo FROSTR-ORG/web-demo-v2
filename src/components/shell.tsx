@@ -39,10 +39,18 @@ export function AppShell({ children, brandSubtitle, headerMeta, headerActions, h
       </header>
       <main className={`app-main ${mainVariant}`}>{children}</main>
       <footer className="app-footer" aria-label="Igloo resources">
-        <Globe size={16} />
-        <BookOpen size={16} />
-        <Github size={16} />
-        <Bird size={16} />
+        <a href="https://frostr.org" target="_blank" rel="noopener noreferrer" title="frostr.org" aria-label="frostr.org" className="footer-link">
+          <Globe size={16} />
+        </a>
+        <a href="https://frostr.org" target="_blank" rel="noopener noreferrer" title="Documentation" aria-label="Documentation" className="footer-link">
+          <BookOpen size={16} />
+        </a>
+        <a href="https://github.com/frostr-org" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub" className="footer-link">
+          <Github size={16} />
+        </a>
+        <a href="https://frostr.org" target="_blank" rel="noopener noreferrer" title="Bird" aria-label="FROSTR social" className="footer-link">
+          <Bird size={16} />
+        </a>
       </footer>
     </div>
   );
