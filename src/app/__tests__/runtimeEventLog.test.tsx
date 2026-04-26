@@ -370,6 +370,81 @@ describe("AppStateProvider — runtimeEventLog", () => {
     expect(latest.runtimeEventLog.some((entry) => entry.badge === "SYNC")).toBe(false);
   });
 
+  it("maps responder-side peer sign activity to a visible SIGN row", async () => {
+    let latest!: AppStateValue;
+    render(
+      <AppStateProvider>
+        <Capture onState={(state) => (latest = state)} />
+      </AppStateProvider>,
+    );
+    await waitFor(() => expect(latest).toBeTruthy());
+
+    const testWindow = window as TestWindow;
+    await act(async () => {
+      testWindow.__iglooTestAbsorbDrains?.({
+        completions: [],
+        failures: [],
+        events: [
+          {
+            kind: "peer_activity",
+            status: BASE_STATUS,
+            activity: {
+              request_id: "req-responder-sign",
+              op_type: "sign",
+              peer: "peer-a",
+              action: "response_sent",
+            },
+          },
+        ],
+      });
+    });
+
+    await waitFor(() =>
+      expect(latest.runtimeEventLog.map((entry) => entry.badge)).toEqual([
+        "SIGN",
+      ]),
+    );
+    expect(latest.runtimeEventLog[0].source).toBe("runtime_event");
+    expect(latest.runtimeEventLog[0].payload).toMatchObject({
+      kind: "peer_activity",
+      activity: {
+        request_id: "req-responder-sign",
+        op_type: "sign",
+        action: "response_sent",
+      },
+    });
+  });
+
+  it("does not surface orphan response failures as Event Log ERROR rows", async () => {
+    let latest!: AppStateValue;
+    render(
+      <AppStateProvider>
+        <Capture onState={(state) => (latest = state)} />
+      </AppStateProvider>,
+    );
+    await waitFor(() => expect(latest).toBeTruthy());
+
+    const testWindow = window as TestWindow;
+    await act(async () => {
+      testWindow.__iglooTestAbsorbDrains?.({
+        completions: [],
+        failures: [
+          {
+            request_id: "internal-inbound-stale",
+            op_type: "ping",
+            code: "peer_rejected",
+            message: "response payload without pending request",
+            failed_peer: null,
+          },
+        ],
+        events: [],
+      });
+    });
+
+    await waitFor(() => expect(latest.runtimeFailures).toHaveLength(0));
+    expect(latest.runtimeEventLog).toHaveLength(0);
+  });
+
   it("surfaces meaningful runtime drains while hiding command_queued/status_changed noise", async () => {
     const signCompletion: CompletedOperation = {
       Sign: { request_id: "req-sign-quiet", signatures_hex64: ["sig"] },

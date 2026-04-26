@@ -374,6 +374,7 @@ export type RuntimeEventKind =
   // Runtime plumbing: kept in AppState.lifecycleEvents for diagnostics,
   // but filtered out of the user-facing dashboard Event Log.
   | "InboundAccepted"
+  | "PeerActivity"
   | "ConfigUpdated"
   | "PolicyUpdated"
   | "StateWiped"
@@ -383,6 +384,7 @@ export type RuntimeEventKind =
   // Runtime plumbing: kept in AppState.lifecycleEvents for diagnostics,
   // but filtered out of the user-facing dashboard Event Log.
   | "inbound_accepted"
+  | "peer_activity"
   | "config_updated"
   | "policy_updated"
   | "state_wiped";
@@ -390,6 +392,12 @@ export type RuntimeEventKind =
 export interface RuntimeEvent {
   kind: RuntimeEventKind;
   status: RuntimeStatusSummary;
+  activity?: {
+    request_id: string;
+    op_type: "sign" | "ecdh" | "ping" | "onboard";
+    peer: string;
+    action: "response_sent";
+  } | null;
 }
 
 export type CompletedOperation =

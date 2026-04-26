@@ -695,7 +695,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
     const indexSnapshot = pendingDispatchIndexRef.current;
     const userFacingFailures = drains.failures.filter(
-      (failure) => !isUncorrelatedPingFailure(failure, indexSnapshot),
+      (failure) =>
+        !isUncorrelatedPingFailure(failure, indexSnapshot) &&
+        !isOrphanResponseFailure(failure),
     );
     const eventLogCompletions = drains.completions.filter(
       (completion) => !isUncorrelatedPingCompletion(completion, indexSnapshot),
@@ -1061,7 +1063,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           },
         });
       }
-      for (const failure of drains.failures) {
+      for (const failure of userFacingFailures) {
         if (failure.op_type !== "onboard") continue;
         runtimeEventLogSeqRef.current += 1;
         newEntries.push({
@@ -6498,6 +6500,10 @@ function isUncorrelatedPingFailure(
   return index[failure.request_id]?.probeSource === "refresh";
 }
 
+function isOrphanResponseFailure(failure: OperationFailure): boolean {
+  return /response payload without pending request/i.test(failure.message);
+}
+
 /**
  * Map a {@link CompletedOperation} discriminant to the typed badge used
  * by the Event Log panel.
@@ -6534,6 +6540,9 @@ function badgeForCompletion(
  */
 function isVisibleRuntimeEventLogEvent(event: RuntimeEvent): boolean {
   const kind = String(event.kind).toLowerCase();
+  if (kind === "peeractivity" || kind === "peer_activity") {
+    return Boolean(event.activity);
+  }
   return !(
     kind === "inboundaccepted" ||
     kind === "inbound_accepted" ||
@@ -6564,6 +6573,20 @@ function badgeForRuntimeEvent(event: RuntimeEvent): RuntimeEventLogBadge {
     case "commandqueued":
     case "command_queued":
       return "INFO";
+    case "peeractivity":
+    case "peer_activity":
+      switch (event.activity?.op_type) {
+        case "sign":
+          return "SIGN";
+        case "ecdh":
+          return "ECDH";
+        case "ping":
+          return "PING";
+        case "onboard":
+          return "ONBOARD";
+        default:
+          return "INFO";
+      }
     case "configupdated":
     case "config_updated":
       return "INFO";

@@ -104,6 +104,7 @@ test.describe("dashboard real-peer workability", () => {
         await expect(
           pageA.getByTestId(`sign-activity-row-${signRequestId}`),
         ).toHaveAttribute("data-status", "completed");
+        await assertRuntimeLogHasBadges(pageB, ["SIGN"]);
 
         const publishRequestId = await publishTestNoteUntilReached(
           pageA,
