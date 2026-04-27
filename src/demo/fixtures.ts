@@ -301,6 +301,7 @@ export function createDemoAppState(
     reloadProfiles: async () => undefined,
     createKeyset: async () => undefined,
     createProfile: async () => DEMO_PROFILE_ID,
+    createTestGroup: async () => ({ profileId: DEMO_PROFILE_ID }),
     updatePackageState: () => undefined,
     setPackageDeviceLabel: () => undefined,
     // fix-followup-distribute-2a — new per-share mutators. The demo

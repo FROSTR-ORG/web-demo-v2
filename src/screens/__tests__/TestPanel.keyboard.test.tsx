@@ -137,7 +137,7 @@ afterEach(() => {
 });
 
 function renderDashboard(initialEntries = ["/dashboard/test-profile-id/test"]) {
-  return render(
+  const result = render(
     <MemoryRouter initialEntries={initialEntries}>
       <Routes>
         <Route path="/dashboard/:profileId/test" element={<DashboardScreen mode="test" />} />
@@ -149,6 +149,10 @@ function renderDashboard(initialEntries = ["/dashboard/test-profile-id/test"]) {
       </Routes>
     </MemoryRouter>,
   );
+  if (initialEntries[0]?.endsWith("/test")) {
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime Tests" }));
+  }
+  return result;
 }
 
 function collectFocusable(): HTMLElement[] {
@@ -175,6 +179,8 @@ describe("VAL-OPS-025 — Test panel keyboard reachability (Ping + all OPS surfa
     expect(screen.queryByLabelText("Refresh peers")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Test" }));
+    expect(screen.getByTestId("test-group-panel")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime Tests" }));
     expect(screen.getByTestId("test-sign-panel")).toBeInTheDocument();
     expect(screen.getByTestId("test-peer-refresh-panel")).toBeInTheDocument();
 

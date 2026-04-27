@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  LOCAL_DEMO_RELAY_URL,
+  appendLocalDemoRelay,
+  isAllowedLocalDemoRelayUrl,
+  validateRelayUrlWithLocalDemo,
+} from "./localDemoRelay";
 import {
   RELAY_DUPLICATE_ERROR,
   RELAY_INVALID_URL_ERROR,
@@ -14,6 +20,10 @@ import {
  * Covers the URL-validation and duplicate-detection contract for the
  * m5-relay-list-persist feature (VAL-SETTINGS-004 / VAL-SETTINGS-023).
  */
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("validateRelayUrl", () => {
   it("accepts canonical wss:// URLs verbatim (no rewrite)", () => {
@@ -158,6 +168,53 @@ describe("normalizeRelayList", () => {
         { validator: allowWsValidator },
       ),
     ).toEqual(["ws://127.0.0.1:8194", "wss://relay.example.com"]);
+  });
+});
+
+describe("local demo relay opt-in", () => {
+  it("keeps ws://127.0.0.1:8194 rejected unless the dev env toggle is set", () => {
+    expect(() => validateRelayUrlWithLocalDemo(LOCAL_DEMO_RELAY_URL)).toThrow(
+      RELAY_INVALID_URL_ERROR,
+    );
+    expect(isAllowedLocalDemoRelayUrl(LOCAL_DEMO_RELAY_URL)).toBe(false);
+
+    vi.stubEnv("VITE_IGLOO_USE_LOCAL_RELAY", "1");
+
+    expect(validateRelayUrlWithLocalDemo(LOCAL_DEMO_RELAY_URL)).toBe(
+      LOCAL_DEMO_RELAY_URL,
+    );
+    expect(isAllowedLocalDemoRelayUrl(LOCAL_DEMO_RELAY_URL)).toBe(true);
+  });
+
+  it("only allows the exact local relay URL when enabled", () => {
+    vi.stubEnv("VITE_IGLOO_USE_LOCAL_RELAY", "1");
+
+    for (const bad of [
+      "ws://localhost:8194",
+      "ws://127.0.0.1:8195",
+      "ws://192.168.1.20:8194",
+      "ws://127.0.0.1:8194/path",
+    ]) {
+      expect(() => validateRelayUrlWithLocalDemo(bad)).toThrow(
+        RELAY_INVALID_URL_ERROR,
+      );
+    }
+  });
+
+  it("appends the local relay once to default-style relay lists when enabled", () => {
+    expect(appendLocalDemoRelay(["wss://relay.primal.net"])).toEqual([
+      "wss://relay.primal.net",
+    ]);
+
+    vi.stubEnv("VITE_IGLOO_USE_LOCAL_RELAY", "1");
+
+    expect(appendLocalDemoRelay(["wss://relay.primal.net"])).toEqual([
+      "wss://relay.primal.net",
+      LOCAL_DEMO_RELAY_URL,
+    ]);
+    expect(
+      appendLocalDemoRelay(["wss://relay.primal.net", LOCAL_DEMO_RELAY_URL]),
+    ).toEqual(["wss://relay.primal.net", LOCAL_DEMO_RELAY_URL]);
   });
 });
 

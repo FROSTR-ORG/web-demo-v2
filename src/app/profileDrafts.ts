@@ -1,4 +1,5 @@
 import type { CreateProfileDraft, ProfileDraft } from "./AppStateTypes";
+import { appendLocalDemoRelay } from "../lib/relay/localDemoRelay";
 
 export const DEFAULT_RELAYS: readonly string[] = [
   "wss://relay.primal.net",
@@ -10,7 +11,7 @@ export function defaultProfileDraft(): ProfileDraft {
     deviceName: "Igloo Web",
     password: "",
     confirmPassword: "",
-    relays: [...DEFAULT_RELAYS],
+    relays: appendLocalDemoRelay(DEFAULT_RELAYS),
   };
 }
 

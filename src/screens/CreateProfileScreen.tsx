@@ -8,6 +8,7 @@ import {
   type PeerPermissionMethod,
 } from "../components/PeerPermissionTags";
 import { useDemoUi } from "../demo/demoUi";
+import { appendLocalDemoRelay } from "../lib/relay/localDemoRelay";
 import { ProfileSetupForm } from "./ProfileSetupForm";
 
 export function CreateProfileScreen() {
@@ -24,7 +25,9 @@ export function CreateProfileScreen() {
     deviceName: demoUi.shared?.profileNamePreset ?? defaultCreateProfileDraft().deviceName,
     password: presetPassword,
     confirmPassword: presetPassword,
-    relays: demoUi.shared?.relayPreset ? ["wss://relay.primal.net", demoUi.shared.relayPreset] : defaultCreateProfileDraft().relays
+    relays: demoUi.shared?.relayPreset
+      ? appendLocalDemoRelay(["wss://relay.primal.net", demoUi.shared.relayPreset])
+      : defaultCreateProfileDraft().relays
   }));
   const [relayInput, setRelayInput] = useState("wss://");
   const [error, setError] = useState("");

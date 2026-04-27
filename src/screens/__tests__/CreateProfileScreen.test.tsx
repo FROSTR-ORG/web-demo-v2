@@ -51,6 +51,7 @@ function renderScreen() {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllEnvs();
 });
 
 beforeEach(() => {
@@ -141,6 +142,14 @@ describe("CreateProfileScreen", () => {
     fireEvent.change(addRowInput, { target: { value: "wss://relay.damus.io" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     expect(screen.getByText("wss://relay.damus.io")).toBeInTheDocument();
+  });
+
+  it("includes the local demo relay in create defaults when the dev env toggle is set", () => {
+    vi.stubEnv("VITE_IGLOO_USE_LOCAL_RELAY", "1");
+    renderScreen();
+    expect(screen.getByText("wss://relay.primal.net")).toBeInTheDocument();
+    expect(screen.getByText("wss://relay.damus.io")).toBeInTheDocument();
+    expect(screen.getByText("ws://127.0.0.1:8194")).toBeInTheDocument();
   });
 
   it("shows neutral unavailable status on first relay until probe data exists (VAL-SHR-001)", () => {

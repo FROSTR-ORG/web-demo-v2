@@ -82,6 +82,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   storage.clear();
+  vi.unstubAllEnvs();
   delete (
     window as typeof window & {
       __iglooTestAllowInsecureRelayForRestore?: boolean;
@@ -228,7 +229,7 @@ describe("AppStateProvider.createProfile — bootstrap runtime source (VAL-FOLLO
   );
 
   it(
-    "rejects ws://127.0.0.1 unless the DEV-only __iglooTestAllowInsecureRelayForRestore hook is set; accepts it with the hook",
+    "rejects ws://127.0.0.1 unless the DEV-only local relay opt-in is set; accepts it with the hook",
     async () => {
       const getState = await renderProvider();
 
@@ -277,6 +278,47 @@ describe("AppStateProvider.createProfile — bootstrap runtime source (VAL-FOLLO
         expect(getState().createSession?.onboardingPackages?.length ?? 0)
           .toBeGreaterThan(0),
       );
+      expect(readRuntimeSource()).toBe("relay_pump");
+    },
+    60_000,
+  );
+
+  it(
+    "accepts the exact local demo relay when VITE_IGLOO_USE_LOCAL_RELAY=1",
+    async () => {
+      vi.stubEnv("VITE_IGLOO_USE_LOCAL_RELAY", "1");
+      const getState = await renderProvider();
+
+      await act(async () => {
+        await getState().createKeyset({
+          groupName: "Relay Validation Env Local Key",
+          threshold: 2,
+          count: 2,
+        });
+      });
+      await waitFor(() =>
+        expect(getState().createSession?.keyset?.group.group_name).toBe(
+          "Relay Validation Env Local Key",
+        ),
+      );
+
+      await act(async () => {
+        await getState().createProfile({
+          deviceName: "Bootstrap Browser",
+          password: "profile-password",
+          confirmPassword: "profile-password",
+          relays: ["wss://relay.example.test", "ws://127.0.0.1:8194"],
+        });
+      });
+
+      await waitFor(() =>
+        expect(getState().createSession?.onboardingPackages?.length ?? 0)
+          .toBeGreaterThan(0),
+      );
+      expect(getState().activeProfile?.relays).toEqual([
+        "wss://relay.example.test",
+        "ws://127.0.0.1:8194",
+      ]);
       expect(readRuntimeSource()).toBe("relay_pump");
     },
     60_000,

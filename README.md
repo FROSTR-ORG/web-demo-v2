@@ -43,6 +43,18 @@ Playwright demo-gallery + multi-device e2e suites.
   `beforeAll` / kill it in `afterAll`, so you usually do not need to start it
   manually; starting it by hand will cause port 8194 contention with those
   specs.
+- **No-Wi-Fi local demo mode** — for a same-laptop browser demo, start the
+  relay above, then run the app on localhost. Vite dev mode automatically adds
+  the local relay on `localhost` / `127.0.0.1`; the env flag is still useful
+  when you want to force the behavior from another local dev hostname:
+  ```bash
+  VITE_IGLOO_USE_LOCAL_RELAY=1 npm run dev
+  ```
+  In Vite dev mode only, this appends `ws://127.0.0.1:8194` to default, live
+  runtime, settings, and normal onboard-sponsor relay lists, and permits that
+  exact insecure loopback relay in create/settings/onboard flows. Production
+  builds and all other `ws://` URLs remain rejected. Set
+  `VITE_IGLOO_USE_LOCAL_RELAY=0` to disable the localhost default.
 - If you do not have a Rust toolchain, `.factory/init.sh` gracefully skips the
   `bifrost-devtools` build and individual multi-device specs self-skip with a
   clear reason.

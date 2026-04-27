@@ -17,8 +17,14 @@ export class OnboardingRelayError extends Error {
   }
 }
 
+export interface OnboardingRelayConnectFailure {
+  relay: string;
+  message: string;
+}
+
 export const ONBOARDING_RELAY_HANDSHAKE_TIMEOUT_MS = 180_000;
 export const ONBOARDING_RELAY_RETRY_INTERVAL_MS = 5_000;
+export const ONBOARDING_RELAY_RESPONSE_SINCE_SKEW_SECONDS = 10;
 
 export interface OnboardingRelayRequest {
   request_id?: string;
@@ -689,6 +695,11 @@ export async function runOnboardingRelayHandshake<T>(input: {
   const filter: RelayFilter = {
     kinds: [input.eventKind],
     "#p": [firstRequest.local_pubkey32],
+    since: Math.max(
+      0,
+      Math.floor(Date.now() / 1_000) -
+        ONBOARDING_RELAY_RESPONSE_SINCE_SKEW_SECONDS,
+    ),
   };
   const timeoutMs = input.timeoutMs ?? ONBOARDING_RELAY_HANDSHAKE_TIMEOUT_MS;
   const retryIntervalMs =
@@ -852,15 +863,21 @@ export async function runOnboardingRelayHandshake<T>(input: {
           connectedRelays: connected.slice(0, index + 1).map((item) => item.url),
         });
       });
+      const connectFailures: OnboardingRelayConnectFailure[] = [];
       connectedResults.forEach((result, index) => {
         if (result.status === "fulfilled") return;
-        emitProgress({
-          type: "relay_connect_failed",
+        const failure = {
           relay: input.relays[index],
           message:
             result.reason instanceof Error
               ? result.reason.message
               : "Relay connection failed.",
+        };
+        connectFailures.push(failure);
+        emitProgress({
+          type: "relay_connect_failed",
+          relay: failure.relay,
+          message: failure.message,
         });
       });
 
@@ -875,6 +892,10 @@ export async function runOnboardingRelayHandshake<T>(input: {
             new OnboardingRelayError(
               "relay_unreachable",
               "Unable to connect to any onboarding relay.",
+              {
+                relays: input.relays,
+                failures: connectFailures,
+              },
             ),
           ),
         );

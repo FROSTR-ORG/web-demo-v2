@@ -44,7 +44,7 @@ const mocks = vi.hoisted(() => ({
     };
     runtimeSnapshot?: { bootstrap: { share: { idx: number; seckey: string } }; state_hex: string };
     localShareIdx?: number;
-    error?: { code: string; message: string };
+    error?: { code: string; message: string; details?: Record<string, unknown> };
   } | null
 }));
 
@@ -417,6 +417,44 @@ describe("OnboardingFailedScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /Back to Onboarding/i }));
     expect(mocks.clearOnboardSession).toHaveBeenCalled();
     expect(mocks.navigate).toHaveBeenCalledWith("/onboard");
+  });
+
+  it("renders relay diagnostics when all onboarding relays are unreachable", () => {
+    mocks.onboardSession = {
+      ...makeOnboardSession(),
+      phase: "failed",
+      error: {
+        code: "relay_unreachable",
+        message: "Unable to connect to any onboarding relay.",
+        details: {
+          relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
+          failures: [
+            {
+              relay: "wss://relay.primal.net",
+              message: "Relay connection failed: wss://relay.primal.net",
+            },
+            {
+              relay: "wss://relay.damus.io",
+              message: "Relay closed before opening: wss://relay.damus.io",
+            },
+          ],
+        },
+      },
+    };
+    render(
+      <MemoryRouter>
+        <OnboardingFailedScreen />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("Relays Unreachable")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Relay connection diagnostics"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("wss://relay.primal.net")).toBeInTheDocument();
+    expect(screen.getByText("wss://relay.damus.io")).toBeInTheDocument();
+    expect(screen.getByText(/Relay connection failed/)).toBeInTheDocument();
+    expect(screen.getByText(/Relay closed before opening/)).toBeInTheDocument();
   });
 
   it("renders rejected variant with red alert styling (VAL-ONB-004)", () => {

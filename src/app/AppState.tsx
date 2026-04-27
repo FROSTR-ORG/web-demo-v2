@@ -17,5 +17,6 @@ export type {
   RecoverSourceSummary,
   ReplaceShareSession,
   RotateKeysetSession,
+  TestGroupDraft,
   TestNotePublishResult,
 } from "./AppStateTypes";

@@ -92,6 +92,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllEnvs();
 });
 
 describe("SettingsSidebar — Relay List (VAL-SETTINGS-003..006, 023)", () => {
@@ -124,6 +125,24 @@ describe("SettingsSidebar — Relay List (VAL-SETTINGS-003..006, 023)", () => {
     renderSidebar();
     const input = screen.getByLabelText("Add relay URL");
     fireEvent.change(input, { target: { value: "http://nos.lol" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(
+      await screen.findByTestId("settings-relay-add-error"),
+    ).toHaveTextContent(RELAY_INVALID_URL_ERROR);
+    expect(mockUpdateRelays).not.toHaveBeenCalled();
+  });
+
+  it("renders the exact local demo relay when the dev env toggle is set", () => {
+    vi.stubEnv("VITE_IGLOO_USE_LOCAL_RELAY", "1");
+    renderSidebar();
+    expect(screen.getByText("ws://127.0.0.1:8194")).toBeInTheDocument();
+  });
+
+  it("Add rejects local relay variants even when the dev env toggle is set", async () => {
+    vi.stubEnv("VITE_IGLOO_USE_LOCAL_RELAY", "1");
+    renderSidebar();
+    const input = screen.getByLabelText("Add relay URL");
+    fireEvent.change(input, { target: { value: "ws://localhost:8194" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     expect(
       await screen.findByTestId("settings-relay-add-error"),
@@ -204,6 +223,19 @@ describe("SettingsSidebar — Relay List (VAL-SETTINGS-003..006, 023)", () => {
       await screen.findByTestId("settings-relay-edit-error"),
     ).toHaveTextContent(RELAY_INVALID_URL_ERROR);
     expect(mockUpdateRelays).not.toHaveBeenCalled();
+  });
+
+  it("Remove preserves the auto-added local demo relay when the dev env toggle is set", async () => {
+    vi.stubEnv("VITE_IGLOO_USE_LOCAL_RELAY", "1");
+    renderSidebar();
+    fireEvent.click(screen.getByLabelText("Remove wss://relay.damus.io"));
+    await waitFor(() => {
+      expect(mockUpdateRelays).toHaveBeenCalledTimes(1);
+    });
+    expect(mockUpdateRelays).toHaveBeenCalledWith([
+      "wss://relay.primal.net",
+      "ws://127.0.0.1:8194",
+    ]);
   });
 
   it("Edit rejects a duplicate with the canonical inline error (VAL-SETTINGS-023)", async () => {

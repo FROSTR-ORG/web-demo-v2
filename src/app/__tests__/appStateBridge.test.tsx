@@ -561,6 +561,7 @@ describe("MockAppStateProvider bridge arming", () => {
     reloadProfiles: async () => undefined,
     createKeyset: async () => undefined,
     createProfile: async () => "prof_mock",
+    createTestGroup: async () => ({ profileId: "prof_mock" }),
     updatePackageState: () => undefined,
     setPackageDeviceLabel: () => undefined,
     encodeDistributionPackage: async () => undefined,

@@ -315,10 +315,13 @@ describe("runOnboardingRelayHandshake", () => {
     });
 
     await flushTimers();
-    expect(client.connections[0].subscriptions[0].filter).toEqual({
-      kinds: [27000],
-      "#p": ["local-pubkey"],
-    });
+    expect(client.connections[0].subscriptions[0].filter).toEqual(
+      expect.objectContaining({
+        kinds: [27000],
+        "#p": ["local-pubkey"],
+        since: expect.any(Number),
+      }),
+    );
     expect(client.connections[0].publishes).toEqual([{ id: "request" }]);
     expect(client.connections[1].publishes).toEqual([{ id: "request" }]);
 
@@ -362,7 +365,18 @@ describe("runOnboardingRelayHandshake", () => {
         onProgress: (event) => progress.push(event.type),
         decodeEvent: async () => null,
       }),
-    ).rejects.toMatchObject({ code: "relay_unreachable" });
+    ).rejects.toMatchObject({
+      code: "relay_unreachable",
+      details: {
+        relays: ["wss://offline.test"],
+        failures: [
+          {
+            relay: "wss://offline.test",
+            message: "offline",
+          },
+        ],
+      },
+    });
     expect(progress).toEqual([
       "relay_connecting",
       "relay_connect_failed",
@@ -561,6 +575,59 @@ describe("runOnboardingRelayHandshake", () => {
     client.connections[0].subscriptions[0].onEvent({ responseTo: "request-2" });
 
     await expect(handshake).resolves.toEqual({ matched: "request-2" });
+    expect(client.connections[0].closed).toBe(true);
+  });
+
+  it("ignores stale response candidates and resolves a fresh current response", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-26T22:00:30Z"));
+    const client = new FakeRelayClient(["wss://relay.test"]);
+    const seenRequests: string[][] = [];
+    const handshake = runOnboardingRelayHandshake({
+      relays: ["wss://relay.test"],
+      eventKind: 27000,
+      sourcePeerPubkey: "peer-pubkey",
+      initialRequest: {
+        request_id: "request-current",
+        local_pubkey32: "local-pubkey",
+        event_json: JSON.stringify({ id: "request-current" }),
+      },
+      relayClient: client,
+      timeoutMs: 30_000,
+      retryIntervalMs: 0,
+      decodeEvent: async (event, requests) => {
+        seenRequests.push(requests.map((request) => request.request_id ?? ""));
+        return (event as { responseTo?: string }).responseTo ===
+          "request-current"
+          ? { matched: "request-current" }
+          : null;
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(client.connections[0].subscriptions[0].filter).toEqual(
+      expect.objectContaining({
+        kinds: [27000],
+        "#p": ["local-pubkey"],
+        since: 1777240820,
+      }),
+    );
+
+    client.connections[0].subscriptions[0].onEvent({
+      responseTo: "request-stale",
+    });
+    await Promise.resolve();
+    expect(client.connections[0].closed).toBe(false);
+
+    client.connections[0].subscriptions[0].onEvent({
+      responseTo: "request-current",
+    });
+
+    await expect(handshake).resolves.toEqual({ matched: "request-current" });
+    expect(seenRequests).toEqual([
+      ["request-current"],
+      ["request-current"],
+    ]);
     expect(client.connections[0].closed).toBe(true);
   });
 

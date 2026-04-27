@@ -13,6 +13,11 @@ import {
   isValidRelayUrl,
   normalizeRelayKey,
 } from "../../../lib/relay/relayUrl";
+import {
+  appendLocalDemoRelay,
+  isAllowedLocalDemoRelayUrl,
+  validateRelayUrlWithLocalDemo,
+} from "../../../lib/relay/localDemoRelay";
 import { paperGroupKey } from "../mocks";
 
 /**
@@ -150,7 +155,7 @@ export function SettingsSidebar({
   // threaded from DashboardScreen before context hydrates. Local edit
   // state (`newRelay`, `editingIndex`, error strings) layers on top.
   const relays = useMemo(
-    () => activeProfile?.relays ?? initialRelays ?? [],
+    () => appendLocalDemoRelay(activeProfile?.relays ?? initialRelays ?? []),
     [activeProfile?.relays, initialRelays],
   );
   const [newRelay, setNewRelay] = useState("");
@@ -427,7 +432,7 @@ export function SettingsSidebar({
       setAddError(RELAY_INVALID_URL_ERROR);
       return;
     }
-    if (!isValidRelayUrl(trimmed)) {
+    if (!isValidRelayUrl(trimmed) && !isAllowedLocalDemoRelayUrl(trimmed)) {
       setAddError(RELAY_INVALID_URL_ERROR);
       return;
     }
@@ -436,7 +441,7 @@ export function SettingsSidebar({
       setAddError(RELAY_DUPLICATE_ERROR);
       return;
     }
-    const next = [...relays, trimmed];
+    const next = [...relays, validateRelayUrlWithLocalDemo(trimmed)];
     setAddSaving(true);
     setAddError("");
     const ok = await persistRelayList(next, setAddError);
@@ -571,7 +576,10 @@ export function SettingsSidebar({
   async function saveEditRelay() {
     if (editingIndex === null) return;
     const trimmed = editingDraft.trim();
-    if (trimmed.length === 0 || !isValidRelayUrl(trimmed)) {
+    if (
+      trimmed.length === 0 ||
+      (!isValidRelayUrl(trimmed) && !isAllowedLocalDemoRelayUrl(trimmed))
+    ) {
       setEditingError(RELAY_INVALID_URL_ERROR);
       return;
     }
@@ -584,7 +592,8 @@ export function SettingsSidebar({
       setEditingError(RELAY_DUPLICATE_ERROR);
       return;
     }
-    const next = relays.map((relay, i) => (i === editingIndex ? trimmed : relay));
+    const validated = validateRelayUrlWithLocalDemo(trimmed);
+    const next = relays.map((relay, i) => (i === editingIndex ? validated : relay));
     setEditingSaving(true);
     setEditingError("");
     const ok = await persistRelayList(next, setEditingError);

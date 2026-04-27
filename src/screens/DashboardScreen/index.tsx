@@ -15,6 +15,7 @@ import type {
 } from "../../app/AppStateTypes";
 import type { PeerRefreshErrorInfo } from "./panels/PeerRow";
 import { AppShell } from "../../components/shell";
+import { Tabs } from "../../components/Tabs";
 import { Button } from "../../components/ui";
 import { useDemoUi } from "../../demo/demoUi";
 import { ClearCredentialsModal } from "./modals/ClearCredentialsModal";
@@ -31,6 +32,7 @@ import { TestEcdhPanel } from "./panels/TestEcdhPanel";
 import { TestPingPanel } from "./panels/TestPingPanel";
 import { TestPeerRefreshPanel } from "./panels/TestPeerRefreshPanel";
 import { TestPublishNotePanel } from "./panels/TestPublishNotePanel";
+import { TestGroupPanel } from "./panels/TestGroupPanel";
 import { TestSignPanel } from "./panels/TestSignPanel";
 import { SettingsSidebar } from "./sidebar/SettingsSidebar";
 import { deriveDashboardState, isNoncePoolDepleted } from "./dashboardState";
@@ -161,6 +163,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
   const {
     activeProfile,
     runtimeStatus,
+    createSession,
     runtimeRelays = [],
     peerLatencyByPubkey = {},
     signerPaused = false,
@@ -194,6 +197,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
   const [exportResult, setExportResult] = useState<{ mode: ExportMode; packageText: string } | null>(null);
   const [policyPromptRequest, setPolicyPromptRequest] = useState<PolicyPromptRequest>(DEFAULT_POLICY_PROMPT_REQUEST);
   const [settingsOpen, setSettingsOpen] = useState(Boolean(demoUi.dashboard?.settingsOpen));
+  const [testTab, setTestTab] = useState("test-group");
   // m5-relay-telemetry — 1 s tick that re-renders so relative lastSeen
   // copy ("Xs ago" / "Xm ago") keeps advancing in the relay-health
   // table even when no runtime snapshot churns (VAL-SETTINGS-012).
@@ -574,10 +578,36 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
   if (!profileId) {
     return <Navigate to="/" replace />;
   }
-  if (!activeProfile || activeProfile.id !== profileId || !runtimeStatus) {
+  const testPageActive = mode === "test";
+  const testSessionMatchesRoute =
+    testPageActive &&
+    activeProfile &&
+    createSession?.createdProfileId === profileId &&
+    createSession.keyset &&
+    createSession.localShare &&
+    createSession.onboardingPackages.length > 0;
+  if (
+    !runtimeStatus ||
+    !activeProfile ||
+    (activeProfile.id !== profileId && !testSessionMatchesRoute)
+  ) {
     return <Navigate to="/" replace />;
   }
-  const testPageActive = mode === "test";
+  const dashboardProfile =
+    activeProfile.id === profileId || !testSessionMatchesRoute
+      ? activeProfile
+      : {
+          ...activeProfile,
+          id: profileId,
+          label: createSession.draft.groupName,
+          deviceName: "Stage Organizer",
+          groupName: createSession.draft.groupName,
+          threshold: createSession.draft.threshold,
+          memberCount: createSession.draft.count,
+          localShareIdx: createSession.localShare!.idx,
+          groupPublicKey:
+            createSession.keyset!.group.group_pk || activeProfile.groupPublicKey,
+        };
   const onlineCount = runtimeStatus.peers.filter((peer) => peer.online).length;
   const signReadyLabel = `${runtimeStatus.readiness.signing_peer_count}/${runtimeStatus.readiness.threshold} sign ready`;
   const dashboardState = hasDemoDashboardState
@@ -623,7 +653,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
       : null;
   const relayRows = relayHealthRowsFromRuntime(
     runtimeRelays,
-    activeProfile.relays,
+    dashboardProfile.relays,
     relayNowMs,
   );
   const completionMode = exportResult?.mode ?? exportMode;
@@ -741,7 +771,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
   const showTestHeaderButton = !testPageActive && !paperPanels;
   const sharePublicKeyLabel =
     runtimeStatus.metadata.share_public_key ||
-    `share-${activeProfile.localShareIdx}`;
+    `share-${dashboardProfile.localShareIdx}`;
 
   return (
     <AppShell
@@ -815,13 +845,13 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
          * modal or re-scan the UI. */}
         <DashboardStateAnnouncer dashboardState={dashboardState} />
         <div className="dashboard-context-strip" aria-label="Active keyset context">
-          <span className="dashboard-context-primary">{activeProfile.groupName}</span>
+          <span className="dashboard-context-primary">{dashboardProfile.groupName}</span>
           <span className="dashboard-context-separator">·</span>
           <span>
-            {activeProfile.threshold}/{activeProfile.memberCount}
+            {dashboardProfile.threshold}/{dashboardProfile.memberCount}
           </span>
           <span className="dashboard-context-separator">·</span>
-          <span>{paperGroupKey(runtimeStatus.metadata.group_public_key || activeProfile.groupPublicKey)}</span>
+          <span>{paperGroupKey(runtimeStatus.metadata.group_public_key || dashboardProfile.groupPublicKey)}</span>
           <span className="dashboard-context-divider" aria-hidden="true" />
           <span>Share #{runtimeStatus.metadata.member_idx}</span>
           <span className="dashboard-context-separator">·</span>
@@ -851,19 +881,36 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
         ) : null}
 
         {testPageActive ? (
-          <>
-            <TestPublishNotePanel signingBlocked={signingBlocked} />
-            <TestSignPanel signingBlocked={signingBlocked} />
-            <TestEcdhPanel ecdhBlocked={ecdhBlocked} />
-            <TestPingPanel
-              pingBlocked={pingBlocked}
-              pingBlockedReason={pingBlockedReason}
-            />
-            <TestPeerRefreshPanel
-              refreshBlocked={pingBlocked}
-              refreshBlockedReason={pingBlockedReason}
-            />
-          </>
+          <Tabs
+            activeTab={testTab}
+            onChange={setTestTab}
+            tabs={[
+              {
+                id: "test-group",
+                label: "Test Group",
+                content: <TestGroupPanel />,
+              },
+              {
+                id: "runtime-tests",
+                label: "Runtime Tests",
+                content: (
+                  <>
+                    <TestPublishNotePanel signingBlocked={signingBlocked} />
+                    <TestSignPanel signingBlocked={signingBlocked} />
+                    <TestEcdhPanel ecdhBlocked={ecdhBlocked} />
+                    <TestPingPanel
+                      pingBlocked={pingBlocked}
+                      pingBlockedReason={pingBlockedReason}
+                    />
+                    <TestPeerRefreshPanel
+                      refreshBlocked={pingBlocked}
+                      refreshBlockedReason={pingBlockedReason}
+                    />
+                  </>
+                ),
+              },
+            ]}
+          />
         ) : dashboardView === "recover" ? (
           <DashboardRecoverPanel
             profileId={profileId}
@@ -884,7 +931,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
           <>
             {dashboardState === "running" && (
               <RunningState
-                relays={activeProfile.relays}
+                relays={dashboardProfile.relays}
                 onlineCount={onlineCount}
                 signReadyLabel={signReadyLabel}
                 peers={runtimeStatus.peers}
@@ -928,7 +975,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
             )}
 
             {dashboardState === "connecting" && (
-              <ConnectingState relays={activeProfile.relays} />
+              <ConnectingState relays={dashboardProfile.relays} />
             )}
 
             {dashboardState === "stopped" && (
@@ -976,7 +1023,7 @@ export function DashboardScreen({ mode = "dashboard" }: DashboardScreenProps = {
           </>
         )}
 
-        {testPageActive ? <SignActivityPanel /> : null}
+        {testPageActive && testTab === "runtime-tests" ? <SignActivityPanel /> : null}
       </section>
 
       {/*

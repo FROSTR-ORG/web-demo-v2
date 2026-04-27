@@ -21,6 +21,7 @@ import type {
   ProfileDraft,
   RuntimeCommand,
   SignLifecycleEntry,
+  TestGroupDraft,
 } from "./AppStateTypes";
 import { PROFILE_NAME_MAX_LENGTH } from "./AppStateTypes";
 
@@ -311,6 +312,23 @@ export function MockAppStateProvider({
         setActiveProfile(nextActive);
       }
       return profileId;
+    },
+    [value],
+  );
+
+  const createTestGroup = useCallback(
+    async (draft: TestGroupDraft) => {
+      const result = await value.createTestGroup(draft);
+      const nextActive =
+        value.profiles.find((profile) => profile.id === result.profileId) ??
+        value.activeProfile;
+      if (nextActive) {
+        setActiveProfile(nextActive);
+      }
+      if (value.createSession) {
+        setCreateSession(value.createSession);
+      }
+      return result;
     },
     [value],
   );
@@ -878,9 +896,13 @@ export function MockAppStateProvider({
   const updateRelays = useCallback(
     async (relays: string[]) => {
       const { normalizeRelayList } = await import("../lib/relay/relayUrl");
+      const { validateRelayUrlWithLocalDemo } = await import(
+        "../lib/relay/localDemoRelay"
+      );
       const { RELAY_EMPTY_ERROR } = await import("./AppStateTypes");
       const normalized = normalizeRelayList(relays, {
         onDuplicate: "throw",
+        validator: validateRelayUrlWithLocalDemo,
       });
       if (normalized.length === 0) {
         throw new Error(RELAY_EMPTY_ERROR);
@@ -1066,6 +1088,7 @@ export function MockAppStateProvider({
       handleRuntimeCommand,
       createKeyset,
       createProfile,
+      createTestGroup,
       updatePackageState,
       setPackageDeviceLabel,
       encodeDistributionPackage,
@@ -1144,6 +1167,7 @@ export function MockAppStateProvider({
       handleRuntimeCommand,
       createKeyset,
       createProfile,
+      createTestGroup,
       updatePackageState,
       setPackageDeviceLabel,
       encodeDistributionPackage,

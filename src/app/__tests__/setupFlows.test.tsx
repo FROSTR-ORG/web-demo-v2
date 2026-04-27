@@ -282,6 +282,199 @@ describe("AppState setup flows", () => {
     await waitFor(() => expect(getState().createSession).toBeNull());
   }, 45_000);
 
+  it("creates a real test group profile and eagerly encodes every remote package with one password", async () => {
+    const getState = await renderProvider();
+
+    await act(async () => {
+      await getState().createKeyset({
+        groupName: "Presenter Base Key",
+        threshold: 2,
+        count: 2,
+      });
+    });
+    await waitFor(() =>
+      expect(getState().createSession?.keyset?.group.group_name).toBe(
+        "Presenter Base Key",
+      ),
+    );
+    await act(async () => {
+      await getState().createProfile({
+        deviceName: "Presenter Browser",
+        password: "base-password",
+        confirmPassword: "base-password",
+        relays: ["wss://relay.example.test"],
+      });
+    });
+    await waitFor(() => expect(getState().activeProfile?.id).toBeTruthy());
+    const originalProfileId = getState().activeProfile!.id;
+
+    let testProfileId = "";
+    await act(async () => {
+      const result = await getState().createTestGroup({
+        groupName: "Stage Crowd",
+        threshold: 2,
+        count: 3,
+        password: "1234",
+      });
+      testProfileId = result.profileId;
+    });
+
+    await waitFor(() =>
+      expect(getState().activeProfile?.id).toBe(testProfileId),
+    );
+    expect(
+      getState().profiles.some((profile) => profile.id === originalProfileId),
+    ).toBe(true);
+    expect(
+      getState().profiles.some((profile) => profile.id === testProfileId),
+    ).toBe(true);
+    expect(getState().activeProfile).toMatchObject({
+      groupName: "Stage Crowd",
+      threshold: 2,
+      memberCount: 3,
+    });
+
+    const session = getState().createSession!;
+    expect(session.createdProfileId).toBe(testProfileId);
+    expect(session.localShare?.idx).toBe(session.keyset?.shares[0]?.idx);
+    expect(session.onboardingPackages).toHaveLength(2);
+    for (const pkg of session.onboardingPackages) {
+      expect(pkg.packageCreated).toBe(true);
+      expect(pkg.packageText.startsWith("bfonboard1")).toBe(true);
+      expect(pkg.packageText.length).toBeLessThanOrEqual(24);
+      expect(pkg.password).toBe("[redacted]");
+      const secret = getState().getCreateSessionPackageSecret(pkg.idx);
+      expect(secret).toMatchObject({ password: "1234" });
+      expect(secret?.packageText.startsWith("bfonboard1")).toBe(true);
+      await expect(
+        decodeBfonboardPackage(secret!.packageText, "1234"),
+      ).resolves.toMatchObject({
+        relays: ["wss://relay.example.test"],
+      });
+    }
+
+    // Regression: Test Group packages are scanned by normal onboarding
+    // clients, so the organizer profile must seed the same permissive
+    // peer policies as the normal create flow. Without respond.onboard
+    // allow entries, requester devices can publish but never complete.
+    const record = storage.get(
+      `${PROFILE_RECORD_PREFIX}${testProfileId}`,
+    ) as StoredProfileRecord;
+    const decoded = await decodeProfilePackage(
+      record.encryptedProfilePackage,
+      "1234",
+    );
+    expect(decoded.device.manual_peer_policy_overrides).toHaveLength(2);
+    for (const override of decoded.device.manual_peer_policy_overrides) {
+      expect(override.policy.request.onboard).toBe("allow");
+      expect(override.policy.respond.onboard).toBe("allow");
+    }
+    expect(decoded.device.relays).toEqual(["wss://relay.example.test"]);
+  }, 45_000);
+
+  it("includes a phone-reachable tunnel relay in test group packages and organizer runtime relays", async () => {
+    const getState = await renderProvider();
+
+    await act(async () => {
+      await getState().createKeyset({
+        groupName: "Tunnel Base Key",
+        threshold: 2,
+        count: 2,
+      });
+    });
+    await act(async () => {
+      await getState().createProfile({
+        deviceName: "Presenter Browser",
+        password: "base-password",
+        confirmPassword: "base-password",
+        relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
+      });
+    });
+    await waitFor(() => expect(getState().activeProfile?.id).toBeTruthy());
+
+    let testProfileId = "";
+    await act(async () => {
+      const result = await getState().createTestGroup({
+        groupName: "Stage Crowd",
+        threshold: 2,
+        count: 2,
+        password: "1234",
+        extraRelays: ["wss://stage-demo.ngrok-free.app"],
+      });
+      testProfileId = result.profileId;
+    });
+
+    const expectedRelays = [
+      "wss://relay.primal.net",
+      "wss://relay.damus.io",
+      "wss://stage-demo.ngrok-free.app",
+    ];
+    expect(getState().activeProfile?.relays).toEqual(expectedRelays);
+    const pkg = getState().createSession!.onboardingPackages[0];
+    const secret = getState().getCreateSessionPackageSecret(pkg.idx);
+    await expect(
+      decodeBfonboardPackage(secret!.packageText, "1234"),
+    ).resolves.toMatchObject({
+      relays: expectedRelays,
+    });
+
+    const record = storage.get(
+      `${PROFILE_RECORD_PREFIX}${testProfileId}`,
+    ) as StoredProfileRecord;
+    const decoded = await decodeProfilePackage(
+      record.encryptedProfilePackage,
+      "1234",
+    );
+    expect(decoded.device.relays).toEqual(expectedRelays);
+  }, 45_000);
+
+  it("falls back to public default relays for test group packages when the active profile only has local relays", async () => {
+    const getState = await renderProvider();
+
+    await act(async () => {
+      await getState().createKeyset({
+        groupName: "Local Relay Base Key",
+        threshold: 2,
+        count: 2,
+      });
+    });
+    await waitFor(() =>
+      expect(getState().createSession?.keyset?.group.group_name).toBe(
+        "Local Relay Base Key",
+      ),
+    );
+    await act(async () => {
+      await getState().createProfile({
+        deviceName: "Presenter Browser",
+        password: "base-password",
+        confirmPassword: "base-password",
+        relays: ["wss://localhost:7777"],
+      });
+    });
+    await waitFor(() => expect(getState().activeProfile?.id).toBeTruthy());
+
+    await act(async () => {
+      await getState().createTestGroup({
+        groupName: "Stage Crowd",
+        threshold: 2,
+        count: 2,
+        password: "1234",
+      });
+    });
+
+    const pkg = getState().createSession!.onboardingPackages[0];
+    const secret = getState().getCreateSessionPackageSecret(pkg.idx);
+    await expect(
+      decodeBfonboardPackage(secret!.packageText, "1234"),
+    ).resolves.toMatchObject({
+      relays: ["wss://relay.primal.net", "wss://relay.damus.io"],
+    });
+    expect(getState().activeProfile?.relays).toEqual([
+      "wss://relay.primal.net",
+      "wss://relay.damus.io",
+    ]);
+  }, 45_000);
+
   it(
     "clears the package-secrets ref when createSession is reset by the AppState bridge (fix-m7-scrutiny-r1-createsession-packagesecrets-ref-reset)",
     async () => {

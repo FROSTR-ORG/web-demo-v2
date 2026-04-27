@@ -54,8 +54,12 @@ import {
   RELAY_INVALID_URL_ERROR,
   isValidRelayUrl,
   normalizeRelayKey,
-  validateRelayUrl,
 } from "../lib/relay/relayUrl";
+import {
+  appendLocalDemoRelay,
+  isAllowedLocalDemoRelayUrl,
+  validateRelayUrlWithLocalDemo,
+} from "../lib/relay/localDemoRelay";
 
 /* ---------- Password strength helper ---------- */
 
@@ -130,7 +134,10 @@ export function OnboardSponsorConfigScreen() {
 
   // VAL-ONBOARD-019 — relay list defaults to the active profile's
   // relays (user can add / remove `wss://…`).
-  const initialRelays = activeProfile?.relays ?? [];
+  const initialRelays = useMemo(
+    () => appendLocalDemoRelay(activeProfile?.relays ?? []),
+    [activeProfile?.relays],
+  );
   const [relays, setRelays] = useState<string[]>(initialRelays);
   const [newRelay, setNewRelay] = useState("");
   const [newRelayError, setNewRelayError] = useState("");
@@ -221,7 +228,7 @@ export function OnboardSponsorConfigScreen() {
       setNewRelayError(RELAY_INVALID_URL_ERROR);
       return;
     }
-    if (!isValidRelayUrl(trimmed)) {
+    if (!isValidRelayUrl(trimmed) && !isAllowedLocalDemoRelayUrl(trimmed)) {
       setNewRelayError(RELAY_INVALID_URL_ERROR);
       return;
     }
@@ -230,9 +237,9 @@ export function OnboardSponsorConfigScreen() {
       setNewRelayError(RELAY_DUPLICATE_ERROR);
       return;
     }
-    // Round-trip once more via validateRelayUrl so the persisted
+    // Round-trip once more via validateRelayUrlWithLocalDemo so the persisted
     // value is byte-identical to the mutator's expectations.
-    const validated = validateRelayUrl(trimmed);
+    const validated = validateRelayUrlWithLocalDemo(trimmed);
     setRelays((prev) => [...prev, validated]);
     setNewRelay("");
     setNewRelayError("");

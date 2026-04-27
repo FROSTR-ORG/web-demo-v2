@@ -155,7 +155,48 @@ import type {
   ReplaceShareSession,
   RotateKeysetSession,
   SignLifecycleEntry,
+  TestGroupDraft,
 } from "./AppStateTypes";
+import { DEFAULT_RELAYS } from "./profileDrafts";
+import {
+  LOCAL_DEMO_RELAY_URL,
+  appendLocalDemoRelay,
+  isAllowedLocalDemoRelayUrl,
+  validateRelayUrlWithLocalDemo,
+} from "../lib/relay/localDemoRelay";
+
+function isPublicWssRelayUrl(relay: string): boolean {
+  try {
+    const parsed = new URL(relay);
+    const hostname = parsed.hostname.toLowerCase();
+    const ipv4Match = hostname.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+    if (ipv4Match) {
+      const [, aRaw, bRaw] = ipv4Match;
+      const a = Number(aRaw);
+      const b = Number(bRaw);
+      if (
+        a === 10 ||
+        a === 127 ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168) ||
+        (a === 169 && b === 254) ||
+        a === 0
+      ) {
+        return false;
+      }
+    }
+    return (
+      parsed.protocol.toLowerCase() === "wss:" &&
+      hostname !== "localhost" &&
+      hostname !== "127.0.0.1" &&
+      hostname !== "::1" &&
+      hostname !== "[::1]" &&
+      !hostname.endsWith(".localhost")
+    );
+  } catch {
+    return false;
+  }
+}
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [profiles, setProfiles] = useState<StoredProfileSummary[]>([]);
@@ -1743,11 +1784,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     async (
       runtime: RuntimeClient,
       relayUrls: string[],
-      options: { resetDrains?: boolean } = {},
+      options: { resetDrains?: boolean; appendLocalDemoRelay?: boolean } = {},
     ) => {
-      const relays = Array.from(
+      const normalizedRelays = Array.from(
         new Set(relayUrls.map((relay) => relay.trim()).filter(Boolean)),
       );
+      const relays =
+        options.appendLocalDemoRelay === false
+          ? normalizedRelays
+          : appendLocalDemoRelay(normalizedRelays);
       const resetDrains = options.resetDrains ?? true;
       liveRelayUrlsRef.current = relays;
       stopRelayPump(false);
@@ -1796,6 +1841,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       runtime: RuntimeClient,
       simulator?: LocalRuntimeSimulator,
       relayUrls?: string[],
+      options: { appendLocalDemoRelay?: boolean } = {},
     ) => {
       if (simulatorRef.current && simulatorRef.current !== simulator) {
         simulatorRef.current.stop();
@@ -1817,7 +1863,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // override is preserved across re-attachments (VAL-OPS-024).
       setRuntimeStatus(augmentStatus(runtime.runtimeStatus()));
       if (relayUrls?.length && !simulator) {
-        void startLiveRelayPump(runtime, relayUrls).catch((error) => {
+        void startLiveRelayPump(runtime, relayUrls, {
+          appendLocalDemoRelay: options.appendLocalDemoRelay,
+        }).catch((error) => {
           setRuntimeRelays(
             relayUrls.map((url) => ({
               url,
@@ -1976,8 +2024,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // form can render the message without re-mapping. The existing
       // DEV-only `__iglooTestAllowInsecureRelayForRestore` opt-in
       // (gated behind `import.meta.env.DEV`) whitelists
-      // `ws://127.0.0.1:*` for the multi-device e2e that targets the
-      // local `bifrost-devtools` relay (plain ws://). See
+      // `ws://127.0.0.1:8194` for the multi-device e2e that targets
+      // the local `bifrost-devtools` relay (plain ws://). See
       // VAL-FOLLOWUP-001 / VAL-FOLLOWUP-010.
       //
       // fix-scrutiny-r1-bootstrap-narrow-dev-allowlist — the allowlist
@@ -1995,18 +2043,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         (window as { __iglooTestAllowInsecureRelayForRestore?: boolean })
           .__iglooTestAllowInsecureRelayForRestore === true;
       const validateCreateBootstrapRelayUrl = (raw: string): string => {
-        if (allowInsecureForLocalRelay && /^ws:\/\//i.test(raw)) {
-          try {
-            const parsed = new URL(raw);
-            if (
-              parsed.protocol.toLowerCase() === "ws:" &&
-              parsed.hostname === "127.0.0.1"
-            ) {
-              return raw;
-            }
-          } catch {
-            /* fall through to strict validator */
-          }
+        if (isAllowedLocalDemoRelayUrl(raw)) {
+          return raw.trim();
+        }
+        if (
+          allowInsecureForLocalRelay &&
+          raw.trim() === LOCAL_DEMO_RELAY_URL
+        ) {
+          return raw.trim();
         }
         return validateRelayUrl(raw);
       };
@@ -2188,6 +2232,139 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       return profileId;
     },
     [augmentStatus, createSession, reloadProfiles, setRuntime],
+  );
+
+  const createTestGroup = useCallback(
+    async (draft: TestGroupDraft): Promise<{ profileId: string }> => {
+      const groupName = draft.groupName.trim() || "Test Group";
+      const count = Math.trunc(draft.count);
+      const threshold = Math.trunc(draft.threshold);
+      const password = draft.password;
+      if (count < 2) {
+        throw new Error("Total members must be at least 2.");
+      }
+      if (count > 20) {
+        throw new Error("Test groups support at most 20 members.");
+      }
+      if (threshold < 2) {
+        throw new Error("Threshold must be at least 2.");
+      }
+      if (threshold > count) {
+        throw new Error("Threshold cannot exceed total members.");
+      }
+      if (password.length < DEMO_PASSWORD_MIN_LENGTH) {
+        throw new Error(PROFILE_PASSWORD_TOO_SHORT_ERROR);
+      }
+      const { normalizeRelayList } = await import("../lib/relay/relayUrl");
+      const activeRelays = normalizeRelayList(activeProfile?.relays ?? [], {
+        onValidatorError: "skip",
+      }).filter(isPublicWssRelayUrl);
+      const baseRelays = activeRelays.length > 0 ? activeRelays : [...DEFAULT_RELAYS];
+      const extraRelays = normalizeRelayList(draft.extraRelays ?? [], {
+        onDuplicate: "skip",
+      }).filter(isPublicWssRelayUrl);
+      const relays = normalizeRelayList([...baseRelays, ...extraRelays], {
+        onDuplicate: "skip",
+      });
+
+      const sessionDraft: CreateDraft = { groupName, threshold, count };
+      const keyset = await createKeysetBundle(sessionDraft);
+      const localShare = keyset.shares[0];
+      const remoteShares = keyset.shares.filter(
+        (share) => share.idx !== localShare.idx,
+      );
+      const profileId = await deriveProfileIdFromShareSecret(localShare.seckey);
+      const deviceName = "Stage Organizer";
+      const createdAt = Date.now();
+      const payload = profilePayloadForShare({
+        profileId,
+        deviceName,
+        share: localShare,
+        group: keyset.group,
+        relays,
+        manualPeerPolicyOverrides: defaultManualPeerPolicyOverrides(
+          keyset.group,
+          localShare.idx,
+        ),
+      });
+      const { record, normalizedPayload } = await buildStoredProfileRecord(
+        payload,
+        password,
+        {
+          createdAt,
+          updatedAt: createdAt,
+          lastUsedAt: createdAt,
+          label: groupName,
+          shareAllocations: [],
+        },
+      );
+
+      const packageSecrets = new Map<number, { packageText: string; password: string }>();
+      const onboardingPackages: OnboardingPackageView[] = [];
+      for (const remoteShare of remoteShares) {
+        const onboardPayload = onboardPayloadForRemoteShare({
+          remoteShare,
+          localShare,
+          group: keyset.group,
+          relays,
+        });
+        const packageText = await encodeOnboardPackage(onboardPayload, password);
+        packageSecrets.set(remoteShare.idx, { packageText, password });
+        onboardingPackages.push({
+          ...buildPendingOnboardingPackageView({
+            remoteShare,
+            group: keyset.group,
+          }),
+          packageText: packageText.slice(0, 24),
+          password: "[redacted]",
+          packageCreated: true,
+        });
+      }
+
+      await saveProfile(record);
+      const runtime = await createRuntimeFromProfilePayload(
+        payload,
+        localShare.idx,
+      );
+      setRuntime(runtime, undefined, relays, { appendLocalDemoRelay: false });
+      setRuntimeStatus(augmentStatus(runtime.runtimeStatus()));
+      unlockedPayloadRef.current = normalizedPayload;
+      unlockedPasswordRef.current = password;
+      createSessionShareContextRef.current = {
+        remoteShares: remoteShares.map((share) => ({
+          idx: share.idx,
+          seckey: share.seckey,
+        })),
+        localShare: { idx: localShare.idx, seckey: localShare.seckey },
+        group: keyset.group,
+        relays,
+      };
+      createSessionPackageSecretsRef.current = packageSecrets;
+
+      const redactedLocalShare: SharePackageWire = {
+        ...localShare,
+        seckey: "[redacted]",
+      };
+      const redactedKeyset: KeysetBundle = {
+        group: keyset.group,
+        shares: keyset.shares.map((share) => ({
+          ...share,
+          seckey: "[redacted]",
+        })),
+      };
+      setCreateSession({
+        draft: sessionDraft,
+        keyset: redactedKeyset,
+        localShare: redactedLocalShare,
+        createdProfileId: profileId,
+        onboardingPackages,
+      });
+      setSignerPausedState(false);
+      setActiveProfile(record.summary);
+      await reloadProfiles();
+      return { profileId };
+    },
+    [activeProfile?.relays, augmentStatus, reloadProfiles, setRuntime],
   );
 
   const updatePackageState = useCallback(
@@ -3063,7 +3240,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const { normalizeRelayList } = await import(
         "../lib/relay/relayUrl"
       );
-      const validated = normalizeRelayList(input.relays ?? []);
+      const validated = normalizeRelayList(input.relays ?? [], {
+        validator: validateRelayUrlWithLocalDemo,
+      });
       if (validated.length === 0) {
         throw new Error(
           (await import("./AppStateTypes"))
@@ -4213,6 +4392,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const { RELAY_EMPTY_ERROR } = await import("./AppStateTypes");
       const normalized = normalizeRelayList(nextRelays, {
         onDuplicate: "throw",
+        validator: validateRelayUrlWithLocalDemo,
       });
       if (normalized.length === 0) {
         throw new Error(RELAY_EMPTY_ERROR);
@@ -5492,6 +5672,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       handleRuntimeCommand,
       createKeyset,
       createProfile,
+      createTestGroup,
       updatePackageState,
       setPackageDeviceLabel,
       encodeDistributionPackage,
@@ -5574,6 +5755,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       handleRuntimeCommand,
       createKeyset,
       createProfile,
+      createTestGroup,
       updatePackageState,
       setPackageDeviceLabel,
       encodeDistributionPackage,

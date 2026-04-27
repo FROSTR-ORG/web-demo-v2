@@ -64,6 +64,14 @@ export interface CreateProfileDraft extends ProfileDraft {
   peerPermissions?: Record<number, PeerPermissionMap>;
 }
 
+export interface TestGroupDraft {
+  groupName: string;
+  threshold: number;
+  count: number;
+  password: string;
+  extraRelays?: string[];
+}
+
 export type ImportProfileDraft = Pick<
   ProfileDraft,
   "password" | "confirmPassword"
@@ -997,6 +1005,7 @@ export interface AppStateValue {
   reloadProfiles: () => Promise<void>;
   createKeyset: (draft: CreateKeysetDraft) => Promise<void>;
   createProfile: (draft: CreateProfileDraft) => Promise<string>;
+  createTestGroup: (draft: TestGroupDraft) => Promise<{ profileId: string }>;
   updatePackageState: (idx: number, patch: OnboardingPackageStatePatch) => void;
   /**
    * Update the optional human-readable device label for a single

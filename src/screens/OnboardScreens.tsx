@@ -583,6 +583,37 @@ function buildLiveHandshakeSteps({
    Screen 3 — Onboarding Failed (/onboard/failed)
    ========================================================== */
 
+function relayConnectFailuresFromDetails(
+  details: unknown,
+): Array<{ relay: string; message: string }> {
+  if (!details || typeof details !== "object") {
+    return [];
+  }
+  const failures = (details as { failures?: unknown }).failures;
+  if (!Array.isArray(failures)) {
+    return [];
+  }
+  return failures.flatMap((failure) => {
+    if (!failure || typeof failure !== "object") {
+      return [];
+    }
+    const relay = (failure as { relay?: unknown }).relay;
+    const message = (failure as { message?: unknown }).message;
+    if (typeof relay !== "string" || relay.length === 0) {
+      return [];
+    }
+    return [
+      {
+        relay,
+        message:
+          typeof message === "string" && message.length > 0
+            ? message
+            : "Connection failed.",
+      },
+    ];
+  });
+}
+
 export function OnboardingFailedScreen() {
   const navigate = useNavigate();
   const { onboardSession, clearOnboardSession } = useAppState();
@@ -607,6 +638,10 @@ export function OnboardingFailedScreen() {
     (rejected
       ? "Challenge verification failed. You may not have a valid share for this group."
       : "Onboarding timed out before the source device confirmed the handoff. They may be offline or unreachable.");
+  const relayFailures =
+    productError?.code === "relay_unreachable"
+      ? relayConnectFailuresFromDetails(productError.details)
+      : [];
 
   /*
    * Paper's error variants use Tailwind-style arbitrary hex classes so
@@ -642,6 +677,26 @@ export function OnboardingFailedScreen() {
           <div className="onboard-error-body">
             <div className="onboard-error-title">{title}</div>
             <div className="onboard-error-description">{description}</div>
+            {relayFailures.length > 0 ? (
+              <div
+                className="onboard-relay-diagnostics"
+                aria-label="Relay connection diagnostics"
+              >
+                {relayFailures.map((failure) => (
+                  <div
+                    className="onboard-relay-diagnostic-row"
+                    key={failure.relay}
+                  >
+                    <span className="onboard-relay-diagnostic-relay">
+                      {failure.relay}
+                    </span>
+                    <span className="onboard-relay-diagnostic-message">
+                      {failure.message}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
 

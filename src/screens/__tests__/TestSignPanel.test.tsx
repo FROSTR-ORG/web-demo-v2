@@ -126,7 +126,7 @@ afterEach(() => {
 });
 
 function renderDashboard() {
-  return render(
+  const result = render(
     <MemoryRouter initialEntries={["/dashboard/test-profile-id/test"]}>
       <Routes>
         <Route path="/dashboard/:profileId/test" element={<DashboardScreen mode="test" />} />
@@ -138,6 +138,8 @@ function renderDashboard() {
       </Routes>
     </MemoryRouter>,
   );
+  fireEvent.click(screen.getByRole("tab", { name: "Runtime Tests" }));
+  return result;
 }
 
 // Convenience: scope queries to the TestSign panel so they ignore sibling

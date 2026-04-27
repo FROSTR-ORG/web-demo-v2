@@ -68,6 +68,7 @@ afterEach(() => {
   cleanup();
   storage.clear();
   vi.useRealTimers();
+  vi.unstubAllEnvs();
 });
 
 /**
@@ -186,6 +187,35 @@ describe("createOnboardSponsorPackage — VAL-ONBOARD-006 dispatch", () => {
     // targetPeerPubkey is set whenever the dispatch attempt ran.
     expect(session?.targetPeerPubkey).toBeTruthy();
     expect(session?.targetPeerPubkey).toMatch(/^[0-9a-f]{64}$/i);
+  }, 30_000);
+
+  it("accepts the exact local demo relay in sponsor packages when the dev env toggle is set", async () => {
+    vi.stubEnv("VITE_IGLOO_USE_LOCAL_RELAY", "1");
+    const { getState } = await bootProvider();
+
+    await act(async () => {
+      await getState().createOnboardSponsorPackage({
+        deviceLabel: "Bob Laptop",
+        password: "sponsor-password",
+        relays: ["wss://relay.local", "ws://127.0.0.1:8194"],
+        profilePassword: "profile-password",
+      });
+    });
+
+    const session = getState().onboardSponsorSession;
+    expect(session?.relays).toEqual([
+      "wss://relay.local",
+      "ws://127.0.0.1:8194",
+    ]);
+    expect(session?.packageText.startsWith("bfonboard1")).toBe(true);
+    const decoded = await decodeBfonboardPackage(
+      session!.packageText,
+      "sponsor-password",
+    );
+    expect(decoded.relays).toEqual([
+      "wss://relay.local",
+      "ws://127.0.0.1:8194",
+    ]);
   }, 30_000);
 
   it("fix-m7-onboard-self-peer-rejection — dispatches against a NON-SELF group member and registers a pending Onboard op", async () => {
