@@ -941,6 +941,38 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
     if (drains.events.length > 0) {
       setLifecycleEvents((previous) => [...previous, ...drains.events]);
+      const completedOnboardPeers = new Set(
+        drains.events.flatMap((event) =>
+          event.activity?.op_type === "onboard" &&
+          event.activity.action === "response_sent" &&
+          typeof event.activity.peer === "string"
+            ? [event.activity.peer.toLowerCase()]
+            : [],
+        ),
+      );
+      if (completedOnboardPeers.size > 0) {
+        setCreateSession((session) => {
+          if (!session) return session;
+          let changed = false;
+          const onboardingPackages = session.onboardingPackages.map((entry) => {
+            if (
+              !completedOnboardPeers.has(entry.memberPubkey.toLowerCase()) ||
+              entry.manuallyMarkedDistributed
+            ) {
+              return entry;
+            }
+            changed = true;
+            return {
+              ...entry,
+              peerOnline: true,
+              manuallyMarkedDistributed: true,
+              pendingDispatchRequestId: undefined,
+              adoptionError: undefined,
+            };
+          });
+          return changed ? { ...session, onboardingPackages } : session;
+        });
+      }
     }
     // Mark pendingDispatchIndex entries that just settled (completion or
     // failure) so the 60s retention window starts from this moment. We

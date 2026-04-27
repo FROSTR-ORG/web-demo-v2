@@ -294,6 +294,57 @@ describe("encodeDistributionPackage — recipient-initiated onboarding", () => {
     expect(pkg.adoptionError).toBeUndefined();
   }, 30_000);
 
+  it("promotes a request-seen package to joined when the source sends an onboard response", async () => {
+    const getState = await renderProvider();
+    const { remoteShares } = await prepareActiveCreateSession(getState);
+    const shareIdx = remoteShares[0].idx;
+
+    await act(async () => {
+      await getState().encodeDistributionPackage(
+        shareIdx,
+        "per-share-password-1234",
+      );
+      getState().updatePackageState(shareIdx, {
+        peerOnline: true,
+        manuallyMarkedDistributed: false,
+      });
+    });
+
+    const seenPackage = getState().createSession!.onboardingPackages.find(
+      (candidate) => candidate.idx === shareIdx,
+    )!;
+    expect(seenPackage.peerOnline).toBe(true);
+    expect(seenPackage.manuallyMarkedDistributed).toBe(false);
+
+    const absorb = useAbsorbDrainsHook();
+    await act(async () => {
+      absorb({
+        completions: [],
+        failures: [],
+        events: [
+          {
+            kind: "peer_activity",
+            status: getState().runtimeStatus!,
+            activity: {
+              request_id: "source-onboard-response",
+              op_type: "onboard",
+              peer: seenPackage.memberPubkey,
+              action: "response_sent",
+            },
+          },
+        ],
+      });
+    });
+
+    const completedPackage = getState().createSession!.onboardingPackages.find(
+      (candidate) => candidate.idx === shareIdx,
+    )!;
+    expect(completedPackage.peerOnline).toBe(true);
+    expect(completedPackage.manuallyMarkedDistributed).toBe(true);
+    expect(completedPackage.pendingDispatchRequestId).toBeUndefined();
+    expect(completedPackage.adoptionError).toBeUndefined();
+  }, 30_000);
+
   it("marks multiple created packages independently from one runtime status snapshot", async () => {
     const getState = await renderProvider();
     const { remoteShares } = await prepareActiveCreateSession(getState, {
