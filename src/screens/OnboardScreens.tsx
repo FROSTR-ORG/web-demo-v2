@@ -742,11 +742,24 @@ export function OnboardingCompleteScreen() {
   const { onboardSession } = useAppState();
   const demoUi = useDemoUi();
   const state = location.state as { fromHandshake?: boolean } | null;
+  const [savedProductSession, setSavedProductSession] = useState<
+    NonNullable<ReturnType<typeof useAppState>["onboardSession"]> | undefined
+  >(undefined);
   const readyProductSession =
     onboardSession?.phase === "ready_to_save" ? onboardSession : null;
 
+  useEffect(() => {
+    if (readyProductSession) {
+      setSavedProductSession(readyProductSession);
+    }
+  }, [readyProductSession]);
+
   if (readyProductSession) {
     return <OnboardingCompleteContent productSession={readyProductSession} />;
+  }
+
+  if (savedProductSession) {
+    return <OnboardingCompleteContent productSession={savedProductSession} />;
   }
 
   if (!state?.fromHandshake || !demoUi.onboard?.packagePreset) {

@@ -592,6 +592,45 @@ describe("OnboardingCompleteScreen", () => {
     expect(mocks.navigate).toHaveBeenCalledWith("/dashboard/profile-onboarded");
   });
 
+  it("keeps product completion mounted if save clears onboardSession before dashboard navigation", async () => {
+    mocks.locationState = null;
+    mocks.onboardSession = makeReadyOnboardSession();
+    let resolveSave!: (profileId: string) => void;
+    mocks.saveOnboardedProfile.mockImplementation(
+      () =>
+        new Promise<string>((resolve) => {
+          resolveSave = resolve;
+          mocks.onboardSession = null;
+        }),
+    );
+    const view = render(
+      <MemoryRouter>
+        <OnboardingCompleteScreen />
+      </MemoryRouter>
+    );
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "local-password" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm Password"), {
+      target: { value: "local-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Save & Launch Signer/i }));
+
+    view.rerender(
+      <MemoryRouter>
+        <OnboardingCompleteScreen />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("Onboarding Complete")).toBeInTheDocument();
+    expect(screen.getByText("Live Onboard Key")).toBeInTheDocument();
+
+    resolveSave("profile-onboarded");
+    await waitFor(() => {
+      expect(mocks.navigate).toHaveBeenCalledWith("/dashboard/profile-onboarded");
+    });
+  });
+
   it("has no Back link (terminal success state)", () => {
     mocks.locationState = { fromHandshake: true, demoUi: { onboard: { packagePreset: "bfonboard1abc123" } } };
     render(
