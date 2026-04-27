@@ -304,9 +304,23 @@ describe("encodeDistributionPackage — recipient-initiated onboarding", () => {
         shareIdx,
         "per-share-password-1234",
       );
-      getState().updatePackageState(shareIdx, {
-        peerOnline: true,
-        manuallyMarkedDistributed: false,
+    });
+
+    const absorb = useAbsorbDrainsHook();
+    const targetPackage = getState().createSession!.onboardingPackages.find(
+      (candidate) => candidate.idx === shareIdx,
+    )!;
+    await act(async () => {
+      absorb({
+        completions: [],
+        failures: [],
+        events: [
+          statusChangedEvent(
+            statusWithOnlinePeers(getState().runtimeStatus!, [
+              targetPackage.memberPubkey,
+            ]),
+          ),
+        ],
       });
     });
 
@@ -316,7 +330,6 @@ describe("encodeDistributionPackage — recipient-initiated onboarding", () => {
     expect(seenPackage.peerOnline).toBe(true);
     expect(seenPackage.manuallyMarkedDistributed).toBe(false);
 
-    const absorb = useAbsorbDrainsHook();
     await act(async () => {
       absorb({
         completions: [],
